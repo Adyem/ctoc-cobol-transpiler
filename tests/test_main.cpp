@@ -28,6 +28,9 @@ int main(void)
     tests = get_pipeline_tests(&count);
     if (run_test_suite(tests, count) != FT_SUCCESS)
         status = FT_FAILURE;
+    tests = get_transpiler_context_tests(&count);
+    if (run_test_suite(tests, count) != FT_SUCCESS)
+        status = FT_FAILURE;
     tests = get_compiler_tests(&count);
     if (run_test_suite(tests, count) != FT_SUCCESS)
         status = FT_FAILURE;
@@ -35,6 +38,9 @@ int main(void)
     if (run_test_suite(tests, count) != FT_SUCCESS)
         status = FT_FAILURE;
     tests = get_grammar_tests(&count);
+    if (run_test_suite(tests, count) != FT_SUCCESS)
+        status = FT_FAILURE;
+    tests = get_cobol_doc_tests(&count);
     if (run_test_suite(tests, count) != FT_SUCCESS)
         status = FT_FAILURE;
     tests = get_cli_tests(&count);

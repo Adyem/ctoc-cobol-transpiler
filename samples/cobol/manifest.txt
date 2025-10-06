@@ -1,0 +1,3 @@
+samples/cobol/copy_file.cob
+samples/cobol/filter_prefix.cob
+samples/cobol/record_writer.cob

@@ -35,14 +35,14 @@ static int sample_manifest_extract_line(const char *buffer, size_t *offset, char
     return (FT_SUCCESS);
 }
 
-static int test_sample_manifest_entries_exist(void)
+static int validate_manifest_entries(const char *manifest_path)
 {
     char manifest_buffer[1024];
     char sample_buffer[2048];
     char line[256];
     size_t offset;
 
-    if (test_read_text_file("samples/cblc/manifest.txt", manifest_buffer, sizeof(manifest_buffer)) != FT_SUCCESS)
+    if (test_read_text_file(manifest_path, manifest_buffer, sizeof(manifest_buffer)) != FT_SUCCESS)
         return (FT_FAILURE);
     offset = 0;
     while (manifest_buffer[offset] != '\0')
@@ -53,24 +53,24 @@ static int test_sample_manifest_entries_exist(void)
             continue;
         if (test_read_text_file(line, sample_buffer, sizeof(sample_buffer)) != FT_SUCCESS)
         {
-            pf_printf("Assertion failed: sample '%s' listed in manifest should exist and be readable\n", line);
+            pf_printf("Assertion failed: sample '%s' listed in manifest '%s' should exist and be readable\n", line, manifest_path);
             return (FT_FAILURE);
         }
     }
     return (FT_SUCCESS);
 }
 
-static int test_sample_inventory_documents_manifest(void)
+static int validate_inventory_mentions(const char *manifest_path, const char *inventory_path)
 {
-    char manifest_buffer[1024];
-    char inventory_buffer[4096];
     char line[256];
     size_t offset;
+    char manifest_buffer[1024];
+    char inventory_buffer[4096];
     size_t inventory_length;
 
-    if (test_read_text_file("samples/cblc/manifest.txt", manifest_buffer, sizeof(manifest_buffer)) != FT_SUCCESS)
+    if (test_read_text_file(manifest_path, manifest_buffer, sizeof(manifest_buffer)) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_read_text_file("docs/cblc_sample_inventory.md", inventory_buffer, sizeof(inventory_buffer)) != FT_SUCCESS)
+    if (test_read_text_file(inventory_path, inventory_buffer, sizeof(inventory_buffer)) != FT_SUCCESS)
         return (FT_FAILURE);
     inventory_length = ft_strlen(inventory_buffer);
     offset = 0;
@@ -82,10 +82,28 @@ static int test_sample_inventory_documents_manifest(void)
             continue;
         if (!ft_strnstr(inventory_buffer, line, inventory_length))
         {
-            pf_printf("Assertion failed: inventory document should mention sample '%s'\n", line);
+            pf_printf("Assertion failed: inventory document '%s' should mention sample '%s'\n", inventory_path, line);
             return (FT_FAILURE);
         }
     }
+    return (FT_SUCCESS);
+}
+
+static int test_sample_manifest_entries_exist(void)
+{
+    if (validate_manifest_entries("samples/cblc/manifest.txt") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (validate_manifest_entries("samples/cobol/manifest.txt") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int test_sample_inventory_documents_manifest(void)
+{
+    if (validate_inventory_mentions("samples/cblc/manifest.txt", "docs/cblc_sample_inventory.md") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (validate_inventory_mentions("samples/cobol/manifest.txt", "docs/cobol_sample_inventory.md") != FT_SUCCESS)
+        return (FT_FAILURE);
     return (FT_SUCCESS);
 }
 

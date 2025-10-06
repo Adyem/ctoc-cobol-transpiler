@@ -95,8 +95,10 @@ TEST_SRC    = tests/test_main.cpp \
               tests/runtime_string_tests.cpp \
               tests/runtime_file_tests.cpp \
               tests/pipeline_tests.cpp \
+              tests/transpiler_context_tests.cpp \
               tests/sample_inventory_tests.cpp \
               tests/grammar_doc_tests.cpp \
+              tests/cobol_doc_tests.cpp \
               tests/cli_tests.cpp \
               tests/compiler_tests.cpp
 

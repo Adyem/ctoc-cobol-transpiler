@@ -25,6 +25,36 @@ typedef enum e_transpiler_diagnostic_level
     TRANSPILE_DIAGNOSTIC_VERBOSE
 }   t_transpiler_diagnostic_level;
 
+#define TRANSPILE_FUNCTION_NAME_MAX 64
+#define TRANSPILE_IDENTIFIER_MAX 64
+
+typedef enum e_transpiler_function_return_mode
+{
+    TRANSPILE_FUNCTION_RETURN_VOID = 0,
+    TRANSPILE_FUNCTION_RETURN_VALUE
+}   t_transpiler_function_return_mode;
+
+typedef struct s_transpiler_function_signature
+{
+    char name[TRANSPILE_FUNCTION_NAME_MAX];
+    t_transpiler_function_return_mode return_mode;
+}   t_transpiler_function_signature;
+
+#define TRANSPILE_ERROR_FUNCTION_RETURNS_VALUE 1001
+#define TRANSPILE_ERROR_ENTRYPOINT_INVALID_NAME 1002
+#define TRANSPILE_ERROR_ENTRYPOINT_ARGUMENT_MISMATCH 1003
+#define TRANSPILE_ERROR_ENTRYPOINT_DUPLICATE 1004
+
+typedef struct s_transpiler_entrypoint
+{
+    int present;
+    char name[TRANSPILE_FUNCTION_NAME_MAX];
+    int has_argument_vectors;
+    int needs_argument_copy;
+    char argc_identifier[TRANSPILE_IDENTIFIER_MAX];
+    char argv_identifier[TRANSPILE_IDENTIFIER_MAX];
+}   t_transpiler_entrypoint;
+
 typedef struct s_transpiler_context
 {
     t_transpiler_language source_language;
@@ -36,6 +66,10 @@ typedef struct s_transpiler_context
     t_transpiler_diagnostic_level diagnostic_level;
     t_transpiler_diagnostic_list diagnostics;
     int last_error_code;
+    t_transpiler_function_signature *functions;
+    size_t function_count;
+    size_t function_capacity;
+    t_transpiler_entrypoint entrypoint;
 }   t_transpiler_context;
 
 int transpiler_context_init(t_transpiler_context *context);
@@ -47,5 +81,12 @@ void transpiler_context_set_format_mode(t_transpiler_context *context, t_transpi
 void transpiler_context_set_diagnostic_level(t_transpiler_context *context, t_transpiler_diagnostic_level level);
 void transpiler_context_record_error(t_transpiler_context *context, int error_code);
 int transpiler_context_has_errors(const t_transpiler_context *context);
+int transpiler_context_register_function(t_transpiler_context *context, const char *name,
+    t_transpiler_function_return_mode return_mode);
+const t_transpiler_function_signature *transpiler_context_find_function(const t_transpiler_context *context,
+    const char *name);
+int transpiler_context_register_entrypoint(t_transpiler_context *context, const char *name,
+    t_transpiler_function_return_mode return_mode, const char *argc_identifier, const char *argv_identifier);
+const t_transpiler_entrypoint *transpiler_context_get_entrypoint(const t_transpiler_context *context);
 
 #endif
