@@ -95,15 +95,15 @@ static int test_lexer_tokenizes_sample_program(void)
     lexer_init(&lexer, source);
     if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_expect_token(&token, LEXER_TOKEN_IDENTIFIER, "IDENTIFICATION", 1, 1) != FT_SUCCESS)
+    if (test_expect_token(&token, LEXER_TOKEN_KEYWORD_IDENTIFICATION, "IDENTIFICATION", 1, 1) != FT_SUCCESS)
         return (FT_FAILURE);
     if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_expect_token(&token, LEXER_TOKEN_KEYWORD_DIVISION, "DIVISION", 1, 15) != FT_SUCCESS)
+    if (test_expect_token(&token, LEXER_TOKEN_KEYWORD_DIVISION, "DIVISION", 1, 16) != FT_SUCCESS)
         return (FT_FAILURE);
     if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_expect_token(&token, LEXER_TOKEN_PERIOD, ".", 1, 23) != FT_SUCCESS)
+    if (test_expect_token(&token, LEXER_TOKEN_PERIOD, ".", 1, 24) != FT_SUCCESS)
         return (FT_FAILURE);
     if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
         return (FT_FAILURE);
@@ -123,15 +123,15 @@ static int test_lexer_tokenizes_sample_program(void)
         return (FT_FAILURE);
     if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_expect_token(&token, LEXER_TOKEN_IDENTIFIER, "WORKING-STORAGE", 3, 1) != FT_SUCCESS)
+    if (test_expect_token(&token, LEXER_TOKEN_KEYWORD_WORKING_STORAGE, "WORKING-STORAGE", 3, 1) != FT_SUCCESS)
         return (FT_FAILURE);
     if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_expect_token(&token, LEXER_TOKEN_IDENTIFIER, "SECTION", 3, 18) != FT_SUCCESS)
+    if (test_expect_token(&token, LEXER_TOKEN_KEYWORD_SECTION, "SECTION", 3, 17) != FT_SUCCESS)
         return (FT_FAILURE);
     if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_expect_token(&token, LEXER_TOKEN_PERIOD, ".", 3, 25) != FT_SUCCESS)
+    if (test_expect_token(&token, LEXER_TOKEN_PERIOD, ".", 3, 24) != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }

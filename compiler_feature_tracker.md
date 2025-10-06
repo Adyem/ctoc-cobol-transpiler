@@ -11,12 +11,15 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Establish token definitions, keyword tables, and trivia handling for the lexer.
 - [x] Implement a libft-based lexer that produces token streams without relying on the C++ standard library.
 - [x] Design AST node structures and ownership model shared by the parser and later stages.
+- [x] Specify supported command-line options and environment variables for the driver.
+- [x] Build a command-line driver that accepts source paths and target direction (CBL-C→COBOL or COBOL→CBL-C).
+- [x] Add configuration handling for output directories, formatting options, and diagnostics levels.
+- [x] Inventory the existing CBL-C language samples and document required tokens and constructs.
+- [x] Define the authoritative CBL-C grammar (expressions, statements, declarations, file directives).
 
 ## Pending Features
 
 ### Core Language Frontend
-- [ ] Inventory the existing CBL-C language samples and document required tokens and constructs.
-- [ ] Define the authoritative CBL-C grammar (expressions, statements, declarations, file directives).
 - [ ] Build a parser that constructs an AST for the supported CBL-C subset.
 - [ ] Provide semantic analysis for type checking, scope resolution, and file/record validation.
 - [ ] Surface semantic diagnostics through the existing diagnostics subsystem.
@@ -43,9 +46,6 @@ are completed; keep completed items grouped separately from the remaining work t
 - [ ] Document runtime APIs consumed by generated code for future maintenance.
 
 ### Tooling & CLI
-- [ ] Specify supported command-line options and environment variables for the driver.
-- [ ] Build a command-line driver that accepts source paths and target direction (CBL-C→COBOL or COBOL→CBL-C).
-- [ ] Add configuration handling for output directories, formatting options, and diagnostics levels.
 - [ ] Integrate logging and error reporting consistent with libft capabilities.
 - [ ] Package CLI usage examples and documentation for the design doc.
 

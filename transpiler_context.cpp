@@ -8,6 +8,9 @@ int transpiler_context_init(t_transpiler_context *context)
     context->target_language = TRANSPILE_LANGUAGE_NONE;
     context->source_path = NULL;
     context->target_path = NULL;
+    context->output_directory = NULL;
+    context->format_mode = TRANSPILE_FORMAT_DEFAULT;
+    context->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
     context->last_error_code = FT_SUCCESS;
     if (transpiler_diagnostics_init(&context->diagnostics) != FT_SUCCESS)
         return (FT_FAILURE);
@@ -23,6 +26,9 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->target_language = TRANSPILE_LANGUAGE_NONE;
     context->source_path = NULL;
     context->target_path = NULL;
+    context->output_directory = NULL;
+    context->format_mode = TRANSPILE_FORMAT_DEFAULT;
+    context->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
     context->last_error_code = FT_SUCCESS;
 }
 
@@ -40,6 +46,27 @@ void transpiler_context_set_io_paths(t_transpiler_context *context, const char *
         return ;
     context->source_path = source_path;
     context->target_path = target_path;
+}
+
+void transpiler_context_set_output_directory(t_transpiler_context *context, const char *output_directory)
+{
+    if (!context)
+        return ;
+    context->output_directory = output_directory;
+}
+
+void transpiler_context_set_format_mode(t_transpiler_context *context, t_transpiler_format_mode mode)
+{
+    if (!context)
+        return ;
+    context->format_mode = mode;
+}
+
+void transpiler_context_set_diagnostic_level(t_transpiler_context *context, t_transpiler_diagnostic_level level)
+{
+    if (!context)
+        return ;
+    context->diagnostic_level = level;
 }
 
 void transpiler_context_record_error(t_transpiler_context *context, int error_code)

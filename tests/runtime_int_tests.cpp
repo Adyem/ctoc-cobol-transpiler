@@ -75,11 +75,11 @@ static int test_runtime_int_from_string(void)
     t_runtime_int value;
 
     runtime_int_set(&value, 48);
-    if (test_expect_success(runtime_int_from_string("-96", &value), "runtime_int_from_string should parse text") != FT_SUCCESS)
+    if (test_expect_success(runtime_int_from_string(&value, "-96"), "runtime_int_from_string should parse text") != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_expect_int_equal(value.value, -96, "runtime_int_from_string should update value") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (runtime_int_from_string("12a", &value) != FT_FAILURE)
+    if (runtime_int_from_string(&value, "12a") != FT_FAILURE)
     {
         pf_printf("Assertion failed: runtime_int_from_string should reject invalid input\n");
         return (FT_FAILURE);

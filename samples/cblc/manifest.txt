@@ -1,0 +1,3 @@
+samples/cblc/copy_file.cblc
+samples/cblc/filter_prefix.cblc
+samples/cblc/record_writer.cblc

@@ -1,0 +1,13 @@
+file in "input.txt";
+file out "filtered.txt";
+char line[128];
+
+open(in, "r");
+open(out, "w");
+while (read(in, line)) {
+    if (starts_with(line, "ERR")) {
+        write(out, line);
+    }
+}
+close(in);
+close(out);
