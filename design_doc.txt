@@ -450,7 +450,8 @@ PROCEDURE DIVISION.
 
 * **Functions/paragraph mapping:** CBL‑C functions → COBOL paragraphs with `PERFORM`. Return
   values are forbidden; every generated function is void and relies on reference parameters or
-  WORKING-STORAGE to communicate results. The program entrypoint is fixed to `void main()`;
+  WORKING-STORAGE to communicate results. Function names must be unique so each paragraph has a
+  single originating definition. The program entrypoint is fixed to `void main()`;
   when callers provide `argc`/`argv`, the transpiler mirrors those buffers into COBOL working
   storage before dispatching user logic.
 * **Arrays/tables with indexing:** Map to `OCCURS` with `INDEXED BY` and generated indices.

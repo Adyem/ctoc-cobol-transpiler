@@ -16,13 +16,18 @@ The grammar captures the subset required for the forward (CBL-C → COBOL) and r
 ## 1. Program Structure
 
 ```
-program             ::= file_section record_section procedure_section
-file_section        ::= { file_declaration }
-record_section      ::= { record_declaration }
-procedure_section   ::= { statement }
+program                 ::= global_declaration_section function_section
+global_declaration_section ::= { global_declaration }
+global_declaration      ::= file_declaration
+                          | record_declaration
+                          | scalar_declaration
+function_section        ::= { function_definition }
+function_definition     ::= 'function' identifier '(' ')' block
+block                   ::= '{' { statement } '}'
+scalar_declaration      ::= scalar_type identifier array_suffix ';'
 ```
 
-A source file is a flat sequence: file declarations, record declarations, then executable statements.  Declarations may be interleaved but appear before the first executable statement.
+A source file lists global declarations (files, records, and scalars) followed by any number of functions.  Every function body hosts the executable statements that previously lived in the `procedure_section`.  Function names must be unique within a translation unit so COBOL paragraph generation can map one-to-one onto the declared entry points. One function must be named `main` to provide the program entrypoint.
 
 ---
 

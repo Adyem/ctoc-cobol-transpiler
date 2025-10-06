@@ -8,7 +8,7 @@ NAME        = ctoc_cobol_transpiler$(EXE_EXT)
 NAME_DEBUG  = ctoc_cobol_transpiler_debug$(EXE_EXT)
 TEST_NAME   = automated_tests$(EXE_EXT)
 
-SRC         = main.cpp runtime_scalar.cpp runtime_string.cpp runtime_file.cpp lexer.cpp lexer_token.cpp ast.cpp transpiler_diagnostics.cpp transpiler_context.cpp transpiler_pipeline.cpp transpiler_cli.cpp
+SRC         = main.cpp runtime_scalar.cpp runtime_string.cpp runtime_file.cpp lexer.cpp lexer_token.cpp ast.cpp parser.cpp transpiler_diagnostics.cpp transpiler_context.cpp transpiler_pipeline.cpp transpiler_cli.cpp
 
 CC          = g++
 
@@ -90,6 +90,7 @@ TEST_SRC    = tests/test_main.cpp \
               tests/test_support.cpp \
               tests/ast_tests.cpp \
               tests/lexer_tests.cpp \
+              tests/parser_tests.cpp \
               tests/runtime_int_tests.cpp \
               tests/runtime_char_tests.cpp \
               tests/runtime_string_tests.cpp \

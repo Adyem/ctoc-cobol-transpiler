@@ -6,9 +6,15 @@ record Person {
 file people "people.dat";
 Person person;
 
-person.name = "ALICE";
-person.id = "0001";
+function write_records() {
+    person.name = "ALICE";
+    person.id = "0001";
 
-open(people, "w");
-write(people, person);
-close(people);
+    open(people, "w");
+    write(people, person);
+    close(people);
+}
+
+function main() {
+    write_records();
+}

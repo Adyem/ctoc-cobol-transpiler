@@ -24,7 +24,7 @@ are completed; keep completed items grouped separately from the remaining work t
 ## Pending Features
 
 ### Core Language Frontend
-- [ ] Build a parser that constructs an AST for the supported CBL-C subset.
+- [x] Build a parser that constructs an AST for the supported CBL-C subset.
 - [ ] Provide semantic analysis for type checking, scope resolution, and file/record validation.
 - [ ] Surface semantic diagnostics through the existing diagnostics subsystem.
 
