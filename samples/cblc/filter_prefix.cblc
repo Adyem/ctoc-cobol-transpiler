@@ -2,12 +2,18 @@ file in "input.txt";
 file out "filtered.txt";
 char line[128];
 
-open(in, "r");
-open(out, "w");
-while (read(in, line)) {
-    if (starts_with(line, "ERR")) {
-        write(out, line);
+function filter_prefix() {
+    open(in, "r");
+    open(out, "w");
+    while (read(in, line)) {
+        if (starts_with(line, "ERR")) {
+            write(out, line);
+        }
     }
+    close(in);
+    close(out);
 }
-close(in);
-close(out);
+
+function main() {
+    filter_prefix();
+}

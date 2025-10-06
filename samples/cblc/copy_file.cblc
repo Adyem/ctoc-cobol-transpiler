@@ -2,10 +2,16 @@ file in "input.txt";
 file out "output.txt";
 char line[256];
 
-open(in, "r");
-open(out, "w");
-while (read(in, line)) {
-    write(out, line);
+function process_file() {
+    open(in, "r");
+    open(out, "w");
+    while (read(in, line)) {
+        write(out, line);
+    }
+    close(in);
+    close(out);
 }
-close(in);
-close(out);
+
+function main() {
+    process_file();
+}

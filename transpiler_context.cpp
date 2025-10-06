@@ -153,7 +153,14 @@ int transpiler_context_register_function(t_transpiler_context *context, const ch
     while (index < context->function_count)
     {
         if (ft_strncmp(context->functions[index].name, name, TRANSPILE_FUNCTION_NAME_MAX) == 0)
-            return (FT_SUCCESS);
+        {
+            pf_snprintf(message, sizeof(message),
+                "function '%s' already declared; choose a unique name", name);
+            transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+                TRANSPILE_ERROR_FUNCTION_DUPLICATE_NAME, message);
+            transpiler_context_record_error(context, TRANSPILE_ERROR_FUNCTION_DUPLICATE_NAME);
+            return (FT_FAILURE);
+        }
         index += 1;
     }
     if (context->function_count >= context->function_capacity)

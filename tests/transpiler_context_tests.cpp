@@ -226,10 +226,9 @@ static int test_transpiler_context_argument_mismatch_keeps_entrypoint_clear(void
     return (FT_SUCCESS);
 }
 
-static int test_transpiler_context_ignores_duplicate_function_registration(void)
+static int test_transpiler_context_rejects_duplicate_function_registration(void)
 {
     t_transpiler_context context;
-    size_t initial_count;
 
     if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
@@ -240,29 +239,34 @@ static int test_transpiler_context_ignores_duplicate_function_registration(void)
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    initial_count = context.function_count;
-    if (test_expect_success(transpiler_context_register_function(&context, "worker",
-            TRANSPILE_FUNCTION_RETURN_VOID),
-            "duplicate function registration should succeed without changes") != FT_SUCCESS)
+    if (transpiler_context_register_function(&context, "worker",
+            TRANSPILE_FUNCTION_RETURN_VOID) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected duplicate function registration to fail\n");
         return (FT_FAILURE);
     }
-    if (test_expect_int_equal(static_cast<int>(context.function_count),
-            static_cast<int>(initial_count),
+    if (test_expect_int_equal(static_cast<int>(context.function_count), 1,
             "duplicate registration should not increase function count") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 0,
-            "duplicate registration should not emit diagnostics") != FT_SUCCESS)
+    if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 1,
+            "duplicate registration should record an error diagnostic") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    if (test_expect_int_equal(transpiler_context_has_errors(&context), 0,
-            "context should remain free of errors after duplicate registration") != FT_SUCCESS)
+    if (test_expect_int_equal(context.diagnostics.items[0].code,
+            TRANSPILE_ERROR_FUNCTION_DUPLICATE_NAME,
+            "diagnostic should report duplicate function name") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(transpiler_context_has_errors(&context), 1,
+            "context should report errors after duplicate registration") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
@@ -490,7 +494,7 @@ const t_test_case *get_transpiler_context_tests(size_t *count)
         {"transpiler_context_rejects_value_return", test_transpiler_context_rejects_value_return},
         {"transpiler_context_registers_main_entrypoint", test_transpiler_context_registers_main_entrypoint},
         {"transpiler_context_entrypoint_registers_function_signature", test_transpiler_context_entrypoint_registers_function_signature},
-        {"transpiler_context_ignores_duplicate_function_registration", test_transpiler_context_ignores_duplicate_function_registration},
+        {"transpiler_context_rejects_duplicate_function_registration", test_transpiler_context_rejects_duplicate_function_registration},
         {"transpiler_context_rejects_non_main_entrypoint", test_transpiler_context_rejects_non_main_entrypoint},
         {"transpiler_context_registers_main_without_arguments", test_transpiler_context_registers_main_without_arguments},
         {"transpiler_context_argument_mismatch_keeps_entrypoint_clear", test_transpiler_context_argument_mismatch_keeps_entrypoint_clear},
