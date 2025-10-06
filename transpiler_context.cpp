@@ -1,4 +1,31 @@
+#include <cstdlib>
+
+#include "libft/CMA/CMA.hpp"
+#include "libft/Printf/printf.hpp"
 #include "transpiler_context.hpp"
+
+static int transpiler_context_functions_reserve(t_transpiler_context *context, size_t desired_capacity)
+{
+    t_transpiler_function_signature *new_functions;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (context->function_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    new_functions = static_cast<t_transpiler_function_signature *>(cma_calloc(desired_capacity,
+        sizeof(t_transpiler_function_signature)));
+    if (!new_functions)
+        return (FT_FAILURE);
+    if (context->functions)
+    {
+        ft_memcpy(new_functions, context->functions,
+            context->function_count * sizeof(t_transpiler_function_signature));
+        cma_free(context->functions);
+    }
+    context->functions = new_functions;
+    context->function_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
 
 int transpiler_context_init(t_transpiler_context *context)
 {
@@ -12,8 +39,17 @@ int transpiler_context_init(t_transpiler_context *context)
     context->format_mode = TRANSPILE_FORMAT_DEFAULT;
     context->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
     context->last_error_code = FT_SUCCESS;
+    context->functions = NULL;
+    context->function_count = 0;
+    context->function_capacity = 0;
+    ft_bzero(&context->entrypoint, sizeof(context->entrypoint));
     if (transpiler_diagnostics_init(&context->diagnostics) != FT_SUCCESS)
         return (FT_FAILURE);
+    if (transpiler_context_functions_reserve(context, 4) != FT_SUCCESS)
+    {
+        transpiler_diagnostics_dispose(&context->diagnostics);
+        return (FT_FAILURE);
+    }
     return (FT_SUCCESS);
 }
 
@@ -30,6 +66,12 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->format_mode = TRANSPILE_FORMAT_DEFAULT;
     context->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
     context->last_error_code = FT_SUCCESS;
+    if (context->functions)
+        cma_free(context->functions);
+    context->functions = NULL;
+    context->function_count = 0;
+    context->function_capacity = 0;
+    ft_bzero(&context->entrypoint, sizeof(context->entrypoint));
 }
 
 void transpiler_context_set_languages(t_transpiler_context *context, t_transpiler_language source, t_transpiler_language target)
@@ -85,4 +127,126 @@ int transpiler_context_has_errors(const t_transpiler_context *context)
     if (context->diagnostics.count > 0)
         return (1);
     return (0);
+}
+
+int transpiler_context_register_function(t_transpiler_context *context, const char *name,
+    t_transpiler_function_return_mode return_mode)
+{
+    t_transpiler_function_signature *signature;
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    size_t index;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (!name)
+        return (FT_FAILURE);
+    if (return_mode != TRANSPILE_FUNCTION_RETURN_VOID)
+    {
+        pf_snprintf(message, sizeof(message),
+            "function '%s' must use void return semantics; pass outputs by reference", name);
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_FUNCTION_RETURNS_VALUE, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_FUNCTION_RETURNS_VALUE);
+        return (FT_FAILURE);
+    }
+    index = 0;
+    while (index < context->function_count)
+    {
+        if (ft_strncmp(context->functions[index].name, name, TRANSPILE_FUNCTION_NAME_MAX) == 0)
+            return (FT_SUCCESS);
+        index += 1;
+    }
+    if (context->function_count >= context->function_capacity)
+    {
+        if (transpiler_context_functions_reserve(context, context->function_capacity * 2) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    signature = &context->functions[context->function_count];
+    ft_strlcpy(signature->name, name, TRANSPILE_FUNCTION_NAME_MAX);
+    signature->return_mode = TRANSPILE_FUNCTION_RETURN_VOID;
+    context->function_count += 1;
+    return (FT_SUCCESS);
+}
+
+const t_transpiler_function_signature *transpiler_context_find_function(const t_transpiler_context *context,
+    const char *name)
+{
+    size_t index;
+
+    if (!context)
+        return (NULL);
+    if (!name)
+        return (NULL);
+    index = 0;
+    while (index < context->function_count)
+    {
+        if (ft_strncmp(context->functions[index].name, name, TRANSPILE_FUNCTION_NAME_MAX) == 0)
+            return (&context->functions[index]);
+        index += 1;
+    }
+    return (NULL);
+}
+
+int transpiler_context_register_entrypoint(t_transpiler_context *context, const char *name,
+    t_transpiler_function_return_mode return_mode, const char *argc_identifier, const char *argv_identifier)
+{
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+    if (!context)
+        return (FT_FAILURE);
+    if (!name)
+        return (FT_FAILURE);
+    if (context->entrypoint.present)
+    {
+        pf_snprintf(message, sizeof(message),
+            "entrypoint '%s' already registered", context->entrypoint.name);
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_ENTRYPOINT_DUPLICATE, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_ENTRYPOINT_DUPLICATE);
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(name, "main", TRANSPILE_FUNCTION_NAME_MAX) != 0)
+    {
+        pf_snprintf(message, sizeof(message),
+            "entrypoint '%s' must be declared as 'main'", name);
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_ENTRYPOINT_INVALID_NAME, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_ENTRYPOINT_INVALID_NAME);
+        return (FT_FAILURE);
+    }
+    if ((argc_identifier && !argv_identifier) || (!argc_identifier && argv_identifier))
+    {
+        pf_snprintf(message, sizeof(message),
+            "entrypoint 'main' must provide both argc and argv when supplying arguments");
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_ENTRYPOINT_ARGUMENT_MISMATCH, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_ENTRYPOINT_ARGUMENT_MISMATCH);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_register_function(context, name, return_mode) != FT_SUCCESS)
+        return (FT_FAILURE);
+    ft_bzero(&context->entrypoint, sizeof(context->entrypoint));
+    context->entrypoint.present = 1;
+    ft_strlcpy(context->entrypoint.name, name, sizeof(context->entrypoint.name));
+    context->entrypoint.has_argument_vectors = 0;
+    context->entrypoint.needs_argument_copy = 0;
+    if (argc_identifier && argv_identifier)
+    {
+        context->entrypoint.has_argument_vectors = 1;
+        context->entrypoint.needs_argument_copy = 1;
+        ft_strlcpy(context->entrypoint.argc_identifier, argc_identifier,
+            sizeof(context->entrypoint.argc_identifier));
+        ft_strlcpy(context->entrypoint.argv_identifier, argv_identifier,
+            sizeof(context->entrypoint.argv_identifier));
+    }
+    return (FT_SUCCESS);
+}
+
+const t_transpiler_entrypoint *transpiler_context_get_entrypoint(const t_transpiler_context *context)
+{
+    if (!context)
+        return (NULL);
+    if (!context->entrypoint.present)
+        return (NULL);
+    return (&context->entrypoint);
 }

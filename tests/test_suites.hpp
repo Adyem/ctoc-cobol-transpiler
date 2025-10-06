@@ -16,5 +16,7 @@ const t_test_case *get_compiler_tests(size_t *count);
 const t_test_case *get_cli_tests(size_t *count);
 const t_test_case *get_sample_tests(size_t *count);
 const t_test_case *get_grammar_tests(size_t *count);
+const t_test_case *get_cobol_doc_tests(size_t *count);
+const t_test_case *get_transpiler_context_tests(size_t *count);
 
 #endif

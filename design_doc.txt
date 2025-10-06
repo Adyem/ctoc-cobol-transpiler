@@ -16,6 +16,7 @@
 
 * **Compiler:** GnuCOBOL (OpenCOBOL) as the primary target.
 * **COBOL dialect:** ANSI‑85 compatible subset with line‑sequential I/O for text and sequential/fixed I/O for binary records.
+  Detailed constraints and unsupported constructs live in `docs/cobol_dialect_requirements.md`.
 * **Runtime assumptions:** No exceptions; explicit status checks or EOF flags. No dynamic memory.
 
 ---
@@ -447,7 +448,11 @@ PROCEDURE DIVISION.
 
 ## 13) Future Work
 
-* **Functions/paragraph mapping:** CBL‑C functions → COBOL paragraphs with `PERFORM`.
+* **Functions/paragraph mapping:** CBL‑C functions → COBOL paragraphs with `PERFORM`. Return
+  values are forbidden; every generated function is void and relies on reference parameters or
+  WORKING-STORAGE to communicate results. The program entrypoint is fixed to `void main()`;
+  when callers provide `argc`/`argv`, the transpiler mirrors those buffers into COBOL working
+  storage before dispatching user logic.
 * **Arrays/tables with indexing:** Map to `OCCURS` with `INDEXED BY` and generated indices.
 * **Status codes:** Optional `FILE STATUS` codes and error branches.
 * **Configurable PIC policies:** Signed/unsigned ints, decimal scaling, COMP‑3.
