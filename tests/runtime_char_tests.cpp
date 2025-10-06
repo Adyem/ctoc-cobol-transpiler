@@ -7,11 +7,11 @@ static int test_runtime_char_transforms(void)
     t_runtime_char character;
 
     runtime_char_set(&character, 'a');
-    runtime_char_uppercase(&character);
-    if (test_expect_char_equal(character.value, 'A', "runtime_char_uppercase should uppercase characters") != FT_SUCCESS)
+    runtime_char_to_upper(&character);
+    if (test_expect_char_equal(character.value, 'A', "runtime_char_to_upper should uppercase characters") != FT_SUCCESS)
         return (FT_FAILURE);
-    runtime_char_lowercase(&character);
-    if (test_expect_char_equal(character.value, 'a', "runtime_char_lowercase should lowercase characters") != FT_SUCCESS)
+    runtime_char_to_lower(&character);
+    if (test_expect_char_equal(character.value, 'a', "runtime_char_to_lower should lowercase characters") != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
@@ -21,7 +21,7 @@ static int test_runtime_char_from_string_rejects_empty_input(void)
     t_runtime_char character;
 
     runtime_char_set(&character, 'X');
-    if (runtime_char_from_string("", &character) != FT_FAILURE)
+    if (runtime_char_from_string(&character, "") != FT_FAILURE)
     {
         pf_printf("Assertion failed: runtime_char_from_string should reject empty text\n");
         return (FT_FAILURE);

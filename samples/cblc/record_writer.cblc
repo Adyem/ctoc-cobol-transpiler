@@ -1,0 +1,14 @@
+record Person {
+    char name[40];
+    char id[10];
+};
+
+file people "people.dat";
+Person person;
+
+person.name = "ALICE";
+person.id = "0001";
+
+open(people, "w");
+write(people, person);
+close(people);

@@ -13,5 +13,8 @@ const t_test_case *get_runtime_string_tests(size_t *count);
 const t_test_case *get_runtime_file_tests(size_t *count);
 const t_test_case *get_pipeline_tests(size_t *count);
 const t_test_case *get_compiler_tests(size_t *count);
+const t_test_case *get_cli_tests(size_t *count);
+const t_test_case *get_sample_tests(size_t *count);
+const t_test_case *get_grammar_tests(size_t *count);
 
 #endif

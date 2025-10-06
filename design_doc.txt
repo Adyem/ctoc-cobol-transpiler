@@ -1,6 +1,6 @@
 # CBL‑C → COBOL Transpiler — Design Document v0.1
 
-*Last updated: 2025‑10‑06*
+*Last updated: 2025‑10‑07*
 
 ## 1) Purpose & Scope
 
@@ -23,6 +23,8 @@
 ## 3) Language Overview (CBL‑C)
 
 CBL‑C is intentionally minimal and C‑flavored.
+
+The authoritative grammar lives in `docs/cblc_grammar.md`; the parser and tests must stay in sync with that specification when new constructs land.
 
 ### 3.1 Declarations
 
@@ -291,8 +293,9 @@ literal       := STRING | INT ;
 
 **CLI / Driver**
 
-* Provide a single executable that accepts an input path and emits to stdout by default.
+* Provide a single executable that accepts explicit input and output paths rather than relying on stdin/stdout defaults.
 * `--direction` flag (or subcommands) selects `cblc-to-cobol` or `cobol-to-cblc` round-trips.
+* Optional `--output-dir`, `--format`, and `--diagnostics` flags tailor emission layout and verbosity per run.
 * Surface parse/semantic diagnostics with file/line metadata to aid adoption.
 
 ---
@@ -511,6 +514,12 @@ while (read(in, line)) {
 
 **End of v0.1**
 
+### Sample Inventory Source of Truth
+
+The canonical set of ready-to-run `.cblc` fixtures lives under `samples/cblc`. Each entry is tracked in
+`samples/cblc/manifest.txt`, and `docs/cblc_sample_inventory.md` documents the purpose and construct coverage for every sample.
+Any new language feature should land alongside an illustrative sample and update both the manifest and inventory notes.
+
 ---
 
 ## 5) Core Architecture & Extensibility Strategy
@@ -549,4 +558,29 @@ Each family can introduce sub-stages that register themselves with the pipeline 
 * Implement stage composition helpers (e.g., `transpiler_pipeline_add_cblc_to_cobol_defaults`) so future CLIs can assemble complex flows with one call.
 
 This structure turns the current prototype into a durable foundation: new stages drop into the pipeline, reuse the diagnostics channel, and extend the context without destabilizing existing entry points.
+
+---
+
+## 6) Tooling & CLI Surface
+
+### 6.1 Command-Line Driver
+
+The executable exposes a deterministic CLI so automation and developers can orchestrate transpilation runs:
+
+```
+ctoc_cobol_transpiler --direction <dir> --input <source> --output <target> [--output-dir <dir>] [--format <style>] [--diagnostics <level>]
+```
+
+* `--direction` (required unless the environment variable below is present) accepts `cblc-to-cobol` or `cobol-to-cblc`.
+* `--input` points at the source file to ingest.
+* `--output` selects the destination file path for emitted code.
+* `--output-dir` overrides the directory root for generated artifacts (defaults to the directory implied by `--output`).
+* `--format` toggles layout policies: `default` honors the formatter planned for production, `minimal` strips extra whitespace, and `pretty` expands with alignment/spacing helpful for reviews.
+* `--diagnostics` tunes verbosity: `silent` suppresses non-fatal notes, `normal` shows errors and warnings, and `verbose` also streams pipeline progress.
+* `--help` prints usage information and exits successfully without further validation.
+
+### 6.2 Environment Integration
+
+* `CTOC_DEFAULT_DIRECTION` supplies a fallback direction when `--direction` is not provided. It uses the same values as the flag (`cblc-to-cobol` / `cobol-to-cblc`).
+* Future releases can layer additional environment variables (dialect selection, diagnostics verbosity) on top of this entry point without breaking existing scripts; the CLI options above remain the source of truth when present.
 

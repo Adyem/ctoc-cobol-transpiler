@@ -31,6 +31,15 @@ int main(void)
     tests = get_compiler_tests(&count);
     if (run_test_suite(tests, count) != FT_SUCCESS)
         status = FT_FAILURE;
+    tests = get_sample_tests(&count);
+    if (run_test_suite(tests, count) != FT_SUCCESS)
+        status = FT_FAILURE;
+    tests = get_grammar_tests(&count);
+    if (run_test_suite(tests, count) != FT_SUCCESS)
+        status = FT_FAILURE;
+    tests = get_cli_tests(&count);
+    if (run_test_suite(tests, count) != FT_SUCCESS)
+        status = FT_FAILURE;
     if (status != FT_SUCCESS)
         return (1);
     return (0);
