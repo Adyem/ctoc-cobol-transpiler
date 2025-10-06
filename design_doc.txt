@@ -1,0 +1,496 @@
+# CBL‑C → COBOL Transpiler — Design Document v0.1
+
+*Last updated: 2025‑10‑06*
+
+## 1) Purpose & Scope
+
+**Goal.** Provide a small, C‑style language ("CBL‑C") that transpiles to portable COBOL (target: GnuCOBOL) so developers can write concise logic while generating standards‑compliant COBOL source.
+
+**Primary focus for v0.1.** Text and fixed‑record file I/O (open/read/write/append/close), line‑oriented processing, and basic control flow. Arithmetic, conditionals, loops, and simple records are included to support file processing.
+
+**Non‑goals (v0.1).** GUI, CICS/IMS, SQL, floating‑point edge semantics, advanced numeric picture clauses, screen sections, multi‑program packaging.
+
+---
+
+## 2) Target Platform & Compatibility
+
+* **Compiler:** GnuCOBOL (OpenCOBOL) as the primary target.
+* **COBOL dialect:** ANSI‑85 compatible subset with line‑sequential I/O for text and sequential/fixed I/O for binary records.
+* **Runtime assumptions:** No exceptions; explicit status checks or EOF flags. No dynamic memory.
+
+---
+
+## 3) Language Overview (CBL‑C)
+
+CBL‑C is intentionally minimal and C‑flavored.
+
+### 3.1 Declarations
+
+```c
+// files
+file input "input.txt";                // default: line sequential (text)
+file output "out.txt";                 // default: line sequential (text)
+file data "records.bin" fixed(128);    // fixed-length record file
+
+// simple scalar variables
+int a = 0;          // maps to PIC 9(10) VALUE 0 (size configurable)
+char line[256];     // maps to PIC X(256)
+
+// records (COBOL group items)
+record Person {
+    char name[40];
+    char id[10];
+};
+```
+
+### 3.2 Statements
+
+```c
+open(input, "r");        // r → OPEN INPUT
+open(output, "w");       // w → OPEN OUTPUT (truncate)
+open(output, "a");       // a → OPEN EXTEND (append)
+
+while (read(input, line)) {
+    write(output, line);
+}
+
+close(input);
+close(output);
+
+// assignment, arithmetic, conditionals
+int c = a + 1;
+if (c > 10) { display("big"); }
+```
+
+### 3.3 Built‑ins
+
+* `display(expr)` → `DISPLAY ...` (strings or identifiers)
+* `read(file, var)` returns boolean success; sets internal EOF state.
+* `write(file, var)` writes a record/line.
+* `eof(file)` returns boolean flag (optional; `read` preferred).
+
+---
+
+## 4) Semantics & COBOL Mapping
+
+### 4.1 Files → FILE‑CONTROL / FD
+
+**CBL‑C:**
+
+```c
+file input "input.txt";
+file output "output.txt";
+file data  "records.bin" fixed(128);
+```
+
+**COBOL:**
+
+```cobol
+ENVIRONMENT DIVISION.
+INPUT-OUTPUT SECTION.
+FILE-CONTROL.
+    SELECT INPUT  ASSIGN TO 'input.txt'
+        ORGANIZATION IS LINE SEQUENTIAL.
+    SELECT OUTPUT ASSIGN TO 'output.txt'
+        ORGANIZATION IS LINE SEQUENTIAL.
+    SELECT DATA   ASSIGN TO 'records.bin'
+        ORGANIZATION IS SEQUENTIAL
+        ACCESS MODE IS SEQUENTIAL
+        RECORDING MODE IS F.
+
+DATA DIVISION.
+FILE SECTION.
+FD INPUT.
+01 INPUT-REC  PIC X(<auto from usages, e.g. 256>).
+FD OUTPUT.
+01 OUTPUT-REC PIC X(<auto>).
+FD DATA.
+01 DATA-REC   PIC X(128).
+```
+
+**Notes:**
+
+* Line files default to `ORGANIZATION IS LINE SEQUENTIAL`.
+* Fixed record files infer `RECORDING MODE IS F` with `PIC X(n)`.
+* One FD per declared logical file; record name is `<FILE>-REC` unless overridden.
+
+### 4.2 Open Modes
+
+| CBL‑C mode | COBOL              | Behavior                  |
+| ---------- | ------------------ | ------------------------- |
+| `"r"`      | `OPEN INPUT file`  | read-only                 |
+| `"w"`      | `OPEN OUTPUT file` | create/truncate and write |
+| `"a"`      | `OPEN EXTEND file` | append                    |
+
+### 4.3 Read / Write
+
+**CBL‑C:**
+
+```c
+char line[256];
+open(input, "r");
+open(output, "w");
+while (read(input, line)) {
+    write(output, line);
+}
+```
+
+**COBOL template:**
+
+```cobol
+WORKING-STORAGE SECTION.
+01 EOF-FLAG       PIC X VALUE 'N'.
+01 LINE           PIC X(256).
+
+PROCEDURE DIVISION.
+    OPEN INPUT INPUT
+         OUTPUT OUTPUT
+    PERFORM UNTIL EOF-FLAG = 'Y'
+        READ INPUT INTO LINE
+            AT END MOVE 'Y' TO EOF-FLAG
+            NOT AT END
+                MOVE LINE TO OUTPUT-REC
+                WRITE OUTPUT-REC
+        END-READ
+    END-PERFORM
+    CLOSE INPUT OUTPUT
+    STOP RUN.
+```
+
+**Boolean `read()` expansion.** Any `while (read(f, v)) { ... }` becomes a `PERFORM UNTIL EOF` loop with `AT END` clause. A single `if (read(...))` expands to one `READ` with conditional body and optional `ELSE` when `AT END` occurs via an internal temp flag.
+
+### 4.4 Records & Structs
+
+**CBL‑C:**
+
+```c
+record Person {
+    char name[40];
+    char id[10];
+};
+Person p;
+read(input, p);       // moves INPUT-REC into group item p
+write(output, p);
+```
+
+**COBOL (group items):**
+
+```cobol
+01 PERSON.
+   05 NAME PIC X(40).
+   05 ID   PIC X(10).
+
+READ INPUT INTO PERSON ...
+MOVE PERSON TO OUTPUT-REC
+WRITE OUTPUT-REC
+```
+
+**Rule.** `record` becomes a group item; field order and sizes map directly to `PIC`.
+
+### 4.5 Scalars & Types
+
+Default numeric size policy (configurable):
+
+| CBL‑C     | COBOL                                                      |
+| --------- | ---------------------------------------------------------- |
+| `int`     | `PIC 9(10) SIGN IS LEADING SEPARATE` (or unsigned `9(10)`) |
+| `char[n]` | `PIC X(n)`                                                 |
+| `bool`    | `PIC X VALUE 'N'/'Y'` or `PIC 9 VALUE 0/1` (configurable)  |
+
+### 4.6 Control Flow
+
+| CBL‑C                    | COBOL                                                             |
+| ------------------------ | ----------------------------------------------------------------- |
+| `if (cond) { ... }`      | `IF cond ... END-IF`                                              |
+| `if/else`                | `IF ... ELSE ... END-IF`                                          |
+| `while (cond) { ... }`   | `PERFORM UNTIL NOT cond ... END-PERFORM` or loop with test inside |
+| `for (init; test; step)` | lowers to `init; PERFORM UNTIL NOT test { body; step; }`          |
+
+Boolean expressions lower to COBOL relational operators with generated temp condition variables if needed.
+
+### 4.7 Display & Literals
+
+`display(expr)` → `DISPLAY expr` with proper quoting for strings and UPPERCASE identifiers. Numeric literals preserved.
+
+---
+
+## 5) Grammar (v0.1 subset)
+
+EBNF‑style sketch focusing on I/O and essentials:
+
+```
+program        := decl* stmt* ;
+
+decl          := fileDecl | varDecl | recordDecl ;
+fileDecl      := 'file' IDENT STRING ( 'fixed' '(' INT ')' )? ';' ;
+varDecl       := type IDENT ( '=' expr )? ';' ;
+recordDecl    := 'record' IDENT '{' fieldDecl+ '}' ';' ;
+fieldDecl     := type IDENT ( '[' INT ']' )? ';' ;
+
+type          := 'int' | 'char' '[' INT ']' | IDENT ; // IDENT may be a record type
+
+stmt          := openStmt | closeStmt | readStmt | writeStmt | assignStmt
+                 | ifStmt | whileStmt | forStmt | displayStmt | block | ';' ;
+openStmt      := 'open' '(' IDENT ',' STRING ')' ';' ;
+closeStmt     := 'close' '(' IDENT ')' ';' ;
+readStmt      := 'read' '(' IDENT ',' lvalue ')' ';' | exprStmt ; // also used in conditions
+writeStmt     := 'write' '(' IDENT ',' rvalue ')' ';' ;
+displayStmt   := 'display' '(' expr ')' ';' ;
+assignStmt    := lvalue '=' expr ';' ;
+ifStmt        := 'if' '(' expr ')' block ( 'else' block )? ;
+whileStmt     := 'while' '(' expr ')' block ;
+forStmt       := 'for' '(' (assignStmt|';') expr? ';' expr? ')' block ;
+block         := '{' stmt* '}' ;
+exprStmt      := expr ';' ;
+expr          := literal | lvalue | call | binary | paren ;
+call          := IDENT '(' (expr (',' expr)*)? ')' ;
+
+lvalue        := IDENT ('.' IDENT)? ; // record fields
+rvalue        := expr ;
+
+literal       := STRING | INT ;
+```
+
+---
+
+## 6) Compiler Architecture
+
+**Front‑end**
+
+* Lexer: hand‑rolled or re2c/Flex. Tokens: identifiers, strings, ints, keywords.
+* Parser: Pratt or LL(1)/Bison/ANTLR. Output: AST nodes.
+* AST nodes: Program, Decls (File, Var, Record), Stmts (Open, Read, Write, While, If, For, Assign, Display, Block), Exprs.
+
+**Middle‑end**
+
+* Symbol table: tracks files, variables, record types, sizes.
+* Type checker: validates lvalue sizes (e.g., `read(file, dest)` length ≥ record length for file); ensures record compatibility.
+* Lowering: desugars `while(read(...))` into EOF‑flag loops; expands `for`.
+
+**Back‑end (COBOL generator)**
+
+* Generates 4 divisions with sections in canonical order.
+* **ENVIRONMENT DIVISION**: one `SELECT` per file with organization/mode.
+* **FILE SECTION**: one `FD` per file + record item sized from usage, or fixed(n).
+* **WORKING‑STORAGE**: scalars, group items, temps, EOF flags (one per file or one global per active loop).
+* **PROCEDURE DIVISION**:
+
+  * Hoists `OPEN` statements to first use (or preserves user order).
+  * Emits `READ ... AT END ... NOT AT END ... END-READ` blocks.
+  * Writes via `MOVE src TO <FILE>-REC` + `WRITE <FILE>-REC` for line/fixed files.
+
+**Naming Conventions**
+
+* Uppercase COBOL identifiers.
+* File logical names are uppercase of declared identifiers.
+* Generated record names: `<FILE>-REC` unless a specific record is bound.
+* Generated EOF flag for file F: `F-EOF-FLAG` (`PIC X VALUE 'N'`).
+
+---
+
+## 7) Codegen Templates (Key)
+
+### 7.1 READ into scalar/array
+
+```
+READ <FILE> INTO <DEST>
+    AT END MOVE 'Y' TO <FILE>-EOF-FLAG
+END-READ
+```
+
+### 7.2 WRITE from scalar/array
+
+```
+MOVE <SRC> TO <FILE>-REC
+WRITE <FILE>-REC
+```
+
+### 7.3 While(read(...)) loop
+
+```
+MOVE 'N' TO <FILE>-EOF-FLAG
+PERFORM UNTIL <FILE>-EOF-FLAG = 'Y'
+    READ <FILE> INTO <DEST>
+        AT END MOVE 'Y' TO <FILE>-EOF-FLAG
+        NOT AT END
+            <BODY>
+    END-READ
+END-PERFORM
+```
+
+### 7.4 Open/Close
+
+```
+OPEN INPUT <FILE>
+OPEN OUTPUT <FILE>
+OPEN EXTEND <FILE>
+CLOSE <FILE>
+```
+
+---
+
+## 8) Worked Example (End‑to‑End)
+
+**CBL‑C:**
+
+```c
+file input  "input.txt";
+file output "output.txt";
+char buf[80];
+
+open(input, "r");
+open(output, "w");
+while (read(input, buf)) {
+    write(output, buf);
+}
+close(input);
+close(output);
+```
+
+**Generated COBOL (abridged):**
+
+```cobol
+IDENTIFICATION DIVISION.
+PROGRAM-ID. EXAMPLE.
+ENVIRONMENT DIVISION.
+INPUT-OUTPUT SECTION.
+FILE-CONTROL.
+    SELECT INPUT  ASSIGN TO 'input.txt'
+        ORGANIZATION IS LINE SEQUENTIAL.
+    SELECT OUTPUT ASSIGN TO 'output.txt'
+        ORGANIZATION IS LINE SEQUENTIAL.
+DATA DIVISION.
+FILE SECTION.
+FD INPUT.
+01 INPUT-REC  PIC X(80).
+FD OUTPUT.
+01 OUTPUT-REC PIC X(80).
+WORKING-STORAGE SECTION.
+01 BUF        PIC X(80).
+01 INPUT-EOF-FLAG PIC X VALUE 'N'.
+PROCEDURE DIVISION.
+    OPEN INPUT INPUT
+         OUTPUT OUTPUT
+    PERFORM UNTIL INPUT-EOF-FLAG = 'Y'
+        READ INPUT INTO BUF
+            AT END MOVE 'Y' TO INPUT-EOF-FLAG
+            NOT AT END
+                MOVE BUF TO OUTPUT-REC
+                WRITE OUTPUT-REC
+        END-READ
+    END-PERFORM
+    CLOSE INPUT OUTPUT
+    STOP RUN.
+```
+
+---
+
+## 9) Edge Cases & Rules
+
+* **Record size inference:** For line sequential files, destination length must be ≥ longest expected line. Default is max of all `char[n]`/record writes observed. Allow manual override via `file f "x" line(n);`.
+* **Mixed writes:** If different sources (sizes) write to the same file, FD record uses the largest size, and writes from shorter sources are right‑padded with spaces by COBOL semantics.
+* **Binary/fixed I/O:** `fixed(n)` forces `PIC X(n)` and fixed recording mode. `read()`/`write()` operate exactly `n` bytes.
+* **Append semantics:** `open(f, "a")` translates to `OPEN EXTEND f`; first write appends. Not all runtimes support read+append; we restrict modes to `r|w|a` (single‑purpose) in v0.1.
+* **EOF handling:** One EOF flag per active file; nested `while(read(f,...))` generate distinct flags if scopes overlap.
+* **Strings:** Null‑termination is not modeled; `char[n]` are fixed‑size buffers.
+
+---
+
+## 10) Testing Strategy
+
+* **Golden tests:** CBL‑C snippet → expected COBOL text. Diff insensitive to whitespace/indent variants.
+* **Round‑trip run:** Compile generated COBOL with GnuCOBOL and run sample pipelines (copy, filter, map). Validate output.
+* **Property tests:** For `while(read(f,x)) write(g,x)` the output equals input for arbitrary text lines up to buffer size.
+* **Negative tests:** Size mismatch (read into too‑small buffer) → compile‑time error with helpful message.
+
+---
+
+## 11) Tooling & Implementation Plan
+
+* **Phase 1 — Prototype (1–2 weeks):** Hand‑rolled lexer+parser (or Bison), AST, codegen for files, loops, display.
+* **Phase 2 — Types & Records:** Record types, field access, sized mapping; improve diagnostics.
+* **Phase 3 — Fixed/Binary Files:** `fixed(n)` support; strict length checks.
+* **Phase 4 — Standard Lib:** Add helpers (`trim`, `rtrim`, `itoa`, `atoi` as pure source transforms).
+* **Phase 5 — Formatter & Linter:** Enforce style, caps, line wrapping for COBOL columns if desired.
+
+**Language choices:** Implement in C++ for control and performance (fits your style: manual memory, no exceptions). Use a global mutex only if multi‑threaded compile is added later; otherwise single‑threaded.
+
+---
+
+## 12) Diagnostics (Examples)
+
+* `error: read into 'buf' (80) is smaller than FD size for INPUT (128).`
+* `error: record 'Person' total size (52) exceeds DATA FD 'INPUT-REC' (40).`
+* `note: declare 'file input "x" line(80);' or increase destination buffer.`
+
+---
+
+## 13) Future Work
+
+* **Functions/paragraph mapping:** CBL‑C functions → COBOL paragraphs with `PERFORM`.
+* **Arrays/tables with indexing:** Map to `OCCURS` with `INDEXED BY` and generated indices.
+* **Status codes:** Optional `FILE STATUS` codes and error branches.
+* **Configurable PIC policies:** Signed/unsigned ints, decimal scaling, COMP‑3.
+* **Multi‑file pipelines:** Map‑reduce style transforms with reusable paragraphs.
+* **Interoperability:** Optional backend to C (bypass COBOL) for dual targets.
+
+---
+
+## 14) Appendix: Minimal Codegen Pseudocode
+
+```text
+for fileDecl f:
+  emit SELECT f.name ASSIGN TO f.path
+  if f.fixed: emit SEQUENTIAL + RECORDING MODE F
+  else: emit LINE SEQUENTIAL
+
+for FD of f:
+  size := resolveRecordSize(f) // from writes or fixed(n)
+  emit FD f.name; 01 f.name-REC PIC X(size).
+
+open(file, mode): emit OPEN <MODE> FILE
+
+while(read(f, dst)) { body }:
+  flag := gensym(f+"-EOF-FLAG")
+  emit MOVE 'N' TO flag
+  emit PERFORM UNTIL flag = 'Y'
+  emit   READ f INTO dst
+  emit     AT END MOVE 'Y' TO flag
+  emit     NOT AT END { body }
+  emit   END-READ
+  emit END-PERFORM
+```
+
+---
+
+## 15) Example Snippets (Ready to Transpile)
+
+**Copy file:**
+
+```c
+file in  "in.txt";
+file out "out.txt";
+char line[256];
+open(in, "r"); open(out, "w");
+while (read(in, line)) { write(out, line); }
+close(in); close(out);
+```
+
+**Filter by prefix:**
+
+```c
+file in  "in.txt";
+file out "filtered.txt";
+char line[128];
+open(in, "r"); open(out, "w");
+while (read(in, line)) {
+    if (starts_with(line, "ERR")) { write(out, line); }
+}
+```
+
+*(`starts_with` lowers to a COBOL string compare on first 3 bytes.)*
+
+---
+
+**End of v0.1**
+
