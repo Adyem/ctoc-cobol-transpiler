@@ -4,9 +4,9 @@
 
 ## 1) Purpose & Scope
 
-**Goal.** Provide a small, C‑style language ("CBL‑C") that transpiles to portable COBOL (target: GnuCOBOL) so developers can write concise logic while generating standards‑compliant COBOL source.
+**Goal.** Provide a small, C‑style language ("CBL‑C") that transpiles to and from portable COBOL (target: GnuCOBOL) so developers can write concise logic while generating standards‑compliant COBOL source or import legacy COBOL into the streamlined syntax.
 
-**Primary focus for v0.1.** Text and fixed‑record file I/O (open/read/write/append/close), line‑oriented processing, and basic control flow. Arithmetic, conditionals, loops, and simple records are included to support file processing.
+**Primary focus for v0.1.** Text and fixed‑record file I/O (open/read/write/append/close), line‑oriented processing, and basic control flow. Arithmetic, conditionals, loops, and simple records are included to support file processing. The transpiler must support emitting COBOL from CBL‑C and regenerating equivalent CBL‑C from the supported COBOL subset so teams can iterate in either syntax.
 
 **Non‑goals (v0.1).** GUI, CICS/IMS, SQL, floating‑point edge semantics, advanced numeric picture clauses, screen sections, multi‑program packaging.
 
@@ -288,6 +288,23 @@ literal       := STRING | INT ;
 
 ---
 
+
+**CLI / Driver**
+
+* Provide a single executable that accepts an input path and emits to stdout by default.
+* `--direction` flag (or subcommands) selects `cblc-to-cobol` or `cobol-to-cblc` round-trips.
+* Surface parse/semantic diagnostics with file/line metadata to aid adoption.
+
+---
+
+**Reverse pipeline (COBOL to CBL‑C)**
+
+* **COBOL parser:** Restrict to the generated subset (ENVIRONMENT, DATA, WORKING‑STORAGE, PROCEDURE divisions as emitted above). Tokenize fixed/free format, normalize to AST mirroring forward codegen structures.
+* **Semantic recovery:** Derive file declarations, record layouts, and control‑flow constructs (e.g., detect `READ`/`AT END` patterns for `while(read(...))`). Preserve literals and expression ordering within supported statements.
+* **CBL‑C emitter:** Reconstruct declarations, `open`/`close`, and structured loops/conditionals matching the original intent. Maintain idempotence when round‑tripping between syntaxes for the supported subset.
+
+---
+
 ## 7) Codegen Templates (Key)
 
 ### 7.1 READ into scalar/array
@@ -493,4 +510,43 @@ while (read(in, line)) {
 ---
 
 **End of v0.1**
+
+---
+
+## 5) Core Architecture & Extensibility Strategy
+
+### 5.1 Pipeline-Oriented Execution
+
+* The transpiler executable is organized around a reusable pipeline (`transpiler_pipeline`) that orchestrates ordered stages.
+* Each stage is a callback receiving a shared `transpiler_context`. Stages return `FT_SUCCESS`/`FT_FAILURE` so the driver can short-circuit on fatal issues.
+* Pipelines can be reset and rebuilt dynamically, enabling different front-end/back-end combinations (e.g., CBL-C→COBOL, COBOL→CBL-C, lint-only runs).
+
+### 5.2 Shared Context & Diagnostics
+
+* `transpiler_context` captures source/target language metadata, I/O paths, the accumulated diagnostics list, and the last error code.
+* Diagnostics are stored in a growable array managed by `transpiler_diagnostics`, making it trivial to collect structured messages from every stage.
+* The context intentionally avoids owning the actual text buffers yet; follow-on work can extend it with lexical buffers, AST handles, or configuration knobs without altering the pipeline API.
+
+### 5.3 Stage Families
+
+The pipeline enables three primary stage families:
+
+1. **Front-end ingestion.** Lexing/parsing/semantic analysis for the input language.
+2. **Mid-level transformations.** IR normalization, optimization, or validation passes.
+3. **Back-end emission.** Code generation for COBOL or CBL-C plus runtime packaging.
+
+Each family can introduce sub-stages that register themselves with the pipeline at startup, enabling feature flags or configuration-driven assembly.
+
+### 5.4 Future Runtime Integration
+
+* The `runtime_scalar` prototype currently feeds a demonstration stage. As richer runtime helpers (e.g., for file I/O or numeric pictures) arrive, they can register as dedicated pipeline stages or utility modules invoked by stages.
+* Runtime capabilities should be exposed through headers that mirror the libft surface we rely upon so downstream modules can consume them without leaking implementation details.
+
+### 5.5 Extending Towards Full Compilation
+
+* Add new context accessors for configuration (dialect selection, path remapping, formatting policies) while keeping the pipeline contract stable.
+* Introduce serialization helpers to emit diagnostics as JSON or textual reports for IDE integration.
+* Implement stage composition helpers (e.g., `transpiler_pipeline_add_cblc_to_cobol_defaults`) so future CLIs can assemble complex flows with one call.
+
+This structure turns the current prototype into a durable foundation: new stages drop into the pipeline, reuse the diagnostics channel, and extend the context without destabilizing existing entry points.
 

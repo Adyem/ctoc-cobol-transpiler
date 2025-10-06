@@ -8,9 +8,7 @@ NAME        = ctoc_cobol_transpiler$(EXE_EXT)
 NAME_DEBUG  = ctoc_cobol_transpiler_debug$(EXE_EXT)
 TEST_NAME   = automated_tests$(EXE_EXT)
 
-HEADER      = dnd_tools.hpp
-
-SRC         = dnd_tools.cpp               main.cpp
+SRC         = main.cpp runtime_scalar.cpp transpiler_diagnostics.cpp transpiler_context.cpp transpiler_pipeline.cpp
 
 CC          = g++
 
@@ -82,7 +80,7 @@ endif
 
 OBJS        = $(SRC:%.cpp=$(OBJ_DIR)/%.o)
 
-TEST_SRC    =
+TEST_SRC    = tests/runtime_scalar_tests.cpp
 
 TEST_OBJS   = $(TEST_SRC:%.cpp=$(OBJ_DIR_TEST)/%.o)
 
@@ -116,10 +114,10 @@ ensure_libft:
 		exit 1; \
 	fi
 
-$(OBJ_DIR)/%.o: %.cpp $(HEADER)
+$(OBJ_DIR)/%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OBJ_DIR_TEST)/%.o: %.cpp $(HEADER)
+$(OBJ_DIR_TEST)/%.o: %.cpp
 	-$(MKDIR) $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
