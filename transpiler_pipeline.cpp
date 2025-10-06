@@ -1,5 +1,6 @@
 #include <cstdlib>
 
+#include "libft/CMA/CMA.hpp"
 #include "transpiler_pipeline.hpp"
 #include "transpiler_diagnostics.hpp"
 #include "libft/Printf/printf.hpp"
@@ -12,13 +13,13 @@ static int transpiler_pipeline_reserve(t_transpiler_pipeline *pipeline, size_t d
         return (FT_FAILURE);
     if (pipeline->stage_capacity >= desired_capacity)
         return (FT_SUCCESS);
-    new_stages = static_cast<t_transpiler_stage *>(ft_calloc(desired_capacity, sizeof(t_transpiler_stage)));
+    new_stages = static_cast<t_transpiler_stage *>(cma_calloc(desired_capacity, sizeof(t_transpiler_stage)));
     if (!new_stages)
         return (FT_FAILURE);
     if (pipeline->stages)
     {
         ft_memcpy(new_stages, pipeline->stages, pipeline->stage_count * sizeof(t_transpiler_stage));
-        free(pipeline->stages);
+        cma_free(pipeline->stages);
     }
     pipeline->stages = new_stages;
     pipeline->stage_capacity = desired_capacity;
@@ -43,7 +44,7 @@ void transpiler_pipeline_dispose(t_transpiler_pipeline *pipeline)
     if (!pipeline)
         return ;
     if (pipeline->stages)
-        free(pipeline->stages);
+        cma_free(pipeline->stages);
     pipeline->stages = NULL;
     pipeline->stage_count = 0;
     pipeline->stage_capacity = 0;

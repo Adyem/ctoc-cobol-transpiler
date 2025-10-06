@@ -27,8 +27,7 @@ typedef struct s_transpiler_pipeline
 
 int transpiler_pipeline_init(t_transpiler_pipeline *pipeline);
 void transpiler_pipeline_dispose(t_transpiler_pipeline *pipeline);
-int transpiler_pipeline_add_stage(t_transpiler_pipeline *pipeline, const char *name, t_transpiler_stage_callback callback, void *u
-ser_data);
+int transpiler_pipeline_add_stage(t_transpiler_pipeline *pipeline, const char *name, t_transpiler_stage_callback callback, void *user_data);
 int transpiler_pipeline_execute(t_transpiler_pipeline *pipeline, t_transpiler_context *context);
 void transpiler_pipeline_reset(t_transpiler_pipeline *pipeline);
 

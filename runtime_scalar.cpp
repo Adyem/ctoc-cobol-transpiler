@@ -80,17 +80,19 @@ int runtime_int_compare(t_runtime_int left, t_runtime_int right)
 
 int runtime_int_to_string(t_runtime_int value, char *buffer, size_t buffer_size)
 {
+    char temporary[32];
     int result;
 
     if (!buffer)
         return (FT_FAILURE);
     if (buffer_size == 0)
         return (FT_FAILURE);
-    result = pf_snprintf(buffer, buffer_size, "%d", value.value);
+    result = pf_snprintf(temporary, sizeof(temporary), "%d", value.value);
     if (result < 0)
         return (FT_FAILURE);
     if (static_cast<size_t>(result) >= buffer_size)
         return (FT_FAILURE);
+    ft_strlcpy(buffer, temporary, buffer_size);
     return (FT_SUCCESS);
 }
 

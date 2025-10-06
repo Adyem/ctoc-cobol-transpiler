@@ -8,7 +8,7 @@ NAME        = ctoc_cobol_transpiler$(EXE_EXT)
 NAME_DEBUG  = ctoc_cobol_transpiler_debug$(EXE_EXT)
 TEST_NAME   = automated_tests$(EXE_EXT)
 
-SRC         = main.cpp runtime_scalar.cpp transpiler_diagnostics.cpp transpiler_context.cpp transpiler_pipeline.cpp
+SRC         = main.cpp runtime_scalar.cpp runtime_string.cpp runtime_file.cpp lexer.cpp lexer_token.cpp ast.cpp transpiler_diagnostics.cpp transpiler_context.cpp transpiler_pipeline.cpp
 
 CC          = g++
 
@@ -26,7 +26,11 @@ else
     $(error Unsupported OPT_LEVEL=$(OPT_LEVEL))
 endif
 
-COMPILE_FLAGS = -Wall -Werror -Wextra -std=c++17 -Wmissing-declarations                 -Wold-style-cast -Wshadow -Wconversion -Wformat=2 -Wundef                 -Wfloat-equal -Wconversion -Wodr -Wuseless-cast                 -Wzero-as-null-pointer-constant -Wmaybe-uninitialized $(OPT_FLAGS)
+COMPILE_FLAGS = -Wall -Werror -Wextra -std=c++17 -Wmissing-declarations \
+                -Wold-style-cast -Wshadow -Wconversion -Wformat=2 -Wundef \
+                -Wfloat-equal -Wconversion -Wodr -Wuseless-cast \
+                -Wzero-as-null-pointer-constant -Wmaybe-uninitialized \
+                -I. $(OPT_FLAGS)
 
 CFLAGS = $(COMPILE_FLAGS)
 
@@ -80,7 +84,18 @@ endif
 
 OBJS        = $(SRC:%.cpp=$(OBJ_DIR)/%.o)
 
-TEST_SRC    = tests/runtime_scalar_tests.cpp
+OBJS_NO_MAIN = $(filter-out $(OBJ_DIR)/main.o,$(OBJS))
+
+TEST_SRC    = tests/test_main.cpp \
+              tests/test_support.cpp \
+              tests/ast_tests.cpp \
+              tests/lexer_tests.cpp \
+              tests/runtime_int_tests.cpp \
+              tests/runtime_char_tests.cpp \
+              tests/runtime_string_tests.cpp \
+              tests/runtime_file_tests.cpp \
+              tests/pipeline_tests.cpp \
+              tests/compiler_tests.cpp
 
 TEST_OBJS   = $(TEST_SRC:%.cpp=$(OBJ_DIR_TEST)/%.o)
 
@@ -99,8 +114,9 @@ debug:
 $(TARGET): $(LIBFT) $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
 
-$(TEST_NAME): $(LIBFT) $(TEST_OBJS)
-	$(CC) $(CFLAGS) $(TEST_OBJS) -o $@ $(LDFLAGS)
+$(TEST_NAME): $(LIBFT) $(TEST_OBJS) $(OBJS_NO_MAIN)
+	$(CC) $(CFLAGS) $(TEST_OBJS) $(OBJS_NO_MAIN) -o $@ $(LDFLAGS)
+
 
 $(LIBFT): ensure_libft
 	$(MAKE) -C $(LIBFT_DIR) $(if $(DEBUG), debug)

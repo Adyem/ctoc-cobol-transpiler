@@ -1,0 +1,62 @@
+#ifndef LEXER_TOKEN_HPP
+#define LEXER_TOKEN_HPP
+
+#include <cstddef>
+
+typedef enum e_lexer_token_kind
+{
+    LEXER_TOKEN_UNKNOWN = 0,
+    LEXER_TOKEN_END_OF_FILE,
+    LEXER_TOKEN_IDENTIFIER,
+    LEXER_TOKEN_NUMERIC_LITERAL,
+    LEXER_TOKEN_STRING_LITERAL,
+    LEXER_TOKEN_PERIOD,
+    LEXER_TOKEN_COMMA,
+    LEXER_TOKEN_COLON,
+    LEXER_TOKEN_SEMICOLON,
+    LEXER_TOKEN_KEYWORD_IDENTIFICATION,
+    LEXER_TOKEN_KEYWORD_DIVISION,
+    LEXER_TOKEN_KEYWORD_PROGRAM_ID,
+    LEXER_TOKEN_KEYWORD_ENVIRONMENT,
+    LEXER_TOKEN_KEYWORD_DATA,
+    LEXER_TOKEN_KEYWORD_PROCEDURE,
+    LEXER_TOKEN_KEYWORD_WORKING_STORAGE,
+    LEXER_TOKEN_KEYWORD_SECTION,
+    LEXER_TOKEN_KEYWORD_FILE,
+    LEXER_TOKEN_KEYWORD_SELECT,
+    LEXER_TOKEN_KEYWORD_ASSIGN,
+    LEXER_TOKEN_KEYWORD_TO,
+    LEXER_TOKEN_KEYWORD_FD,
+    LEXER_TOKEN_KEYWORD_PIC,
+    LEXER_TOKEN_KEYWORD_VALUE,
+    LEXER_TOKEN_KEYWORD_IF,
+    LEXER_TOKEN_KEYWORD_ELSE,
+    LEXER_TOKEN_KEYWORD_PERFORM,
+    LEXER_TOKEN_KEYWORD_UNTIL,
+    LEXER_TOKEN_KEYWORD_MOVE,
+    LEXER_TOKEN_KEYWORD_OPEN,
+    LEXER_TOKEN_KEYWORD_CLOSE,
+    LEXER_TOKEN_KEYWORD_READ,
+    LEXER_TOKEN_KEYWORD_WRITE
+}   t_lexer_token_kind;
+
+typedef enum e_lexer_trivia_kind
+{
+    LEXER_TRIVIA_NONE = 0,
+    LEXER_TRIVIA_WHITESPACE,
+    LEXER_TRIVIA_COMMENT
+}   t_lexer_trivia_kind;
+
+typedef struct s_lexer_token
+{
+    t_lexer_token_kind kind;
+    const char *lexeme;
+    size_t length;
+    size_t line;
+    size_t column;
+}   t_lexer_token;
+
+t_lexer_token_kind lexer_token_lookup_keyword(const char *text, size_t length);
+t_lexer_trivia_kind lexer_classify_trivia(const char *text, size_t length);
+
+#endif

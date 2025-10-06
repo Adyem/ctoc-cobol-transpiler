@@ -6,7 +6,12 @@
 
 #include "libft/Libft/libft.hpp"
 #include "libft/Printf/printf.hpp"
+#include "ast.hpp"
+#include "lexer.hpp"
+#include "lexer_token.hpp"
+#include "runtime_file.hpp"
 #include "runtime_scalar.hpp"
+#include "runtime_string.hpp"
 #include "transpiler_context.hpp"
 #include "transpiler_pipeline.hpp"
 
@@ -41,6 +46,218 @@ static int test_expect_char_equal(char actual, char expected, const char *messag
     if (message)
         pf_printf("Assertion failed: %s (expected %c, got %c)\n", message, expected, actual);
     return (FT_FAILURE);
+}
+
+static int test_expect_cstring_equal(const char *actual, const char *expected, const char *message)
+{
+    if (!actual && !expected)
+        return (FT_SUCCESS);
+    if (!actual || !expected)
+    {
+        if (message)
+            pf_printf("Assertion failed: %s (expected %s, got %s)\n", message,
+                expected ? expected : "(null)", actual ? actual : "(null)");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(actual, expected, ft_strlen(expected) + 1) == 0)
+        return (FT_SUCCESS);
+    if (message)
+        pf_printf("Assertion failed: %s (expected %s, got %s)\n", message, expected, actual);
+    return (FT_FAILURE);
+}
+
+static int test_expect_token(const t_lexer_token *token, t_lexer_token_kind expected_kind,
+    const char *expected_lexeme, size_t expected_line, size_t expected_column)
+{
+    size_t index;
+    size_t expected_length;
+
+    if (!token)
+        return (FT_FAILURE);
+    if (token->kind != expected_kind)
+    {
+        pf_printf("Assertion failed: token kind mismatch (expected %d, got %d)\n", expected_kind, token->kind);
+        return (FT_FAILURE);
+    }
+    if (token->line != expected_line)
+    {
+        pf_printf("Assertion failed: token line mismatch (expected %zu, got %zu)\n", expected_line, token->line);
+        return (FT_FAILURE);
+    }
+    if (token->column != expected_column)
+    {
+        pf_printf("Assertion failed: token column mismatch (expected %zu, got %zu)\n", expected_column, token->column);
+        return (FT_FAILURE);
+    }
+    if (!expected_lexeme)
+    {
+        if (token->length != 0)
+        {
+            pf_printf("Assertion failed: token length mismatch (expected 0, got %zu)\n", token->length);
+            return (FT_FAILURE);
+        }
+        return (FT_SUCCESS);
+    }
+    expected_length = ft_strlen(expected_lexeme);
+    if (token->length != expected_length)
+    {
+        pf_printf("Assertion failed: token length mismatch (expected %zu, got %zu)\n", expected_length, token->length);
+        return (FT_FAILURE);
+    }
+    if (!token->lexeme)
+    {
+        pf_printf("Assertion failed: token lexeme should not be null\n");
+        return (FT_FAILURE);
+    }
+    index = 0;
+    while (index < expected_length)
+    {
+        if (token->lexeme[index] != expected_lexeme[index])
+        {
+            pf_printf("Assertion failed: token lexeme mismatch at index %zu (expected %c, got %c)\n",
+                index, expected_lexeme[index], token->lexeme[index]);
+            return (FT_FAILURE);
+        }
+        index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+static int test_ast_node_add_child_preserves_order(void)
+{
+    t_ast_node *program;
+    t_ast_node *division;
+    t_ast_node *sequence;
+    int status;
+
+    program = ast_node_create(AST_NODE_PROGRAM);
+    if (!program)
+        return (FT_FAILURE);
+    division = ast_node_create(AST_NODE_IDENTIFICATION_DIVISION);
+    if (!division)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    if (ast_node_add_child(program, division) != FT_SUCCESS)
+    {
+        ast_node_destroy(division);
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    sequence = ast_node_create(AST_NODE_STATEMENT_SEQUENCE);
+    if (!sequence)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    if (ast_node_add_child(program, sequence) != FT_SUCCESS)
+    {
+        ast_node_destroy(sequence);
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    status = FT_SUCCESS;
+    if (ast_node_child_count(program) != 2)
+        status = FT_FAILURE;
+    else if (ast_node_get_child(program, 0) != division)
+        status = FT_FAILURE;
+    else if (ast_node_get_child(program, 1) != sequence)
+        status = FT_FAILURE;
+    else if (ast_node_get_child(program, 1)->kind != AST_NODE_STATEMENT_SEQUENCE)
+        status = FT_FAILURE;
+    ast_node_destroy(program);
+    return (status);
+}
+
+static int test_ast_node_set_token_copies_lexeme(void)
+{
+    t_ast_node *node;
+    t_lexer_token token;
+    char buffer[16];
+    const char *source;
+    size_t length;
+    size_t index;
+
+    node = ast_node_create(AST_NODE_IDENTIFIER);
+    if (!node)
+        return (FT_FAILURE);
+    source = "program";
+    length = 0;
+    while (source[length] != '\0')
+    {
+        buffer[length] = source[length];
+        length += 1;
+    }
+    buffer[length] = '\0';
+    token.kind = LEXER_TOKEN_IDENTIFIER;
+    token.lexeme = buffer;
+    token.length = length;
+    token.line = 4;
+    token.column = 2;
+    if (ast_node_set_token(node, &token) != FT_SUCCESS)
+    {
+        ast_node_destroy(node);
+        return (FT_FAILURE);
+    }
+    buffer[0] = 'X';
+    if (!node->token.lexeme)
+    {
+        ast_node_destroy(node);
+        return (FT_FAILURE);
+    }
+    if (node->token.kind != LEXER_TOKEN_IDENTIFIER)
+    {
+        ast_node_destroy(node);
+        return (FT_FAILURE);
+    }
+    if (node->token.length != length)
+    {
+        ast_node_destroy(node);
+        return (FT_FAILURE);
+    }
+    if (node->token.lexeme[0] != 'p')
+    {
+        ast_node_destroy(node);
+        return (FT_FAILURE);
+    }
+    index = 0;
+    while (index < node->token.length)
+    {
+        if (node->token.lexeme[index] != source[index])
+        {
+            ast_node_destroy(node);
+            return (FT_FAILURE);
+        }
+        index += 1;
+    }
+    if (node->token.lexeme[node->token.length] != '\0')
+    {
+        ast_node_destroy(node);
+        return (FT_FAILURE);
+    }
+    if (ast_node_set_token(node, NULL) != FT_SUCCESS)
+    {
+        ast_node_destroy(node);
+        return (FT_FAILURE);
+    }
+    if (node->token.lexeme != NULL)
+    {
+        ast_node_destroy(node);
+        return (FT_FAILURE);
+    }
+    if (node->token.length != 0)
+    {
+        ast_node_destroy(node);
+        return (FT_FAILURE);
+    }
+    if (node->token.kind != LEXER_TOKEN_UNKNOWN)
+    {
+        ast_node_destroy(node);
+        return (FT_FAILURE);
+    }
+    ast_node_destroy(node);
+    return (FT_SUCCESS);
 }
 
 static int test_write_text_file(const char *path, const char *contents)
@@ -152,11 +369,343 @@ static int test_run_command_expect_failure(const char *command)
     return (FT_SUCCESS);
 }
 
+static int test_lexer_keyword_lookup_identifies_keywords(void)
+{
+    t_lexer_token_kind kind;
+
+    kind = lexer_token_lookup_keyword("division", ft_strlen("division"));
+    if (kind != LEXER_TOKEN_KEYWORD_DIVISION)
+    {
+        pf_printf("Assertion failed: lexer should classify DIVISION keyword\n");
+        return (FT_FAILURE);
+    }
+    kind = lexer_token_lookup_keyword("Program-Id", ft_strlen("Program-Id"));
+    if (kind != LEXER_TOKEN_KEYWORD_PROGRAM_ID)
+    {
+        pf_printf("Assertion failed: lexer should classify PROGRAM-ID keyword\n");
+        return (FT_FAILURE);
+    }
+    kind = lexer_token_lookup_keyword("working-storage", ft_strlen("working-storage"));
+    if (kind != LEXER_TOKEN_KEYWORD_WORKING_STORAGE)
+    {
+        pf_printf("Assertion failed: lexer should classify WORKING-STORAGE keyword\n");
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+static int test_lexer_keyword_lookup_defaults_to_identifier(void)
+{
+    t_lexer_token_kind kind;
+
+    kind = lexer_token_lookup_keyword("custom-name", ft_strlen("custom-name"));
+    if (kind != LEXER_TOKEN_IDENTIFIER)
+    {
+        pf_printf("Assertion failed: lexer should treat unknown words as identifiers\n");
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+static int test_lexer_trivia_detects_whitespace(void)
+{
+    const char *text;
+    t_lexer_trivia_kind trivia;
+
+    text = " \t\n\r";
+    trivia = lexer_classify_trivia(text, ft_strlen(text));
+    if (trivia != LEXER_TRIVIA_WHITESPACE)
+    {
+        pf_printf("Assertion failed: lexer should treat whitespace as trivia\n");
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+static int test_lexer_trivia_detects_comments(void)
+{
+    const char *comment;
+    const char *not_comment;
+    t_lexer_trivia_kind trivia;
+
+    comment = "*> comment line";
+    trivia = lexer_classify_trivia(comment, ft_strlen(comment));
+    if (trivia != LEXER_TRIVIA_COMMENT)
+    {
+        pf_printf("Assertion failed: lexer should classify *> lines as comments\n");
+        return (FT_FAILURE);
+    }
+    not_comment = "* missing arrow";
+    trivia = lexer_classify_trivia(not_comment, ft_strlen(not_comment));
+    if (trivia != LEXER_TRIVIA_NONE)
+    {
+        pf_printf("Assertion failed: lexer should ignore asterisk without > as comment start\n");
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+static int test_lexer_tokenizes_sample_program(void)
+{
+    const char *source;
+    t_lexer lexer;
+    t_lexer_token token;
+
+    source = "identification division.\n"
+        "program-id. sample-program.\n"
+        "*> comment line\n"
+        "move 42 to result.\n";
+    lexer_init(&lexer, source);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_KEYWORD_IDENTIFICATION, "identification", 1, 1) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_KEYWORD_DIVISION, "division", 1, 16) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_PERIOD, ".", 1, 24) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_KEYWORD_PROGRAM_ID, "program-id", 2, 1) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_PERIOD, ".", 2, 11) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_IDENTIFIER, "sample-program", 2, 13) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_PERIOD, ".", 2, 27) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_KEYWORD_MOVE, "move", 4, 1) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_NUMERIC_LITERAL, "42", 4, 6) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_KEYWORD_TO, "to", 4, 9) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_IDENTIFIER, "result", 4, 12) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_PERIOD, ".", 4, 18) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_END_OF_FILE, NULL, 5, 1) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int test_lexer_reports_unterminated_string(void)
+{
+    const char *source;
+    t_lexer lexer;
+    t_lexer_token token;
+
+    source = "move \"unterminated\n";
+    lexer_init(&lexer, source);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_KEYWORD_MOVE, "move", 1, 1) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_FAILURE)
+    {
+        pf_printf("Assertion failed: lexer should fail for unterminated string literal\n");
+        return (FT_FAILURE);
+    }
+    if (token.kind != LEXER_TOKEN_UNKNOWN)
+    {
+        pf_printf("Assertion failed: unterminated string should produce unknown token\n");
+        return (FT_FAILURE);
+    }
+    if (token.line != 1 || token.column != 6)
+    {
+        pf_printf("Assertion failed: unterminated string should report start location\n");
+        return (FT_FAILURE);
+    }
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_END_OF_FILE, NULL, 2, 1) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 static void test_cleanup_example_artifacts(const char *source_path, const char *binary_path, const char *output_path)
 {
     test_remove_file(output_path);
     test_remove_file(binary_path);
     test_remove_file(source_path);
+}
+
+static int test_runtime_file_write_and_read_text(void)
+{
+    const char *path;
+    const char *contents;
+    t_runtime_file file;
+    char buffer[128];
+    size_t bytes_read;
+    size_t expected_length;
+
+    path = "test_runtime_file.txt";
+    contents = "runtime-file-contents";
+    runtime_file_init(&file);
+    if (test_expect_success(runtime_file_open_write(&file, path), "runtime_file_open_write should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(runtime_file_write(&file, contents, ft_strlen(contents)), "runtime_file_write should succeed") != FT_SUCCESS)
+    {
+        runtime_file_close(&file);
+        test_remove_file(path);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(runtime_file_close(&file), "runtime_file_close should succeed") != FT_SUCCESS)
+    {
+        test_remove_file(path);
+        return (FT_FAILURE);
+    }
+    runtime_file_init(&file);
+    if (test_expect_success(runtime_file_open_read(&file, path), "runtime_file_open_read should succeed") != FT_SUCCESS)
+    {
+        test_remove_file(path);
+        return (FT_FAILURE);
+    }
+    ft_memset(buffer, 0, sizeof(buffer));
+    if (test_expect_success(runtime_file_read(&file, buffer, sizeof(buffer), &bytes_read), "runtime_file_read should succeed") != FT_SUCCESS)
+    {
+        runtime_file_close(&file);
+        test_remove_file(path);
+        return (FT_FAILURE);
+    }
+    expected_length = static_cast<size_t>(ft_strlen(contents));
+    if (bytes_read != expected_length)
+    {
+        pf_printf("Assertion failed: runtime_file_read should report full length (expected %zu, got %zu)\n",
+            expected_length, bytes_read);
+        runtime_file_close(&file);
+        test_remove_file(path);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(buffer, contents, "runtime_file_read should capture file contents") != FT_SUCCESS)
+    {
+        runtime_file_close(&file);
+        test_remove_file(path);
+        return (FT_FAILURE);
+    }
+    runtime_file_close(&file);
+    test_remove_file(path);
+    return (FT_SUCCESS);
+}
+
+static int test_runtime_file_open_read_missing_path(void)
+{
+    t_runtime_file file;
+
+    runtime_file_init(&file);
+    if (runtime_file_open_read(&file, "nonexistent-runtime-file.txt") != FT_FAILURE)
+    {
+        pf_printf("Assertion failed: runtime_file_open_read should fail for missing files\n");
+        runtime_file_close(&file);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(runtime_file_close(&file), "runtime_file_close should allow closing unopened file") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int test_runtime_file_reopen_transitions_modes(void)
+{
+    const char *path;
+    const char *contents;
+    t_runtime_file file;
+    char buffer[64];
+    size_t bytes_read;
+    size_t expected_length;
+
+    path = "test_runtime_file_reopen.txt";
+    contents = "runtime-file-reopen";
+    runtime_file_init(&file);
+    if (test_expect_success(runtime_file_open_write(&file, path), "runtime_file_open_write should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(runtime_file_write(&file, contents, ft_strlen(contents)),
+        "runtime_file_write should succeed") != FT_SUCCESS)
+    {
+        runtime_file_close(&file);
+        test_remove_file(path);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(runtime_file_open_read(&file, path),
+        "runtime_file_open_read should replace existing descriptor") != FT_SUCCESS)
+    {
+        runtime_file_close(&file);
+        test_remove_file(path);
+        return (FT_FAILURE);
+    }
+    ft_memset(buffer, 0, sizeof(buffer));
+    if (test_expect_success(runtime_file_read(&file, buffer, sizeof(buffer), &bytes_read),
+        "runtime_file_read should succeed after reopening") != FT_SUCCESS)
+    {
+        runtime_file_close(&file);
+        test_remove_file(path);
+        return (FT_FAILURE);
+    }
+    expected_length = ft_strlen(contents);
+    if (bytes_read != expected_length)
+    {
+        pf_printf("Assertion failed: runtime_file_read should report full length after reopening (expected %zu, got %zu)\n",
+            expected_length, bytes_read);
+        runtime_file_close(&file);
+        test_remove_file(path);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(buffer, contents, "runtime_file_read should return written contents") != FT_SUCCESS)
+    {
+        runtime_file_close(&file);
+        test_remove_file(path);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(runtime_file_close(&file), "runtime_file_close should succeed") != FT_SUCCESS)
+    {
+        test_remove_file(path);
+        return (FT_FAILURE);
+    }
+    test_remove_file(path);
+    return (FT_SUCCESS);
+}
+
+static int test_runtime_file_requires_open_descriptor(void)
+{
+    t_runtime_file file;
+    char buffer[8];
+    size_t bytes_read;
+
+    runtime_file_init(&file);
+    if (runtime_file_read(&file, buffer, sizeof(buffer), &bytes_read) != FT_FAILURE)
+    {
+        pf_printf("Assertion failed: runtime_file_read should fail without open descriptor\n");
+        return (FT_FAILURE);
+    }
+    if (runtime_file_write(&file, "x", 1) != FT_FAILURE)
+    {
+        pf_printf("Assertion failed: runtime_file_write should fail without open descriptor\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(runtime_file_close(&file), "runtime_file_close should allow closing unopened file") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
 }
 
 static int test_runtime_int_add_and_subtract(void)
@@ -303,6 +852,137 @@ static int test_runtime_char_to_string_and_compare(void)
         return (FT_FAILURE);
     if (test_expect_int_equal(runtime_char_compare(left, left), 0, "runtime_char_compare should detect equality") != FT_SUCCESS)
         return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int test_runtime_string_assign_and_trim(void)
+{
+    t_runtime_string value;
+
+    if (test_expect_success(runtime_string_init(&value, 0), "runtime_string_init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(runtime_string_assign(&value, "   hello world  "), "runtime_string_assign should copy text") != FT_SUCCESS)
+    {
+        runtime_string_dispose(&value);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(runtime_string_trim(&value), "runtime_string_trim should succeed") != FT_SUCCESS)
+    {
+        runtime_string_dispose(&value);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(value.data, "hello world", "runtime_string_trim should remove leading and trailing whitespace") != FT_SUCCESS)
+    {
+        runtime_string_dispose(&value);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(value.length), 11, "runtime_string_trim should update length") != FT_SUCCESS)
+    {
+        runtime_string_dispose(&value);
+        return (FT_FAILURE);
+    }
+    runtime_string_dispose(&value);
+    return (FT_SUCCESS);
+}
+
+static int test_runtime_string_compare_orders_text(void)
+{
+    t_runtime_string left;
+    t_runtime_string right;
+    int comparison;
+
+    if (test_expect_success(runtime_string_init(&left, 0), "runtime_string_init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(runtime_string_init(&right, 0), "runtime_string_init should succeed") != FT_SUCCESS)
+    {
+        runtime_string_dispose(&left);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(runtime_string_assign(&left, "APPLE"), "runtime_string_assign should copy text") != FT_SUCCESS)
+    {
+        runtime_string_dispose(&left);
+        runtime_string_dispose(&right);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(runtime_string_assign(&right, "APRICOT"), "runtime_string_assign should copy text") != FT_SUCCESS)
+    {
+        runtime_string_dispose(&left);
+        runtime_string_dispose(&right);
+        return (FT_FAILURE);
+    }
+    comparison = runtime_string_compare(&left, &right);
+    if (test_expect_int_equal(comparison, -1, "runtime_string_compare should order lexicographically") != FT_SUCCESS)
+    {
+        runtime_string_dispose(&left);
+        runtime_string_dispose(&right);
+        return (FT_FAILURE);
+    }
+    comparison = runtime_string_compare(&right, &left);
+    if (test_expect_int_equal(comparison, 1, "runtime_string_compare should reverse ordering") != FT_SUCCESS)
+    {
+        runtime_string_dispose(&left);
+        runtime_string_dispose(&right);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(runtime_string_assign(&right, "APPLE"), "runtime_string_assign should copy text") != FT_SUCCESS)
+    {
+        runtime_string_dispose(&left);
+        runtime_string_dispose(&right);
+        return (FT_FAILURE);
+    }
+    comparison = runtime_string_compare(&left, &right);
+    if (test_expect_int_equal(comparison, 0, "runtime_string_compare should report equality") != FT_SUCCESS)
+    {
+        runtime_string_dispose(&left);
+        runtime_string_dispose(&right);
+        return (FT_FAILURE);
+    }
+    runtime_string_dispose(&left);
+    runtime_string_dispose(&right);
+    return (FT_SUCCESS);
+}
+
+static int test_runtime_string_to_int_parses_numbers(void)
+{
+    t_runtime_string text;
+    t_runtime_int value;
+
+    if (test_expect_success(runtime_string_init(&text, 0), "runtime_string_init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(runtime_string_assign(&text, "   -256  "), "runtime_string_assign should copy text") != FT_SUCCESS)
+    {
+        runtime_string_dispose(&text);
+        return (FT_FAILURE);
+    }
+    runtime_int_set(&value, 99);
+    if (test_expect_success(runtime_string_to_int(&text, &value), "runtime_string_to_int should parse trimmed numbers") != FT_SUCCESS)
+    {
+        runtime_string_dispose(&text);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(value.value, -256, "runtime_string_to_int should store parsed integers") != FT_SUCCESS)
+    {
+        runtime_string_dispose(&text);
+        return (FT_FAILURE);
+    }
+    runtime_int_set(&value, 73);
+    if (test_expect_success(runtime_string_assign(&text, "12a"), "runtime_string_assign should copy text") != FT_SUCCESS)
+    {
+        runtime_string_dispose(&text);
+        return (FT_FAILURE);
+    }
+    if (runtime_string_to_int(&text, &value) != FT_FAILURE)
+    {
+        runtime_string_dispose(&text);
+        pf_printf("Assertion failed: runtime_string_to_int should reject invalid numbers\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(value.value, 73, "runtime_string_to_int should leave destination unchanged on failure") != FT_SUCCESS)
+    {
+        runtime_string_dispose(&text);
+        return (FT_FAILURE);
+    }
+    runtime_string_dispose(&text);
     return (FT_SUCCESS);
 }
 
@@ -588,6 +1268,14 @@ static int run_test_case(const t_test_case *test)
 static int run_all_tests(void)
 {
     static const t_test_case tests[] = {
+        {"ast_node_add_child_preserves_order", test_ast_node_add_child_preserves_order},
+        {"ast_node_set_token_copies_lexeme", test_ast_node_set_token_copies_lexeme},
+        {"lexer_keyword_lookup_identifies_keywords", test_lexer_keyword_lookup_identifies_keywords},
+        {"lexer_keyword_lookup_defaults_to_identifier", test_lexer_keyword_lookup_defaults_to_identifier},
+        {"lexer_trivia_detects_whitespace", test_lexer_trivia_detects_whitespace},
+        {"lexer_trivia_detects_comments", test_lexer_trivia_detects_comments},
+        {"lexer_tokenizes_sample_program", test_lexer_tokenizes_sample_program},
+        {"lexer_reports_unterminated_string", test_lexer_reports_unterminated_string},
         {"runtime_int_add_and_subtract", test_runtime_int_add_and_subtract},
         {"runtime_int_add_detects_overflow", test_runtime_int_add_detects_overflow},
         {"runtime_int_to_string", test_runtime_int_to_string},
@@ -596,6 +1284,13 @@ static int run_all_tests(void)
         {"runtime_char_transforms", test_runtime_char_transforms},
         {"runtime_char_from_string_rejects_empty_input", test_runtime_char_from_string_rejects_empty_input},
         {"runtime_char_to_string_and_compare", test_runtime_char_to_string_and_compare},
+        {"runtime_string_assign_and_trim", test_runtime_string_assign_and_trim},
+        {"runtime_string_compare_orders_text", test_runtime_string_compare_orders_text},
+        {"runtime_string_to_int_parses_numbers", test_runtime_string_to_int_parses_numbers},
+        {"runtime_file_write_and_read_text", test_runtime_file_write_and_read_text},
+        {"runtime_file_open_read_missing_path", test_runtime_file_open_read_missing_path},
+        {"runtime_file_reopen_transitions_modes", test_runtime_file_reopen_transitions_modes},
+        {"runtime_file_requires_open_descriptor", test_runtime_file_requires_open_descriptor},
         {"transpiler_pipeline_executes_stage", test_transpiler_pipeline_executes_stage},
         {"transpiler_pipeline_reports_failure", test_transpiler_pipeline_reports_failure},
         {"transpiler_pipeline_stops_after_failure", test_transpiler_pipeline_stops_after_failure},

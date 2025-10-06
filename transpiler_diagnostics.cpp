@@ -1,5 +1,6 @@
 #include <cstdlib>
 
+#include "libft/CMA/CMA.hpp"
 #include "transpiler_diagnostics.hpp"
 
 static int transpiler_diagnostics_reserve(t_transpiler_diagnostic_list *list, size_t desired_capacity)
@@ -10,13 +11,13 @@ static int transpiler_diagnostics_reserve(t_transpiler_diagnostic_list *list, si
         return (FT_FAILURE);
     if (list->capacity >= desired_capacity)
         return (FT_SUCCESS);
-    new_items = static_cast<t_transpiler_diagnostic *>(ft_calloc(desired_capacity, sizeof(t_transpiler_diagnostic)));
+    new_items = static_cast<t_transpiler_diagnostic *>(cma_calloc(desired_capacity, sizeof(t_transpiler_diagnostic)));
     if (!new_items)
         return (FT_FAILURE);
     if (list->items)
     {
         ft_memcpy(new_items, list->items, list->count * sizeof(t_transpiler_diagnostic));
-        free(list->items);
+        cma_free(list->items);
     }
     list->items = new_items;
     list->capacity = desired_capacity;
@@ -40,7 +41,7 @@ void transpiler_diagnostics_dispose(t_transpiler_diagnostic_list *list)
     if (!list)
         return ;
     if (list->items)
-        free(list->items);
+        cma_free(list->items);
     list->items = NULL;
     list->count = 0;
     list->capacity = 0;
