@@ -132,6 +132,19 @@ dirs:
 	-$(MKDIR) $(OBJ_DIR_DEBUG)
 	-$(MKDIR) $(OBJ_DIR_TEST)
 
+install_cobc:
+	@if ! command -v cobc >/dev/null 2>&1; then \
+		apt-get update && apt-get install -y gnucobol; \
+	else \
+		printf 'cobc already installed.\n'; \
+	fi
+
+
+tests_with_cobc: install_cobc
+	$(MAKE) initialize
+	$(MAKE) tests
+	$(MAKE) test
+
 debug:
 	$(MAKE) all DEBUG=1
 
