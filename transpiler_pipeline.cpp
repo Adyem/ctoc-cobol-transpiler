@@ -2,8 +2,7 @@
 
 #include "libft/CMA/CMA.hpp"
 #include "transpiler_pipeline.hpp"
-#include "transpiler_diagnostics.hpp"
-#include "libft/Printf/printf.hpp"
+#include "transpiler_logging.hpp"
 
 static int transpiler_pipeline_reserve(t_transpiler_pipeline *pipeline, size_t desired_capacity)
 {
@@ -83,17 +82,6 @@ user_data)
     return (FT_SUCCESS);
 }
 
-static void transpiler_pipeline_report_failure(t_transpiler_context *context, const t_transpiler_stage *stage, int error_code)
-{
-    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
-
-    if (!context)
-        return ;
-    pf_snprintf(message, sizeof(message), "Stage '%s' failed with code %d", stage->name, error_code);
-    transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR, error_code, message);
-    transpiler_context_record_error(context, error_code);
-}
-
 int transpiler_pipeline_execute(t_transpiler_pipeline *pipeline, t_transpiler_context *context)
 {
     size_t index;
@@ -107,13 +95,15 @@ int transpiler_pipeline_execute(t_transpiler_pipeline *pipeline, t_transpiler_co
     index = 0;
     while (index < pipeline->stage_count)
     {
+        transpiler_logging_stage_start(context, pipeline->stages[index].name);
         status = pipeline->stages[index].callback(context, pipeline->stages[index].user_data);
         if (status != FT_SUCCESS)
         {
             pipeline->last_error = status;
-            transpiler_pipeline_report_failure(context, &pipeline->stages[index], status);
+            transpiler_logging_stage_failure(context, pipeline->stages[index].name, status);
             return (FT_FAILURE);
         }
+        transpiler_logging_stage_success(context, pipeline->stages[index].name);
         index += 1;
     }
     return (FT_SUCCESS);

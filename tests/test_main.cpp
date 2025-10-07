@@ -16,6 +16,15 @@ int main(void)
     tests = get_parser_tests(&count);
     if (run_test_suite(tests, count) != FT_SUCCESS)
         status = FT_FAILURE;
+    tests = get_semantics_tests(&count);
+    if (run_test_suite(tests, count) != FT_SUCCESS)
+        status = FT_FAILURE;
+    tests = get_codegen_tests(&count);
+    if (run_test_suite(tests, count) != FT_SUCCESS)
+        status = FT_FAILURE;
+    tests = get_cobol_type_tests(&count);
+    if (run_test_suite(tests, count) != FT_SUCCESS)
+        status = FT_FAILURE;
     tests = get_runtime_int_tests(&count);
     if (run_test_suite(tests, count) != FT_SUCCESS)
         status = FT_FAILURE;
@@ -31,6 +40,9 @@ int main(void)
     tests = get_pipeline_tests(&count);
     if (run_test_suite(tests, count) != FT_SUCCESS)
         status = FT_FAILURE;
+    tests = get_logging_tests(&count);
+    if (run_test_suite(tests, count) != FT_SUCCESS)
+        status = FT_FAILURE;
     tests = get_transpiler_context_tests(&count);
     if (run_test_suite(tests, count) != FT_SUCCESS)
         status = FT_FAILURE;
@@ -44,6 +56,9 @@ int main(void)
     if (run_test_suite(tests, count) != FT_SUCCESS)
         status = FT_FAILURE;
     tests = get_cobol_doc_tests(&count);
+    if (run_test_suite(tests, count) != FT_SUCCESS)
+        status = FT_FAILURE;
+    tests = get_cli_doc_tests(&count);
     if (run_test_suite(tests, count) != FT_SUCCESS)
         status = FT_FAILURE;
     tests = get_cli_tests(&count);

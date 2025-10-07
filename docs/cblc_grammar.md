@@ -16,7 +16,7 @@ The grammar captures the subset required for the forward (CBL-C → COBOL) and r
 ## 1. Program Structure
 
 ```
-program                 ::= global_declaration_section function_section
+program             ::= global_declaration_section function_section
 global_declaration_section ::= { global_declaration }
 global_declaration      ::= file_declaration
                           | record_declaration

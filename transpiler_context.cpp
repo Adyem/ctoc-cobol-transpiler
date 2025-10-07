@@ -27,6 +27,31 @@ static int transpiler_context_functions_reserve(t_transpiler_context *context, s
     return (FT_SUCCESS);
 }
 
+static int transpiler_context_files_reserve(t_transpiler_context *context, size_t desired_capacity)
+{
+    t_transpiler_file_declaration *new_files;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (context->file_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    new_files = static_cast<t_transpiler_file_declaration *>(cma_calloc(desired_capacity,
+        sizeof(t_transpiler_file_declaration)));
+    if (!new_files)
+        return (FT_FAILURE);
+    if (context->files)
+    {
+        ft_memcpy(new_files, context->files,
+            context->file_count * sizeof(t_transpiler_file_declaration));
+        cma_free(context->files);
+    }
+    context->files = new_files;
+    context->file_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
 int transpiler_context_init(t_transpiler_context *context)
 {
     if (!context)
@@ -42,11 +67,24 @@ int transpiler_context_init(t_transpiler_context *context)
     context->functions = NULL;
     context->function_count = 0;
     context->function_capacity = 0;
+    context->files = NULL;
+    context->file_count = 0;
+    context->file_capacity = 0;
     ft_bzero(&context->entrypoint, sizeof(context->entrypoint));
     if (transpiler_diagnostics_init(&context->diagnostics) != FT_SUCCESS)
         return (FT_FAILURE);
     if (transpiler_context_functions_reserve(context, 4) != FT_SUCCESS)
     {
+        transpiler_diagnostics_dispose(&context->diagnostics);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_files_reserve(context, 4) != FT_SUCCESS)
+    {
+        if (context->functions)
+            cma_free(context->functions);
+        context->functions = NULL;
+        context->function_count = 0;
+        context->function_capacity = 0;
         transpiler_diagnostics_dispose(&context->diagnostics);
         return (FT_FAILURE);
     }
@@ -71,6 +109,11 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->functions = NULL;
     context->function_count = 0;
     context->function_capacity = 0;
+    if (context->files)
+        cma_free(context->files);
+    context->files = NULL;
+    context->file_count = 0;
+    context->file_capacity = 0;
     ft_bzero(&context->entrypoint, sizeof(context->entrypoint));
 }
 
@@ -256,4 +299,90 @@ const t_transpiler_entrypoint *transpiler_context_get_entrypoint(const t_transpi
     if (!context->entrypoint.present)
         return (NULL);
     return (&context->entrypoint);
+}
+
+int transpiler_context_register_file(t_transpiler_context *context, const char *name, t_transpiler_file_role role,
+    const char *path, size_t explicit_record_length)
+{
+    t_transpiler_file_declaration *file;
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    size_t index;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (!name || !path)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < context->file_count)
+    {
+        if (ft_strncmp(context->files[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        {
+            pf_snprintf(message, sizeof(message),
+                "file '%s' already declared; choose a unique identifier", name);
+            transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+                TRANSPILE_ERROR_FILE_DUPLICATE_NAME, message);
+            transpiler_context_record_error(context, TRANSPILE_ERROR_FILE_DUPLICATE_NAME);
+            return (FT_FAILURE);
+        }
+        index += 1;
+    }
+    if (context->file_count >= context->file_capacity)
+    {
+        if (transpiler_context_files_reserve(context, context->file_capacity * 2) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    file = &context->files[context->file_count];
+    ft_bzero(file, sizeof(*file));
+    ft_strlcpy(file->name, name, sizeof(file->name));
+    ft_strlcpy(file->path, path, sizeof(file->path));
+    file->role = role;
+    file->explicit_record_length = explicit_record_length;
+    file->inferred_record_length = explicit_record_length;
+    context->file_count += 1;
+    return (FT_SUCCESS);
+}
+
+int transpiler_context_record_file_length_hint(t_transpiler_context *context, const char *name, size_t record_length)
+{
+    t_transpiler_file_declaration *file;
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    size_t index;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (!name)
+        return (FT_FAILURE);
+    if (record_length == 0)
+        return (FT_SUCCESS);
+    index = 0;
+    while (index < context->file_count)
+    {
+        if (ft_strncmp(context->files[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+            break ;
+        index += 1;
+    }
+    if (index >= context->file_count)
+    {
+        pf_snprintf(message, sizeof(message),
+            "file '%s' not declared before recording record length", name);
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_FILE_UNKNOWN, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_FILE_UNKNOWN);
+        return (FT_FAILURE);
+    }
+    file = &context->files[index];
+    if (file->explicit_record_length > 0)
+        return (FT_SUCCESS);
+    if (record_length > file->inferred_record_length)
+        file->inferred_record_length = record_length;
+    return (FT_SUCCESS);
+}
+
+const t_transpiler_file_declaration *transpiler_context_get_files(const t_transpiler_context *context, size_t *count)
+{
+    if (!context)
+        return (NULL);
+    if (count)
+        *count = context->file_count;
+    return (context->files);
 }

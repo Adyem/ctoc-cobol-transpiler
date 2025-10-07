@@ -14,24 +14,26 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Specify supported command-line options and environment variables for the driver.
 - [x] Build a command-line driver that accepts source paths and target direction (CBL-C→COBOL or COBOL→CBL-C).
 - [x] Add configuration handling for output directories, formatting options, and diagnostics levels.
+- [x] Integrate logging and error reporting consistent with libft capabilities.
 - [x] Inventory the existing CBL-C language samples and document required tokens and constructs.
 - [x] Define the authoritative CBL-C grammar (expressions, statements, declarations, file directives).
 - [x] Define baseline sample programs for both translation directions.
 - [x] Determine the minimum COBOL dialect requirements and document unsupported features.
 - [x] Enforce void-only function signatures so generated procedures communicate via references.
 - [x] Capture `void main()` entrypoint metadata and track argument mirroring requirements for COBOL.
+- [x] Provide semantic analysis for type checking, scope resolution, and file/record validation.
+- [x] Surface semantic diagnostics through the existing diagnostics subsystem.
+- [x] Package CLI usage examples and documentation for the design doc.
+- [x] Map file declarations to ENVIRONMENT/DATA DIVISION blocks with inferred record sizes.
+- [x] Encode data type mappings and formatting helpers for elementary items and groups.
+- [x] Emit procedural COBOL for control flow (IF, PERFORM UNTIL, PERFORM VARYING) matching CBL-C semantics.
 
 ## Pending Features
 
 ### Core Language Frontend
 - [x] Build a parser that constructs an AST for the supported CBL-C subset.
-- [ ] Provide semantic analysis for type checking, scope resolution, and file/record validation.
-- [ ] Surface semantic diagnostics through the existing diagnostics subsystem.
 
 ### COBOL Code Generation (CBL-C → COBOL)
-- [ ] Map file declarations to ENVIRONMENT/DATA DIVISION blocks with inferred record sizes.
-- [ ] Encode data type mappings and formatting helpers for elementary items and groups.
-- [ ] Emit procedural COBOL for control flow (IF, PERFORM UNTIL, PERFORM VARYING) matching CBL-C semantics.
 - [ ] Generate COBOL paragraphs for user-defined functions or reusable blocks.
 - [ ] Support arithmetic, comparisons, and string operations using libft helpers where necessary.
 - [ ] Implement formatting and indentation rules for generated COBOL source.
@@ -49,8 +51,6 @@ are completed; keep completed items grouped separately from the remaining work t
 - [ ] Document runtime APIs consumed by generated code for future maintenance.
 
 ### Tooling & CLI
-- [ ] Integrate logging and error reporting consistent with libft capabilities.
-- [ ] Package CLI usage examples and documentation for the design doc.
 
 ### Testing & Quality Gates
 - [ ] Establish golden-file tests for representative snippets covering both translation directions.
