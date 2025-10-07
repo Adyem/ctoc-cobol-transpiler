@@ -30,6 +30,24 @@ COBOL paragraphs, and every sample includes a `function main()` entrypoint that 
 - **Constructs:** `record` types with scalar members, integer state tracked in global variables, `while` loops over `read` calls,
   and conditional aggregation guarded by `starts_with`.
 
+### `samples/cblc/reverse_constructs.cblc`
+- **Purpose:** Serves as the golden CBL-C output for the reverse emitter integration test that exercises COBOL control flow and
+  file I/O recovery.
+- **Constructs:** Uppercase identifier normalization, `open`/`close` pairs, negated `while` loops, nested `if`/`else` blocks,
+  `read` statements that capture buffers, and `write` calls forwarding the recovered record.
+
+### `samples/cblc/reverse_normalization.cblc`
+- **Purpose:** Captures the expected normalized output when COBOL paragraphs include lowercase identifiers, leading-zero
+  numerics, and inconsistent spacing.
+- **Constructs:** Multiple `function` blocks separated by a single blank line, uppercase identifier emission with collapsed
+  underscores, canonical numeric literals, and normalized string literal quoting.
+
+### `samples/cblc/reverse_control_flow.cblc`
+- **Purpose:** Locks down the recovered CBL-C for nested conditionals and loops so the reverse emitter preserves complex
+  control-flow structure.
+- **Constructs:** `if` statements with negated conditions, `while` loops sourced from `PERFORM UNTIL` and `PERFORM VARYING`,
+  counter initialization and increment patterns, and trailing `return ;` statements for each recovered function.
+
 ## Maintenance Checklist
 
 1. Add a new `.cblc` file under `samples/cblc` when introducing language features that need sample coverage.

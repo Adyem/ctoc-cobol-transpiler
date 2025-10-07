@@ -2,7 +2,7 @@
 
 #include "test_suites.hpp"
 
-static int test_runtime_file_write_and_read_text(void)
+FT_TEST(test_runtime_file_write_and_read_text)
 {
     const char *path;
     const char *contents;
@@ -62,7 +62,7 @@ static int test_runtime_file_write_and_read_text(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_file_open_read_missing_path(void)
+FT_TEST(test_runtime_file_open_read_missing_path)
 {
     t_runtime_file file;
 
@@ -78,7 +78,7 @@ static int test_runtime_file_open_read_missing_path(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_file_reopen_transitions_modes(void)
+FT_TEST(test_runtime_file_reopen_transitions_modes)
 {
     const char *path;
     const char *contents;
@@ -138,7 +138,7 @@ static int test_runtime_file_reopen_transitions_modes(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_file_requires_open_descriptor(void)
+FT_TEST(test_runtime_file_requires_open_descriptor)
 {
     t_runtime_file file;
     char buffer[8];

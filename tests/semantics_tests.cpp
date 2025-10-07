@@ -201,7 +201,7 @@ static int semantics_attach_procedure_with_move(t_ast_node *program, const char 
     return (FT_SUCCESS);
 }
 
-static int test_semantics_accepts_declared_move(void)
+FT_TEST(test_semantics_accepts_declared_move)
 {
     t_transpiler_context context;
     t_ast_node *program;
@@ -232,7 +232,7 @@ static int test_semantics_accepts_declared_move(void)
     return (status);
 }
 
-static int test_semantics_rejects_undeclared_identifier(void)
+FT_TEST(test_semantics_rejects_undeclared_identifier)
 {
     t_transpiler_context context;
     t_ast_node *program;
@@ -268,7 +268,7 @@ static int test_semantics_rejects_undeclared_identifier(void)
     return (status);
 }
 
-static int test_semantics_detects_duplicate_data_item(void)
+FT_TEST(test_semantics_detects_duplicate_data_item)
 {
     t_transpiler_context context;
     t_ast_node *program;

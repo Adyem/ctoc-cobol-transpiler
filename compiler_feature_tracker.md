@@ -39,6 +39,10 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Add round-trip tests to ensure COBOL emitted from CBL-C re-parses to the original program.
 - [x] Parse the ANSI-85 subset of COBOL targeted by the forward compiler.
 - [x] Audit existing runtime helpers for compatibility with libft memory allocation patterns.
+- [x] Recover higher-level constructs (loops, conditionals, file I/O) from procedural COBOL into CBL-C syntax.
+- [x] Validate round-trip fidelity with golden input/output fixtures.
+- [x] Normalize identifiers, literal formats, and layout during re-emission to produce idiomatic CBL-C.
+- [x] Integrate continuous integration scripts (make targets) that build, run tests, and lint the codebase.
 
 ## Pending Features
 
@@ -46,14 +50,10 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Build a parser that constructs an AST for the supported CBL-C subset.
 
 ### Reverse Pipeline (COBOL → CBL-C)
-- [ ] Recover higher-level constructs (loops, conditionals, file I/O) from procedural COBOL into CBL-C syntax.
-- [ ] Normalize identifiers, literal formats, and layout during re-emission to produce idiomatic CBL-C.
-- [ ] Validate round-trip fidelity with golden input/output fixtures.
 
 ### Tooling & CLI
 
 ### Testing & Quality Gates
-- [ ] Integrate continuous integration scripts (make targets) that build, run tests, and lint the codebase.
 
 ### Stretch / Future Enhancements
 - [ ] Extend the grammar to support advanced numeric picture clauses, OCCURS tables, and paragraph factoring.

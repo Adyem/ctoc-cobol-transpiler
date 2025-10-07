@@ -3,7 +3,7 @@
 #include "libft/CMA/CMA.hpp"
 #include "test_suites.hpp"
 
-static int test_transpiler_codegen_emits_text_file_sections(void)
+FT_TEST(test_transpiler_codegen_emits_text_file_sections)
 {
     t_transpiler_context context;
     t_transpiler_cobol_file_sections sections;
@@ -44,7 +44,7 @@ cleanup:
     return (status);
 }
 
-static int test_transpiler_codegen_respects_explicit_record_length(void)
+FT_TEST(test_transpiler_codegen_respects_explicit_record_length)
 {
     t_transpiler_context context;
     t_transpiler_cobol_file_sections sections;
@@ -85,7 +85,7 @@ cleanup:
     return (status);
 }
 
-static int test_transpiler_codegen_formats_if_else(void)
+FT_TEST(test_transpiler_codegen_formats_if_else)
 {
     t_transpiler_cobol_procedure procedure;
     t_transpiler_cobol_paragraph *paragraph;
@@ -174,7 +174,7 @@ cleanup:
     return (status);
 }
 
-static int test_transpiler_codegen_formats_perform_until(void)
+FT_TEST(test_transpiler_codegen_formats_perform_until)
 {
     t_transpiler_cobol_procedure procedure;
     t_transpiler_cobol_paragraph *paragraph;
@@ -250,7 +250,7 @@ cleanup:
     return (status);
 }
 
-static int test_transpiler_codegen_formats_perform_varying(void)
+FT_TEST(test_transpiler_codegen_formats_perform_varying)
 {
     t_transpiler_cobol_procedure procedure;
     t_transpiler_cobol_paragraph *paragraph;
@@ -326,7 +326,7 @@ cleanup:
     return (status);
 }
 
-static int test_transpiler_codegen_emits_multiple_paragraphs(void)
+FT_TEST(test_transpiler_codegen_emits_multiple_paragraphs)
 {
     t_transpiler_cobol_procedure procedure;
     t_transpiler_cobol_paragraph *main_paragraph;

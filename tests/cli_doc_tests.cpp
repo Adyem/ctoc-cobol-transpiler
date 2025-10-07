@@ -36,7 +36,7 @@ static int cli_usage_document_expect_contains(const char *buffer, const char *sn
     return (FT_SUCCESS);
 }
 
-static int test_cli_usage_document_exists(void)
+FT_TEST(test_cli_usage_document_exists)
 {
     char buffer[32768];
 
@@ -52,7 +52,7 @@ static int test_cli_usage_document_exists(void)
     return (FT_SUCCESS);
 }
 
-static int test_cli_usage_lists_supported_flags(void)
+FT_TEST(test_cli_usage_lists_supported_flags)
 {
     static const char *snippets[] = {
         "--direction",
@@ -80,7 +80,7 @@ static int test_cli_usage_lists_supported_flags(void)
     return (FT_SUCCESS);
 }
 
-static int test_cli_usage_mentions_environment_variable(void)
+FT_TEST(test_cli_usage_mentions_environment_variable)
 {
     char buffer[32768];
 
@@ -93,7 +93,7 @@ static int test_cli_usage_mentions_environment_variable(void)
     return (FT_SUCCESS);
 }
 
-static int test_design_doc_references_cli_usage_document(void)
+FT_TEST(test_design_doc_references_cli_usage_document)
 {
     FILE *file;
     char line[1024];

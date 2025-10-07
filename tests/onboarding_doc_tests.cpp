@@ -36,7 +36,7 @@ static int onboarding_doc_expect_contains(const char *buffer, const char *snippe
     return (FT_SUCCESS);
 }
 
-static int test_onboarding_doc_exists(void)
+FT_TEST(test_onboarding_doc_exists)
 {
     char buffer[65536];
 
@@ -52,7 +52,7 @@ static int test_onboarding_doc_exists(void)
     return (FT_SUCCESS);
 }
 
-static int test_onboarding_doc_covers_repository_setup(void)
+FT_TEST(test_onboarding_doc_covers_repository_setup)
 {
     char buffer[65536];
 
@@ -67,7 +67,7 @@ static int test_onboarding_doc_covers_repository_setup(void)
     return (FT_SUCCESS);
 }
 
-static int test_onboarding_doc_highlights_testing_steps(void)
+FT_TEST(test_onboarding_doc_highlights_testing_steps)
 {
     char buffer[65536];
 
@@ -82,7 +82,7 @@ static int test_onboarding_doc_highlights_testing_steps(void)
     return (FT_SUCCESS);
 }
 
-static int test_design_doc_links_onboarding_checklist(void)
+FT_TEST(test_design_doc_links_onboarding_checklist)
 {
     FILE *file;
     char line[1024];

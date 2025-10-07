@@ -1,0 +1,13 @@
+function MAIN() {
+    open(INPUT_FILE, "r");
+    while (!(EOF_FLAG == "Y")) {
+        read(INPUT_FILE, OUTPUT_RECORD);
+        if (EOF_FLAG == "N") {
+            write(OUTPUT_FILE, OUTPUT_RECORD);
+        } else {
+            EOF_FLAG = "Y";
+        }
+    }
+    close(INPUT_FILE);
+    return ;
+}

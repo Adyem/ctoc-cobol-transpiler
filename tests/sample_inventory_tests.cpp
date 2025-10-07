@@ -335,7 +335,7 @@ static int validate_cblc_sample_functions_unique(const char *manifest_path)
     return (FT_SUCCESS);
 }
 
-static int test_sample_manifest_entries_exist(void)
+FT_TEST(test_sample_manifest_entries_exist)
 {
     if (validate_manifest_entries("samples/cblc/manifest.txt") != FT_SUCCESS)
         return (FT_FAILURE);
@@ -344,7 +344,7 @@ static int test_sample_manifest_entries_exist(void)
     return (FT_SUCCESS);
 }
 
-static int test_sample_inventory_documents_manifest(void)
+FT_TEST(test_sample_inventory_documents_manifest)
 {
     if (validate_inventory_mentions("samples/cblc/manifest.txt", "docs/cblc_sample_inventory.md") != FT_SUCCESS)
         return (FT_FAILURE);
@@ -353,14 +353,14 @@ static int test_sample_inventory_documents_manifest(void)
     return (FT_SUCCESS);
 }
 
-static int test_cblc_samples_define_unique_functions(void)
+FT_TEST(test_cblc_samples_define_unique_functions)
 {
     if (validate_cblc_sample_functions_unique("samples/cblc/manifest.txt") != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
 
-static int test_sample_manifests_have_pairs(void)
+FT_TEST(test_sample_manifests_have_pairs)
 {
     if (validate_sample_pairs_match() != FT_SUCCESS)
         return (FT_FAILURE);

@@ -2,7 +2,7 @@
 
 #include "test_suites.hpp"
 
-static int test_ast_node_add_child_preserves_order(void)
+FT_TEST(test_ast_node_add_child_preserves_order)
 {
     t_ast_node *program;
     t_ast_node *division;
@@ -49,7 +49,7 @@ static int test_ast_node_add_child_preserves_order(void)
     return (status);
 }
 
-static int test_ast_node_set_token_copies_lexeme(void)
+FT_TEST(test_ast_node_set_token_copies_lexeme)
 {
     t_ast_node *node;
     t_lexer_token token;

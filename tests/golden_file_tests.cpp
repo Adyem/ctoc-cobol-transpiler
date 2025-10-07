@@ -12,7 +12,7 @@ static int golden_expect_file_matches(const char *path, const char *expected,
     return (FT_SUCCESS);
 }
 
-static int test_cblc_copy_file_matches_golden(void)
+FT_TEST(test_cblc_copy_file_matches_golden)
 {
     static const char expected[] =
         "file in \"input.txt\";\n"
@@ -37,7 +37,7 @@ static int test_cblc_copy_file_matches_golden(void)
     return (FT_SUCCESS);
 }
 
-static int test_cblc_filter_prefix_matches_golden(void)
+FT_TEST(test_cblc_filter_prefix_matches_golden)
 {
     static const char expected[] =
         "file in \"input.txt\";\n"
@@ -64,7 +64,7 @@ static int test_cblc_filter_prefix_matches_golden(void)
     return (FT_SUCCESS);
 }
 
-static int test_cblc_record_writer_matches_golden(void)
+FT_TEST(test_cblc_record_writer_matches_golden)
 {
     static const char expected[] =
         "record Person {\n"
@@ -90,7 +90,7 @@ static int test_cblc_record_writer_matches_golden(void)
     return (FT_SUCCESS);
 }
 
-static int test_cblc_record_summary_matches_golden(void)
+FT_TEST(test_cblc_record_summary_matches_golden)
 {
     static const char expected[] =
         "record RecordEntry {\n"
@@ -123,7 +123,7 @@ static int test_cblc_record_summary_matches_golden(void)
     return (FT_SUCCESS);
 }
 
-static int test_cobol_copy_file_matches_golden(void)
+FT_TEST(test_cobol_copy_file_matches_golden)
 {
     static const char expected[] =
         "       IDENTIFICATION DIVISION.\n"
@@ -162,7 +162,7 @@ static int test_cobol_copy_file_matches_golden(void)
     return (FT_SUCCESS);
 }
 
-static int test_cobol_filter_prefix_matches_golden(void)
+FT_TEST(test_cobol_filter_prefix_matches_golden)
 {
     static const char expected[] =
         "       IDENTIFICATION DIVISION.\n"
@@ -206,7 +206,7 @@ static int test_cobol_filter_prefix_matches_golden(void)
     return (FT_SUCCESS);
 }
 
-static int test_cobol_record_writer_matches_golden(void)
+FT_TEST(test_cobol_record_writer_matches_golden)
 {
     static const char expected[] =
         "       IDENTIFICATION DIVISION.\n"
@@ -242,7 +242,7 @@ static int test_cobol_record_writer_matches_golden(void)
     return (FT_SUCCESS);
 }
 
-static int test_cobol_record_summary_matches_golden(void)
+FT_TEST(test_cobol_record_summary_matches_golden)
 {
     static const char expected[] =
         "       IDENTIFICATION DIVISION.\n"

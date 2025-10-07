@@ -2,7 +2,7 @@
 
 #include "test_suites.hpp"
 
-static int test_logging_info_requires_verbose(void)
+FT_TEST(test_logging_info_requires_verbose)
 {
     t_transpiler_context context;
 
@@ -44,7 +44,7 @@ static int test_logging_info_requires_verbose(void)
     return (FT_SUCCESS);
 }
 
-static int test_logging_warning_respects_silent_level(void)
+FT_TEST(test_logging_warning_respects_silent_level)
 {
     t_transpiler_context context;
 
@@ -93,7 +93,7 @@ static int test_logging_warning_respects_silent_level(void)
     return (FT_SUCCESS);
 }
 
-static int test_logging_stage_failure_records_error(void)
+FT_TEST(test_logging_stage_failure_records_error)
 {
     t_transpiler_context context;
 
@@ -131,7 +131,7 @@ static int test_logging_stage_failure_records_error(void)
     return (FT_SUCCESS);
 }
 
-static int test_logging_stage_progress_requires_verbose(void)
+FT_TEST(test_logging_stage_progress_requires_verbose)
 {
     t_transpiler_context context;
 

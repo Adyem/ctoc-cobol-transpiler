@@ -5,6 +5,111 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+static size_t g_total_tests = 0;
+static size_t g_failed_tests = 0;
+
+static void test_format_index(size_t value, char *buffer, size_t buffer_size)
+{
+    size_t position;
+    size_t left;
+    size_t right;
+    char temp;
+
+    if (!buffer || buffer_size == 0)
+        return ;
+    if (buffer_size == 1)
+    {
+        buffer[0] = '\0';
+        return ;
+    }
+    if (value == 0)
+    {
+        buffer[0] = '0';
+        buffer[1] = '\0';
+        return ;
+    }
+    position = 0;
+    while (value > 0 && position + 1 < buffer_size)
+    {
+        buffer[position] = static_cast<char>('0' + (value % 10));
+        value /= 10;
+        position += 1;
+    }
+    if (value > 0)
+    {
+        buffer[buffer_size - 1] = '\0';
+        return ;
+    }
+    buffer[position] = '\0';
+    if (position == 0)
+        return ;
+    left = 0;
+    right = position - 1;
+    while (left < right)
+    {
+        temp = buffer[left];
+        buffer[left] = buffer[right];
+        buffer[right] = temp;
+        left += 1;
+        right -= 1;
+    }
+}
+
+static void test_format_description(const char *name, char *buffer, size_t buffer_size)
+{
+    size_t index;
+    size_t output;
+    size_t start;
+    int capitalize;
+    char current;
+
+    if (!buffer || buffer_size == 0)
+        return ;
+    buffer[0] = '\0';
+    if (!name)
+        return ;
+    start = 0;
+    if (ft_strncmp(name, "test_", 5) == 0)
+        start = 5;
+    index = start;
+    output = 0;
+    capitalize = 1;
+    while (name[index] != '\0' && output + 1 < buffer_size)
+    {
+        current = name[index];
+        if (current == '_')
+        {
+            if (output > 0 && buffer[output - 1] != ' ')
+            {
+                buffer[output] = ' ';
+                output += 1;
+            }
+            capitalize = 1;
+        }
+        else
+        {
+            if (capitalize && current >= 'a' && current <= 'z')
+                current = static_cast<char>(current - 'a' + 'A');
+            buffer[output] = current;
+            output += 1;
+            capitalize = 0;
+        }
+        index += 1;
+    }
+    if (output > 0 && buffer[output - 1] == ' ')
+        output -= 1;
+    buffer[output] = '\0';
+}
+
+int test_assert_failure(const char *expression, const char *file, int line)
+{
+    if (expression)
+        pf_printf("Assertion failed: %s (%s:%d)\n", expression, file, line);
+    else
+        pf_printf("Assertion failed at %s:%d\n", file, line);
+    return (FT_FAILURE);
+}
+
 int test_expect_success(int status, const char *message)
 {
     if (status == FT_SUCCESS)
@@ -219,15 +324,34 @@ void test_remove_file(const char *path)
 int run_test_case(const t_test_case *test)
 {
     int status;
+    size_t test_index;
+    char description[128];
+    char index_text[16];
 
     if (!test)
         return (FT_FAILURE);
-    pf_printf("Running %s...\n", test->name);
+    test_index = g_total_tests + 1;
+    g_total_tests += 1;
+    test_format_description(test->name, description, sizeof(description));
+    if (description[0] == '\0' && test->name)
+        ft_strlcpy(description, test->name, sizeof(description));
+    test_format_index(test_index, index_text, sizeof(index_text));
     status = test->execute();
     if (status != FT_SUCCESS)
-        pf_printf("FAILED %s\n", test->name);
+    {
+        pf_printf("FT_TEST KO test number ");
+        pf_printf("%s", index_text);
+        pf_printf(" - ");
+        pf_printf("%s\n", description);
+        g_failed_tests += 1;
+    }
     else
-        pf_printf("PASSED %s\n", test->name);
+    {
+        pf_printf("FT_TEST OK test number ");
+        pf_printf("%s", index_text);
+        pf_printf(" - ");
+        pf_printf("%s\n", description);
+    }
     return (status);
 }
 
@@ -247,4 +371,17 @@ int run_test_suite(const t_test_case *tests, size_t count)
         index += 1;
     }
     return (status);
+}
+
+void test_report_summary(void)
+{
+    size_t passed;
+
+    passed = g_total_tests - g_failed_tests;
+    pf_printf("============================================\n");
+    pf_printf("Total: %zu | Passed: %zu | Failed: %zu\n", g_total_tests, passed, g_failed_tests);
+    if (g_failed_tests == 0)
+        pf_printf("Result: ALL TESTS PASSED\n");
+    else
+        pf_printf("Result: TESTS FAILED\n");
 }

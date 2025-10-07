@@ -27,6 +27,24 @@ filesystem synchronized.
 - **Constructs:** Sequential file input, status-driven conditional logic, `ADD` statements updating counters, and stored totals
   in WORKING-STORAGE.
 
+### `samples/cobol/reverse_constructs.cob`
+- **Purpose:** Drives the COBOL→CBL-C reverse emitter against the constructs it currently recovers so we can enforce the output
+  shape with golden fixtures.
+- **Constructs:** `PERFORM UNTIL` loops, `READ ... INTO` file operations, guarded `IF`/`ELSE` blocks, `WRITE ... FROM` output,
+  and `MOVE` statements updating sentinel flags.
+
+### `samples/cobol/reverse_normalization.cob`
+- **Purpose:** Exercises identifier, literal, and layout normalization paths so the reverse emitter can produce idiomatic CBL-C
+  even from loosely formatted COBOL.
+- **Constructs:** Hyphenated identifiers, lowercase working-storage names, string literals with mixed casing, numeric literals
+  that include leading zeros, multiple procedure paragraphs, and STOP statements.
+
+### `samples/cobol/reverse_control_flow.cob`
+- **Purpose:** Expands the reverse fixtures with combined conditional branches and looping constructs so complex control flow
+  sequencing stays stable under round-trip testing.
+- **Constructs:** `IF NOT` conditionals, `PERFORM UNTIL` loops, `PERFORM VARYING` counters, sequential `MOVE` assignments, and
+  STOP statements spread across multiple procedure paragraphs.
+
 ## Maintenance Checklist
 
 1. Add a new `.cob` file under `samples/cobol` when introducing COBOL-side language features that need sample coverage.

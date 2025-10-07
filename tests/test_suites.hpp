@@ -31,5 +31,7 @@ const t_test_case *get_contributing_doc_tests(size_t *count);
 const t_test_case *get_onboarding_doc_tests(size_t *count);
 const t_test_case *get_transpiler_context_tests(size_t *count);
 const t_test_case *get_logging_tests(size_t *count);
+const t_test_case *get_cobol_reverse_tests(size_t *count);
+const t_test_case *get_ci_tests(size_t *count);
 
 #endif

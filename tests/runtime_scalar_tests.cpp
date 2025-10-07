@@ -123,7 +123,7 @@ static int test_expect_token(const t_lexer_token *token, t_lexer_token_kind expe
     return (FT_SUCCESS);
 }
 
-static int test_ast_node_add_child_preserves_order(void)
+FT_TEST(test_ast_node_add_child_preserves_order)
 {
     t_ast_node *program;
     t_ast_node *division;
@@ -170,7 +170,7 @@ static int test_ast_node_add_child_preserves_order(void)
     return (status);
 }
 
-static int test_ast_node_set_token_copies_lexeme(void)
+FT_TEST(test_ast_node_set_token_copies_lexeme)
 {
     t_ast_node *node;
     t_lexer_token token;
@@ -369,7 +369,7 @@ static int test_run_command_expect_failure(const char *command)
     return (FT_SUCCESS);
 }
 
-static int test_lexer_keyword_lookup_identifies_keywords(void)
+FT_TEST(test_lexer_keyword_lookup_identifies_keywords)
 {
     t_lexer_token_kind kind;
 
@@ -394,7 +394,7 @@ static int test_lexer_keyword_lookup_identifies_keywords(void)
     return (FT_SUCCESS);
 }
 
-static int test_lexer_keyword_lookup_defaults_to_identifier(void)
+FT_TEST(test_lexer_keyword_lookup_defaults_to_identifier)
 {
     t_lexer_token_kind kind;
 
@@ -407,7 +407,7 @@ static int test_lexer_keyword_lookup_defaults_to_identifier(void)
     return (FT_SUCCESS);
 }
 
-static int test_lexer_trivia_detects_whitespace(void)
+FT_TEST(test_lexer_trivia_detects_whitespace)
 {
     const char *text;
     t_lexer_trivia_kind trivia;
@@ -422,7 +422,7 @@ static int test_lexer_trivia_detects_whitespace(void)
     return (FT_SUCCESS);
 }
 
-static int test_lexer_trivia_detects_comments(void)
+FT_TEST(test_lexer_trivia_detects_comments)
 {
     const char *comment;
     const char *not_comment;
@@ -445,7 +445,7 @@ static int test_lexer_trivia_detects_comments(void)
     return (FT_SUCCESS);
 }
 
-static int test_lexer_tokenizes_sample_program(void)
+FT_TEST(test_lexer_tokenizes_sample_program)
 {
     const char *source;
     t_lexer lexer;
@@ -511,7 +511,7 @@ static int test_lexer_tokenizes_sample_program(void)
     return (FT_SUCCESS);
 }
 
-static int test_lexer_reports_unterminated_string(void)
+FT_TEST(test_lexer_reports_unterminated_string)
 {
     const char *source;
     t_lexer lexer;
@@ -552,7 +552,7 @@ static void test_cleanup_example_artifacts(const char *source_path, const char *
     test_remove_file(source_path);
 }
 
-static int test_runtime_file_write_and_read_text(void)
+FT_TEST(test_runtime_file_write_and_read_text)
 {
     const char *path;
     const char *contents;
@@ -610,7 +610,7 @@ static int test_runtime_file_write_and_read_text(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_file_open_read_missing_path(void)
+FT_TEST(test_runtime_file_open_read_missing_path)
 {
     t_runtime_file file;
 
@@ -626,7 +626,7 @@ static int test_runtime_file_open_read_missing_path(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_file_reopen_transitions_modes(void)
+FT_TEST(test_runtime_file_reopen_transitions_modes)
 {
     const char *path;
     const char *contents;
@@ -686,7 +686,7 @@ static int test_runtime_file_reopen_transitions_modes(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_file_requires_open_descriptor(void)
+FT_TEST(test_runtime_file_requires_open_descriptor)
 {
     t_runtime_file file;
     char buffer[8];
@@ -708,7 +708,7 @@ static int test_runtime_file_requires_open_descriptor(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_int_add_and_subtract(void)
+FT_TEST(test_runtime_int_add_and_subtract)
 {
     t_runtime_int left;
     t_runtime_int right;
@@ -727,7 +727,7 @@ static int test_runtime_int_add_and_subtract(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_int_add_detects_overflow(void)
+FT_TEST(test_runtime_int_add_detects_overflow)
 {
     t_runtime_int left;
     t_runtime_int right;
@@ -746,7 +746,7 @@ static int test_runtime_int_add_detects_overflow(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_int_to_string(void)
+FT_TEST(test_runtime_int_to_string)
 {
     t_runtime_int value;
     char buffer[32];
@@ -762,7 +762,7 @@ static int test_runtime_int_to_string(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_int_to_string_rejects_small_buffer(void)
+FT_TEST(test_runtime_int_to_string_rejects_small_buffer)
 {
     t_runtime_int value;
     char buffer[1];
@@ -779,7 +779,7 @@ static int test_runtime_int_to_string_rejects_small_buffer(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_int_from_string(void)
+FT_TEST(test_runtime_int_from_string)
 {
     t_runtime_int value;
 
@@ -799,7 +799,7 @@ static int test_runtime_int_from_string(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_char_transforms(void)
+FT_TEST(test_runtime_char_transforms)
 {
     t_runtime_char value;
 
@@ -813,7 +813,7 @@ static int test_runtime_char_transforms(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_char_from_string_rejects_empty_input(void)
+FT_TEST(test_runtime_char_from_string_rejects_empty_input)
 {
     t_runtime_char value;
 
@@ -828,7 +828,7 @@ static int test_runtime_char_from_string_rejects_empty_input(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_char_to_string_and_compare(void)
+FT_TEST(test_runtime_char_to_string_and_compare)
 {
     t_runtime_char left;
     t_runtime_char right;
@@ -855,7 +855,7 @@ static int test_runtime_char_to_string_and_compare(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_string_assign_and_trim(void)
+FT_TEST(test_runtime_string_assign_and_trim)
 {
     t_runtime_string value;
 
@@ -885,7 +885,7 @@ static int test_runtime_string_assign_and_trim(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_string_compare_orders_text(void)
+FT_TEST(test_runtime_string_compare_orders_text)
 {
     t_runtime_string left;
     t_runtime_string right;
@@ -942,7 +942,7 @@ static int test_runtime_string_compare_orders_text(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_string_to_int_parses_numbers(void)
+FT_TEST(test_runtime_string_to_int_parses_numbers)
 {
     t_runtime_string text;
     t_runtime_int value;
@@ -998,7 +998,7 @@ static int test_stage_callback(t_transpiler_context *context, void *user_data)
     return (FT_SUCCESS);
 }
 
-static int test_transpiler_pipeline_executes_stage(void)
+FT_TEST(test_transpiler_pipeline_executes_stage)
 {
     t_transpiler_pipeline pipeline;
     t_transpiler_context context;
@@ -1051,7 +1051,7 @@ static int early_failing_stage_callback(t_transpiler_context *context, void *use
     return (FT_FAILURE);
 }
 
-static int test_transpiler_pipeline_reports_failure(void)
+FT_TEST(test_transpiler_pipeline_reports_failure)
 {
     t_transpiler_pipeline pipeline;
     t_transpiler_context context;
@@ -1107,7 +1107,7 @@ static int test_transpiler_pipeline_reports_failure(void)
     return (FT_SUCCESS);
 }
 
-static int test_transpiler_pipeline_stops_after_failure(void)
+FT_TEST(test_transpiler_pipeline_stops_after_failure)
 {
     t_transpiler_pipeline pipeline;
     t_transpiler_context context;
@@ -1151,7 +1151,7 @@ static int test_transpiler_pipeline_stops_after_failure(void)
     return (FT_SUCCESS);
 }
 
-static int test_compiler_builds_example_c_file(void)
+FT_TEST(test_compiler_builds_example_c_file)
 {
     const char *source_path;
     const char *binary_path;
@@ -1214,41 +1214,54 @@ static int test_compiler_builds_example_c_file(void)
     return (FT_SUCCESS);
 }
 
-static int test_compiler_rejects_invalid_c_file(void)
+FT_TEST(test_compiler_rejects_invalid_c_file)
 {
     const char *source_path;
     const char *binary_path;
+    const char *output_path;
     const char *source_code;
+    const char *expected_fragment;
     char command[256];
+    char output_buffer[512];
     int command_length;
 
     source_path = "test_example_invalid_compiler.c";
     binary_path = "test_example_invalid_compiler.bin";
+    output_path = "test_example_invalid_compiler.log";
     source_code = "int main(void)\n"
         "{\n"
         "    return 0\n";
     if (test_write_text_file(source_path, source_code) != FT_SUCCESS)
     {
-        test_remove_file(binary_path);
-        test_remove_file(source_path);
+        test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "cc %s -o %s", source_path, binary_path);
+    command_length = pf_snprintf(command, sizeof(command), "cc %s -o %s 2> %s", source_path, binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
-        test_remove_file(binary_path);
-        test_remove_file(source_path);
+        test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
     if (test_run_command_expect_failure(command) != FT_SUCCESS)
     {
         pf_printf("Assertion failed: compiler should reject invalid source\n");
-        test_remove_file(binary_path);
-        test_remove_file(source_path);
+        test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
-    test_remove_file(binary_path);
-    test_remove_file(source_path);
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: compiler diagnostics should be captured\n");
+        test_cleanup_example_artifacts(source_path, binary_path, output_path);
+        return (FT_FAILURE);
+    }
+    expected_fragment = "error: expected";
+    if (!ft_strnstr(output_buffer, expected_fragment, ft_strlen(output_buffer)))
+    {
+        pf_printf("Assertion failed: compiler diagnostics should mention syntax error\n");
+        test_cleanup_example_artifacts(source_path, binary_path, output_path);
+        return (FT_FAILURE);
+    }
+    test_cleanup_example_artifacts(source_path, binary_path, output_path);
     return (FT_SUCCESS);
 }
 

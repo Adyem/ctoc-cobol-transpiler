@@ -3,7 +3,7 @@
 #include "libft/Libft/libft.hpp"
 #include "test_suites.hpp"
 
-static int test_parser_parses_minimal_program(void)
+FT_TEST(test_parser_parses_minimal_program)
 {
     const char *source;
     t_parser parser;
@@ -193,7 +193,7 @@ static int test_parser_parses_minimal_program(void)
     return (FT_SUCCESS);
 }
 
-static int test_parser_parses_control_flow_statements(void)
+FT_TEST(test_parser_parses_control_flow_statements)
 {
     const char *source;
     t_parser parser;
@@ -439,7 +439,7 @@ static int test_parser_parses_control_flow_statements(void)
     return (FT_SUCCESS);
 }
 
-static int test_parser_rejects_unknown_statement(void)
+FT_TEST(test_parser_rejects_unknown_statement)
 {
     const char *source;
     t_parser parser;

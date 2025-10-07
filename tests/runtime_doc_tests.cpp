@@ -36,7 +36,7 @@ static int runtime_doc_expect_contains(const char *buffer, const char *snippet)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_doc_exists(void)
+FT_TEST(test_runtime_doc_exists)
 {
     char buffer[65536];
 
@@ -52,7 +52,7 @@ static int test_runtime_doc_exists(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_doc_lists_modules(void)
+FT_TEST(test_runtime_doc_lists_modules)
 {
     static const char *snippets[] = {
         "runtime_scalar",
@@ -77,7 +77,7 @@ static int test_runtime_doc_lists_modules(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_doc_mentions_cma(void)
+FT_TEST(test_runtime_doc_mentions_cma)
 {
     char buffer[65536];
 
@@ -90,7 +90,7 @@ static int test_runtime_doc_mentions_cma(void)
     return (FT_SUCCESS);
 }
 
-static int test_design_doc_references_runtime_doc(void)
+FT_TEST(test_design_doc_references_runtime_doc)
 {
     FILE *file;
     char line[1024];

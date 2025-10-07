@@ -7,7 +7,7 @@ static void test_cleanup_example_artifacts(const char *source_path, const char *
     test_remove_file(source_path);
 }
 
-static int test_compiler_builds_example_c_file(void)
+FT_TEST(test_compiler_builds_example_c_file)
 {
     const char *source_path;
     const char *binary_path;
@@ -70,41 +70,54 @@ static int test_compiler_builds_example_c_file(void)
     return (FT_SUCCESS);
 }
 
-static int test_compiler_rejects_invalid_c_file(void)
+FT_TEST(test_compiler_rejects_invalid_c_file)
 {
     const char *source_path;
     const char *binary_path;
+    const char *output_path;
     const char *source_code;
+    const char *expected_fragment;
     char command[256];
+    char output_buffer[512];
     int command_length;
 
     source_path = "test_example_invalid_compiler.c";
     binary_path = "test_example_invalid_compiler.bin";
+    output_path = "test_example_invalid_compiler.log";
     source_code = "int main(void)\n"
         "{\n"
         "    return 0\n";
     if (test_write_text_file(source_path, source_code) != FT_SUCCESS)
     {
-        test_remove_file(binary_path);
-        test_remove_file(source_path);
+        test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "cc %s -o %s", source_path, binary_path);
+    command_length = pf_snprintf(command, sizeof(command), "cc %s -o %s 2> %s", source_path, binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
-        test_remove_file(binary_path);
-        test_remove_file(source_path);
+        test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
     if (test_run_command_expect_failure(command) != FT_SUCCESS)
     {
         pf_printf("Assertion failed: compiler should reject invalid source\n");
-        test_remove_file(binary_path);
-        test_remove_file(source_path);
+        test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
-    test_remove_file(binary_path);
-    test_remove_file(source_path);
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: compiler diagnostics should be captured\n");
+        test_cleanup_example_artifacts(source_path, binary_path, output_path);
+        return (FT_FAILURE);
+    }
+    expected_fragment = "error: expected";
+    if (!ft_strnstr(output_buffer, expected_fragment, ft_strlen(output_buffer)))
+    {
+        pf_printf("Assertion failed: compiler diagnostics should mention syntax error\n");
+        test_cleanup_example_artifacts(source_path, binary_path, output_path);
+        return (FT_FAILURE);
+    }
+    test_cleanup_example_artifacts(source_path, binary_path, output_path);
     return (FT_SUCCESS);
 }
 

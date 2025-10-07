@@ -3,12 +3,11 @@
 
 #include "test_suites.hpp"
 
-static int test_runtime_string_assign_and_trim(void)
+FT_TEST(test_runtime_string_assign_and_trim)
 {
     t_runtime_string value;
 
-    if (test_expect_success(runtime_string_init(&value, 0), "runtime_string_init should succeed") != FT_SUCCESS)
-        return (FT_FAILURE);
+    FT_ASSERT_SUCCESS(runtime_string_init(&value, 0), "runtime_string_init should succeed");
     if (test_expect_success(runtime_string_assign(&value, "   hello world  "), "runtime_string_assign should copy text") != FT_SUCCESS)
     {
         runtime_string_dispose(&value);
@@ -33,7 +32,7 @@ static int test_runtime_string_assign_and_trim(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_string_compare_orders_text(void)
+FT_TEST(test_runtime_string_compare_orders_text)
 {
     t_runtime_string left;
     t_runtime_string right;
@@ -90,7 +89,7 @@ static int test_runtime_string_compare_orders_text(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_string_to_int_parses_numbers(void)
+FT_TEST(test_runtime_string_to_int_parses_numbers)
 {
     t_runtime_string text;
     t_runtime_int value;
@@ -134,7 +133,7 @@ static int test_runtime_string_to_int_parses_numbers(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_string_equals_detects_matches(void)
+FT_TEST(test_runtime_string_equals_detects_matches)
 {
     t_runtime_string left;
     t_runtime_string right;
@@ -183,7 +182,7 @@ static int test_runtime_string_equals_detects_matches(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_string_concat_appends_text(void)
+FT_TEST(test_runtime_string_concat_appends_text)
 {
     t_runtime_string left;
     t_runtime_string right;

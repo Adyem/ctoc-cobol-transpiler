@@ -2,7 +2,7 @@
 
 #include "test_suites.hpp"
 
-static int test_runtime_char_transforms(void)
+FT_TEST(test_runtime_char_transforms)
 {
     t_runtime_char character;
 
@@ -16,7 +16,7 @@ static int test_runtime_char_transforms(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_char_from_string_rejects_empty_input(void)
+FT_TEST(test_runtime_char_from_string_rejects_empty_input)
 {
     t_runtime_char character;
 
@@ -31,7 +31,7 @@ static int test_runtime_char_from_string_rejects_empty_input(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_char_to_string_and_compare(void)
+FT_TEST(test_runtime_char_to_string_and_compare)
 {
     t_runtime_char left;
     t_runtime_char right;

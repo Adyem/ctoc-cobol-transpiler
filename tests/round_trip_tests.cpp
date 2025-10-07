@@ -40,7 +40,7 @@ static char *test_round_trip_join_fragments(const char *a, const char *b,
     return (result);
 }
 
-static int test_codegen_round_trip_parses_generated_cobol(void)
+FT_TEST(test_codegen_round_trip_parses_generated_cobol)
 {
     t_transpiler_context context;
     t_transpiler_cobol_file_sections sections;

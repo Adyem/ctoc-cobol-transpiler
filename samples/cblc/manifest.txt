@@ -2,3 +2,6 @@ samples/cblc/copy_file.cblc
 samples/cblc/filter_prefix.cblc
 samples/cblc/record_writer.cblc
 samples/cblc/record_summary.cblc
+samples/cblc/reverse_constructs.cblc
+samples/cblc/reverse_normalization.cblc
+samples/cblc/reverse_control_flow.cblc
