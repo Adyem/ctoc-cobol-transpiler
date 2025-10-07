@@ -172,7 +172,7 @@ function NORMALIZE_VALUES() {
 - **Purpose:** Locks down the recovered CBL-C for nested conditionals and loops so the reverse emitter preserves complex
   control-flow structure.
 - **Constructs:** `if` statements with negated conditions, `while` loops sourced from `PERFORM UNTIL` and `PERFORM VARYING`,
-  counter initialization and increment patterns, and trailing `return ;` statements for each recovered function.
+  counter initialization with `++` increments, and trailing `return ;` statements for each recovered function.
 
 ```cblc
 function MAIN() {
@@ -184,7 +184,7 @@ function MAIN() {
         INDEX = 0;
         while (!(INDEX >= LIMIT)) {
             RESULT = INDEX;
-            INDEX = INDEX + 1;
+            INDEX++;
         }
     }
     return ;

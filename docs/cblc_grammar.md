@@ -76,6 +76,8 @@ statement           ::= assignment_statement
 
 assignment_statement ::= identifier assignment_tail
 assignment_tail     ::= '=' expression ';'
+                      | '++' ';'
+                      | '--' ';'
 
 if_statement        ::= 'if' '(' expression ')' statement [ 'else' statement ]
 while_statement     ::= 'while' '(' expression ')' statement

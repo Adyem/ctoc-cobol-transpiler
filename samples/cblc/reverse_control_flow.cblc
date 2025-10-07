@@ -7,7 +7,7 @@ function MAIN() {
         INDEX = 0;
         while (!(INDEX >= LIMIT)) {
             RESULT = INDEX;
-            INDEX = INDEX + 1;
+            INDEX++;
         }
     }
     return ;
