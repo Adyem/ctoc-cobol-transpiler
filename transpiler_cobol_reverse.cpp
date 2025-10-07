@@ -909,7 +909,7 @@ static int cobol_reverse_emit_paragraph(t_transpiler_context *context, t_cblc_bu
         return (FT_FAILURE);
     if (paragraph->kind != AST_NODE_PARAGRAPH)
         return (FT_FAILURE);
-    if (cblc_builder_append_string(builder, "function ") != FT_SUCCESS)
+    if (cblc_builder_append_string(builder, "function void ") != FT_SUCCESS)
         return (FT_FAILURE);
     if (cobol_reverse_append_identifier(builder, &paragraph->token) != FT_SUCCESS)
         return (FT_FAILURE);

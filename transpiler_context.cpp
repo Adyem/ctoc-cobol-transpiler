@@ -52,6 +52,37 @@ static int transpiler_context_files_reserve(t_transpiler_context *context, size_
     return (FT_SUCCESS);
 }
 
+static int transpiler_context_assign_paths(const char ***storage, size_t *count,
+    size_t *capacity, const char **paths, size_t path_count)
+{
+    const char **new_paths;
+
+    if (!storage || !count || !capacity)
+        return (FT_FAILURE);
+    if (path_count == 0)
+    {
+        if (*storage && *capacity > 0)
+            ft_bzero(*storage, *capacity * sizeof(const char *));
+        *count = 0;
+        return (FT_SUCCESS);
+    }
+    if (!paths)
+        return (FT_FAILURE);
+    if (*capacity < path_count)
+    {
+        new_paths = static_cast<const char **>(cma_calloc(path_count, sizeof(const char *)));
+        if (!new_paths)
+            return (FT_FAILURE);
+        if (*storage)
+            cma_free(*storage);
+        *storage = new_paths;
+        *capacity = path_count;
+    }
+    ft_memcpy(*storage, paths, path_count * sizeof(const char *));
+    *count = path_count;
+    return (FT_SUCCESS);
+}
+
 int transpiler_context_init(t_transpiler_context *context)
 {
     if (!context)
@@ -60,6 +91,12 @@ int transpiler_context_init(t_transpiler_context *context)
     context->target_language = TRANSPILE_LANGUAGE_NONE;
     context->source_path = NULL;
     context->target_path = NULL;
+    context->source_paths = NULL;
+    context->source_count = 0;
+    context->source_capacity = 0;
+    context->target_paths = NULL;
+    context->target_count = 0;
+    context->target_capacity = 0;
     context->output_directory = NULL;
     context->format_mode = TRANSPILE_FORMAT_DEFAULT;
     context->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
@@ -114,6 +151,16 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->files = NULL;
     context->file_count = 0;
     context->file_capacity = 0;
+    if (context->source_paths)
+        cma_free(context->source_paths);
+    context->source_paths = NULL;
+    context->source_count = 0;
+    context->source_capacity = 0;
+    if (context->target_paths)
+        cma_free(context->target_paths);
+    context->target_paths = NULL;
+    context->target_count = 0;
+    context->target_capacity = 0;
     ft_bzero(&context->entrypoint, sizeof(context->entrypoint));
 }
 
@@ -125,12 +172,32 @@ void transpiler_context_set_languages(t_transpiler_context *context, t_transpile
     context->target_language = target;
 }
 
-void transpiler_context_set_io_paths(t_transpiler_context *context, const char *source_path, const char *target_path)
+int transpiler_context_set_io_paths(t_transpiler_context *context, const char **source_paths, size_t source_count,
+    const char **target_paths, size_t target_count)
 {
     if (!context)
-        return ;
-    context->source_path = source_path;
-    context->target_path = target_path;
+        return (FT_FAILURE);
+    if (source_count != target_count)
+        return (FT_FAILURE);
+    if (transpiler_context_assign_paths(&context->source_paths, &context->source_count,
+            &context->source_capacity, source_paths, source_count) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (transpiler_context_assign_paths(&context->target_paths, &context->target_count,
+            &context->target_capacity, target_paths, target_count) != FT_SUCCESS)
+    {
+        (void)transpiler_context_assign_paths(&context->source_paths, &context->source_count,
+            &context->source_capacity, NULL, 0);
+        context->source_path = NULL;
+        context->target_path = NULL;
+        return (FT_FAILURE);
+    }
+    context->source_path = NULL;
+    context->target_path = NULL;
+    if (context->source_count > 0)
+        context->source_path = context->source_paths[0];
+    if (context->target_count > 0)
+        context->target_path = context->target_paths[0];
+    return (FT_SUCCESS);
 }
 
 void transpiler_context_set_output_directory(t_transpiler_context *context, const char *output_directory)
@@ -183,15 +250,6 @@ int transpiler_context_register_function(t_transpiler_context *context, const ch
         return (FT_FAILURE);
     if (!name)
         return (FT_FAILURE);
-    if (return_mode != TRANSPILE_FUNCTION_RETURN_VOID)
-    {
-        pf_snprintf(message, sizeof(message),
-            "function '%s' must use void return semantics; pass outputs by reference", name);
-        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
-            TRANSPILE_ERROR_FUNCTION_RETURNS_VALUE, message);
-        transpiler_context_record_error(context, TRANSPILE_ERROR_FUNCTION_RETURNS_VALUE);
-        return (FT_FAILURE);
-    }
     index = 0;
     while (index < context->function_count)
     {
@@ -213,7 +271,7 @@ int transpiler_context_register_function(t_transpiler_context *context, const ch
     }
     signature = &context->functions[context->function_count];
     ft_strlcpy(signature->name, name, TRANSPILE_FUNCTION_NAME_MAX);
-    signature->return_mode = TRANSPILE_FUNCTION_RETURN_VOID;
+    signature->return_mode = return_mode;
     context->function_count += 1;
     return (FT_SUCCESS);
 }
@@ -262,6 +320,15 @@ int transpiler_context_register_entrypoint(t_transpiler_context *context, const 
         transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
             TRANSPILE_ERROR_ENTRYPOINT_INVALID_NAME, message);
         transpiler_context_record_error(context, TRANSPILE_ERROR_ENTRYPOINT_INVALID_NAME);
+        return (FT_FAILURE);
+    }
+    if (return_mode != TRANSPILE_FUNCTION_RETURN_VOID)
+    {
+        pf_snprintf(message, sizeof(message),
+            "entrypoint '%s' must use void return semantics; pass outputs by reference", name);
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_FUNCTION_RETURNS_VALUE, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_FUNCTION_RETURNS_VALUE);
         return (FT_FAILURE);
     }
     if ((argc_identifier && !argv_identifier) || (!argc_identifier && argv_identifier))

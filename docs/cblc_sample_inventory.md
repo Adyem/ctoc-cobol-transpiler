@@ -3,7 +3,7 @@
 This document captures the reference CBL-C snippets that exercise the currently defined surface area of the language. Each
 sample lives in `samples/cblc` and is registered in `samples/cblc/manifest.txt` so automated checks can ensure the examples stay
 in sync with the documentation. Executable statements appear inside named `function` blocks so the transpiler can emit matching
-COBOL paragraphs, and every sample includes a `function main()` entrypoint that invokes the showcased routine.
+COBOL paragraphs, and every sample includes a `function void main()` entrypoint that invokes the showcased routine.
 
 ## Sample Coverage
 
@@ -18,7 +18,7 @@ file in "input.txt";
 file out "output.txt";
 char line[256];
 
-function process_file() {
+function void process_file() {
     open(in, "r");
     open(out, "w");
     while (read(in, line)) {
@@ -28,7 +28,7 @@ function process_file() {
     close(out);
 }
 
-function main() {
+function void main() {
     process_file();
 }
 ```
@@ -44,7 +44,7 @@ file in "input.txt";
 file out "filtered.txt";
 char line[128];
 
-function filter_prefix() {
+function void filter_prefix() {
     open(in, "r");
     open(out, "w");
     while (read(in, line)) {
@@ -56,7 +56,7 @@ function filter_prefix() {
     close(out);
 }
 
-function main() {
+function void main() {
     filter_prefix();
 }
 ```
@@ -76,7 +76,7 @@ record Person {
 file people "people.dat";
 Person person;
 
-function write_records() {
+function void write_records() {
     person.name = "ALICE";
     person.id = "0001";
 
@@ -85,7 +85,7 @@ function write_records() {
     close(people);
 }
 
-function main() {
+function void main() {
     write_records();
 }
 ```
@@ -106,7 +106,7 @@ RecordEntry entry;
 int accepted_count;
 int total_amount;
 
-function summarize_records() {
+function void summarize_records() {
     accepted_count = 0;
     total_amount = 0;
 
@@ -120,7 +120,7 @@ function summarize_records() {
     close(input);
 }
 
-function main() {
+function void main() {
     summarize_records();
 }
 ```
@@ -132,7 +132,7 @@ function main() {
   `read` statements that capture buffers, and `write` calls forwarding the recovered record.
 
 ```cblc
-function MAIN() {
+function void MAIN() {
     open(INPUT_FILE, "r");
     while (!(EOF_FLAG == true)) {
         read(INPUT_FILE, OUTPUT_RECORD);
@@ -154,14 +154,14 @@ function MAIN() {
   underscores, canonical numeric literals, and normalized string literal quoting.
 
 ```cblc
-function ENTRY_PARAGRAPH() {
+function void ENTRY_PARAGRAPH() {
     SCRATCH_NOTE = "mixED Case value";
     RUNNING_TOTAL_VALUE = 0;
     STATUS_FLAG = true;
     return ;
 }
 
-function NORMALIZE_VALUES() {
+function void NORMALIZE_VALUES() {
     RUNNING_TOTAL_VALUE = 7;
     SCRATCH_NOTE = "done";
     return ;
@@ -175,7 +175,7 @@ function NORMALIZE_VALUES() {
   counter initialization with `++` increments, and trailing `return ;` statements for each recovered function.
 
 ```cblc
-function MAIN() {
+function void MAIN() {
     if (!(FLAG == true)) {
         while (!(COUNT > LIMIT)) {
             LIMIT = COUNT;
@@ -190,11 +190,109 @@ function MAIN() {
     return ;
 }
 
-function NEXT() {
+function void NEXT() {
     FLAG = true;
     return ;
 }
 ```
+
+### `samples/cblc/return_numeric.cblc`
+- **Purpose:** Demonstrates scalar functions that return values through the trailing BY REFERENCE slot with integer arithmetic.
+- **Constructs:** Global integer declarations, a value-returning helper, `return` statements with expressions, and a `function void main()` caller that captures the result.
+
+```cblc
+int addend_a;
+int addend_b;
+int sum_result;
+
+function int compute_sum() {
+    sum_result = addend_a + addend_b;
+    return sum_result;
+}
+
+function void main() {
+    addend_a = 12;
+    addend_b = 30;
+    sum_result = compute_sum();
+    display(sum_result);
+}
+```
+
+### `samples/cblc/return_boolean.cblc`
+- **Purpose:** Captures boolean return semantics with conditional `return` paths so diagnostics can validate the trailing slot wiring.
+- **Constructs:** Integer and boolean globals, modulo arithmetic, comparisons, boolean literals, and a `function void main()` consumer that branches on the returned value.
+
+```cblc
+int candidate_value;
+int remainder_value;
+bool is_even_result;
+
+function bool is_even() {
+    remainder_value = candidate_value % 2;
+    if (remainder_value == 0) {
+        return true;
+    }
+    return false;
+}
+
+function void main() {
+    candidate_value = 9;
+    is_even_result = is_even();
+    if (is_even_result) {
+        display("EVEN");
+    } else {
+        display("ODD");
+    }
+}
+```
+
+### `samples/cblc/return_character.cblc`
+- **Purpose:** Showcases character return values forwarded through the trailing argument so callers can reuse the same storage.
+- **Constructs:** Global character state, literal character assignments, function returns in expression contexts, and console output of the captured value.
+
+```cblc
+char current_grade;
+
+function char fetch_grade() {
+    return current_grade;
+}
+
+function void main() {
+    current_grade = 'A';
+    current_grade = fetch_grade();
+    display(current_grade);
+}
+```
+
+### `samples/cblc/multi_module_main.cblc`
+- **Purpose:** Demonstrates splitting a program across multiple translation units where the entrypoint resides in one file and helper routines live alongside it.
+- **Constructs:** Global integers shared within a unit, helper functions invoked from `main`, cross-file calls to external routines, arithmetic updates, and console output of computed values.
+
+```cblc
+int accumulator;
+
+function void add_once() {
+    accumulator = accumulator + 1;
+}
+
+function void main() {
+    accumulator = 0;
+    show_banner();
+    add_once();
+    display(accumulator);
+}
+```
+
+### `samples/cblc/multi_module_worker.cblc`
+- **Purpose:** Provides the companion helper module for the multi-file workflow so the CLI can transpile several source units in one invocation.
+- **Constructs:** Standalone helper function definitions, string literals, and console output emitted from a non-entry translation unit.
+
+```cblc
+function void show_banner() {
+    display("WORKER READY");
+}
+```
+
 
 ## Maintenance Checklist
 

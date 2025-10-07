@@ -22,12 +22,13 @@ global_declaration      ::= file_declaration
                           | record_declaration
                           | scalar_declaration
 function_section        ::= { function_definition }
-function_definition     ::= 'function' identifier '(' ')' block
+function_definition     ::= 'function' function_return_type identifier '(' ')' block
+function_return_type    ::= 'void' | scalar_type
 block                   ::= '{' { statement } '}'
 scalar_declaration      ::= scalar_type identifier array_suffix ';'
 ```
 
-A source file lists global declarations (files, records, and scalars) followed by any number of functions.  Every function body hosts the executable statements that previously lived in the `procedure_section`.  Function names must be unique within a translation unit so COBOL paragraph generation can map one-to-one onto the declared entry points. One function must be named `main` to provide the program entrypoint.
+A source file lists global declarations (files, records, and scalars) followed by any number of functions.  Every function body hosts the executable statements that previously lived in the `procedure_section`.  Function names must be unique within a translation unit so COBOL paragraph generation can map one-to-one onto the declared entry points. One function must be named `main` to provide the program entrypoint and must declare a `void` return type so COBOL callers can pass outputs by reference.
 
 ---
 

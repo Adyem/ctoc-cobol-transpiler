@@ -326,6 +326,68 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_transpiler_codegen_emits_call_with_return_slot)
+{
+    t_transpiler_cobol_procedure procedure;
+    t_transpiler_cobol_paragraph *paragraph;
+    t_transpiler_cobol_statement_block *block;
+    t_transpiler_cobol_statement *call_statement;
+    char *procedure_text;
+    int status;
+
+    transpiler_cobol_procedure_init(&procedure);
+    paragraph = transpiler_cobol_paragraph_create("main");
+    if (!paragraph)
+        return (FT_FAILURE);
+    block = transpiler_cobol_paragraph_get_statements(paragraph);
+    if (!block)
+    {
+        transpiler_cobol_paragraph_destroy(paragraph);
+        return (FT_FAILURE);
+    }
+    procedure_text = NULL;
+    call_statement = NULL;
+    status = FT_FAILURE;
+    call_statement = transpiler_cobol_statement_create_call("worker");
+    if (!call_statement)
+        goto cleanup;
+    if (transpiler_cobol_call_append_argument(call_statement, "ARG-ONE") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_cobol_call_append_argument(call_statement, "ARG-TWO") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_cobol_call_set_return_slot(call_statement, "RESULT-SLOT") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_cobol_statement_block_append(block, call_statement) != FT_SUCCESS)
+    {
+        transpiler_cobol_statement_destroy(call_statement);
+        call_statement = NULL;
+        goto cleanup;
+    }
+    call_statement = NULL;
+    if (transpiler_cobol_procedure_append(&procedure, paragraph) != FT_SUCCESS)
+        goto cleanup;
+    paragraph = NULL;
+    if (test_expect_success(transpiler_codegen_build_procedure_division(&procedure, &procedure_text),
+            "procedure generation should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(procedure_text,
+            "       PROCEDURE DIVISION.\n"
+            "       MAIN.\n"
+            "           CALL 'WORKER' USING BY REFERENCE ARG-ONE BY REFERENCE ARG-TWO BY REFERENCE RESULT-SLOT\n",
+            "procedure division should append return slot as final call argument") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (procedure_text)
+        cma_free(procedure_text);
+    if (call_statement)
+        transpiler_cobol_statement_destroy(call_statement);
+    if (paragraph)
+        transpiler_cobol_paragraph_destroy(paragraph);
+    transpiler_cobol_procedure_dispose(&procedure);
+    return (status);
+}
+
 FT_TEST(test_transpiler_codegen_emits_multiple_paragraphs)
 {
     t_transpiler_cobol_procedure procedure;
@@ -405,8 +467,9 @@ const t_test_case *get_codegen_tests(size_t *count)
         {"transpiler_codegen_formats_if_else", test_transpiler_codegen_formats_if_else},
         {"transpiler_codegen_formats_perform_until", test_transpiler_codegen_formats_perform_until},
         {"transpiler_codegen_formats_perform_varying", test_transpiler_codegen_formats_perform_varying},
+        {"transpiler_codegen_emits_call_with_return_slot", test_transpiler_codegen_emits_call_with_return_slot},
         {"transpiler_codegen_emits_multiple_paragraphs", test_transpiler_codegen_emits_multiple_paragraphs}
-    };
+};
 
     if (count)
         *count = sizeof(tests) / sizeof(tests[0]);

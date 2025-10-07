@@ -5,8 +5,12 @@
 
 typedef struct s_transpiler_cli_options
 {
-    const char *input_path;
-    const char *output_path;
+    const char **input_paths;
+    size_t input_count;
+    size_t input_capacity;
+    const char **output_paths;
+    size_t output_count;
+    size_t output_capacity;
     const char *output_directory;
     t_transpiler_language source_language;
     t_transpiler_language target_language;
@@ -16,6 +20,7 @@ typedef struct s_transpiler_cli_options
 }   t_transpiler_cli_options;
 
 int transpiler_cli_options_init(t_transpiler_cli_options *options);
+void transpiler_cli_options_dispose(t_transpiler_cli_options *options);
 int transpiler_cli_parse(t_transpiler_cli_options *options, int argc, const char **argv);
 int transpiler_cli_apply(const t_transpiler_cli_options *options, t_transpiler_context *context);
 void transpiler_cli_print_usage(void);

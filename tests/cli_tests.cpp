@@ -45,12 +45,20 @@ FT_TEST(test_cli_parse_direction_flag)
         return (FT_FAILURE);
     if (test_expect_int_equal(options.target_language, TRANSPILE_LANGUAGE_COBOL, "target language should match direction") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_expect_cstring_equal(options.input_path, "input.cblc", "input path should be recorded") != FT_SUCCESS)
+    if (test_expect_int_equal(static_cast<int>(options.input_count), 1, "one input path should be recorded") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_expect_cstring_equal(options.output_path, "output.cob", "output path should be recorded") != FT_SUCCESS)
+    if (test_expect_cstring_equal(options.input_paths[0], "input.cblc", "input path should be recorded") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_int_equal(static_cast<int>(options.output_count), 1, "one output path should be recorded") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_cstring_equal(options.output_paths[0], "output.cob", "output path should be recorded") != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_expect_int_equal(options.show_help, 0, "show_help should remain disabled") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
         return (FT_FAILURE);
+    }
+    transpiler_cli_options_dispose(&options);
     return (FT_SUCCESS);
 }
 
@@ -74,13 +82,23 @@ FT_TEST(test_cli_direction_from_environment)
     {
         test_unset_environment("CTOC_DEFAULT_DIRECTION");
         pf_printf("Assertion failed: transpiler_cli_parse should use CTOC_DEFAULT_DIRECTION\n");
+        transpiler_cli_options_dispose(&options);
         return (FT_FAILURE);
     }
     test_unset_environment("CTOC_DEFAULT_DIRECTION");
-    if (test_expect_int_equal(options.source_language, TRANSPILE_LANGUAGE_COBOL, "environment should set source language") != FT_SUCCESS)
+    if (test_expect_int_equal(options.source_language, TRANSPILE_LANGUAGE_COBOL,
+            "environment should set source language") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
         return (FT_FAILURE);
-    if (test_expect_int_equal(options.target_language, TRANSPILE_LANGUAGE_CBL_C, "environment should set target language") != FT_SUCCESS)
+    }
+    if (test_expect_int_equal(options.target_language, TRANSPILE_LANGUAGE_CBL_C,
+            "environment should set target language") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
         return (FT_FAILURE);
+    }
+    transpiler_cli_options_dispose(&options);
     return (FT_SUCCESS);
 }
 
@@ -92,10 +110,15 @@ FT_TEST(test_cli_help_short_circuits_validation)
     };
     t_transpiler_cli_options options;
 
-    if (test_expect_success(transpiler_cli_parse(&options, 2, argv), "transpiler_cli_parse should succeed for --help") != FT_SUCCESS)
+    if (test_expect_success(transpiler_cli_parse(&options, 2, argv),
+            "transpiler_cli_parse should succeed for --help") != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_expect_int_equal(options.show_help, 1, "--help should enable usage flag") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
         return (FT_FAILURE);
+    }
+    transpiler_cli_options_dispose(&options);
     return (FT_SUCCESS);
 }
 
@@ -119,46 +142,285 @@ FT_TEST(test_cli_optional_configuration)
     t_transpiler_cli_options options;
     t_transpiler_context context;
 
-    if (test_expect_success(transpiler_cli_parse(&options, 13, argv), "transpiler_cli_parse should accept configuration flags") != FT_SUCCESS)
+    if (test_expect_success(transpiler_cli_parse(&options, 13, argv),
+            "transpiler_cli_parse should accept configuration flags") != FT_SUCCESS)
         return (FT_FAILURE);
     if (transpiler_context_init(&context) != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
         return (FT_FAILURE);
+    }
     if (transpiler_cli_apply(&options, &context) != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(options.input_count), 1, "one input should remain recorded") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(options.input_paths[0], "legacy.cob", "input path should be preserved") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(options.output_count), 1, "one output should remain recorded") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(options.output_paths[0], "modern.cblc", "output path should be preserved") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
         return (FT_FAILURE);
     }
     if (test_expect_cstring_equal(options.output_directory, "out", "output directory should be recorded") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(options.format_mode, TRANSPILE_FORMAT_PRETTY, "format mode should map to enum") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(options.diagnostic_level, TRANSPILE_DIAGNOSTIC_VERBOSE, "diagnostic level should map to enum") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.source_count), 1, "context should record one source path") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.source_paths[0], "legacy.cob", "context should store input path") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.target_count), 1, "context should record one output path") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.target_paths[0], "modern.cblc", "context should store output path") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
         return (FT_FAILURE);
     }
     if (test_expect_cstring_equal(context.output_directory, "out", "context should receive output directory") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(context.format_mode, TRANSPILE_FORMAT_PRETTY, "context should store format mode") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(context.diagnostic_level, TRANSPILE_DIAGNOSTIC_VERBOSE, "context should store diagnostic level") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
         return (FT_FAILURE);
     }
     transpiler_context_dispose(&context);
+    transpiler_cli_options_dispose(&options);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cli_supports_multiple_inputs)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cblc-to-cobol",
+        "--input",
+        "first.cblc",
+        "--output",
+        "first.cob",
+        "--input",
+        "second.cblc",
+        "--output",
+        "second.cob"
+    };
+    t_transpiler_cli_options options;
+
+    if (test_expect_success(transpiler_cli_parse(&options, 11, argv),
+            "transpiler_cli_parse should accept multiple inputs") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_int_equal(static_cast<int>(options.input_count), 2,
+            "two input paths should be recorded") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(options.input_paths[0], "first.cblc",
+            "first input path should match") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(options.input_paths[1], "second.cblc",
+            "second input path should match") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(options.output_count), 2,
+            "two output paths should be recorded") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(options.output_paths[0], "first.cob",
+            "first output path should match") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(options.output_paths[1], "second.cob",
+            "second output path should match") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    transpiler_cli_options_dispose(&options);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cli_apply_propagates_multi_file_context)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cblc-to-cobol",
+        "--input",
+        "first.cblc",
+        "--output",
+        "first.cob",
+        "--input",
+        "second.cblc",
+        "--output",
+        "second.cob"
+    };
+    t_transpiler_cli_options options;
+    t_transpiler_context context;
+
+    if (test_expect_success(transpiler_cli_parse(&options, 11, argv),
+            "transpiler_cli_parse should accept multi-file inputs") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_cli_apply(&options, &context),
+            "transpiler_cli_apply should populate context paths") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.source_count), 2,
+            "context should record two source paths") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.target_count), 2,
+            "context should record two target paths") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.source_paths[0], "first.cblc",
+            "first source path should remain accessible") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.source_paths[1], "second.cblc",
+            "second source path should remain accessible") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.target_paths[0], "first.cob",
+            "first target path should remain accessible") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.target_paths[1], "second.cob",
+            "second target path should remain accessible") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.source_path, "first.cblc",
+            "legacy single-source alias should point to first path") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.target_path, "first.cob",
+            "legacy single-target alias should point to first path") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    transpiler_cli_options_dispose(&options);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cli_rejects_mismatched_path_counts)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cblc-to-cobol",
+        "--input",
+        "first.cblc",
+        "--input",
+        "second.cblc",
+        "--output",
+        "only.cob"
+    };
+    t_transpiler_cli_options options;
+
+    if (transpiler_cli_parse(&options, 9, argv) == FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        pf_printf("Assertion failed: transpiler_cli_parse should reject mismatched path counts\n");
+        return (FT_FAILURE);
+    }
+    transpiler_cli_options_dispose(&options);
     return (FT_SUCCESS);
 }
 
@@ -168,7 +430,10 @@ const t_test_case *get_cli_tests(size_t *count)
         {"cli_parse_direction_flag", test_cli_parse_direction_flag},
         {"cli_direction_from_environment", test_cli_direction_from_environment},
         {"cli_help_short_circuits_validation", test_cli_help_short_circuits_validation},
-        {"cli_optional_configuration", test_cli_optional_configuration}
+        {"cli_optional_configuration", test_cli_optional_configuration},
+        {"cli_supports_multiple_inputs", test_cli_supports_multiple_inputs},
+        {"cli_apply_propagates_multi_file_context", test_cli_apply_propagates_multi_file_context},
+        {"cli_rejects_mismatched_path_counts", test_cli_rejects_mismatched_path_counts}
     };
 
     if (count)

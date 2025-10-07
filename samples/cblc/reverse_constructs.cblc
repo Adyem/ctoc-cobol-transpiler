@@ -1,4 +1,4 @@
-function MAIN() {
+function void MAIN() {
     open(INPUT_FILE, "r");
     while (!(EOF_FLAG == true)) {
         read(INPUT_FILE, OUTPUT_RECORD);

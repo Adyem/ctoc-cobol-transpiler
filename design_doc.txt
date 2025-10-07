@@ -598,12 +598,13 @@ This structure turns the current prototype into a durable foundation: new stages
 The executable exposes a deterministic CLI so automation and developers can orchestrate transpilation runs:
 
 ```
-ctoc_cobol_transpiler --direction <dir> --input <source> --output <target> [--output-dir <dir>] [--format <style>] [--diagnostics <level>]
+ctoc_cobol_transpiler --direction <dir> --input <source> [--input <source> ...] \
+    --output <target> [--output <target> ...] [--output-dir <dir>] [--format <style>] [--diagnostics <level>]
 ```
 
 * `--direction` (required unless the environment variable below is present) accepts `cblc-to-cobol` or `cobol-to-cblc`.
-* `--input` points at the source file to ingest.
-* `--output` selects the destination file path for emitted code.
+* `--input` points at the source file to ingest. Repeat the flag to add additional translation units.
+* `--output` selects the destination file path for emitted code. Provide one output per input; mismatches are rejected.
 * `--output-dir` overrides the directory root for generated artifacts (defaults to the directory implied by `--output`).
 * `--format` toggles layout policies: `default` honors the formatter planned for production, `minimal` strips extra whitespace, and `pretty` expands with alignment/spacing helpful for reviews.
 * `--diagnostics` tunes verbosity: `silent` suppresses non-fatal notes, `normal` shows errors and warnings, and `verbose` also streams pipeline progress.

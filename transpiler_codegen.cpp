@@ -393,6 +393,44 @@ static int transpiler_codegen_append_statement(t_transpiler_codegen_buffer *buff
         return (transpiler_codegen_append_perform_until(buffer, &statement->perform_until, indentation));
     if (statement->kind == TRANSPILE_COBOL_STATEMENT_PERFORM_VARYING)
         return (transpiler_codegen_append_perform_varying(buffer, &statement->perform_varying, indentation));
+    if (statement->kind == TRANSPILE_COBOL_STATEMENT_CALL)
+    {
+        char subprogram_name[TRANSPILE_FUNCTION_NAME_MAX];
+        size_t index;
+
+        if (!statement->call.subprogram)
+            return (FT_FAILURE);
+        if (transpiler_codegen_buffer_begin_area_b_line(buffer, indentation) != FT_SUCCESS)
+            return (FT_FAILURE);
+        transpiler_codegen_uppercase_copy(statement->call.subprogram, subprogram_name,
+            sizeof(subprogram_name));
+        if (transpiler_codegen_buffer_append_format(buffer, "CALL '%s'", subprogram_name) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (statement->call.argument_count > 0 || statement->call.return_slot)
+        {
+            if (transpiler_codegen_buffer_append_string(buffer, " USING") != FT_SUCCESS)
+                return (FT_FAILURE);
+            index = 0;
+            while (index < statement->call.argument_count)
+            {
+                if (transpiler_codegen_buffer_append_string(buffer, " BY REFERENCE ") != FT_SUCCESS)
+                    return (FT_FAILURE);
+                if (transpiler_codegen_buffer_append_string(buffer, statement->call.arguments[index]) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                index += 1;
+            }
+            if (statement->call.return_slot)
+            {
+                if (transpiler_codegen_buffer_append_string(buffer, " BY REFERENCE ") != FT_SUCCESS)
+                    return (FT_FAILURE);
+                if (transpiler_codegen_buffer_append_string(buffer, statement->call.return_slot) != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+        }
+        if (transpiler_codegen_buffer_end_line(buffer) != FT_SUCCESS)
+            return (FT_FAILURE);
+        return (FT_SUCCESS);
+    }
     return (FT_FAILURE);
 }
 

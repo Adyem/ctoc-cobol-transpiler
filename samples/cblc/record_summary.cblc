@@ -8,7 +8,7 @@ RecordEntry entry;
 int accepted_count;
 int total_amount;
 
-function summarize_records() {
+function void summarize_records() {
     accepted_count = 0;
     total_amount = 0;
 
@@ -22,6 +22,6 @@ function summarize_records() {
     close(input);
 }
 
-function main() {
+function void main() {
     summarize_records();
 }

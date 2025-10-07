@@ -45,6 +45,33 @@ filesystem synchronized.
 - **Constructs:** `IF NOT` conditionals, `PERFORM UNTIL` loops, `PERFORM VARYING` counters, sequential `MOVE` assignments, and
   STOP statements spread across multiple procedure paragraphs.
 
+### `samples/cobol/return_numeric.cob`
+- **Purpose:** Demonstrates value-returning helpers expressed as separate COBOL subprograms that accept arguments by reference
+  and populate a trailing return slot.
+- **Constructs:** `CALL` statements with `USING BY REFERENCE` arguments, subprogram definitions with `LINKAGE SECTION`
+  parameters, arithmetic implemented through `COMPUTE`, and `GOBACK` exits for the invoked routine.
+
+### `samples/cobol/return_boolean.cob`
+- **Purpose:** Captures conditional return logic routed through a referenced slot so boolean results can surface alongside other
+  state updates.
+- **Constructs:** Multi-argument `CALL` sequences, remainder-driven `DIVIDE` operations, conditional `MOVE` assignments that set
+  flag bytes, and subprogram linkages that mirror the return buffer contract.
+
+### `samples/cobol/return_character.cob`
+- **Purpose:** Provides a character-oriented example where the subprogram writes to the trailing buffer so callers can reuse
+  their own storage for results.
+- **Constructs:** Single-argument `CALL` statements, working-storage defaults that seed returned values, linkage section buffer
+  declarations, and `MOVE` statements that copy data into the supplied return slot.
+
+### `samples/cobol/multi_module_main.cob`
+- **Purpose:** Illustrates the forward pipeline's multi-file support where the primary program calls into a helper emitted from another translation unit.
+- **Constructs:** Working-storage counters, `CALL` statements targeting external subprograms, `PERFORM`ed helper paragraphs, arithmetic updates, and formatted numeric displays.
+
+### `samples/cobol/multi_module_worker.cob`
+- **Purpose:** Supplies the companion subprogram that receives calls from the multi-module main routine so the CLI can emit multiple COBOL artifacts in a single run.
+- **Constructs:** Standalone program IDs, literal-initialized working-storage messages, console output, and `GOBACK` termination for callable modules.
+
+
 ## Maintenance Checklist
 
 1. Add a new `.cob` file under `samples/cobol` when introducing COBOL-side language features that need sample coverage.

@@ -5,3 +5,8 @@ samples/cblc/record_summary.cblc
 samples/cblc/reverse_constructs.cblc
 samples/cblc/reverse_normalization.cblc
 samples/cblc/reverse_control_flow.cblc
+samples/cblc/return_numeric.cblc
+samples/cblc/return_boolean.cblc
+samples/cblc/return_character.cblc
+samples/cblc/multi_module_main.cblc
+samples/cblc/multi_module_worker.cblc

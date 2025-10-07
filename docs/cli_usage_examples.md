@@ -4,15 +4,25 @@ The `ctoc_cobol_transpiler` binary provides a single entry point for converting 
 
 ## Required options
 
-Every run must specify the transformation direction alongside the input and output paths:
+Every run must specify the transformation direction alongside at least one input and output path:
 
 ```
 ctoc_cobol_transpiler --direction cblc-to-cobol --input samples/cblc/copy_file.cblc --output build/copy_file.cob
 ```
 
 * `--direction` accepts `cblc-to-cobol` or `cobol-to-cblc` and determines which frontend/parser and backend/emitter pair the pipeline assembles.
-* `--input` points at the source file that the pipeline reads.
-* `--output` names the artifact written by the code generator.
+* `--input` points at the source file that the pipeline reads. Repeat the flag to queue additional translation units.
+* `--output` names the artifact written by the code generator. Provide one `--output` per input so the files can be emitted side by side.
+
+When converting several modules in a single invocation, pair each input with a matching output in the order they appear:
+
+```
+ctoc_cobol_transpiler --direction cblc-to-cobol \
+  --input src/records.cblc --output build/records.cob \
+  --input src/formatters.cblc --output build/formatters.cob
+```
+
+The tool rejects mismatched counts to ensure every generated COBOL file has a designated destination.
 
 ## Optional layout and destination controls
 

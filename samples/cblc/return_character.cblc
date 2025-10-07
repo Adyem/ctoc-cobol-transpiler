@@ -1,0 +1,11 @@
+char current_grade;
+
+function char fetch_grade() {
+    return current_grade;
+}
+
+function void main() {
+    current_grade = 'A';
+    current_grade = fetch_grade();
+    display(current_grade);
+}

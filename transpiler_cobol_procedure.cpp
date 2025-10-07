@@ -102,7 +102,39 @@ static t_transpiler_cobol_statement *transpiler_cobol_statement_allocate(void)
     transpiler_cobol_statement_block_init(&statement->if_statement.else_branch);
     transpiler_cobol_statement_block_init(&statement->perform_until.body);
     transpiler_cobol_statement_block_init(&statement->perform_varying.body);
+    statement->call.arguments = NULL;
+    statement->call.argument_count = 0;
+    statement->call.argument_capacity = 0;
+    statement->call.return_slot = NULL;
     return (statement);
+}
+
+static int transpiler_cobol_call_reserve(t_transpiler_cobol_call_statement *call, size_t desired_capacity)
+{
+    const char **new_arguments;
+    size_t index;
+
+    if (!call)
+        return (FT_FAILURE);
+    if (call->argument_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    new_arguments = static_cast<const char **>(cma_calloc(desired_capacity,
+        sizeof(*new_arguments)));
+    if (!new_arguments)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < call->argument_count)
+    {
+        new_arguments[index] = call->arguments[index];
+        index += 1;
+    }
+    if (call->arguments)
+        cma_free(call->arguments);
+    call->arguments = new_arguments;
+    call->argument_capacity = desired_capacity;
+    return (FT_SUCCESS);
 }
 
 int transpiler_cobol_statement_block_append(t_transpiler_cobol_statement_block *block,
@@ -199,6 +231,52 @@ t_transpiler_cobol_statement *transpiler_cobol_statement_create_perform_varying(
     return (statement);
 }
 
+t_transpiler_cobol_statement *transpiler_cobol_statement_create_call(const char *subprogram)
+{
+    t_transpiler_cobol_statement *statement;
+
+    if (!subprogram)
+        return (NULL);
+    if (subprogram[0] == '\0')
+        return (NULL);
+    statement = transpiler_cobol_statement_allocate();
+    if (!statement)
+        return (NULL);
+    statement->kind = TRANSPILE_COBOL_STATEMENT_CALL;
+    statement->call.subprogram = subprogram;
+    return (statement);
+}
+
+int transpiler_cobol_call_append_argument(t_transpiler_cobol_statement *statement, const char *argument)
+{
+    t_transpiler_cobol_call_statement *call;
+
+    if (!statement || !argument)
+        return (FT_FAILURE);
+    if (statement->kind != TRANSPILE_COBOL_STATEMENT_CALL)
+        return (FT_FAILURE);
+    call = &statement->call;
+    if (call->argument_count >= call->argument_capacity)
+    {
+        if (transpiler_cobol_call_reserve(call, call->argument_capacity == 0 ? 4 : call->argument_capacity * 2)
+            != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    call->arguments[call->argument_count] = argument;
+    call->argument_count += 1;
+    return (FT_SUCCESS);
+}
+
+int transpiler_cobol_call_set_return_slot(t_transpiler_cobol_statement *statement, const char *return_slot)
+{
+    if (!statement || !return_slot)
+        return (FT_FAILURE);
+    if (statement->kind != TRANSPILE_COBOL_STATEMENT_CALL)
+        return (FT_FAILURE);
+    statement->call.return_slot = return_slot;
+    return (FT_SUCCESS);
+}
+
 void transpiler_cobol_statement_destroy(t_transpiler_cobol_statement *statement)
 {
     if (!statement)
@@ -215,6 +293,15 @@ void transpiler_cobol_statement_destroy(t_transpiler_cobol_statement *statement)
     else if (statement->kind == TRANSPILE_COBOL_STATEMENT_PERFORM_VARYING)
     {
         transpiler_cobol_statement_block_dispose(&statement->perform_varying.body);
+    }
+    else if (statement->kind == TRANSPILE_COBOL_STATEMENT_CALL)
+    {
+        if (statement->call.arguments)
+            cma_free(statement->call.arguments);
+        statement->call.arguments = NULL;
+        statement->call.argument_count = 0;
+        statement->call.argument_capacity = 0;
+        statement->call.return_slot = NULL;
     }
     cma_free(statement);
 }
