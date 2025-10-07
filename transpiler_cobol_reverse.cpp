@@ -587,6 +587,44 @@ static int cobol_reverse_emit_perform_until(t_transpiler_context *context, t_cbl
     return (FT_SUCCESS);
 }
 
+static int cobol_reverse_step_is_unit_increment(const t_ast_node *step, int *direction)
+{
+    size_t index;
+    int sign;
+
+    if (!step)
+        return (0);
+    if (!direction)
+        return (0);
+    if (step->kind != AST_NODE_LITERAL)
+        return (0);
+    if (step->token.kind != LEXER_TOKEN_NUMERIC_LITERAL)
+        return (0);
+    if (!step->token.lexeme)
+        return (0);
+    if (step->token.length == 0)
+        return (0);
+    sign = 1;
+    index = 0;
+    if (step->token.lexeme[index] == '+' || step->token.lexeme[index] == '-')
+    {
+        if (step->token.lexeme[index] == '-')
+            sign = -1;
+        index += 1;
+    }
+    while (index < step->token.length && step->token.lexeme[index] == '0')
+        index += 1;
+    if (index >= step->token.length)
+        return (0);
+    if (step->token.lexeme[index] != '1')
+        return (0);
+    index += 1;
+    if (index < step->token.length)
+        return (0);
+    *direction = sign;
+    return (1);
+}
+
 static int cobol_reverse_emit_perform_varying(t_transpiler_context *context, t_cblc_builder *builder,
     const t_ast_node *statement, size_t indentation)
 {
@@ -595,6 +633,7 @@ static int cobol_reverse_emit_perform_varying(t_transpiler_context *context, t_c
     const t_ast_node *step;
     const t_ast_node *condition;
     const t_ast_node *body;
+    int direction;
 
     (void)context;
     if (!statement)
@@ -634,14 +673,31 @@ static int cobol_reverse_emit_perform_varying(t_transpiler_context *context, t_c
         return (FT_FAILURE);
     if (cobol_reverse_append_value(builder, counter) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (cblc_builder_append_string(builder, " = ") != FT_SUCCESS)
-        return (FT_FAILURE);
-    if (cobol_reverse_append_value(builder, counter) != FT_SUCCESS)
-        return (FT_FAILURE);
-    if (cblc_builder_append_string(builder, " + ") != FT_SUCCESS)
-        return (FT_FAILURE);
-    if (cobol_reverse_append_value(builder, step) != FT_SUCCESS)
-        return (FT_FAILURE);
+    direction = 0;
+    if (cobol_reverse_step_is_unit_increment(step, &direction))
+    {
+        if (direction > 0)
+        {
+            if (cblc_builder_append_string(builder, "++") != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        else
+        {
+            if (cblc_builder_append_string(builder, "--") != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+    }
+    else
+    {
+        if (cblc_builder_append_string(builder, " = ") != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cobol_reverse_append_value(builder, counter) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_builder_append_string(builder, " + ") != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cobol_reverse_append_value(builder, step) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
     if (cblc_builder_append_string(builder, ";") != FT_SUCCESS)
         return (FT_FAILURE);
     if (cblc_builder_append_newline(builder) != FT_SUCCESS)

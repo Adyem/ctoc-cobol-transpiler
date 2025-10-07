@@ -179,7 +179,7 @@ FT_TEST(test_cblc_reverse_control_flow_matches_golden)
         "        INDEX = 0;\n"
         "        while (!(INDEX >= LIMIT)) {\n"
         "            RESULT = INDEX;\n"
-        "            INDEX = INDEX + 1;\n"
+        "            INDEX++;\n"
         "        }\n"
         "    }\n"
         "    return ;\n"
