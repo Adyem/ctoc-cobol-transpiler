@@ -21,6 +21,44 @@ static int test_runtime_int_add_and_subtract(void)
     return (FT_SUCCESS);
 }
 
+static int test_runtime_int_multiply_and_divide(void)
+{
+    t_runtime_int left;
+    t_runtime_int right;
+    t_runtime_int result;
+
+    runtime_int_set(&left, 12);
+    runtime_int_set(&right, 6);
+    if (test_expect_success(runtime_int_multiply(left, right, &result), "runtime_int_multiply should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_int_equal(result.value, 72, "runtime_int_multiply should multiply values") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(runtime_int_divide(result, right, &result), "runtime_int_divide should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_int_equal(result.value, 12, "runtime_int_divide should divide values") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int test_runtime_int_divide_rejects_zero(void)
+{
+    t_runtime_int dividend;
+    t_runtime_int divisor;
+    t_runtime_int result;
+
+    runtime_int_set(&dividend, 88);
+    runtime_int_set(&divisor, 0);
+    runtime_int_set(&result, 41);
+    if (runtime_int_divide(dividend, divisor, &result) != FT_FAILURE)
+    {
+        pf_printf("Assertion failed: runtime_int_divide should reject division by zero\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(result.value, 41, "runtime_int_divide should preserve destination on failure") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 static int test_runtime_int_add_detects_overflow(void)
 {
     t_runtime_int left;
@@ -93,6 +131,8 @@ const t_test_case *get_runtime_int_tests(size_t *count)
 {
     static const t_test_case tests[] = {
         {"runtime_int_add_and_subtract", test_runtime_int_add_and_subtract},
+        {"runtime_int_multiply_and_divide", test_runtime_int_multiply_and_divide},
+        {"runtime_int_divide_rejects_zero", test_runtime_int_divide_rejects_zero},
         {"runtime_int_add_detects_overflow", test_runtime_int_add_detects_overflow},
         {"runtime_int_to_string", test_runtime_int_to_string},
         {"runtime_int_to_string_rejects_small_buffer", test_runtime_int_to_string_rejects_small_buffer},

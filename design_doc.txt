@@ -18,6 +18,12 @@
 * **COBOL dialect:** ANSI‑85 compatible subset with line‑sequential I/O for text and sequential/fixed I/O for binary records.
   Detailed constraints and unsupported constructs live in `docs/cobol_dialect_requirements.md`.
 * **Runtime assumptions:** No exceptions; explicit status checks or EOF flags. No dynamic memory.
+  Detailed helper APIs live in `docs/runtime_api_reference.md` so generated code
+  authors understand the libft-backed surface area.
+  Contributor expectations and repository workflow are summarized in
+  `docs/contributing.md` for onboarding and review reference.
+  A step-by-step environment preparation guide is maintained in
+  `docs/onboarding_checklist.md` to help new developers verify their setup.
 
 ---
 
@@ -436,6 +442,7 @@ PROCEDURE DIVISION.
 ## 10) Testing Strategy
 
 * **Golden tests:** CBL‑C snippet → expected COBOL text. Diff insensitive to whitespace/indent variants.
+* **Round-trip tests:** Generated COBOL from CBL-C fixtures re-parses without structural loss, guarding the reverse pipeline assumptions.
 * **Round‑trip run:** Compile generated COBOL with GnuCOBOL and run sample pipelines (copy, filter, map). Validate output.
 * **Property tests:** For `while(read(f,x)) write(g,x)` the output equals input for arbitrary text lines up to buffer size.
 * **Negative tests:** Size mismatch (read into too‑small buffer) → compile‑time error with helpful message.
@@ -572,6 +579,7 @@ Each family can introduce sub-stages that register themselves with the pipeline 
 
 * The `runtime_scalar` prototype currently feeds a demonstration stage. As richer runtime helpers (e.g., for file I/O or numeric pictures) arrive, they can register as dedicated pipeline stages or utility modules invoked by stages.
 * Runtime capabilities should be exposed through headers that mirror the libft surface we rely upon so downstream modules can consume them without leaking implementation details.
+* A dedicated runtime audit suite (`runtime_audit_tests`) guards the helpers against regressions that would reintroduce `malloc`/`new` usage and verifies every allocator-backed module includes `libft/CMA/CMA.hpp` before compilation.
 
 ### 5.5 Extending Towards Full Compilation
 

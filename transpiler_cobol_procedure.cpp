@@ -1,6 +1,7 @@
 #include "transpiler_cobol_procedure.hpp"
 
 #include "libft/CMA/CMA.hpp"
+#include "libft/Libft/libft.hpp"
 
 static int transpiler_cobol_statement_block_reserve(t_transpiler_cobol_statement_block *block,
     size_t desired_capacity)
@@ -28,6 +29,35 @@ static int transpiler_cobol_statement_block_reserve(t_transpiler_cobol_statement
         cma_free(block->statements);
     block->statements = new_statements;
     block->capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
+static int transpiler_cobol_procedure_reserve(t_transpiler_cobol_procedure *procedure,
+    size_t desired_capacity)
+{
+    t_transpiler_cobol_paragraph **new_paragraphs;
+    size_t index;
+
+    if (!procedure)
+        return (FT_FAILURE);
+    if (procedure->capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    new_paragraphs = static_cast<t_transpiler_cobol_paragraph **>(cma_calloc(desired_capacity,
+        sizeof(*new_paragraphs)));
+    if (!new_paragraphs)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < procedure->count)
+    {
+        new_paragraphs[index] = procedure->paragraphs[index];
+        index += 1;
+    }
+    if (procedure->paragraphs)
+        cma_free(procedure->paragraphs);
+    procedure->paragraphs = new_paragraphs;
+    procedure->capacity = desired_capacity;
     return (FT_SUCCESS);
 }
 
@@ -223,4 +253,94 @@ t_transpiler_cobol_statement_block *transpiler_cobol_perform_varying_get_body(t_
     if (statement->kind != TRANSPILE_COBOL_STATEMENT_PERFORM_VARYING)
         return (NULL);
     return (&statement->perform_varying.body);
+}
+
+t_transpiler_cobol_paragraph *transpiler_cobol_paragraph_create(const char *name)
+{
+    t_transpiler_cobol_paragraph *paragraph;
+    size_t length;
+
+    if (!name)
+        return (NULL);
+    if (name[0] == '\0')
+        return (NULL);
+    paragraph = static_cast<t_transpiler_cobol_paragraph *>(cma_calloc(1,
+        sizeof(*paragraph)));
+    if (!paragraph)
+        return (NULL);
+    length = ft_strlen(name);
+    paragraph->name = static_cast<char *>(cma_calloc(length + 1, sizeof(char)));
+    if (!paragraph->name)
+    {
+        cma_free(paragraph);
+        return (NULL);
+    }
+    ft_strlcpy(paragraph->name, name, length + 1);
+    transpiler_cobol_statement_block_init(&paragraph->statements);
+    return (paragraph);
+}
+
+void transpiler_cobol_paragraph_destroy(t_transpiler_cobol_paragraph *paragraph)
+{
+    if (!paragraph)
+        return ;
+    if (paragraph->name)
+        cma_free(paragraph->name);
+    transpiler_cobol_statement_block_dispose(&paragraph->statements);
+    paragraph->name = NULL;
+    cma_free(paragraph);
+}
+
+t_transpiler_cobol_statement_block *transpiler_cobol_paragraph_get_statements(t_transpiler_cobol_paragraph *paragraph)
+{
+    if (!paragraph)
+        return (NULL);
+    return (&paragraph->statements);
+}
+
+void transpiler_cobol_procedure_init(t_transpiler_cobol_procedure *procedure)
+{
+    if (!procedure)
+        return ;
+    procedure->paragraphs = NULL;
+    procedure->count = 0;
+    procedure->capacity = 0;
+}
+
+void transpiler_cobol_procedure_dispose(t_transpiler_cobol_procedure *procedure)
+{
+    size_t index;
+
+    if (!procedure)
+        return ;
+    index = 0;
+    while (index < procedure->count)
+    {
+        if (procedure->paragraphs && procedure->paragraphs[index])
+            transpiler_cobol_paragraph_destroy(procedure->paragraphs[index]);
+        index += 1;
+    }
+    if (procedure->paragraphs)
+        cma_free(procedure->paragraphs);
+    procedure->paragraphs = NULL;
+    procedure->count = 0;
+    procedure->capacity = 0;
+}
+
+int transpiler_cobol_procedure_append(t_transpiler_cobol_procedure *procedure,
+    t_transpiler_cobol_paragraph *paragraph)
+{
+    if (!procedure)
+        return (FT_FAILURE);
+    if (!paragraph)
+        return (FT_FAILURE);
+    if (procedure->count >= procedure->capacity)
+    {
+        if (transpiler_cobol_procedure_reserve(procedure,
+                procedure->capacity == 0 ? 4 : procedure->capacity * 2) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    procedure->paragraphs[procedure->count] = paragraph;
+    procedure->count += 1;
+    return (FT_SUCCESS);
 }

@@ -77,6 +77,19 @@ typedef struct s_transpiler_cobol_statement
     t_transpiler_cobol_perform_varying perform_varying;
 }   t_transpiler_cobol_statement;
 
+typedef struct s_transpiler_cobol_paragraph
+{
+    char *name;
+    t_transpiler_cobol_statement_block statements;
+}   t_transpiler_cobol_paragraph;
+
+typedef struct s_transpiler_cobol_procedure
+{
+    t_transpiler_cobol_paragraph **paragraphs;
+    size_t count;
+    size_t capacity;
+}   t_transpiler_cobol_procedure;
+
 void transpiler_cobol_statement_block_init(t_transpiler_cobol_statement_block *block);
 void transpiler_cobol_statement_block_dispose(t_transpiler_cobol_statement_block *block);
 int transpiler_cobol_statement_block_append(t_transpiler_cobol_statement_block *block,
@@ -101,5 +114,14 @@ t_transpiler_cobol_statement_block *transpiler_cobol_if_get_else_branch(t_transp
 t_transpiler_cobol_statement_block *transpiler_cobol_perform_until_get_body(t_transpiler_cobol_statement *statement);
 
 t_transpiler_cobol_statement_block *transpiler_cobol_perform_varying_get_body(t_transpiler_cobol_statement *statement);
+
+t_transpiler_cobol_paragraph *transpiler_cobol_paragraph_create(const char *name);
+void transpiler_cobol_paragraph_destroy(t_transpiler_cobol_paragraph *paragraph);
+t_transpiler_cobol_statement_block *transpiler_cobol_paragraph_get_statements(t_transpiler_cobol_paragraph *paragraph);
+
+void transpiler_cobol_procedure_init(t_transpiler_cobol_procedure *procedure);
+void transpiler_cobol_procedure_dispose(t_transpiler_cobol_procedure *procedure);
+int transpiler_cobol_procedure_append(t_transpiler_cobol_procedure *procedure,
+    t_transpiler_cobol_paragraph *paragraph);
 
 #endif

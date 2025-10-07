@@ -25,6 +25,11 @@ COBOL paragraphs, and every sample includes a `function main()` entrypoint that 
 - **Constructs:** `record` blocks with nested field declarations, `function` definitions (`write_records`, `main`), scalar
   variables instantiated from record types, string assignments to record members, and `write` operations for structured records.
 
+### `samples/cblc/record_summary.cblc`
+- **Purpose:** Mirrors the COBOL record summarization flow so the reverse pipeline can validate counter and accumulator recovery.
+- **Constructs:** `record` types with scalar members, integer state tracked in global variables, `while` loops over `read` calls,
+  and conditional aggregation guarded by `starts_with`.
+
 ## Maintenance Checklist
 
 1. Add a new `.cblc` file under `samples/cblc` when introducing language features that need sample coverage.

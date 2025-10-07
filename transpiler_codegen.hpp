@@ -15,7 +15,7 @@ void transpiler_codegen_file_sections_dispose(t_transpiler_cobol_file_sections *
 int transpiler_codegen_build_file_sections(const t_transpiler_context *context,
     t_transpiler_cobol_file_sections *sections);
 
-int transpiler_codegen_build_procedure_division(const t_transpiler_cobol_statement_block *statements,
+int transpiler_codegen_build_procedure_division(const t_transpiler_cobol_procedure *procedure,
     char **out);
 
 #endif

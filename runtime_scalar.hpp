@@ -19,6 +19,8 @@ void runtime_int_set(t_runtime_int *destination, int value);
 int runtime_int_from_string(t_runtime_int *destination, const char *text);
 int runtime_int_add(t_runtime_int left, t_runtime_int right, t_runtime_int *result);
 int runtime_int_subtract(t_runtime_int left, t_runtime_int right, t_runtime_int *result);
+int runtime_int_multiply(t_runtime_int left, t_runtime_int right, t_runtime_int *result);
+int runtime_int_divide(t_runtime_int dividend, t_runtime_int divisor, t_runtime_int *result);
 int runtime_int_compare(t_runtime_int left, t_runtime_int right);
 int runtime_int_to_string(t_runtime_int value, char *buffer, size_t buffer_size);
 

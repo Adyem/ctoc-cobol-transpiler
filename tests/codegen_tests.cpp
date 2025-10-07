@@ -23,18 +23,18 @@ static int test_transpiler_codegen_emits_text_file_sections(void)
             "codegen should build file sections") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_cstring_equal(sections.environment_division,
-            "ENVIRONMENT DIVISION.\n"
-            "    INPUT-OUTPUT SECTION.\n"
-            "    FILE-CONTROL.\n"
-            "        SELECT INPUT_FILE ASSIGN TO \"input.txt\"\n"
-            "            ORGANIZATION IS LINE SEQUENTIAL.\n",
+            "       ENVIRONMENT DIVISION.\n"
+            "       INPUT-OUTPUT SECTION.\n"
+            "       FILE-CONTROL.\n"
+            "           SELECT INPUT_FILE ASSIGN TO \"input.txt\"\n"
+            "               ORGANIZATION IS LINE SEQUENTIAL.\n",
             "environment division should describe input file") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_cstring_equal(sections.data_division,
-            "DATA DIVISION.\n"
-            "    FILE SECTION.\n"
-            "    FD INPUT_FILE.\n"
-            "        01 INPUT_FILE-REC PIC X(80).\n",
+            "       DATA DIVISION.\n"
+            "       FILE SECTION.\n"
+            "       FD INPUT_FILE.\n"
+            "       01 INPUT_FILE-REC PIC X(80).\n",
             "data division should size record from hint") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -64,18 +64,18 @@ static int test_transpiler_codegen_respects_explicit_record_length(void)
             "codegen should build data file sections") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_cstring_equal(sections.environment_division,
-            "ENVIRONMENT DIVISION.\n"
-            "    INPUT-OUTPUT SECTION.\n"
-            "    FILE-CONTROL.\n"
-            "        SELECT DATA_STORE ASSIGN TO \"store.bin\"\n"
-            "            ORGANIZATION IS SEQUENTIAL.\n",
+            "       ENVIRONMENT DIVISION.\n"
+            "       INPUT-OUTPUT SECTION.\n"
+            "       FILE-CONTROL.\n"
+            "           SELECT DATA_STORE ASSIGN TO \"store.bin\"\n"
+            "               ORGANIZATION IS SEQUENTIAL.\n",
             "environment division should emit sequential organization for data file") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_cstring_equal(sections.data_division,
-            "DATA DIVISION.\n"
-            "    FILE SECTION.\n"
-            "    FD DATA_STORE.\n"
-            "        01 DATA_STORE-REC PIC X(128).\n",
+            "       DATA DIVISION.\n"
+            "       FILE SECTION.\n"
+            "       FD DATA_STORE.\n"
+            "       01 DATA_STORE-REC PIC X(128).\n",
             "data division should preserve explicit record length") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -87,16 +87,27 @@ cleanup:
 
 static int test_transpiler_codegen_formats_if_else(void)
 {
-    t_transpiler_cobol_statement_block block;
+    t_transpiler_cobol_procedure procedure;
+    t_transpiler_cobol_paragraph *paragraph;
+    t_transpiler_cobol_statement_block *block;
     t_transpiler_cobol_condition condition;
     t_transpiler_cobol_statement *if_statement;
     t_transpiler_cobol_statement_block *branch;
     t_transpiler_cobol_statement *move_statement;
-    char *procedure;
+    char *procedure_text;
     int status;
 
-    transpiler_cobol_statement_block_init(&block);
-    procedure = NULL;
+    transpiler_cobol_procedure_init(&procedure);
+    paragraph = transpiler_cobol_paragraph_create("main");
+    if (!paragraph)
+        return (FT_FAILURE);
+    block = transpiler_cobol_paragraph_get_statements(paragraph);
+    if (!block)
+    {
+        transpiler_cobol_paragraph_destroy(paragraph);
+        return (FT_FAILURE);
+    }
+    procedure_text = NULL;
     if_statement = NULL;
     status = FT_FAILURE;
     condition.left = "FLAG";
@@ -128,47 +139,64 @@ static int test_transpiler_codegen_formats_if_else(void)
         transpiler_cobol_statement_destroy(move_statement);
         goto cleanup;
     }
-    if (transpiler_cobol_statement_block_append(&block, if_statement) != FT_SUCCESS)
+    if (transpiler_cobol_statement_block_append(block, if_statement) != FT_SUCCESS)
     {
         transpiler_cobol_statement_destroy(if_statement);
         if_statement = NULL;
         goto cleanup;
     }
     if_statement = NULL;
-    if (test_expect_success(transpiler_codegen_build_procedure_division(&block, &procedure),
+    if (transpiler_cobol_procedure_append(&procedure, paragraph) != FT_SUCCESS)
+        goto cleanup;
+    paragraph = NULL;
+    if (test_expect_success(transpiler_codegen_build_procedure_division(&procedure, &procedure_text),
             "procedure generation should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(procedure,
-            "PROCEDURE DIVISION.\n"
-            "    IF FLAG = 'Y'\n"
-            "        MOVE INPUT-REC TO OUTPUT-REC\n"
-            "    ELSE\n"
-            "        MOVE ZERO TO OUTPUT-REC\n"
-            "    END-IF\n",
+    if (test_expect_cstring_equal(procedure_text,
+            "       PROCEDURE DIVISION.\n"
+            "       MAIN.\n"
+            "           IF FLAG = 'Y'\n"
+            "               MOVE INPUT-REC TO OUTPUT-REC\n"
+            "           ELSE\n"
+            "               MOVE ZERO TO OUTPUT-REC\n"
+            "           END-IF\n",
             "procedure division should format IF/ELSE branches") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
-    if (procedure)
-        cma_free(procedure);
+    if (procedure_text)
+        cma_free(procedure_text);
     if (if_statement)
         transpiler_cobol_statement_destroy(if_statement);
-    transpiler_cobol_statement_block_dispose(&block);
+    if (paragraph)
+        transpiler_cobol_paragraph_destroy(paragraph);
+    transpiler_cobol_procedure_dispose(&procedure);
     return (status);
 }
 
 static int test_transpiler_codegen_formats_perform_until(void)
 {
-    t_transpiler_cobol_statement_block block;
+    t_transpiler_cobol_procedure procedure;
+    t_transpiler_cobol_paragraph *paragraph;
+    t_transpiler_cobol_statement_block *block;
     t_transpiler_cobol_condition condition;
     t_transpiler_cobol_statement *perform_statement;
     t_transpiler_cobol_statement_block *body;
     t_transpiler_cobol_statement *move_statement;
-    char *procedure;
+    char *procedure_text;
     int status;
 
-    transpiler_cobol_statement_block_init(&block);
-    procedure = NULL;
+    transpiler_cobol_procedure_init(&procedure);
+    paragraph = transpiler_cobol_paragraph_create("main");
+    if (!paragraph)
+        return (FT_FAILURE);
+    block = transpiler_cobol_paragraph_get_statements(paragraph);
+    if (!block)
+    {
+        transpiler_cobol_paragraph_destroy(paragraph);
+        return (FT_FAILURE);
+    }
+    procedure_text = NULL;
     perform_statement = NULL;
     status = FT_FAILURE;
     condition.left = "EOF-FLAG";
@@ -189,45 +217,62 @@ static int test_transpiler_codegen_formats_perform_until(void)
         transpiler_cobol_statement_destroy(move_statement);
         goto cleanup;
     }
-    if (transpiler_cobol_statement_block_append(&block, perform_statement) != FT_SUCCESS)
+    if (transpiler_cobol_statement_block_append(block, perform_statement) != FT_SUCCESS)
     {
         transpiler_cobol_statement_destroy(perform_statement);
         perform_statement = NULL;
         goto cleanup;
     }
     perform_statement = NULL;
-    if (test_expect_success(transpiler_codegen_build_procedure_division(&block, &procedure),
+    if (transpiler_cobol_procedure_append(&procedure, paragraph) != FT_SUCCESS)
+        goto cleanup;
+    paragraph = NULL;
+    if (test_expect_success(transpiler_codegen_build_procedure_division(&procedure, &procedure_text),
             "procedure generation should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(procedure,
-            "PROCEDURE DIVISION.\n"
-            "    PERFORM UNTIL NOT EOF-FLAG = 'Y'\n"
-            "        MOVE BUFFER TO OUTPUT-REC\n"
-            "    END-PERFORM\n",
+    if (test_expect_cstring_equal(procedure_text,
+            "       PROCEDURE DIVISION.\n"
+            "       MAIN.\n"
+            "           PERFORM UNTIL NOT EOF-FLAG = 'Y'\n"
+            "               MOVE BUFFER TO OUTPUT-REC\n"
+            "           END-PERFORM\n",
             "procedure division should format PERFORM UNTIL loops") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
-    if (procedure)
-        cma_free(procedure);
+    if (procedure_text)
+        cma_free(procedure_text);
     if (perform_statement)
         transpiler_cobol_statement_destroy(perform_statement);
-    transpiler_cobol_statement_block_dispose(&block);
+    if (paragraph)
+        transpiler_cobol_paragraph_destroy(paragraph);
+    transpiler_cobol_procedure_dispose(&procedure);
     return (status);
 }
 
 static int test_transpiler_codegen_formats_perform_varying(void)
 {
-    t_transpiler_cobol_statement_block block;
+    t_transpiler_cobol_procedure procedure;
+    t_transpiler_cobol_paragraph *paragraph;
+    t_transpiler_cobol_statement_block *block;
     t_transpiler_cobol_condition condition;
     t_transpiler_cobol_statement *perform_statement;
     t_transpiler_cobol_statement_block *body;
     t_transpiler_cobol_statement *move_statement;
-    char *procedure;
+    char *procedure_text;
     int status;
 
-    transpiler_cobol_statement_block_init(&block);
-    procedure = NULL;
+    transpiler_cobol_procedure_init(&procedure);
+    paragraph = transpiler_cobol_paragraph_create("main");
+    if (!paragraph)
+        return (FT_FAILURE);
+    block = transpiler_cobol_paragraph_get_statements(paragraph);
+    if (!block)
+    {
+        transpiler_cobol_paragraph_destroy(paragraph);
+        return (FT_FAILURE);
+    }
+    procedure_text = NULL;
     perform_statement = NULL;
     status = FT_FAILURE;
     condition.left = "INDEX";
@@ -248,30 +293,107 @@ static int test_transpiler_codegen_formats_perform_varying(void)
         transpiler_cobol_statement_destroy(move_statement);
         goto cleanup;
     }
-    if (transpiler_cobol_statement_block_append(&block, perform_statement) != FT_SUCCESS)
+    if (transpiler_cobol_statement_block_append(block, perform_statement) != FT_SUCCESS)
     {
         transpiler_cobol_statement_destroy(perform_statement);
         perform_statement = NULL;
         goto cleanup;
     }
     perform_statement = NULL;
-    if (test_expect_success(transpiler_codegen_build_procedure_division(&block, &procedure),
+    if (transpiler_cobol_procedure_append(&procedure, paragraph) != FT_SUCCESS)
+        goto cleanup;
+    paragraph = NULL;
+    if (test_expect_success(transpiler_codegen_build_procedure_division(&procedure, &procedure_text),
             "procedure generation should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(procedure,
-            "PROCEDURE DIVISION.\n"
-            "    PERFORM VARYING INDEX FROM 0 BY 1 UNTIL INDEX > 10\n"
-            "        MOVE INDEX TO SUM\n"
-            "    END-PERFORM\n",
+    if (test_expect_cstring_equal(procedure_text,
+            "       PROCEDURE DIVISION.\n"
+            "       MAIN.\n"
+            "           PERFORM VARYING INDEX FROM 0 BY 1 UNTIL INDEX > 10\n"
+            "               MOVE INDEX TO SUM\n"
+            "           END-PERFORM\n",
             "procedure division should format PERFORM VARYING loops") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
-    if (procedure)
-        cma_free(procedure);
+    if (procedure_text)
+        cma_free(procedure_text);
     if (perform_statement)
         transpiler_cobol_statement_destroy(perform_statement);
-    transpiler_cobol_statement_block_dispose(&block);
+    if (paragraph)
+        transpiler_cobol_paragraph_destroy(paragraph);
+    transpiler_cobol_procedure_dispose(&procedure);
+    return (status);
+}
+
+static int test_transpiler_codegen_emits_multiple_paragraphs(void)
+{
+    t_transpiler_cobol_procedure procedure;
+    t_transpiler_cobol_paragraph *main_paragraph;
+    t_transpiler_cobol_paragraph *helper_paragraph;
+    t_transpiler_cobol_statement *statement;
+    char *procedure_text;
+    int status;
+
+    transpiler_cobol_procedure_init(&procedure);
+    main_paragraph = transpiler_cobol_paragraph_create("main");
+    if (!main_paragraph)
+        return (FT_FAILURE);
+    helper_paragraph = transpiler_cobol_paragraph_create("helper");
+    if (!helper_paragraph)
+    {
+        transpiler_cobol_paragraph_destroy(main_paragraph);
+        return (FT_FAILURE);
+    }
+    procedure_text = NULL;
+    statement = transpiler_cobol_statement_create_move("INPUT-REC", "OUTPUT-REC");
+    if (!statement)
+        goto cleanup;
+    if (transpiler_cobol_statement_block_append(transpiler_cobol_paragraph_get_statements(main_paragraph), statement)
+        != FT_SUCCESS)
+    {
+        transpiler_cobol_statement_destroy(statement);
+        goto cleanup;
+    }
+    statement = transpiler_cobol_statement_create_move("ZERO", "OUTPUT-REC");
+    if (!statement)
+        goto cleanup;
+    if (transpiler_cobol_statement_block_append(transpiler_cobol_paragraph_get_statements(helper_paragraph), statement)
+        != FT_SUCCESS)
+    {
+        transpiler_cobol_statement_destroy(statement);
+        goto cleanup;
+    }
+    statement = NULL;
+    if (transpiler_cobol_procedure_append(&procedure, main_paragraph) != FT_SUCCESS)
+        goto cleanup;
+    main_paragraph = NULL;
+    if (transpiler_cobol_procedure_append(&procedure, helper_paragraph) != FT_SUCCESS)
+        goto cleanup;
+    helper_paragraph = NULL;
+    if (test_expect_success(transpiler_codegen_build_procedure_division(&procedure, &procedure_text),
+            "procedure generation should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(procedure_text,
+            "       PROCEDURE DIVISION.\n"
+            "       MAIN.\n"
+            "           MOVE INPUT-REC TO OUTPUT-REC\n"
+            "\n"
+            "       HELPER.\n"
+            "           MOVE ZERO TO OUTPUT-REC\n",
+            "procedure division should emit multiple paragraphs with spacing") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (procedure_text)
+        cma_free(procedure_text);
+    if (statement)
+        transpiler_cobol_statement_destroy(statement);
+    if (main_paragraph)
+        transpiler_cobol_paragraph_destroy(main_paragraph);
+    if (helper_paragraph)
+        transpiler_cobol_paragraph_destroy(helper_paragraph);
+    transpiler_cobol_procedure_dispose(&procedure);
     return (status);
 }
 
@@ -282,7 +404,8 @@ const t_test_case *get_codegen_tests(size_t *count)
         {"transpiler_codegen_respects_explicit_record_length", test_transpiler_codegen_respects_explicit_record_length},
         {"transpiler_codegen_formats_if_else", test_transpiler_codegen_formats_if_else},
         {"transpiler_codegen_formats_perform_until", test_transpiler_codegen_formats_perform_until},
-        {"transpiler_codegen_formats_perform_varying", test_transpiler_codegen_formats_perform_varying}
+        {"transpiler_codegen_formats_perform_varying", test_transpiler_codegen_formats_perform_varying},
+        {"transpiler_codegen_emits_multiple_paragraphs", test_transpiler_codegen_emits_multiple_paragraphs}
     };
 
     if (count)
