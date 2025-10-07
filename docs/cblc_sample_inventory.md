@@ -157,7 +157,7 @@ function MAIN() {
 function ENTRY_PARAGRAPH() {
     SCRATCH_NOTE = "mixED Case value";
     RUNNING_TOTAL_VALUE = 0;
-    STATUS_FLAG = "y";
+    STATUS_FLAG = true;
     return ;
 }
 

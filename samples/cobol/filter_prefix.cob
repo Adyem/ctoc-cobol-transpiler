@@ -17,8 +17,9 @@
        01  PREFIX PIC X(8) VALUE "ALLOW".
        01  EOF-FLAG PIC X VALUE 'N'.
        PROCEDURE DIVISION.
-           OPEN INPUT SOURCE-FILE
-                OUTPUT TARGET-FILE.
+MAIN.
+           OPEN INPUT SOURCE-FILE.
+           OPEN OUTPUT TARGET-FILE.
            PERFORM UNTIL EOF-FLAG = 'Y'
                READ SOURCE-FILE
                    AT END
@@ -30,5 +31,6 @@
                        END-IF
                END-READ
            END-PERFORM.
-           CLOSE SOURCE-FILE TARGET-FILE.
+           CLOSE SOURCE-FILE.
+           CLOSE TARGET-FILE.
            STOP RUN.

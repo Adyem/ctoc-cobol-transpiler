@@ -152,7 +152,7 @@ FT_TEST(test_cblc_reverse_normalization_matches_golden)
         "function ENTRY_PARAGRAPH() {\n"
         "    SCRATCH_NOTE = \"mixED Case value\";\n"
         "    RUNNING_TOTAL_VALUE = 0;\n"
-        "    STATUS_FLAG = \"y\";\n"
+        "    STATUS_FLAG = true;\n"
         "    return ;\n"
         "}\n\n"
         "function NORMALIZE_VALUES() {\n"
@@ -214,8 +214,9 @@ FT_TEST(test_cobol_copy_file_matches_golden)
         "       WORKING-STORAGE SECTION.\n"
         "       01  EOF-FLAG PIC X VALUE 'N'.\n"
         "       PROCEDURE DIVISION.\n"
-        "           OPEN INPUT INPUT-FILE\n"
-        "                OUTPUT OUTPUT-FILE.\n"
+        "MAIN.\n"
+        "           OPEN INPUT INPUT-FILE.\n"
+        "           OPEN OUTPUT OUTPUT-FILE.\n"
         "           PERFORM UNTIL EOF-FLAG = 'Y'\n"
         "               READ INPUT-FILE\n"
         "                   AT END\n"
@@ -225,7 +226,8 @@ FT_TEST(test_cobol_copy_file_matches_golden)
         "                       WRITE OUTPUT-RECORD\n"
         "               END-READ\n"
         "           END-PERFORM.\n"
-        "           CLOSE INPUT-FILE OUTPUT-FILE.\n"
+        "           CLOSE INPUT-FILE.\n"
+        "           CLOSE OUTPUT-FILE.\n"
         "           STOP RUN.\n";
 
     if (golden_expect_file_matches("samples/cobol/copy_file.cob", expected,
@@ -256,8 +258,9 @@ FT_TEST(test_cobol_filter_prefix_matches_golden)
         "       01  PREFIX PIC X(8) VALUE \"ALLOW\".\n"
         "       01  EOF-FLAG PIC X VALUE 'N'.\n"
         "       PROCEDURE DIVISION.\n"
-        "           OPEN INPUT SOURCE-FILE\n"
-        "                OUTPUT TARGET-FILE.\n"
+        "MAIN.\n"
+        "           OPEN INPUT SOURCE-FILE.\n"
+        "           OPEN OUTPUT TARGET-FILE.\n"
         "           PERFORM UNTIL EOF-FLAG = 'Y'\n"
         "               READ SOURCE-FILE\n"
         "                   AT END\n"
@@ -269,7 +272,8 @@ FT_TEST(test_cobol_filter_prefix_matches_golden)
         "                       END-IF\n"
         "               END-READ\n"
         "           END-PERFORM.\n"
-        "           CLOSE SOURCE-FILE TARGET-FILE.\n"
+        "           CLOSE SOURCE-FILE.\n"
+        "           CLOSE TARGET-FILE.\n"
         "           STOP RUN.\n";
 
     if (golden_expect_file_matches("samples/cobol/filter_prefix.cob", expected,
@@ -299,6 +303,7 @@ FT_TEST(test_cobol_record_writer_matches_golden)
         "           05  WORK-ID PIC X(4).\n"
         "           05  WORK-NAME PIC X(24).\n"
         "       PROCEDURE DIVISION.\n"
+        "MAIN.\n"
         "           OPEN OUTPUT REPORT-FILE.\n"
         "           MOVE \"0001\" TO WORK-ID.\n"
         "           MOVE \"INITIAL ENTRY\" TO WORK-NAME.\n"
@@ -334,6 +339,7 @@ FT_TEST(test_cobol_record_summary_matches_golden)
         "       01  TOTAL-AMOUNT PIC 9(7) VALUE 0.\n"
         "       01  ACCEPTED-COUNT PIC 9(4) VALUE 0.\n"
         "       PROCEDURE DIVISION.\n"
+        "MAIN.\n"
         "           OPEN INPUT INPUT-FILE.\n"
         "           PERFORM UNTIL EOF-FLAG = 'Y'\n"
         "               READ INPUT-FILE\n"

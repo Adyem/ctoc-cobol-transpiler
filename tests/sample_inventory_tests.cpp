@@ -65,7 +65,7 @@ static int validate_inventory_mentions(const char *manifest_path, const char *in
     char line[256];
     size_t offset;
     char manifest_buffer[1024];
-    char inventory_buffer[4096];
+    char inventory_buffer[16384];
     size_t inventory_length;
 
     if (test_read_text_file(manifest_path, manifest_buffer, sizeof(manifest_buffer)) != FT_SUCCESS)

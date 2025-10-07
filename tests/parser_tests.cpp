@@ -477,6 +477,7 @@ FT_TEST(test_parser_accepts_boolean_character_literals)
     t_ast_node *if_statement;
     t_ast_node *condition;
     t_ast_node *right_operand;
+    t_ast_node *branch_sequence;
 
     source = "IDENTIFICATION DIVISION.\n"
         "PROGRAM-ID. BOOL-LITERALS.\n"
@@ -552,7 +553,7 @@ FT_TEST(test_parser_accepts_boolean_character_literals)
         ast_node_destroy(program);
         return (FT_FAILURE);
     }
-    if (ast_node_child_count(if_statement) != 3)
+    if (ast_node_child_count(if_statement) != 2)
     {
         ast_node_destroy(program);
         return (FT_FAILURE);
@@ -576,6 +577,22 @@ FT_TEST(test_parser_accepts_boolean_character_literals)
     }
     if (!right_operand->token.lexeme || right_operand->token.length != 3
         || right_operand->token.lexeme[1] != 'N')
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    branch_sequence = ast_node_get_child(if_statement, 1);
+    if (!branch_sequence || branch_sequence->kind != AST_NODE_STATEMENT_SEQUENCE)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    if (ast_node_child_count(branch_sequence) != 1)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    if (ast_node_get_child(branch_sequence, 0)->kind != AST_NODE_MOVE_STATEMENT)
     {
         ast_node_destroy(program);
         return (FT_FAILURE);

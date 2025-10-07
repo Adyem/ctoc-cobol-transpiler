@@ -14,8 +14,9 @@
        WORKING-STORAGE SECTION.
        01  EOF-FLAG PIC X VALUE 'N'.
        PROCEDURE DIVISION.
-           OPEN INPUT INPUT-FILE
-                OUTPUT OUTPUT-FILE.
+MAIN.
+           OPEN INPUT INPUT-FILE.
+           OPEN OUTPUT OUTPUT-FILE.
            PERFORM UNTIL EOF-FLAG = 'Y'
                READ INPUT-FILE
                    AT END
@@ -25,5 +26,6 @@
                        WRITE OUTPUT-RECORD
                END-READ
            END-PERFORM.
-           CLOSE INPUT-FILE OUTPUT-FILE.
+           CLOSE INPUT-FILE.
+           CLOSE OUTPUT-FILE.
            STOP RUN.
