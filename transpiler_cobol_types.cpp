@@ -180,7 +180,21 @@ static int transpiler_cobol_elementary_append_picture(t_transpiler_cobol_buffer 
     }
     if (element->kind == TRANSPILE_COBOL_ELEMENTARY_BOOLEAN)
     {
-        return (transpiler_cobol_buffer_append_string(buffer, "PIC X VALUE 'N'"));
+        if (transpiler_cobol_buffer_append_string(buffer, "PIC X") != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (element->length > 1)
+        {
+            if (transpiler_cobol_buffer_append_string(buffer, "(") != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (transpiler_cobol_buffer_append_number_with_min_digits(buffer,
+                    static_cast<unsigned long long>(element->length), 1) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (transpiler_cobol_buffer_append_string(buffer, ")") != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        if (transpiler_cobol_buffer_append_string(buffer, " VALUE 'N'") != FT_SUCCESS)
+            return (FT_FAILURE);
+        return (FT_SUCCESS);
     }
     if (element->kind == TRANSPILE_COBOL_ELEMENTARY_NUMERIC_SIGNED
         || element->kind == TRANSPILE_COBOL_ELEMENTARY_NUMERIC_UNSIGNED)

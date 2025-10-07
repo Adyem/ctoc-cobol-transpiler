@@ -21,6 +21,6 @@ MAIN.
        END-IF
        STOP RUN.
 NEXT.
-       MOVE 'DONE' TO FLAG.
+       MOVE 'Y' TO FLAG.
        STOP RUN.
 

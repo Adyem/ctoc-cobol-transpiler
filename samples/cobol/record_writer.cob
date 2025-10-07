@@ -16,6 +16,7 @@
            05  WORK-ID PIC X(4).
            05  WORK-NAME PIC X(24).
        PROCEDURE DIVISION.
+MAIN.
            OPEN OUTPUT REPORT-FILE.
            MOVE "0001" TO WORK-ID.
            MOVE "INITIAL ENTRY" TO WORK-NAME.

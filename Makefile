@@ -106,6 +106,8 @@ TEST_SRC    = tests/test_main.cpp \
               tests/golden_file_tests.cpp \
               tests/grammar_doc_tests.cpp \
               tests/cobol_doc_tests.cpp \
+              tests/cobol_execution_tests.cpp \
+              tests/cblc_doc_tests.cpp \
               tests/cli_doc_tests.cpp \
               tests/contributing_doc_tests.cpp \
               tests/onboarding_doc_tests.cpp \
@@ -129,6 +131,19 @@ dirs:
 	-$(MKDIR) $(OBJ_DIR)
 	-$(MKDIR) $(OBJ_DIR_DEBUG)
 	-$(MKDIR) $(OBJ_DIR_TEST)
+
+install_cobc:
+	@if ! command -v cobc >/dev/null 2>&1; then \
+		apt-get update && apt-get install -y gnucobol; \
+	else \
+		printf 'cobc already installed.\n'; \
+	fi
+
+
+tests_with_cobc: install_cobc
+	$(MAKE) initialize
+	$(MAKE) tests
+	$(MAKE) test
 
 debug:
 	$(MAKE) all DEBUG=1
