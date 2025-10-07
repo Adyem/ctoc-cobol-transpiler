@@ -106,6 +106,18 @@ static int cobol_reverse_run_fixture(const char *cobol_path, const char *expecte
 
 FT_TEST(test_cobol_reverse_fixtures)
 {
+    if (cobol_reverse_run_fixture("samples/cobol/copy_file.cob",
+            "samples/cblc/copy_file.cblc", "copy_file") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_reverse_run_fixture("samples/cobol/filter_prefix.cob",
+            "samples/cblc/filter_prefix.cblc", "filter_prefix") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_reverse_run_fixture("samples/cobol/record_writer.cob",
+            "samples/cblc/record_writer.cblc", "record_writer") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_reverse_run_fixture("samples/cobol/record_summary.cob",
+            "samples/cblc/record_summary.cblc", "record_summary") != FT_SUCCESS)
+        return (FT_FAILURE);
     if (cobol_reverse_run_fixture("samples/cobol/reverse_constructs.cob",
             "samples/cblc/reverse_constructs.cblc", "reverse_constructs") != FT_SUCCESS)
         return (FT_FAILURE);

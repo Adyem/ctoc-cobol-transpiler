@@ -161,7 +161,10 @@ static int parser_parse_literal_node(t_parser *parser, t_ast_node **out_node)
         ast_node_destroy(node);
         return (parser_set_error(parser));
     }
-    if (parser->current.kind != LEXER_TOKEN_STRING_LITERAL && parser->current.kind != LEXER_TOKEN_NUMERIC_LITERAL)
+    if (parser->current.kind != LEXER_TOKEN_STRING_LITERAL
+        && parser->current.kind != LEXER_TOKEN_NUMERIC_LITERAL
+        && parser->current.kind != LEXER_TOKEN_KEYWORD_TRUE
+        && parser->current.kind != LEXER_TOKEN_KEYWORD_FALSE)
     {
         ast_node_destroy(node);
         return (parser_set_error(parser));
@@ -189,7 +192,10 @@ static int parser_parse_value_node(t_parser *parser, t_ast_node **out_node)
         return (parser_set_error(parser));
     if (parser->current.kind == LEXER_TOKEN_IDENTIFIER)
         return (parser_parse_identifier_node(parser, out_node));
-    if (parser->current.kind == LEXER_TOKEN_STRING_LITERAL || parser->current.kind == LEXER_TOKEN_NUMERIC_LITERAL)
+    if (parser->current.kind == LEXER_TOKEN_STRING_LITERAL
+        || parser->current.kind == LEXER_TOKEN_NUMERIC_LITERAL
+        || parser->current.kind == LEXER_TOKEN_KEYWORD_TRUE
+        || parser->current.kind == LEXER_TOKEN_KEYWORD_FALSE)
         return (parser_parse_literal_node(parser, out_node));
     return (parser_set_error(parser));
 }

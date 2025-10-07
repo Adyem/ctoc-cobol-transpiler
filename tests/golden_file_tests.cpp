@@ -123,6 +123,78 @@ FT_TEST(test_cblc_record_summary_matches_golden)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_cblc_reverse_constructs_matches_golden)
+{
+    static const char expected[] =
+        "function MAIN() {\n"
+        "    open(INPUT_FILE, \"r\");\n"
+        "    while (!(EOF_FLAG == true)) {\n"
+        "        read(INPUT_FILE, OUTPUT_RECORD);\n"
+        "        if (EOF_FLAG == false) {\n"
+        "            write(OUTPUT_FILE, OUTPUT_RECORD);\n"
+        "        } else {\n"
+        "            EOF_FLAG = true;\n"
+        "        }\n"
+        "    }\n"
+        "    close(INPUT_FILE);\n"
+        "    return ;\n"
+        "}\n";
+
+    if (golden_expect_file_matches("samples/cblc/reverse_constructs.cblc", expected,
+            "reverse_constructs.cblc should match golden content") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cblc_reverse_normalization_matches_golden)
+{
+    static const char expected[] =
+        "function ENTRY_PARAGRAPH() {\n"
+        "    SCRATCH_NOTE = \"mixED Case value\";\n"
+        "    RUNNING_TOTAL_VALUE = 0;\n"
+        "    STATUS_FLAG = \"y\";\n"
+        "    return ;\n"
+        "}\n\n"
+        "function NORMALIZE_VALUES() {\n"
+        "    RUNNING_TOTAL_VALUE = 7;\n"
+        "    SCRATCH_NOTE = \"done\";\n"
+        "    return ;\n"
+        "}\n";
+
+    if (golden_expect_file_matches("samples/cblc/reverse_normalization.cblc", expected,
+            "reverse_normalization.cblc should match golden content") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cblc_reverse_control_flow_matches_golden)
+{
+    static const char expected[] =
+        "function MAIN() {\n"
+        "    if (!(FLAG == true)) {\n"
+        "        while (!(COUNT > LIMIT)) {\n"
+        "            LIMIT = COUNT;\n"
+        "        }\n"
+        "    } else {\n"
+        "        INDEX = 0;\n"
+        "        while (!(INDEX >= LIMIT)) {\n"
+        "            RESULT = INDEX;\n"
+        "            INDEX = INDEX + 1;\n"
+        "        }\n"
+        "    }\n"
+        "    return ;\n"
+        "}\n\n"
+        "function NEXT() {\n"
+        "    FLAG = true;\n"
+        "    return ;\n"
+        "}\n";
+
+    if (golden_expect_file_matches("samples/cblc/reverse_control_flow.cblc", expected,
+            "reverse_control_flow.cblc should match golden content") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_cobol_copy_file_matches_golden)
 {
     static const char expected[] =
@@ -140,14 +212,14 @@ FT_TEST(test_cobol_copy_file_matches_golden)
         "       FD  OUTPUT-FILE.\n"
         "       01  OUTPUT-RECORD PIC X(256).\n"
         "       WORKING-STORAGE SECTION.\n"
-        "       01  EOF-FLAG PIC X VALUE \"N\".\n"
+        "       01  EOF-FLAG PIC X VALUE 'N'.\n"
         "       PROCEDURE DIVISION.\n"
         "           OPEN INPUT INPUT-FILE\n"
         "                OUTPUT OUTPUT-FILE.\n"
-        "           PERFORM UNTIL EOF-FLAG = \"Y\"\n"
+        "           PERFORM UNTIL EOF-FLAG = 'Y'\n"
         "               READ INPUT-FILE\n"
         "                   AT END\n"
-        "                       MOVE \"Y\" TO EOF-FLAG\n"
+        "                       MOVE 'Y' TO EOF-FLAG\n"
         "                   NOT AT END\n"
         "                       MOVE INPUT-RECORD TO OUTPUT-RECORD\n"
         "                       WRITE OUTPUT-RECORD\n"
@@ -182,14 +254,14 @@ FT_TEST(test_cobol_filter_prefix_matches_golden)
         "           05  TARGET-LINE PIC X(256).\n"
         "       WORKING-STORAGE SECTION.\n"
         "       01  PREFIX PIC X(8) VALUE \"ALLOW\".\n"
-        "       01  EOF-FLAG PIC X VALUE \"N\".\n"
+        "       01  EOF-FLAG PIC X VALUE 'N'.\n"
         "       PROCEDURE DIVISION.\n"
         "           OPEN INPUT SOURCE-FILE\n"
         "                OUTPUT TARGET-FILE.\n"
-        "           PERFORM UNTIL EOF-FLAG = \"Y\"\n"
+        "           PERFORM UNTIL EOF-FLAG = 'Y'\n"
         "               READ SOURCE-FILE\n"
         "                   AT END\n"
-        "                       MOVE \"Y\" TO EOF-FLAG\n"
+        "                       MOVE 'Y' TO EOF-FLAG\n"
         "                   NOT AT END\n"
         "                       IF SOURCE-LINE(1:5) = PREFIX(1:5)\n"
         "                           MOVE SOURCE-RECORD TO TARGET-RECORD\n"
@@ -258,15 +330,15 @@ FT_TEST(test_cobol_record_summary_matches_golden)
         "           05  RECORD-STATUS PIC X.\n"
         "           05  RECORD-AMOUNT PIC 9(6).\n"
         "       WORKING-STORAGE SECTION.\n"
-        "       01  EOF-FLAG PIC X VALUE \"N\".\n"
+        "       01  EOF-FLAG PIC X VALUE 'N'.\n"
         "       01  TOTAL-AMOUNT PIC 9(7) VALUE 0.\n"
         "       01  ACCEPTED-COUNT PIC 9(4) VALUE 0.\n"
         "       PROCEDURE DIVISION.\n"
         "           OPEN INPUT INPUT-FILE.\n"
-        "           PERFORM UNTIL EOF-FLAG = \"Y\"\n"
+        "           PERFORM UNTIL EOF-FLAG = 'Y'\n"
         "               READ INPUT-FILE\n"
         "                   AT END\n"
-        "                       MOVE \"Y\" TO EOF-FLAG\n"
+        "                       MOVE 'Y' TO EOF-FLAG\n"
         "                   NOT AT END\n"
         "                       IF RECORD-STATUS = \"A\"\n"
         "                           ADD 1 TO ACCEPTED-COUNT\n"
@@ -290,6 +362,9 @@ const t_test_case *get_golden_file_tests(size_t *count)
         {"cblc_filter_prefix_matches_golden", test_cblc_filter_prefix_matches_golden},
         {"cblc_record_writer_matches_golden", test_cblc_record_writer_matches_golden},
         {"cblc_record_summary_matches_golden", test_cblc_record_summary_matches_golden},
+        {"cblc_reverse_constructs_matches_golden", test_cblc_reverse_constructs_matches_golden},
+        {"cblc_reverse_normalization_matches_golden", test_cblc_reverse_normalization_matches_golden},
+        {"cblc_reverse_control_flow_matches_golden", test_cblc_reverse_control_flow_matches_golden},
         {"cobol_copy_file_matches_golden", test_cobol_copy_file_matches_golden},
         {"cobol_filter_prefix_matches_golden", test_cobol_filter_prefix_matches_golden},
         {"cobol_record_writer_matches_golden", test_cobol_record_writer_matches_golden},

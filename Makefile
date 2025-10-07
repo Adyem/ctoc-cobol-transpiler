@@ -106,6 +106,8 @@ TEST_SRC    = tests/test_main.cpp \
               tests/golden_file_tests.cpp \
               tests/grammar_doc_tests.cpp \
               tests/cobol_doc_tests.cpp \
+              tests/cobol_execution_tests.cpp \
+              tests/cblc_doc_tests.cpp \
               tests/cli_doc_tests.cpp \
               tests/contributing_doc_tests.cpp \
               tests/onboarding_doc_tests.cpp \

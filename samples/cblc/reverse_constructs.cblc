@@ -1,11 +1,11 @@
 function MAIN() {
     open(INPUT_FILE, "r");
-    while (!(EOF_FLAG == "Y")) {
+    while (!(EOF_FLAG == true)) {
         read(INPUT_FILE, OUTPUT_RECORD);
-        if (EOF_FLAG == "N") {
+        if (EOF_FLAG == false) {
             write(OUTPUT_FILE, OUTPUT_RECORD);
         } else {
-            EOF_FLAG = "Y";
+            EOF_FLAG = true;
         }
     }
     close(INPUT_FILE);

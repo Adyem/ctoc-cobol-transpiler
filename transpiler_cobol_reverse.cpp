@@ -273,14 +273,42 @@ static int cobol_reverse_append_identifier(t_cblc_builder *builder, const t_lexe
     return (FT_SUCCESS);
 }
 
+static const char *cobol_reverse_boolean_from_string_literal(const t_lexer_token *token)
+{
+    char value;
+
+    if (!token)
+        return (NULL);
+    if (token->kind != LEXER_TOKEN_STRING_LITERAL)
+        return (NULL);
+    if (token->length != 3)
+        return (NULL);
+    if (!token->lexeme)
+        return (NULL);
+    if (token->lexeme[0] != '\'')
+        return (NULL);
+    if (token->lexeme[2] != '\'')
+        return (NULL);
+    value = token->lexeme[1];
+    if (value == 'Y' || value == 'y')
+        return ("true");
+    if (value == 'N' || value == 'n')
+        return ("false");
+    return (NULL);
+}
+
 static int cobol_reverse_append_string_literal(t_cblc_builder *builder, const t_lexer_token *token)
 {
     size_t index;
+    const char *boolean_text;
 
     if (!builder)
         return (FT_FAILURE);
     if (!token)
         return (FT_FAILURE);
+    boolean_text = cobol_reverse_boolean_from_string_literal(token);
+    if (boolean_text)
+        return (cblc_builder_append_string(builder, boolean_text));
     if (token->length < 2)
         return (FT_FAILURE);
     if (cblc_builder_append_char(builder, '"') != FT_SUCCESS)
@@ -366,6 +394,10 @@ static int cobol_reverse_append_value(t_cblc_builder *builder, const t_ast_node 
             return (cobol_reverse_append_string_literal(builder, &node->token));
         if (node->token.kind == LEXER_TOKEN_NUMERIC_LITERAL)
             return (cobol_reverse_append_numeric_literal(builder, &node->token));
+        if (node->token.kind == LEXER_TOKEN_KEYWORD_TRUE)
+            return (cblc_builder_append_string(builder, "true"));
+        if (node->token.kind == LEXER_TOKEN_KEYWORD_FALSE)
+            return (cblc_builder_append_string(builder, "false"));
     }
     return (FT_FAILURE);
 }

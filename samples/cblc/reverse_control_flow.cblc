@@ -1,5 +1,5 @@
 function MAIN() {
-    if (!(FLAG == "Y")) {
+    if (!(FLAG == true)) {
         while (!(COUNT > LIMIT)) {
             LIMIT = COUNT;
         }
@@ -14,6 +14,6 @@ function MAIN() {
 }
 
 function NEXT() {
-    FLAG = "DONE";
+    FLAG = true;
     return ;
 }

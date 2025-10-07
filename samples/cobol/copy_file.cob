@@ -12,14 +12,14 @@
        FD  OUTPUT-FILE.
        01  OUTPUT-RECORD PIC X(256).
        WORKING-STORAGE SECTION.
-       01  EOF-FLAG PIC X VALUE "N".
+       01  EOF-FLAG PIC X VALUE 'N'.
        PROCEDURE DIVISION.
            OPEN INPUT INPUT-FILE
                 OUTPUT OUTPUT-FILE.
-           PERFORM UNTIL EOF-FLAG = "Y"
+           PERFORM UNTIL EOF-FLAG = 'Y'
                READ INPUT-FILE
                    AT END
-                       MOVE "Y" TO EOF-FLAG
+                       MOVE 'Y' TO EOF-FLAG
                    NOT AT END
                        MOVE INPUT-RECORD TO OUTPUT-RECORD
                        WRITE OUTPUT-RECORD

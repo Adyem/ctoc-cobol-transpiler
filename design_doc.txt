@@ -213,7 +213,7 @@ Default numeric size policy (configurable):
 | --------- | ---------------------------------------------------------- |
 | `int`     | `PIC 9(10) SIGN IS LEADING SEPARATE` (or unsigned `9(10)`) |
 | `char[n]` | `PIC X(n)`                                                 |
-| `bool`    | `PIC X VALUE 'N'/'Y'` or `PIC 9 VALUE 0/1` (configurable)  |
+| `bool`    | `PIC X VALUE 'N'` (size 1, `'Y'`/`'N'` operators supported) |
 
 Helper routines in `transpiler_cobol_types` encapsulate these policies. Elementary descriptors carry
 length, scale, and signedness so they can render `PIC` clauses (including optional `V9` precision and

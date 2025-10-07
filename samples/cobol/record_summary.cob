@@ -11,15 +11,15 @@
            05  RECORD-STATUS PIC X.
            05  RECORD-AMOUNT PIC 9(6).
        WORKING-STORAGE SECTION.
-       01  EOF-FLAG PIC X VALUE "N".
+       01  EOF-FLAG PIC X VALUE 'N'.
        01  TOTAL-AMOUNT PIC 9(7) VALUE 0.
        01  ACCEPTED-COUNT PIC 9(4) VALUE 0.
        PROCEDURE DIVISION.
            OPEN INPUT INPUT-FILE.
-           PERFORM UNTIL EOF-FLAG = "Y"
+           PERFORM UNTIL EOF-FLAG = 'Y'
                READ INPUT-FILE
                    AT END
-                       MOVE "Y" TO EOF-FLAG
+                       MOVE 'Y' TO EOF-FLAG
                    NOT AT END
                        IF RECORD-STATUS = "A"
                            ADD 1 TO ACCEPTED-COUNT
