@@ -22,6 +22,11 @@ filesystem synchronized.
   layouts.
 - **Constructs:** Group data items, literal assignments, arithmetic updates, and sequential file output.
 
+### `samples/cobol/record_summary.cob`
+- **Purpose:** Aggregates accepted records and total amounts to exercise numeric accumulation with conditional gating.
+- **Constructs:** Sequential file input, status-driven conditional logic, `ADD` statements updating counters, and stored totals
+  in WORKING-STORAGE.
+
 ## Maintenance Checklist
 
 1. Add a new `.cob` file under `samples/cobol` when introducing COBOL-side language features that need sample coverage.

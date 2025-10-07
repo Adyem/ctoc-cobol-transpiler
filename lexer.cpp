@@ -154,6 +154,8 @@ static int lexer_is_identifier_continue(char value)
         return (1);
     if (value == '-')
         return (1);
+    if (value == '_')
+        return (1);
     return (0);
 }
 
@@ -251,6 +253,10 @@ static int lexer_collect_punctuation(t_lexer *lexer, t_lexer_token *token, size_
         kind = LEXER_TOKEN_COLON;
     else if (value == ';')
         kind = LEXER_TOKEN_SEMICOLON;
+    else if (value == '(')
+        kind = LEXER_TOKEN_LEFT_PAREN;
+    else if (value == ')')
+        kind = LEXER_TOKEN_RIGHT_PAREN;
     lexer_build_token(lexer, token, kind, start_offset, start_line, start_column);
     if (kind == LEXER_TOKEN_UNKNOWN)
         return (FT_FAILURE);
@@ -294,7 +300,47 @@ int lexer_next_token(t_lexer *lexer, t_lexer_token *token)
         return (lexer_collect_numeric_literal(lexer, token, start_offset, start_line, start_column));
     if (value == '"' || value == g_lexer_single_quote)
         return (lexer_collect_string_literal(lexer, token, start_offset, start_line, start_column));
-    if (value == '.' || value == ',' || value == ':' || value == ';')
+    if (value == '=')
+    {
+        lexer_advance(lexer);
+        lexer_build_token(lexer, token, LEXER_TOKEN_EQUALS, start_offset, start_line, start_column);
+        return (FT_SUCCESS);
+    }
+    if (value == '<')
+    {
+        t_lexer_token_kind kind;
+
+        lexer_advance(lexer);
+        kind = LEXER_TOKEN_LESS_THAN;
+        if (!lexer_is_at_end(lexer) && lexer_peek(lexer) == '=')
+        {
+            lexer_advance(lexer);
+            kind = LEXER_TOKEN_LESS_OR_EQUAL;
+        }
+        else if (!lexer_is_at_end(lexer) && lexer_peek(lexer) == '>')
+        {
+            lexer_advance(lexer);
+            kind = LEXER_TOKEN_NOT_EQUALS;
+        }
+        lexer_build_token(lexer, token, kind, start_offset, start_line, start_column);
+        return (FT_SUCCESS);
+    }
+    if (value == '>')
+    {
+        t_lexer_token_kind kind;
+
+        lexer_advance(lexer);
+        kind = LEXER_TOKEN_GREATER_THAN;
+        if (!lexer_is_at_end(lexer) && lexer_peek(lexer) == '=')
+        {
+            lexer_advance(lexer);
+            kind = LEXER_TOKEN_GREATER_OR_EQUAL;
+        }
+        lexer_build_token(lexer, token, kind, start_offset, start_line, start_column);
+        return (FT_SUCCESS);
+    }
+    if (value == '.' || value == ',' || value == ':' || value == ';'
+        || value == '(' || value == ')')
         return (lexer_collect_punctuation(lexer, token, start_offset, start_line, start_column));
     return (lexer_collect_unknown(lexer, token, start_offset, start_line, start_column));
 }

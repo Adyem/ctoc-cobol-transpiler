@@ -167,11 +167,22 @@ static const char *transpiler_codegen_organization_for_role(t_transpiler_file_ro
     return ("LINE SEQUENTIAL");
 }
 
-static int transpiler_codegen_buffer_append_indent(t_transpiler_codegen_buffer *buffer, size_t indentation)
+static int transpiler_codegen_buffer_begin_area_a_line(t_transpiler_codegen_buffer *buffer)
+{
+    if (!buffer)
+        return (FT_FAILURE);
+    if (transpiler_codegen_buffer_append_string(buffer, "       ") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int transpiler_codegen_buffer_begin_area_b_line(t_transpiler_codegen_buffer *buffer, size_t indentation)
 {
     size_t index;
 
     if (!buffer)
+        return (FT_FAILURE);
+    if (transpiler_codegen_buffer_append_string(buffer, "           ") != FT_SUCCESS)
         return (FT_FAILURE);
     index = 0;
     while (index < indentation)
@@ -180,6 +191,15 @@ static int transpiler_codegen_buffer_append_indent(t_transpiler_codegen_buffer *
             return (FT_FAILURE);
         index += 1;
     }
+    return (FT_SUCCESS);
+}
+
+static int transpiler_codegen_buffer_end_line(t_transpiler_codegen_buffer *buffer)
+{
+    if (!buffer)
+        return (FT_FAILURE);
+    if (transpiler_codegen_buffer_append_string(buffer, "\n") != FT_SUCCESS)
+        return (FT_FAILURE);
     return (FT_SUCCESS);
 }
 
@@ -242,30 +262,34 @@ static int transpiler_codegen_append_if_statement(t_transpiler_codegen_buffer *b
         return (FT_FAILURE);
     if (!if_statement)
         return (FT_FAILURE);
-    if (transpiler_codegen_buffer_append_indent(buffer, indentation) != FT_SUCCESS)
+    if (transpiler_codegen_buffer_begin_area_b_line(buffer, indentation) != FT_SUCCESS)
         return (FT_FAILURE);
     if (transpiler_codegen_buffer_append_string(buffer, "IF ") != FT_SUCCESS)
         return (FT_FAILURE);
     if (transpiler_codegen_append_condition(buffer, &if_statement->condition) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (transpiler_codegen_buffer_append_string(buffer, "\n") != FT_SUCCESS)
+    if (transpiler_codegen_buffer_end_line(buffer) != FT_SUCCESS)
         return (FT_FAILURE);
     if (transpiler_codegen_append_statement_block(buffer, &if_statement->then_branch,
             indentation + 1) != FT_SUCCESS)
         return (FT_FAILURE);
     if (if_statement->else_branch.count > 0)
     {
-        if (transpiler_codegen_buffer_append_indent(buffer, indentation) != FT_SUCCESS)
+        if (transpiler_codegen_buffer_begin_area_b_line(buffer, indentation) != FT_SUCCESS)
             return (FT_FAILURE);
-        if (transpiler_codegen_buffer_append_string(buffer, "ELSE\n") != FT_SUCCESS)
+        if (transpiler_codegen_buffer_append_string(buffer, "ELSE") != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (transpiler_codegen_buffer_end_line(buffer) != FT_SUCCESS)
             return (FT_FAILURE);
         if (transpiler_codegen_append_statement_block(buffer, &if_statement->else_branch,
                 indentation + 1) != FT_SUCCESS)
             return (FT_FAILURE);
     }
-    if (transpiler_codegen_buffer_append_indent(buffer, indentation) != FT_SUCCESS)
+    if (transpiler_codegen_buffer_begin_area_b_line(buffer, indentation) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (transpiler_codegen_buffer_append_string(buffer, "END-IF\n") != FT_SUCCESS)
+    if (transpiler_codegen_buffer_append_string(buffer, "END-IF") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (transpiler_codegen_buffer_end_line(buffer) != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
@@ -277,20 +301,22 @@ static int transpiler_codegen_append_perform_until(t_transpiler_codegen_buffer *
         return (FT_FAILURE);
     if (!perform_until)
         return (FT_FAILURE);
-    if (transpiler_codegen_buffer_append_indent(buffer, indentation) != FT_SUCCESS)
+    if (transpiler_codegen_buffer_begin_area_b_line(buffer, indentation) != FT_SUCCESS)
         return (FT_FAILURE);
     if (transpiler_codegen_buffer_append_string(buffer, "PERFORM UNTIL ") != FT_SUCCESS)
         return (FT_FAILURE);
     if (transpiler_codegen_append_condition(buffer, &perform_until->condition) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (transpiler_codegen_buffer_append_string(buffer, "\n") != FT_SUCCESS)
+    if (transpiler_codegen_buffer_end_line(buffer) != FT_SUCCESS)
         return (FT_FAILURE);
     if (transpiler_codegen_append_statement_block(buffer, &perform_until->body,
             indentation + 1) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (transpiler_codegen_buffer_append_indent(buffer, indentation) != FT_SUCCESS)
+    if (transpiler_codegen_buffer_begin_area_b_line(buffer, indentation) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (transpiler_codegen_buffer_append_string(buffer, "END-PERFORM\n") != FT_SUCCESS)
+    if (transpiler_codegen_buffer_append_string(buffer, "END-PERFORM") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (transpiler_codegen_buffer_end_line(buffer) != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
@@ -304,7 +330,7 @@ static int transpiler_codegen_append_perform_varying(t_transpiler_codegen_buffer
         return (FT_FAILURE);
     if (!perform_varying->counter || !perform_varying->initial || !perform_varying->step)
         return (FT_FAILURE);
-    if (transpiler_codegen_buffer_append_indent(buffer, indentation) != FT_SUCCESS)
+    if (transpiler_codegen_buffer_begin_area_b_line(buffer, indentation) != FT_SUCCESS)
         return (FT_FAILURE);
     if (transpiler_codegen_buffer_append_string(buffer, "PERFORM VARYING ") != FT_SUCCESS)
         return (FT_FAILURE);
@@ -322,14 +348,16 @@ static int transpiler_codegen_append_perform_varying(t_transpiler_codegen_buffer
         return (FT_FAILURE);
     if (transpiler_codegen_append_condition(buffer, &perform_varying->condition) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (transpiler_codegen_buffer_append_string(buffer, "\n") != FT_SUCCESS)
+    if (transpiler_codegen_buffer_end_line(buffer) != FT_SUCCESS)
         return (FT_FAILURE);
     if (transpiler_codegen_append_statement_block(buffer, &perform_varying->body,
             indentation + 1) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (transpiler_codegen_buffer_append_indent(buffer, indentation) != FT_SUCCESS)
+    if (transpiler_codegen_buffer_begin_area_b_line(buffer, indentation) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (transpiler_codegen_buffer_append_string(buffer, "END-PERFORM\n") != FT_SUCCESS)
+    if (transpiler_codegen_buffer_append_string(buffer, "END-PERFORM") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (transpiler_codegen_buffer_end_line(buffer) != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
@@ -345,7 +373,7 @@ static int transpiler_codegen_append_statement(t_transpiler_codegen_buffer *buff
     {
         if (!statement->move.source || !statement->move.target)
             return (FT_FAILURE);
-        if (transpiler_codegen_buffer_append_indent(buffer, indentation) != FT_SUCCESS)
+        if (transpiler_codegen_buffer_begin_area_b_line(buffer, indentation) != FT_SUCCESS)
             return (FT_FAILURE);
         if (transpiler_codegen_buffer_append_string(buffer, "MOVE ") != FT_SUCCESS)
             return (FT_FAILURE);
@@ -355,7 +383,7 @@ static int transpiler_codegen_append_statement(t_transpiler_codegen_buffer *buff
             return (FT_FAILURE);
         if (transpiler_codegen_buffer_append_string(buffer, statement->move.target) != FT_SUCCESS)
             return (FT_FAILURE);
-        if (transpiler_codegen_buffer_append_string(buffer, "\n") != FT_SUCCESS)
+        if (transpiler_codegen_buffer_end_line(buffer) != FT_SUCCESS)
             return (FT_FAILURE);
         return (FT_SUCCESS);
     }
@@ -442,15 +470,35 @@ int transpiler_codegen_build_file_sections(const t_transpiler_context *context,
     transpiler_codegen_buffer_init(&environment_buffer);
     transpiler_codegen_buffer_init(&data_buffer);
     status = FT_FAILURE;
-    if (transpiler_codegen_buffer_append_string(&environment_buffer, "ENVIRONMENT DIVISION.\n") != FT_SUCCESS)
+    if (transpiler_codegen_buffer_begin_area_a_line(&environment_buffer) != FT_SUCCESS)
         goto cleanup;
-    if (transpiler_codegen_buffer_append_string(&environment_buffer, "    INPUT-OUTPUT SECTION.\n") != FT_SUCCESS)
+    if (transpiler_codegen_buffer_append_string(&environment_buffer, "ENVIRONMENT DIVISION.") != FT_SUCCESS)
         goto cleanup;
-    if (transpiler_codegen_buffer_append_string(&environment_buffer, "    FILE-CONTROL.\n") != FT_SUCCESS)
+    if (transpiler_codegen_buffer_end_line(&environment_buffer) != FT_SUCCESS)
         goto cleanup;
-    if (transpiler_codegen_buffer_append_string(&data_buffer, "DATA DIVISION.\n") != FT_SUCCESS)
+    if (transpiler_codegen_buffer_begin_area_a_line(&environment_buffer) != FT_SUCCESS)
         goto cleanup;
-    if (transpiler_codegen_buffer_append_string(&data_buffer, "    FILE SECTION.\n") != FT_SUCCESS)
+    if (transpiler_codegen_buffer_append_string(&environment_buffer, "INPUT-OUTPUT SECTION.") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_codegen_buffer_end_line(&environment_buffer) != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_codegen_buffer_begin_area_a_line(&environment_buffer) != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_codegen_buffer_append_string(&environment_buffer, "FILE-CONTROL.") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_codegen_buffer_end_line(&environment_buffer) != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_codegen_buffer_begin_area_a_line(&data_buffer) != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_codegen_buffer_append_string(&data_buffer, "DATA DIVISION.") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_codegen_buffer_end_line(&data_buffer) != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_codegen_buffer_begin_area_a_line(&data_buffer) != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_codegen_buffer_append_string(&data_buffer, "FILE SECTION.") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_codegen_buffer_end_line(&data_buffer) != FT_SUCCESS)
         goto cleanup;
     files = transpiler_context_get_files(context, &file_count);
     index = 0;
@@ -460,19 +508,35 @@ int transpiler_codegen_build_file_sections(const t_transpiler_context *context,
         size_t record_length;
 
         transpiler_codegen_uppercase_copy(files[index].name, upper_name, sizeof(upper_name));
+        if (transpiler_codegen_buffer_begin_area_b_line(&environment_buffer, 0) != FT_SUCCESS)
+            goto cleanup;
         if (transpiler_codegen_buffer_append_format(&environment_buffer,
-            "        SELECT %s ASSIGN TO \"%s\"\n",
+            "SELECT %s ASSIGN TO \"%s\"",
             upper_name, files[index].path) != FT_SUCCESS)
             goto cleanup;
+        if (transpiler_codegen_buffer_end_line(&environment_buffer) != FT_SUCCESS)
+            goto cleanup;
+        if (transpiler_codegen_buffer_begin_area_b_line(&environment_buffer, 1) != FT_SUCCESS)
+            goto cleanup;
         if (transpiler_codegen_buffer_append_format(&environment_buffer,
-            "            ORGANIZATION IS %s.\n",
+            "ORGANIZATION IS %s.",
             transpiler_codegen_organization_for_role(files[index].role)) != FT_SUCCESS)
             goto cleanup;
+        if (transpiler_codegen_buffer_end_line(&environment_buffer) != FT_SUCCESS)
+            goto cleanup;
         record_length = transpiler_codegen_determine_record_length(&files[index]);
-        if (transpiler_codegen_buffer_append_format(&data_buffer, "    FD %s.\n", upper_name) != FT_SUCCESS)
+        if (transpiler_codegen_buffer_begin_area_a_line(&data_buffer) != FT_SUCCESS)
+            goto cleanup;
+        if (transpiler_codegen_buffer_append_format(&data_buffer, "FD %s.", upper_name) != FT_SUCCESS)
+            goto cleanup;
+        if (transpiler_codegen_buffer_end_line(&data_buffer) != FT_SUCCESS)
+            goto cleanup;
+        if (transpiler_codegen_buffer_begin_area_a_line(&data_buffer) != FT_SUCCESS)
             goto cleanup;
         if (transpiler_codegen_buffer_append_format(&data_buffer,
-            "        01 %s-REC PIC X(%zu).\n", upper_name, record_length) != FT_SUCCESS)
+            "01 %s-REC PIC X(%zu).", upper_name, record_length) != FT_SUCCESS)
+            goto cleanup;
+        if (transpiler_codegen_buffer_end_line(&data_buffer) != FT_SUCCESS)
             goto cleanup;
         if (index + 1 < file_count)
         {
@@ -494,10 +558,11 @@ cleanup:
     return (status);
 }
 
-int transpiler_codegen_build_procedure_division(const t_transpiler_cobol_statement_block *statements,
+int transpiler_codegen_build_procedure_division(const t_transpiler_cobol_procedure *procedure,
     char **out)
 {
     t_transpiler_codegen_buffer procedure_buffer;
+    size_t index;
     int status;
 
     if (!out)
@@ -505,10 +570,49 @@ int transpiler_codegen_build_procedure_division(const t_transpiler_cobol_stateme
     *out = NULL;
     transpiler_codegen_buffer_init(&procedure_buffer);
     status = FT_FAILURE;
-    if (transpiler_codegen_buffer_append_string(&procedure_buffer, "PROCEDURE DIVISION.\n") != FT_SUCCESS)
+    if (transpiler_codegen_buffer_begin_area_a_line(&procedure_buffer) != FT_SUCCESS)
         goto cleanup;
-    if (transpiler_codegen_append_statement_block(&procedure_buffer, statements, 1) != FT_SUCCESS)
+    if (transpiler_codegen_buffer_append_string(&procedure_buffer, "PROCEDURE DIVISION.") != FT_SUCCESS)
         goto cleanup;
+    if (transpiler_codegen_buffer_end_line(&procedure_buffer) != FT_SUCCESS)
+        goto cleanup;
+    index = 0;
+    if (procedure)
+    {
+        while (index < procedure->count)
+        {
+            t_transpiler_cobol_paragraph *paragraph;
+            char upper_name[TRANSPILE_IDENTIFIER_MAX];
+
+            if (!procedure->paragraphs)
+                goto cleanup;
+            paragraph = procedure->paragraphs[index];
+            if (!paragraph)
+                goto cleanup;
+            if (!paragraph->name)
+                goto cleanup;
+            transpiler_codegen_uppercase_copy(paragraph->name, upper_name, sizeof(upper_name));
+            if (upper_name[0] == '\0')
+                goto cleanup;
+            if (transpiler_codegen_buffer_begin_area_a_line(&procedure_buffer) != FT_SUCCESS)
+                goto cleanup;
+            if (transpiler_codegen_buffer_append_string(&procedure_buffer, upper_name) != FT_SUCCESS)
+                goto cleanup;
+            if (transpiler_codegen_buffer_append_string(&procedure_buffer, ".") != FT_SUCCESS)
+                goto cleanup;
+            if (transpiler_codegen_buffer_end_line(&procedure_buffer) != FT_SUCCESS)
+                goto cleanup;
+            if (transpiler_codegen_append_statement_block(&procedure_buffer,
+                    &paragraph->statements, 0) != FT_SUCCESS)
+                goto cleanup;
+            if (index + 1 < procedure->count)
+            {
+                if (transpiler_codegen_buffer_append_string(&procedure_buffer, "\n") != FT_SUCCESS)
+                    goto cleanup;
+            }
+            index += 1;
+        }
+    }
     if (transpiler_codegen_copy_buffer(&procedure_buffer, out) != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;

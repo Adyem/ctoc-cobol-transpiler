@@ -1,0 +1,27 @@
+record RecordEntry {
+    char status[2];
+    int amount;
+};
+
+file input "records.dat";
+RecordEntry entry;
+int accepted_count;
+int total_amount;
+
+function summarize_records() {
+    accepted_count = 0;
+    total_amount = 0;
+
+    open(input, "r");
+    while (read(input, entry)) {
+        if (starts_with(entry.status, "A")) {
+            accepted_count = accepted_count + 1;
+            total_amount = total_amount + entry.amount;
+        }
+    }
+    close(input);
+}
+
+function main() {
+    summarize_records();
+}

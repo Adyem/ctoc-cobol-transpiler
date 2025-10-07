@@ -211,3 +211,87 @@ int runtime_string_to_int(const t_runtime_string *value, t_runtime_int *destinat
     cma_free(buffer);
     return (status);
 }
+
+int runtime_string_equals(const t_runtime_string *left, const t_runtime_string *right)
+{
+    size_t index;
+
+    if (!left || !right)
+        return (0);
+    if (!left->data || !right->data)
+        return (0);
+    if (left->length != right->length)
+        return (0);
+    index = 0;
+    while (index < left->length)
+    {
+        if (left->data[index] != right->data[index])
+            return (0);
+        index += 1;
+    }
+    return (1);
+}
+
+int runtime_string_concat(t_runtime_string *destination, const t_runtime_string *left,
+    const t_runtime_string *right)
+{
+    size_t total_length;
+    size_t index;
+    const char *left_data;
+    const char *right_data;
+    char *left_copy;
+    char *right_copy;
+
+    if (!destination || !left || !right)
+        return (FT_FAILURE);
+    if (!left->data || !right->data)
+        return (FT_FAILURE);
+    total_length = left->length + right->length;
+    if (runtime_string_reserve(destination, total_length + 1) != FT_SUCCESS)
+        return (FT_FAILURE);
+    left_copy = NULL;
+    right_copy = NULL;
+    left_data = left->data;
+    right_data = right->data;
+    if (left == destination)
+    {
+        left_copy = static_cast<char *>(cma_calloc(left->length + 1, sizeof(char)));
+        if (!left_copy)
+            return (FT_FAILURE);
+        if (left->length > 0)
+            ft_memcpy(left_copy, left->data, left->length);
+        left_data = left_copy;
+    }
+    if (right == destination)
+    {
+        right_copy = static_cast<char *>(cma_calloc(right->length + 1, sizeof(char)));
+        if (!right_copy)
+        {
+            if (left_copy)
+                cma_free(left_copy);
+            return (FT_FAILURE);
+        }
+        if (right->length > 0)
+            ft_memcpy(right_copy, right->data, right->length);
+        right_data = right_copy;
+    }
+    index = 0;
+    while (index < left->length)
+    {
+        destination->data[index] = left_data[index];
+        index += 1;
+    }
+    index = 0;
+    while (index < right->length)
+    {
+        destination->data[left->length + index] = right_data[index];
+        index += 1;
+    }
+    destination->data[total_length] = '\0';
+    destination->length = total_length;
+    if (left_copy)
+        cma_free(left_copy);
+    if (right_copy)
+        cma_free(right_copy);
+    return (FT_SUCCESS);
+}

@@ -69,6 +69,35 @@ int runtime_int_subtract(t_runtime_int left, t_runtime_int right, t_runtime_int 
     return (FT_SUCCESS);
 }
 
+int runtime_int_multiply(t_runtime_int left, t_runtime_int right, t_runtime_int *result)
+{
+    long long accumulator;
+
+    accumulator = static_cast<long long>(left.value);
+    accumulator *= static_cast<long long>(right.value);
+    if (runtime_check_destination_int(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (runtime_int_overflow(accumulator) != FT_SUCCESS)
+        return (FT_FAILURE);
+    result->value = static_cast<int>(accumulator);
+    return (FT_SUCCESS);
+}
+
+int runtime_int_divide(t_runtime_int dividend, t_runtime_int divisor, t_runtime_int *result)
+{
+    long long quotient;
+
+    if (runtime_check_destination_int(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (divisor.value == 0)
+        return (FT_FAILURE);
+    quotient = static_cast<long long>(dividend.value) / static_cast<long long>(divisor.value);
+    if (runtime_int_overflow(quotient) != FT_SUCCESS)
+        return (FT_FAILURE);
+    result->value = static_cast<int>(quotient);
+    return (FT_SUCCESS);
+}
+
 int runtime_int_compare(t_runtime_int left, t_runtime_int right)
 {
     if (left.value < right.value)

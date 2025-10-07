@@ -18,5 +18,8 @@ int runtime_string_assign(t_runtime_string *value, const char *text);
 int runtime_string_trim(t_runtime_string *value);
 int runtime_string_compare(const t_runtime_string *left, const t_runtime_string *right);
 int runtime_string_to_int(const t_runtime_string *value, t_runtime_int *destination);
+int runtime_string_equals(const t_runtime_string *left, const t_runtime_string *right);
+int runtime_string_concat(t_runtime_string *destination, const t_runtime_string *left,
+    const t_runtime_string *right);
 
 #endif

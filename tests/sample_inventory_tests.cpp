@@ -89,6 +89,128 @@ static int validate_inventory_mentions(const char *manifest_path, const char *in
     return (FT_SUCCESS);
 }
 
+static int sample_manifest_extract_basename(const char *line, char *basename, size_t basename_size)
+{
+    const char *start;
+    const char *end;
+    size_t length;
+    size_t index;
+
+    if (!line)
+        return (FT_FAILURE);
+    if (!basename)
+        return (FT_FAILURE);
+    if (basename_size == 0)
+        return (FT_FAILURE);
+    start = ft_strrchr(line, '/');
+    if (start)
+        start++;
+    else
+        start = line;
+    end = ft_strrchr(start, '.');
+    if (end)
+        length = static_cast<size_t>(end - start);
+    else
+        length = ft_strlen(start);
+    if (length + 1 >= basename_size)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < length)
+    {
+        basename[index] = start[index];
+        index++;
+    }
+    basename[length] = '\0';
+    return (FT_SUCCESS);
+}
+
+static int sample_manifest_collect_basenames(const char *manifest_path, char names[][64], size_t capacity, size_t *count)
+{
+    char manifest_buffer[1024];
+    char line[256];
+    size_t offset;
+
+    if (!names)
+        return (FT_FAILURE);
+    if (!count)
+        return (FT_FAILURE);
+    if (capacity == 0)
+        return (FT_FAILURE);
+    if (test_read_text_file(manifest_path, manifest_buffer, sizeof(manifest_buffer)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    offset = 0;
+    *count = 0;
+    while (manifest_buffer[offset] != '\0')
+    {
+        if (sample_manifest_extract_line(manifest_buffer, &offset, line, sizeof(line)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (ft_strlen(line) == 0)
+            continue;
+        if (*count >= capacity)
+        {
+            pf_printf("Assertion failed: manifest '%s' lists more samples than expected\n", manifest_path);
+            return (FT_FAILURE);
+        }
+        if (sample_manifest_extract_basename(line, names[*count], 64) != FT_SUCCESS)
+            return (FT_FAILURE);
+        (*count)++;
+    }
+    return (FT_SUCCESS);
+}
+
+static int sample_basename_exists(const char *needle, char names[][64], size_t count)
+{
+    size_t index;
+
+    if (!needle)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < count)
+    {
+        if (ft_strncmp(needle, names[index], ft_strlen(needle) + 1) == 0)
+            return (FT_SUCCESS);
+        index++;
+    }
+    return (FT_FAILURE);
+}
+
+static int validate_sample_pairs_match(void)
+{
+    char cobol_names[16][64];
+    char cblc_names[16][64];
+    size_t cobol_count;
+    size_t cblc_count;
+    size_t index;
+
+    if (sample_manifest_collect_basenames("samples/cobol/manifest.txt", cobol_names,
+            sizeof(cobol_names) / sizeof(cobol_names[0]), &cobol_count) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (sample_manifest_collect_basenames("samples/cblc/manifest.txt", cblc_names,
+            sizeof(cblc_names) / sizeof(cblc_names[0]), &cblc_count) != FT_SUCCESS)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < cobol_count)
+    {
+        if (sample_basename_exists(cobol_names[index], cblc_names, cblc_count) != FT_SUCCESS)
+        {
+            pf_printf("Assertion failed: COBOL sample '%s' should have a matching CBL-C fixture\n", cobol_names[index]);
+            return (FT_FAILURE);
+        }
+        index++;
+    }
+    index = 0;
+    while (index < cblc_count)
+    {
+        if (sample_basename_exists(cblc_names[index], cobol_names, cobol_count) != FT_SUCCESS)
+        {
+            pf_printf("Assertion failed: CBL-C sample '%s' should have a matching COBOL fixture\n", cblc_names[index]);
+            return (FT_FAILURE);
+        }
+        index++;
+    }
+    return (FT_SUCCESS);
+}
+
 static int sample_validate_unique_functions(const char *sample_path, const char *sample_source)
 {
     char function_names[16][64];
@@ -238,12 +360,20 @@ static int test_cblc_samples_define_unique_functions(void)
     return (FT_SUCCESS);
 }
 
+static int test_sample_manifests_have_pairs(void)
+{
+    if (validate_sample_pairs_match() != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 const t_test_case *get_sample_tests(size_t *count)
 {
     static const t_test_case tests[] = {
         {"sample_manifest_entries_exist", test_sample_manifest_entries_exist},
         {"sample_inventory_documents_manifest", test_sample_inventory_documents_manifest},
-        {"cblc_samples_define_unique_functions", test_cblc_samples_define_unique_functions}
+        {"cblc_samples_define_unique_functions", test_cblc_samples_define_unique_functions},
+        {"sample_manifests_have_pairs", test_sample_manifests_have_pairs}
     };
 
     if (count)
