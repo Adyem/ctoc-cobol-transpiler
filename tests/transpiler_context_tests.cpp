@@ -38,32 +38,35 @@ FT_TEST(test_transpiler_context_registers_void_function)
     return (FT_SUCCESS);
 }
 
-FT_TEST(test_transpiler_context_rejects_value_return)
+FT_TEST(test_transpiler_context_registers_value_return_function)
 {
     t_transpiler_context context;
+    const t_transpiler_function_signature *signature;
 
     if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (transpiler_context_register_function(&context, "bad_func", TRANSPILE_FUNCTION_RETURN_VALUE) != FT_FAILURE)
-    {
-        transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected registration to fail for non-void function\n");
-        return (FT_FAILURE);
-    }
-    if (test_expect_int_equal(transpiler_context_has_errors(&context), 1,
-        "context should report errors for non-void function") != FT_SUCCESS)
+    if (test_expect_success(transpiler_context_register_function(&context, "compute",
+            TRANSPILE_FUNCTION_RETURN_VALUE),
+            "value-returning function registration should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 1,
-        "registration should emit a diagnostic") != FT_SUCCESS)
+    signature = transpiler_context_find_function(&context, "compute");
+    if (!signature)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected to locate value-return function signature\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(signature->return_mode, TRANSPILE_FUNCTION_RETURN_VALUE,
+            "registered function should record value return mode") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    if (test_expect_int_equal(context.diagnostics.items[0].code, TRANSPILE_ERROR_FUNCTION_RETURNS_VALUE,
-        "diagnostic should use function return error code") != FT_SUCCESS)
+    if (test_expect_int_equal(transpiler_context_has_errors(&context), 0,
+            "context should not record errors for value-return function") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
@@ -591,11 +594,113 @@ FT_TEST(test_transpiler_context_tracks_record_length_hint)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_transpiler_context_records_multiple_io_paths)
+{
+    t_transpiler_context context;
+    const char *inputs[] = {"first.cblc", "second.cblc"};
+    const char *outputs[] = {"first.cob", "second.cob"};
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (transpiler_context_set_io_paths(&context, inputs, 2, outputs, 2) != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected to record multiple IO paths\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.source_count), 2,
+            "context should track two source paths") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.target_count), 2,
+            "context should track two target paths") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.source_paths[0], "first.cblc",
+            "first source path should be preserved") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.source_paths[1], "second.cblc",
+            "second source path should be preserved") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.target_paths[0], "first.cob",
+            "first target path should be preserved") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.target_paths[1], "second.cob",
+            "second target path should be preserved") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.source_path, "first.cblc",
+            "context should expose first source via legacy field") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.target_path, "first.cob",
+            "context should expose first target via legacy field") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_rejects_mismatched_io_paths)
+{
+    t_transpiler_context context;
+    const char *inputs[] = {"first.cblc", "second.cblc"};
+    const char *outputs[] = {"only.cob"};
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (transpiler_context_set_io_paths(&context, inputs, 2, outputs, 1) == FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected mismatched counts to fail\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.source_count), 0,
+            "context should leave source count empty on failure") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.target_count), 0,
+            "context should leave target count empty on failure") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (context.source_path || context.target_path)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: legacy path aliases should be cleared on failure\n");
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
 const t_test_case *get_transpiler_context_tests(size_t *count)
 {
     static const t_test_case tests[] = {
         {"transpiler_context_registers_void_function", test_transpiler_context_registers_void_function},
-        {"transpiler_context_rejects_value_return", test_transpiler_context_rejects_value_return},
+        {"transpiler_context_registers_value_return_function", test_transpiler_context_registers_value_return_function},
         {"transpiler_context_registers_main_entrypoint", test_transpiler_context_registers_main_entrypoint},
         {"transpiler_context_entrypoint_registers_function_signature", test_transpiler_context_entrypoint_registers_function_signature},
         {"transpiler_context_rejects_duplicate_function_registration", test_transpiler_context_rejects_duplicate_function_registration},
@@ -606,7 +711,9 @@ const t_test_case *get_transpiler_context_tests(size_t *count)
         {"transpiler_context_rejects_non_void_entrypoint", test_transpiler_context_rejects_non_void_entrypoint},
         {"transpiler_context_rejects_duplicate_entrypoint", test_transpiler_context_rejects_duplicate_entrypoint},
         {"transpiler_context_registers_file_declaration", test_transpiler_context_registers_file_declaration},
-        {"transpiler_context_tracks_record_length_hint", test_transpiler_context_tracks_record_length_hint}
+        {"transpiler_context_tracks_record_length_hint", test_transpiler_context_tracks_record_length_hint},
+        {"transpiler_context_records_multiple_io_paths", test_transpiler_context_records_multiple_io_paths},
+        {"transpiler_context_rejects_mismatched_io_paths", test_transpiler_context_rejects_mismatched_io_paths}
     };
 
     if (count)

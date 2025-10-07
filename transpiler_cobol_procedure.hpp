@@ -37,7 +37,8 @@ typedef enum e_transpiler_cobol_statement_kind
     TRANSPILE_COBOL_STATEMENT_MOVE = 0,
     TRANSPILE_COBOL_STATEMENT_IF,
     TRANSPILE_COBOL_STATEMENT_PERFORM_UNTIL,
-    TRANSPILE_COBOL_STATEMENT_PERFORM_VARYING
+    TRANSPILE_COBOL_STATEMENT_PERFORM_VARYING,
+    TRANSPILE_COBOL_STATEMENT_CALL
 }   t_transpiler_cobol_statement_kind;
 
 typedef struct s_transpiler_cobol_move_statement
@@ -45,6 +46,15 @@ typedef struct s_transpiler_cobol_move_statement
     const char *source;
     const char *target;
 }   t_transpiler_cobol_move_statement;
+
+typedef struct s_transpiler_cobol_call_statement
+{
+    const char *subprogram;
+    const char **arguments;
+    size_t argument_count;
+    size_t argument_capacity;
+    const char *return_slot;
+}   t_transpiler_cobol_call_statement;
 
 typedef struct s_transpiler_cobol_if_statement
 {
@@ -75,6 +85,7 @@ typedef struct s_transpiler_cobol_statement
     t_transpiler_cobol_if_statement if_statement;
     t_transpiler_cobol_perform_until perform_until;
     t_transpiler_cobol_perform_varying perform_varying;
+    t_transpiler_cobol_call_statement call;
 }   t_transpiler_cobol_statement;
 
 typedef struct s_transpiler_cobol_paragraph
@@ -104,6 +115,10 @@ t_transpiler_cobol_statement *transpiler_cobol_statement_create_perform_until(
 
 t_transpiler_cobol_statement *transpiler_cobol_statement_create_perform_varying(const char *counter,
     const char *initial, const char *step, const t_transpiler_cobol_condition *condition);
+
+t_transpiler_cobol_statement *transpiler_cobol_statement_create_call(const char *subprogram);
+int transpiler_cobol_call_append_argument(t_transpiler_cobol_statement *statement, const char *argument);
+int transpiler_cobol_call_set_return_slot(t_transpiler_cobol_statement *statement, const char *return_slot);
 
 void transpiler_cobol_statement_destroy(t_transpiler_cobol_statement *statement);
 

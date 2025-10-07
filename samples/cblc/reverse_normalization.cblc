@@ -1,11 +1,11 @@
-function ENTRY_PARAGRAPH() {
+function void ENTRY_PARAGRAPH() {
     SCRATCH_NOTE = "mixED Case value";
     RUNNING_TOTAL_VALUE = 0;
     STATUS_FLAG = true;
     return ;
 }
 
-function NORMALIZE_VALUES() {
+function void NORMALIZE_VALUES() {
     RUNNING_TOTAL_VALUE = 7;
     SCRATCH_NOTE = "done";
     return ;

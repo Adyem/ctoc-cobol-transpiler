@@ -1,0 +1,3 @@
+function void show_banner() {
+    display("WORKER READY");
+}

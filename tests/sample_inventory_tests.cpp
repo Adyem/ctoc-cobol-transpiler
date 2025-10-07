@@ -234,6 +234,9 @@ static int sample_validate_unique_functions(const char *sample_path, const char 
         size_t remaining;
         const char *found;
         size_t relative;
+        size_t type_start;
+        size_t type_length;
+        char return_type[32];
         size_t name_start;
         size_t name_length;
         char name[64];
@@ -244,12 +247,49 @@ static int sample_validate_unique_functions(const char *sample_path, const char 
         if (!found)
             break;
         relative = static_cast<size_t>(found - sample_source);
-        name_start = relative + needle_length;
+        type_start = relative + needle_length;
+        while (type_start < length && sample_source[type_start] == ' ')
+            type_start++;
+        if (type_start >= length)
+        {
+            pf_printf("Assertion failed: sample '%s' should declare a return type after keyword\n", sample_path);
+            return (FT_FAILURE);
+        }
+        type_length = 0;
+        while (type_start + type_length < length && sample_source[type_start + type_length] != ' '
+            && sample_source[type_start + type_length] != '\n'
+            && sample_source[type_start + type_length] != '(')
+        {
+            if (type_length + 1 >= sizeof(return_type))
+            {
+                pf_printf("Assertion failed: sample '%s' declares an unexpectedly long return type\n", sample_path);
+                return (FT_FAILURE);
+            }
+            return_type[type_length] = sample_source[type_start + type_length];
+            type_length++;
+        }
+        if (type_length == 0)
+        {
+            pf_printf("Assertion failed: sample '%s' should provide a return type before function name\n", sample_path);
+            return (FT_FAILURE);
+        }
+        return_type[type_length] = '\0';
+        if (type_start + type_length >= length)
+        {
+            pf_printf("Assertion failed: sample '%s' should separate return type from function name\n", sample_path);
+            return (FT_FAILURE);
+        }
+        if (sample_source[type_start + type_length] == '(')
+        {
+            pf_printf("Assertion failed: sample '%s' should include a function name after return type\n", sample_path);
+            return (FT_FAILURE);
+        }
+        name_start = type_start + type_length;
         while (name_start < length && sample_source[name_start] == ' ')
             name_start++;
         if (name_start >= length)
         {
-            pf_printf("Assertion failed: sample '%s' should declare a function name after keyword\n", sample_path);
+            pf_printf("Assertion failed: sample '%s' should declare a function name after return type\n", sample_path);
             return (FT_FAILURE);
         }
         name_length = 0;
@@ -284,6 +324,12 @@ static int sample_validate_unique_functions(const char *sample_path, const char 
             return (FT_FAILURE);
         }
         name[name_length] = '\0';
+        if (ft_strncmp(name, "main", ft_strlen("main") + 1) == 0
+            && ft_strncmp(return_type, "void", ft_strlen("void") + 1) != 0)
+        {
+            pf_printf("Assertion failed: sample '%s' should declare main with a void return type\n", sample_path);
+            return (FT_FAILURE);
+        }
         index = 0;
         while (index < function_count)
         {

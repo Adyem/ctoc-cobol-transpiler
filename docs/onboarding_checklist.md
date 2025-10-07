@@ -4,6 +4,7 @@ This checklist helps new contributors install dependencies, set up the repositor
 
 ## Repository Setup
 - [ ] Install a C++17-capable compiler toolchain and GNU Make.
+- [ ] Install the COBOL toolchain (for example, the `gnucobol` package) so `cobc` is available for sample execution tests.
 - [ ] Clone the repository with submodules: `git clone --recurse-submodules`.
 - [ ] If the repository is already cloned, run `make initialize` to sync the `libft` submodule.
 - [ ] Verify the libft build scripts exist at `libft/Makefile`.
@@ -16,6 +17,7 @@ This checklist helps new contributors install dependencies, set up the repositor
 ## Test Execution
 - [ ] Build the automated test runner with `make tests`.
 - [ ] Execute `make test` to run the full suite (requires initialized `libft`).
+- [ ] Confirm `cobc` is installed by the toolchain step above or run `make install_cobc` if the binary is missing before executing COBOL-backed tests.
 - [ ] Investigate and resolve any failing tests before committing changes.
 
 ## Documentation & Workflow

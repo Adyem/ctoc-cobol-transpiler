@@ -1,0 +1,21 @@
+int candidate_value;
+int remainder_value;
+bool is_even_result;
+
+function bool is_even() {
+    remainder_value = candidate_value % 2;
+    if (remainder_value == 0) {
+        return true;
+    }
+    return false;
+}
+
+function void main() {
+    candidate_value = 9;
+    is_even_result = is_even();
+    if (is_even_result) {
+        display("EVEN");
+    } else {
+        display("ODD");
+    }
+}

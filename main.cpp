@@ -21,17 +21,23 @@ int main(int argc, const char **argv)
     if (transpiler_cli_parse(&options, argc, argv) != FT_SUCCESS)
     {
         transpiler_cli_print_usage();
+        transpiler_cli_options_dispose(&options);
         return (1);
     }
     if (options.show_help)
     {
         transpiler_cli_print_usage();
+        transpiler_cli_options_dispose(&options);
         return (0);
     }
     if (transpiler_pipeline_init(&pipeline) != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
         return (1);
+    }
     if (transpiler_context_init(&context) != FT_SUCCESS)
     {
+        transpiler_cli_options_dispose(&options);
         transpiler_pipeline_dispose(&pipeline);
         return (1);
     }
@@ -39,18 +45,21 @@ int main(int argc, const char **argv)
     {
         transpiler_context_dispose(&context);
         transpiler_pipeline_dispose(&pipeline);
+        transpiler_cli_options_dispose(&options);
         return (1);
     }
     if (transpiler_pipeline_add_stage(&pipeline, "runtime-scalar-demo", runtime_demo_stage, NULL) != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         transpiler_pipeline_dispose(&pipeline);
+        transpiler_cli_options_dispose(&options);
         return (1);
     }
     status = transpiler_pipeline_execute(&pipeline, &context);
     transpiler_logging_flush(&context);
     transpiler_context_dispose(&context);
     transpiler_pipeline_dispose(&pipeline);
+    transpiler_cli_options_dispose(&options);
     if (status != FT_SUCCESS)
         return (1);
     return (0);

@@ -18,7 +18,7 @@ FT_TEST(test_cblc_copy_file_matches_golden)
         "file in \"input.txt\";\n"
         "file out \"output.txt\";\n"
         "char line[256];\n\n"
-        "function process_file() {\n"
+        "function void process_file() {\n"
         "    open(in, \"r\");\n"
         "    open(out, \"w\");\n"
         "    while (read(in, line)) {\n"
@@ -27,7 +27,7 @@ FT_TEST(test_cblc_copy_file_matches_golden)
         "    close(in);\n"
         "    close(out);\n"
         "}\n\n"
-        "function main() {\n"
+        "function void main() {\n"
         "    process_file();\n"
         "}\n";
 
@@ -43,7 +43,7 @@ FT_TEST(test_cblc_filter_prefix_matches_golden)
         "file in \"input.txt\";\n"
         "file out \"filtered.txt\";\n"
         "char line[128];\n\n"
-        "function filter_prefix() {\n"
+        "function void filter_prefix() {\n"
         "    open(in, \"r\");\n"
         "    open(out, \"w\");\n"
         "    while (read(in, line)) {\n"
@@ -54,7 +54,7 @@ FT_TEST(test_cblc_filter_prefix_matches_golden)
         "    close(in);\n"
         "    close(out);\n"
         "}\n\n"
-        "function main() {\n"
+        "function void main() {\n"
         "    filter_prefix();\n"
         "}\n";
 
@@ -73,14 +73,14 @@ FT_TEST(test_cblc_record_writer_matches_golden)
         "};\n\n"
         "file people \"people.dat\";\n"
         "Person person;\n\n"
-        "function write_records() {\n"
+        "function void write_records() {\n"
         "    person.name = \"ALICE\";\n"
         "    person.id = \"0001\";\n\n"
         "    open(people, \"w\");\n"
         "    write(people, person);\n"
         "    close(people);\n"
         "}\n\n"
-        "function main() {\n"
+        "function void main() {\n"
         "    write_records();\n"
         "}\n";
 
@@ -101,7 +101,7 @@ FT_TEST(test_cblc_record_summary_matches_golden)
         "RecordEntry entry;\n"
         "int accepted_count;\n"
         "int total_amount;\n\n"
-        "function summarize_records() {\n"
+        "function void summarize_records() {\n"
         "    accepted_count = 0;\n"
         "    total_amount = 0;\n\n"
         "    open(input, \"r\");\n"
@@ -113,7 +113,7 @@ FT_TEST(test_cblc_record_summary_matches_golden)
         "    }\n"
         "    close(input);\n"
         "}\n\n"
-        "function main() {\n"
+        "function void main() {\n"
         "    summarize_records();\n"
         "}\n";
 
@@ -126,7 +126,7 @@ FT_TEST(test_cblc_record_summary_matches_golden)
 FT_TEST(test_cblc_reverse_constructs_matches_golden)
 {
     static const char expected[] =
-        "function MAIN() {\n"
+        "function void MAIN() {\n"
         "    open(INPUT_FILE, \"r\");\n"
         "    while (!(EOF_FLAG == true)) {\n"
         "        read(INPUT_FILE, OUTPUT_RECORD);\n"
@@ -149,13 +149,13 @@ FT_TEST(test_cblc_reverse_constructs_matches_golden)
 FT_TEST(test_cblc_reverse_normalization_matches_golden)
 {
     static const char expected[] =
-        "function ENTRY_PARAGRAPH() {\n"
+        "function void ENTRY_PARAGRAPH() {\n"
         "    SCRATCH_NOTE = \"mixED Case value\";\n"
         "    RUNNING_TOTAL_VALUE = 0;\n"
         "    STATUS_FLAG = true;\n"
         "    return ;\n"
         "}\n\n"
-        "function NORMALIZE_VALUES() {\n"
+        "function void NORMALIZE_VALUES() {\n"
         "    RUNNING_TOTAL_VALUE = 7;\n"
         "    SCRATCH_NOTE = \"done\";\n"
         "    return ;\n"
@@ -170,7 +170,7 @@ FT_TEST(test_cblc_reverse_normalization_matches_golden)
 FT_TEST(test_cblc_reverse_control_flow_matches_golden)
 {
     static const char expected[] =
-        "function MAIN() {\n"
+        "function void MAIN() {\n"
         "    if (!(FLAG == true)) {\n"
         "        while (!(COUNT > LIMIT)) {\n"
         "            LIMIT = COUNT;\n"
@@ -184,7 +184,7 @@ FT_TEST(test_cblc_reverse_control_flow_matches_golden)
         "    }\n"
         "    return ;\n"
         "}\n\n"
-        "function NEXT() {\n"
+        "function void NEXT() {\n"
         "    FLAG = true;\n"
         "    return ;\n"
         "}\n";
@@ -361,6 +361,91 @@ FT_TEST(test_cobol_record_summary_matches_golden)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_cblc_multi_module_main_matches_golden)
+{
+    static const char expected[] =
+        "int accumulator;\n"
+        "\n"
+        "function void add_once() {\n"
+        "    accumulator = accumulator + 1;\n"
+        "}\n"
+        "\n"
+        "function void main() {\n"
+        "    accumulator = 0;\n"
+        "    show_banner();\n"
+        "    add_once();\n"
+        "    display(accumulator);\n"
+        "}\n";
+
+    if (golden_expect_file_matches("samples/cblc/multi_module_main.cblc", expected,
+            "multi_module_main.cblc should match golden content") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cblc_multi_module_worker_matches_golden)
+{
+    static const char expected[] =
+        "function void show_banner() {\n"
+        "    display(\"WORKER READY\");\n"
+        "}\n";
+
+    if (golden_expect_file_matches("samples/cblc/multi_module_worker.cblc", expected,
+            "multi_module_worker.cblc should match golden content") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cobol_multi_module_main_matches_golden)
+{
+    static const char expected[] =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. MULTI-MODULE-MAIN.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 ACCUMULATOR PIC 9(4) VALUE 0000.\n"
+        "       01 DISPLAY-BUFFER PIC Z(4).\n"
+        "       PROCEDURE DIVISION.\n"
+        "MAIN.\n"
+        "       MOVE 0 TO ACCUMULATOR.\n"
+        "       CALL 'SHOW-BANNER'.\n"
+        "       PERFORM ADD-ONCE.\n"
+        "       MOVE ACCUMULATOR TO DISPLAY-BUFFER.\n"
+        "       DISPLAY DISPLAY-BUFFER.\n"
+        "       STOP RUN.\n"
+        "\n"
+        "ADD-ONCE.\n"
+        "       ADD 1 TO ACCUMULATOR.\n"
+        "       EXIT.\n"
+        "       END PROGRAM MULTI-MODULE-MAIN.\n";
+
+    if (golden_expect_file_matches("samples/cobol/multi_module_main.cob", expected,
+            "multi_module_main.cob should match golden content") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cobol_multi_module_worker_matches_golden)
+{
+    static const char expected[] =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. SHOW-BANNER.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 WORKER-MESSAGE PIC X(12) VALUE \"WORKER READY\".\n"
+        "       PROCEDURE DIVISION.\n"
+        "MAIN.\n"
+        "       DISPLAY WORKER-MESSAGE.\n"
+        "       GOBACK.\n"
+        "       END PROGRAM SHOW-BANNER.\n";
+
+    if (golden_expect_file_matches("samples/cobol/multi_module_worker.cob", expected,
+            "multi_module_worker.cob should match golden content") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+
 const t_test_case *get_golden_file_tests(size_t *count)
 {
     static const t_test_case tests[] = {
@@ -371,10 +456,14 @@ const t_test_case *get_golden_file_tests(size_t *count)
         {"cblc_reverse_constructs_matches_golden", test_cblc_reverse_constructs_matches_golden},
         {"cblc_reverse_normalization_matches_golden", test_cblc_reverse_normalization_matches_golden},
         {"cblc_reverse_control_flow_matches_golden", test_cblc_reverse_control_flow_matches_golden},
+        {"cblc_multi_module_main_matches_golden", test_cblc_multi_module_main_matches_golden},
+        {"cblc_multi_module_worker_matches_golden", test_cblc_multi_module_worker_matches_golden},
         {"cobol_copy_file_matches_golden", test_cobol_copy_file_matches_golden},
         {"cobol_filter_prefix_matches_golden", test_cobol_filter_prefix_matches_golden},
         {"cobol_record_writer_matches_golden", test_cobol_record_writer_matches_golden},
-        {"cobol_record_summary_matches_golden", test_cobol_record_summary_matches_golden}
+        {"cobol_record_summary_matches_golden", test_cobol_record_summary_matches_golden},
+        {"cobol_multi_module_main_matches_golden", test_cobol_multi_module_main_matches_golden},
+        {"cobol_multi_module_worker_matches_golden", test_cobol_multi_module_worker_matches_golden}
     };
 
     if (count)

@@ -1,0 +1,15 @@
+int addend_a;
+int addend_b;
+int sum_result;
+
+function int compute_sum() {
+    sum_result = addend_a + addend_b;
+    return sum_result;
+}
+
+function void main() {
+    addend_a = 12;
+    addend_b = 30;
+    sum_result = compute_sum();
+    display(sum_result);
+}

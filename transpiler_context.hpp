@@ -81,6 +81,12 @@ typedef struct s_transpiler_context
     t_transpiler_language target_language;
     const char *source_path;
     const char *target_path;
+    const char **source_paths;
+    size_t source_count;
+    size_t source_capacity;
+    const char **target_paths;
+    size_t target_count;
+    size_t target_capacity;
     const char *output_directory;
     t_transpiler_format_mode format_mode;
     t_transpiler_diagnostic_level diagnostic_level;
@@ -98,7 +104,8 @@ typedef struct s_transpiler_context
 int transpiler_context_init(t_transpiler_context *context);
 void transpiler_context_dispose(t_transpiler_context *context);
 void transpiler_context_set_languages(t_transpiler_context *context, t_transpiler_language source, t_transpiler_language target);
-void transpiler_context_set_io_paths(t_transpiler_context *context, const char *source_path, const char *target_path);
+int transpiler_context_set_io_paths(t_transpiler_context *context, const char **source_paths, size_t source_count,
+    const char **target_paths, size_t target_count);
 void transpiler_context_set_output_directory(t_transpiler_context *context, const char *output_directory);
 void transpiler_context_set_format_mode(t_transpiler_context *context, t_transpiler_format_mode mode);
 void transpiler_context_set_diagnostic_level(t_transpiler_context *context, t_transpiler_diagnostic_level level);

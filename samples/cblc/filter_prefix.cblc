@@ -2,7 +2,7 @@ file in "input.txt";
 file out "filtered.txt";
 char line[128];
 
-function filter_prefix() {
+function void filter_prefix() {
     open(in, "r");
     open(out, "w");
     while (read(in, line)) {
@@ -14,6 +14,6 @@ function filter_prefix() {
     close(out);
 }
 
-function main() {
+function void main() {
     filter_prefix();
 }

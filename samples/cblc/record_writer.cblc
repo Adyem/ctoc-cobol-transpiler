@@ -6,7 +6,7 @@ record Person {
 file people "people.dat";
 Person person;
 
-function write_records() {
+function void write_records() {
     person.name = "ALICE";
     person.id = "0001";
 
@@ -15,6 +15,6 @@ function write_records() {
     close(people);
 }
 
-function main() {
+function void main() {
     write_records();
 }

@@ -196,11 +196,283 @@ FT_TEST(test_cobol_sample_record_writer_executes)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_cobol_sample_return_numeric_executes)
+{
+    char directory[256];
+    char binary_path[256];
+    char output_path[256];
+    char command[512];
+    char output_buffer[128];
+    const char *expected_output;
+    int command_length;
+
+    directory[0] = '\0';
+    binary_path[0] = '\0';
+    output_path[0] = '\0';
+    if (cobol_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_join_path(directory, "return_numeric.bin", binary_path, sizeof(binary_path)) != FT_SUCCESS)
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s samples/cobol/return_numeric.cob", binary_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    if (test_run_command(command) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: cobc should compile return_numeric fixture\n");
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    if (cobol_join_path(directory, "return_numeric.out", output_path, sizeof(output_path)) != FT_SUCCESS)
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    command_length = pf_snprintf(command, sizeof(command),
+        "cd %s && ./return_numeric.bin > return_numeric.out", directory);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    if (test_run_command(command) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: return_numeric fixture should execute successfully\n");
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    expected_output = "   42\n";
+    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    {
+        pf_printf("Assertion failed: return_numeric fixture should emit computed sum\n");
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cobol_sample_return_boolean_executes)
+{
+    char directory[256];
+    char binary_path[256];
+    char output_path[256];
+    char command[512];
+    char output_buffer[128];
+    const char *expected_output;
+    int command_length;
+
+    directory[0] = '\0';
+    binary_path[0] = '\0';
+    output_path[0] = '\0';
+    if (cobol_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_join_path(directory, "return_boolean.bin", binary_path, sizeof(binary_path)) != FT_SUCCESS)
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s samples/cobol/return_boolean.cob", binary_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    if (test_run_command(command) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: cobc should compile return_boolean fixture\n");
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    if (cobol_join_path(directory, "return_boolean.out", output_path, sizeof(output_path)) != FT_SUCCESS)
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    command_length = pf_snprintf(command, sizeof(command),
+        "cd %s && ./return_boolean.bin > return_boolean.out", directory);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    if (test_run_command(command) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: return_boolean fixture should execute successfully\n");
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    expected_output = "ODD\n";
+    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    {
+        pf_printf("Assertion failed: return_boolean fixture should identify odd values\n");
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cobol_sample_return_character_executes)
+{
+    char directory[256];
+    char binary_path[256];
+    char output_path[256];
+    char command[512];
+    char output_buffer[128];
+    const char *expected_output;
+    int command_length;
+
+    directory[0] = '\0';
+    binary_path[0] = '\0';
+    output_path[0] = '\0';
+    if (cobol_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_join_path(directory, "return_character.bin", binary_path, sizeof(binary_path)) != FT_SUCCESS)
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s samples/cobol/return_character.cob", binary_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    if (test_run_command(command) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: cobc should compile return_character fixture\n");
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    if (cobol_join_path(directory, "return_character.out", output_path, sizeof(output_path)) != FT_SUCCESS)
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    command_length = pf_snprintf(command, sizeof(command),
+        "cd %s && ./return_character.bin > return_character.out", directory);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    if (test_run_command(command) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: return_character fixture should execute successfully\n");
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    expected_output = "A\n";
+    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    {
+        pf_printf("Assertion failed: return_character fixture should emit fetched grade\n");
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cobol_sample_multi_module_executes)
+{
+    char directory[256];
+    char binary_path[256];
+    char output_path[256];
+    char command[512];
+    char output_buffer[128];
+    const char *expected_output;
+    int command_length;
+
+    directory[0] = '\0';
+    binary_path[0] = '\0';
+    output_path[0] = '\0';
+    if (cobol_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_join_path(directory, "multi_module.bin", binary_path, sizeof(binary_path)) != FT_SUCCESS)
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s samples/cobol/multi_module_main.cob samples/cobol/multi_module_worker.cob", binary_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    if (test_run_command(command) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: cobc should compile multi-module fixtures\n");
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    if (cobol_join_path(directory, "multi_module.out", output_path, sizeof(output_path)) != FT_SUCCESS)
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    command_length = pf_snprintf(command, sizeof(command),
+        "cd %s && ./multi_module.bin > multi_module.out", directory);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    if (test_run_command(command) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: multi-module fixtures should execute successfully\n");
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+    {
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    expected_output = "WORKER READY\n   1\n";
+    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    {
+        pf_printf("Assertion failed: multi-module program should emit banner and accumulator\n");
+        cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+        return (FT_FAILURE);
+    }
+    cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
+    return (FT_SUCCESS);
+}
+
 const t_test_case *get_cobol_execution_tests(size_t *count)
 {
     static const t_test_case tests[] = {
         {"cobol_sample_copy_file_executes", test_cobol_sample_copy_file_executes},
-        {"cobol_sample_record_writer_executes", test_cobol_sample_record_writer_executes}
+        {"cobol_sample_record_writer_executes", test_cobol_sample_record_writer_executes},
+        {"cobol_sample_return_numeric_executes", test_cobol_sample_return_numeric_executes},
+        {"cobol_sample_return_boolean_executes", test_cobol_sample_return_boolean_executes},
+        {"cobol_sample_return_character_executes", test_cobol_sample_return_character_executes},
+        {"cobol_sample_multi_module_executes", test_cobol_sample_multi_module_executes}
     };
 
     if (count)

@@ -5,3 +5,8 @@ samples/cobol/record_summary.cob
 samples/cobol/reverse_constructs.cob
 samples/cobol/reverse_normalization.cob
 samples/cobol/reverse_control_flow.cob
+samples/cobol/return_numeric.cob
+samples/cobol/return_boolean.cob
+samples/cobol/return_character.cob
+samples/cobol/multi_module_main.cob
+samples/cobol/multi_module_worker.cob
