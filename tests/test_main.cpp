@@ -85,6 +85,13 @@ int main(void)
     tests = get_cli_tests(&count);
     if (run_test_suite(tests, count) != FT_SUCCESS)
         status = FT_FAILURE;
+    tests = get_ci_tests(&count);
+    if (run_test_suite(tests, count) != FT_SUCCESS)
+        status = FT_FAILURE;
+    tests = get_cobol_reverse_tests(&count);
+    if (run_test_suite(tests, count) != FT_SUCCESS)
+        status = FT_FAILURE;
+    test_report_summary();
     if (status != FT_SUCCESS)
         return (1);
     return (0);

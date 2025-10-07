@@ -26,7 +26,7 @@ static void test_unset_environment(const char *name)
 #endif
 }
 
-static int test_cli_parse_direction_flag(void)
+FT_TEST(test_cli_parse_direction_flag)
 {
     const char *argv[] = {
         "ctoc_cobol_transpiler",
@@ -54,7 +54,7 @@ static int test_cli_parse_direction_flag(void)
     return (FT_SUCCESS);
 }
 
-static int test_cli_direction_from_environment(void)
+FT_TEST(test_cli_direction_from_environment)
 {
     const char *argv[] = {
         "ctoc_cobol_transpiler",
@@ -84,7 +84,7 @@ static int test_cli_direction_from_environment(void)
     return (FT_SUCCESS);
 }
 
-static int test_cli_help_short_circuits_validation(void)
+FT_TEST(test_cli_help_short_circuits_validation)
 {
     const char *argv[] = {
         "ctoc_cobol_transpiler",
@@ -99,7 +99,7 @@ static int test_cli_help_short_circuits_validation(void)
     return (FT_SUCCESS);
 }
 
-static int test_cli_optional_configuration(void)
+FT_TEST(test_cli_optional_configuration)
 {
     const char *argv[] = {
         "ctoc_cobol_transpiler",

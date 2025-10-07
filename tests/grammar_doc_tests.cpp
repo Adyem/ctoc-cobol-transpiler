@@ -17,7 +17,7 @@ static int grammar_document_load(char *buffer, size_t buffer_size)
     return (FT_SUCCESS);
 }
 
-static int test_grammar_document_exists(void)
+FT_TEST(test_grammar_document_exists)
 {
     char buffer[65536];
 
@@ -55,7 +55,7 @@ static int grammar_document_expect_rule(const char *buffer, const char *rule)
     return (FT_SUCCESS);
 }
 
-static int test_grammar_document_lists_core_rules(void)
+FT_TEST(test_grammar_document_lists_core_rules)
 {
     static const char *rules[] = {
         "file_declaration    ::=",
@@ -88,7 +88,7 @@ static int test_grammar_document_lists_core_rules(void)
     return (FT_SUCCESS);
 }
 
-static int test_design_doc_mentions_grammar(void)
+FT_TEST(test_design_doc_mentions_grammar)
 {
     char line[1024];
     FILE *file;

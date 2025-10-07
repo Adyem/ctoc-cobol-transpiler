@@ -3,7 +3,7 @@
 #include "libft/CMA/CMA.hpp"
 #include "test_suites.hpp"
 
-static int test_transpiler_cobol_formats_signed_integer(void)
+FT_TEST(test_transpiler_cobol_formats_signed_integer)
 {
     t_transpiler_cobol_elementary element;
     char *formatted;
@@ -29,7 +29,7 @@ cleanup:
     return (status);
 }
 
-static int test_transpiler_cobol_formats_character_array(void)
+FT_TEST(test_transpiler_cobol_formats_character_array)
 {
     t_transpiler_cobol_elementary element;
     char *formatted;
@@ -54,7 +54,7 @@ cleanup:
     return (status);
 }
 
-static int test_transpiler_cobol_formats_group_with_boolean(void)
+FT_TEST(test_transpiler_cobol_formats_group_with_boolean)
 {
     t_transpiler_cobol_elementary flag_element;
     t_transpiler_cobol_elementary name_element;

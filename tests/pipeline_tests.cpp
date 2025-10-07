@@ -15,7 +15,7 @@ static int test_stage_callback(t_transpiler_context *context, void *user_data)
     return (FT_SUCCESS);
 }
 
-static int test_transpiler_pipeline_executes_stage(void)
+FT_TEST(test_transpiler_pipeline_executes_stage)
 {
     t_transpiler_pipeline pipeline;
     t_transpiler_context context;
@@ -70,7 +70,7 @@ static int early_failing_stage_callback(t_transpiler_context *context, void *use
     return (FT_FAILURE);
 }
 
-static int test_transpiler_pipeline_reports_failure(void)
+FT_TEST(test_transpiler_pipeline_reports_failure)
 {
     t_transpiler_pipeline pipeline;
     t_transpiler_context context;
@@ -105,7 +105,7 @@ static int test_transpiler_pipeline_reports_failure(void)
     return (FT_SUCCESS);
 }
 
-static int test_transpiler_pipeline_stops_after_failure(void)
+FT_TEST(test_transpiler_pipeline_stops_after_failure)
 {
     t_transpiler_pipeline pipeline;
     t_transpiler_context context;

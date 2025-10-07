@@ -36,7 +36,7 @@ static int cobol_dialect_doc_expect_contains(const char *buffer, const char *nee
     return (FT_SUCCESS);
 }
 
-static int test_cobol_dialect_doc_exists(void)
+FT_TEST(test_cobol_dialect_doc_exists)
 {
     char buffer[4096];
 
@@ -52,7 +52,7 @@ static int test_cobol_dialect_doc_exists(void)
     return (FT_SUCCESS);
 }
 
-static int test_cobol_dialect_doc_lists_constraints(void)
+FT_TEST(test_cobol_dialect_doc_lists_constraints)
 {
     static const char *needles[] = {
         "ANSI-85 compatible COBOL",
@@ -79,7 +79,7 @@ static int test_cobol_dialect_doc_lists_constraints(void)
     return (FT_SUCCESS);
 }
 
-static int test_design_doc_references_cobol_dialect_doc(void)
+FT_TEST(test_design_doc_references_cobol_dialect_doc)
 {
     char line[1024];
     FILE *file;

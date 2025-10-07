@@ -2,3 +2,6 @@ samples/cobol/copy_file.cob
 samples/cobol/filter_prefix.cob
 samples/cobol/record_writer.cob
 samples/cobol/record_summary.cob
+samples/cobol/reverse_constructs.cob
+samples/cobol/reverse_normalization.cob
+samples/cobol/reverse_control_flow.cob

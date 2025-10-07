@@ -2,7 +2,7 @@
 
 #include "test_suites.hpp"
 
-static int test_runtime_record_init_sets_defaults(void)
+FT_TEST(test_runtime_record_init_sets_defaults)
 {
     t_runtime_record record;
 
@@ -29,7 +29,7 @@ static int test_runtime_record_init_sets_defaults(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_record_set_length_preserves_data(void)
+FT_TEST(test_runtime_record_set_length_preserves_data)
 {
     t_runtime_record record;
 
@@ -61,7 +61,7 @@ static int test_runtime_record_set_length_preserves_data(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_record_copy_round_trip(void)
+FT_TEST(test_runtime_record_copy_round_trip)
 {
     t_runtime_record record;
     char buffer[32];
@@ -108,7 +108,7 @@ static int test_runtime_record_copy_round_trip(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_record_fill_updates_contents(void)
+FT_TEST(test_runtime_record_fill_updates_contents)
 {
     t_runtime_record record;
 
@@ -133,7 +133,7 @@ static int test_runtime_record_fill_updates_contents(void)
     return (FT_SUCCESS);
 }
 
-static int test_runtime_record_copy_rejects_overflow(void)
+FT_TEST(test_runtime_record_copy_rejects_overflow)
 {
     t_runtime_record record;
 

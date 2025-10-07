@@ -7,8 +7,10 @@ endif
 NAME        = ctoc_cobol_transpiler$(EXE_EXT)
 NAME_DEBUG  = ctoc_cobol_transpiler_debug$(EXE_EXT)
 TEST_NAME   = automated_tests$(EXE_EXT)
+PYTHON      ?= python3
+LINT_SCRIPT  = scripts/lint_sources.py
 
-SRC         = main.cpp runtime_scalar.cpp runtime_string.cpp runtime_record.cpp runtime_file.cpp lexer.cpp lexer_token.cpp ast.cpp parser.cpp transpiler_diagnostics.cpp transpiler_context.cpp transpiler_pipeline.cpp transpiler_cli.cpp transpiler_logging.cpp transpiler_semantics.cpp transpiler_codegen.cpp transpiler_cobol_types.cpp transpiler_cobol_procedure.cpp
+SRC         = main.cpp runtime_scalar.cpp runtime_string.cpp runtime_record.cpp runtime_file.cpp lexer.cpp lexer_token.cpp ast.cpp parser.cpp transpiler_diagnostics.cpp transpiler_context.cpp transpiler_pipeline.cpp transpiler_cli.cpp transpiler_logging.cpp transpiler_semantics.cpp transpiler_codegen.cpp transpiler_cobol_types.cpp transpiler_cobol_procedure.cpp transpiler_cobol_reverse.cpp
 
 CC          = g++
 
@@ -109,11 +111,13 @@ TEST_SRC    = tests/test_main.cpp \
               tests/onboarding_doc_tests.cpp \
               tests/runtime_doc_tests.cpp \
               tests/cli_tests.cpp \
+              tests/ci_tests.cpp \
               tests/codegen_tests.cpp \
               tests/round_trip_tests.cpp \
               tests/cobol_type_tests.cpp \
               tests/compiler_tests.cpp \
-              tests/logging_tests.cpp
+              tests/logging_tests.cpp \
+              tests/cobol_reverse_tests.cpp
 
 TEST_OBJS   = $(TEST_SRC:%.cpp=$(OBJ_DIR_TEST)/%.o)
 
@@ -159,6 +163,9 @@ $(OBJ_DIR_TEST)/%.o: %.cpp
 clean:
 	-$(RM) $(OBJ_DIR)/*.o $(OBJ_DIR_DEBUG)/*.o
 	-$(RM) $(OBJ_DIR_TEST)/*.o $(OBJ_DIR_TEST)/tests/*.o
+	-$(RM) test_example_compiler.c test_example_compiler.bin test_example_compiler.txt
+	-$(RM) test_example_invalid_compiler.c test_example_invalid_compiler.bin test_example_invalid_compiler.log
+	-$(RM) test_runtime_file.txt
 	@if [ -f $(SUBMODULE_SENTINEL) ]; then \
 		$(MAKE) -C $(LIBFT_DIR) fclean; \
 	else \
@@ -178,4 +185,22 @@ both: all debug
 
 re_both: re both
 
-.PHONY: all dirs clean fclean re debug both re_both tests test initialize ensure_libft
+lint:
+	$(PYTHON) $(LINT_SCRIPT)
+
+ci-build:
+	$(MAKE) fclean
+	$(MAKE) all OPT_LEVEL=2
+	$(MAKE) debug
+
+ci-test:
+	$(MAKE) test
+
+ci-lint: lint
+
+ci:
+	$(MAKE) ci-build
+	$(MAKE) ci-test
+	$(MAKE) ci-lint
+
+.PHONY: all dirs clean fclean re debug both re_both tests test initialize ensure_libft lint ci-build ci-test ci-lint ci

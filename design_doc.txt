@@ -615,4 +615,5 @@ ctoc_cobol_transpiler --direction <dir> --input <source> --output <target> [--ou
 * Future releases can layer additional environment variables (dialect selection, diagnostics verbosity) on top of this entry point without breaking existing scripts; the CLI options above remain the source of truth when present.
 
 See `docs/cli_usage_examples.md` for walkthroughs that combine these options into end-to-end invocations, including environment variable usage and formatting permutations suitable for onboarding checklists.
+Consult `docs/ci_pipeline.md` for the CI-aligned build, test, and lint targets that guard these workflows.
 

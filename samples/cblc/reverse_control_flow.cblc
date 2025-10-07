@@ -1,0 +1,19 @@
+function MAIN() {
+    if (!(FLAG == "Y")) {
+        while (!(COUNT > LIMIT)) {
+            LIMIT = COUNT;
+        }
+    } else {
+        INDEX = 0;
+        while (!(INDEX >= LIMIT)) {
+            RESULT = INDEX;
+            INDEX = INDEX + 1;
+        }
+    }
+    return ;
+}
+
+function NEXT() {
+    FLAG = "DONE";
+    return ;
+}

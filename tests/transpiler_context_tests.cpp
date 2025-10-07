@@ -2,7 +2,7 @@
 
 #include "test_suites.hpp"
 
-static int test_transpiler_context_registers_void_function(void)
+FT_TEST(test_transpiler_context_registers_void_function)
 {
     t_transpiler_context context;
     const t_transpiler_function_signature *signature;
@@ -38,7 +38,7 @@ static int test_transpiler_context_registers_void_function(void)
     return (FT_SUCCESS);
 }
 
-static int test_transpiler_context_rejects_value_return(void)
+FT_TEST(test_transpiler_context_rejects_value_return)
 {
     t_transpiler_context context;
 
@@ -72,7 +72,7 @@ static int test_transpiler_context_rejects_value_return(void)
     return (FT_SUCCESS);
 }
 
-static int test_transpiler_context_registers_main_entrypoint(void)
+FT_TEST(test_transpiler_context_registers_main_entrypoint)
 {
     t_transpiler_context context;
     const t_transpiler_entrypoint *entrypoint;
@@ -133,7 +133,7 @@ static int test_transpiler_context_registers_main_entrypoint(void)
     return (FT_SUCCESS);
 }
 
-static int test_transpiler_context_entrypoint_registers_function_signature(void)
+FT_TEST(test_transpiler_context_entrypoint_registers_function_signature)
 {
     t_transpiler_context context;
     const t_transpiler_function_signature *signature;
@@ -176,7 +176,7 @@ static int test_transpiler_context_entrypoint_registers_function_signature(void)
     return (FT_SUCCESS);
 }
 
-static int test_transpiler_context_argument_mismatch_keeps_entrypoint_clear(void)
+FT_TEST(test_transpiler_context_argument_mismatch_keeps_entrypoint_clear)
 {
     t_transpiler_context context;
     const t_transpiler_entrypoint *entrypoint;
@@ -226,7 +226,7 @@ static int test_transpiler_context_argument_mismatch_keeps_entrypoint_clear(void
     return (FT_SUCCESS);
 }
 
-static int test_transpiler_context_rejects_duplicate_function_registration(void)
+FT_TEST(test_transpiler_context_rejects_duplicate_function_registration)
 {
     t_transpiler_context context;
 
@@ -275,7 +275,7 @@ static int test_transpiler_context_rejects_duplicate_function_registration(void)
     return (FT_SUCCESS);
 }
 
-static int test_transpiler_context_rejects_non_main_entrypoint(void)
+FT_TEST(test_transpiler_context_rejects_non_main_entrypoint)
 {
     t_transpiler_context context;
 
@@ -311,7 +311,7 @@ static int test_transpiler_context_rejects_non_main_entrypoint(void)
     return (FT_SUCCESS);
 }
 
-static int test_transpiler_context_registers_main_without_arguments(void)
+FT_TEST(test_transpiler_context_registers_main_without_arguments)
 {
     t_transpiler_context context;
     const t_transpiler_entrypoint *entrypoint;
@@ -372,7 +372,7 @@ static int test_transpiler_context_registers_main_without_arguments(void)
     return (FT_SUCCESS);
 }
 
-static int test_transpiler_context_rejects_argument_mismatch(void)
+FT_TEST(test_transpiler_context_rejects_argument_mismatch)
 {
     t_transpiler_context context;
 
@@ -408,7 +408,7 @@ static int test_transpiler_context_rejects_argument_mismatch(void)
     return (FT_SUCCESS);
 }
 
-static int test_transpiler_context_rejects_non_void_entrypoint(void)
+FT_TEST(test_transpiler_context_rejects_non_void_entrypoint)
 {
     t_transpiler_context context;
 
@@ -444,7 +444,7 @@ static int test_transpiler_context_rejects_non_void_entrypoint(void)
     return (FT_SUCCESS);
 }
 
-static int test_transpiler_context_rejects_duplicate_entrypoint(void)
+FT_TEST(test_transpiler_context_rejects_duplicate_entrypoint)
 {
     t_transpiler_context context;
 
@@ -487,7 +487,7 @@ static int test_transpiler_context_rejects_duplicate_entrypoint(void)
     return (FT_SUCCESS);
 }
 
-static int test_transpiler_context_registers_file_declaration(void)
+FT_TEST(test_transpiler_context_registers_file_declaration)
 {
     t_transpiler_context context;
     const t_transpiler_file_declaration *files;
@@ -548,7 +548,7 @@ static int test_transpiler_context_registers_file_declaration(void)
     return (FT_SUCCESS);
 }
 
-static int test_transpiler_context_tracks_record_length_hint(void)
+FT_TEST(test_transpiler_context_tracks_record_length_hint)
 {
     t_transpiler_context context;
     const t_transpiler_file_declaration *files;

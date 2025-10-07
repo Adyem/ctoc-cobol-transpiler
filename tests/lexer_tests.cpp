@@ -2,7 +2,7 @@
 
 #include "test_suites.hpp"
 
-static int test_lexer_keyword_lookup_identifies_keywords(void)
+FT_TEST(test_lexer_keyword_lookup_identifies_keywords)
 {
     t_lexer_token_kind kind;
 
@@ -27,7 +27,7 @@ static int test_lexer_keyword_lookup_identifies_keywords(void)
     return (FT_SUCCESS);
 }
 
-static int test_lexer_keyword_lookup_defaults_to_identifier(void)
+FT_TEST(test_lexer_keyword_lookup_defaults_to_identifier)
 {
     t_lexer_token_kind kind;
 
@@ -40,7 +40,7 @@ static int test_lexer_keyword_lookup_defaults_to_identifier(void)
     return (FT_SUCCESS);
 }
 
-static int test_lexer_trivia_detects_whitespace(void)
+FT_TEST(test_lexer_trivia_detects_whitespace)
 {
     const char *text;
     t_lexer_trivia_kind trivia;
@@ -55,7 +55,7 @@ static int test_lexer_trivia_detects_whitespace(void)
     return (FT_SUCCESS);
 }
 
-static int test_lexer_trivia_detects_comments(void)
+FT_TEST(test_lexer_trivia_detects_comments)
 {
     const char *comment;
     const char *not_comment;
@@ -78,7 +78,7 @@ static int test_lexer_trivia_detects_comments(void)
     return (FT_SUCCESS);
 }
 
-static int test_lexer_tokenizes_sample_program(void)
+FT_TEST(test_lexer_tokenizes_sample_program)
 {
     const char *source;
     t_lexer lexer;
@@ -136,7 +136,7 @@ static int test_lexer_tokenizes_sample_program(void)
     return (FT_SUCCESS);
 }
 
-static int test_lexer_reports_unterminated_string(void)
+FT_TEST(test_lexer_reports_unterminated_string)
 {
     const char *source;
     t_lexer lexer;

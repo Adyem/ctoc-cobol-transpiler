@@ -36,7 +36,7 @@ static int contributing_doc_expect_contains(const char *buffer, const char *snip
     return (FT_SUCCESS);
 }
 
-static int test_contributing_doc_exists(void)
+FT_TEST(test_contributing_doc_exists)
 {
     char buffer[65536];
 
@@ -52,7 +52,7 @@ static int test_contributing_doc_exists(void)
     return (FT_SUCCESS);
 }
 
-static int test_contributing_doc_spells_out_coding_standards(void)
+FT_TEST(test_contributing_doc_spells_out_coding_standards)
 {
     char buffer[65536];
 
@@ -67,7 +67,7 @@ static int test_contributing_doc_spells_out_coding_standards(void)
     return (FT_SUCCESS);
 }
 
-static int test_contributing_doc_mentions_testing_policy(void)
+FT_TEST(test_contributing_doc_mentions_testing_policy)
 {
     char buffer[65536];
 
@@ -80,7 +80,7 @@ static int test_contributing_doc_mentions_testing_policy(void)
     return (FT_SUCCESS);
 }
 
-static int test_design_doc_references_contributing_doc(void)
+FT_TEST(test_design_doc_references_contributing_doc)
 {
     FILE *file;
     char line[1024];
