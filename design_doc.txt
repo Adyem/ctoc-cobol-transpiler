@@ -160,6 +160,15 @@ PROCEDURE DIVISION.
     STOP RUN.
 ```
 
+The control-flow emitter now stores structured statement trees in a dedicated
+`transpiler_cobol_procedure` helper. `IF` nodes expose explicit `THEN`/`ELSE`
+blocks, `PERFORM UNTIL` carries the translated loop condition (including a
+negated flag for `while (cond)` patterns), and `PERFORM VARYING` records the
+counter variable, initial value, and step expression. `transpiler_codegen`
+walks those trees to produce properly indented COBOL sentences, ensuring that
+nested bodies land inside the right scope and that the generated source matches
+the expected `IF`/`PERFORM` layout from the CBL-C semantics.
+
 **Boolean `read()` expansion.** Any `while (read(f, v)) { ... }` becomes a `PERFORM UNTIL EOF` loop with `AT END` clause. A single `if (read(...))` expands to one `READ` with conditional body and optional `ELSE` when `AT END` occurs via an internal temp flag.
 
 ### 4.4 Records & Structs
@@ -199,6 +208,11 @@ Default numeric size policy (configurable):
 | `int`     | `PIC 9(10) SIGN IS LEADING SEPARATE` (or unsigned `9(10)`) |
 | `char[n]` | `PIC X(n)`                                                 |
 | `bool`    | `PIC X VALUE 'N'/'Y'` or `PIC 9 VALUE 0/1` (configurable)  |
+
+Helper routines in `transpiler_cobol_types` encapsulate these policies. Elementary descriptors carry
+length, scale, and signedness so they can render `PIC` clauses (including optional `V9` precision and
+`SIGN IS LEADING SEPARATE`). Group helpers emit `01` headers and stitch nested `05` entries, letting
+file section records and working-storage layouts share consistent formatting surfaces.
 
 ### 4.6 Control Flow
 
@@ -274,6 +288,8 @@ literal       := STRING | INT ;
 
 * Generates 4 divisions with sections in canonical order.
 * **ENVIRONMENT DIVISION**: one `SELECT` per file with organization/mode.
+  * Logical file names uppercase the declared identifier and attach the parsed path via `ASSIGN TO`. Record layouts reuse the
+    inferred lengths captured during semantic analysis so COBOL `FD` entries align with the buffers used in generated code.
 * **FILE SECTION**: one `FD` per file + record item sized from usage, or fixed(n).
 * **WORKING‑STORAGE**: scalars, group items, temps, EOF flags (one per file or one global per active loop).
 * **PROCEDURE DIVISION**:
@@ -589,4 +605,6 @@ ctoc_cobol_transpiler --direction <dir> --input <source> --output <target> [--ou
 
 * `CTOC_DEFAULT_DIRECTION` supplies a fallback direction when `--direction` is not provided. It uses the same values as the flag (`cblc-to-cobol` / `cobol-to-cblc`).
 * Future releases can layer additional environment variables (dialect selection, diagnostics verbosity) on top of this entry point without breaking existing scripts; the CLI options above remain the source of truth when present.
+
+See `docs/cli_usage_examples.md` for walkthroughs that combine these options into end-to-end invocations, including environment variable usage and formatting permutations suitable for onboarding checklists.
 

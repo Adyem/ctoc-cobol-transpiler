@@ -487,6 +487,110 @@ static int test_transpiler_context_rejects_duplicate_entrypoint(void)
     return (FT_SUCCESS);
 }
 
+static int test_transpiler_context_registers_file_declaration(void)
+{
+    t_transpiler_context context;
+    const t_transpiler_file_declaration *files;
+    size_t count;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_file(&context, "input_file", TRANSPILE_FILE_ROLE_INPUT,
+            "input.txt", 0), "file registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    files = transpiler_context_get_files(&context, &count);
+    if (!files)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected file registry to be available\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(count), 1,
+            "file registration should add a single entry") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(files[0].name, "input_file",
+            "file registration should copy identifier") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(files[0].path, "input.txt",
+            "file registration should copy path") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(files[0].role), static_cast<int>(TRANSPILE_FILE_ROLE_INPUT),
+            "file registration should store role") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(files[0].explicit_record_length), 0,
+            "file should default explicit length to zero when unspecified") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(files[0].inferred_record_length), 0,
+            "inferred length should start at zero") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+static int test_transpiler_context_tracks_record_length_hint(void)
+{
+    t_transpiler_context context;
+    const t_transpiler_file_declaration *files;
+    size_t count;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_file(&context, "log_file", TRANSPILE_FILE_ROLE_OUTPUT,
+            "log.txt", 0), "file registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_record_file_length_hint(&context, "log_file", 64),
+            "initial hint should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_record_file_length_hint(&context, "log_file", 128),
+            "larger hint should update inferred length") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    files = transpiler_context_get_files(&context, &count);
+    if (!files)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected file registry to be available\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(files[0].inferred_record_length), 128,
+            "inferred length should track maximum hint") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
 const t_test_case *get_transpiler_context_tests(size_t *count)
 {
     static const t_test_case tests[] = {
@@ -500,7 +604,9 @@ const t_test_case *get_transpiler_context_tests(size_t *count)
         {"transpiler_context_argument_mismatch_keeps_entrypoint_clear", test_transpiler_context_argument_mismatch_keeps_entrypoint_clear},
         {"transpiler_context_rejects_argument_mismatch", test_transpiler_context_rejects_argument_mismatch},
         {"transpiler_context_rejects_non_void_entrypoint", test_transpiler_context_rejects_non_void_entrypoint},
-        {"transpiler_context_rejects_duplicate_entrypoint", test_transpiler_context_rejects_duplicate_entrypoint}
+        {"transpiler_context_rejects_duplicate_entrypoint", test_transpiler_context_rejects_duplicate_entrypoint},
+        {"transpiler_context_registers_file_declaration", test_transpiler_context_registers_file_declaration},
+        {"transpiler_context_tracks_record_length_hint", test_transpiler_context_tracks_record_length_hint}
     };
 
     if (count)

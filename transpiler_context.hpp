@@ -27,6 +27,7 @@ typedef enum e_transpiler_diagnostic_level
 
 #define TRANSPILE_FUNCTION_NAME_MAX 64
 #define TRANSPILE_IDENTIFIER_MAX 64
+#define TRANSPILE_FILE_PATH_MAX 260
 
 typedef enum e_transpiler_function_return_mode
 {
@@ -45,6 +46,24 @@ typedef struct s_transpiler_function_signature
 #define TRANSPILE_ERROR_ENTRYPOINT_ARGUMENT_MISMATCH 1003
 #define TRANSPILE_ERROR_ENTRYPOINT_DUPLICATE 1004
 #define TRANSPILE_ERROR_FUNCTION_DUPLICATE_NAME 1005
+#define TRANSPILE_ERROR_FILE_DUPLICATE_NAME 1006
+#define TRANSPILE_ERROR_FILE_UNKNOWN 1007
+
+typedef enum e_transpiler_file_role
+{
+    TRANSPILE_FILE_ROLE_INPUT = 0,
+    TRANSPILE_FILE_ROLE_OUTPUT,
+    TRANSPILE_FILE_ROLE_DATA
+}   t_transpiler_file_role;
+
+typedef struct s_transpiler_file_declaration
+{
+    char name[TRANSPILE_IDENTIFIER_MAX];
+    t_transpiler_file_role role;
+    char path[TRANSPILE_FILE_PATH_MAX];
+    size_t explicit_record_length;
+    size_t inferred_record_length;
+}   t_transpiler_file_declaration;
 
 typedef struct s_transpiler_entrypoint
 {
@@ -70,6 +89,9 @@ typedef struct s_transpiler_context
     t_transpiler_function_signature *functions;
     size_t function_count;
     size_t function_capacity;
+    t_transpiler_file_declaration *files;
+    size_t file_count;
+    size_t file_capacity;
     t_transpiler_entrypoint entrypoint;
 }   t_transpiler_context;
 
@@ -89,5 +111,9 @@ const t_transpiler_function_signature *transpiler_context_find_function(const t_
 int transpiler_context_register_entrypoint(t_transpiler_context *context, const char *name,
     t_transpiler_function_return_mode return_mode, const char *argc_identifier, const char *argv_identifier);
 const t_transpiler_entrypoint *transpiler_context_get_entrypoint(const t_transpiler_context *context);
+int transpiler_context_register_file(t_transpiler_context *context, const char *name, t_transpiler_file_role role,
+    const char *path, size_t explicit_record_length);
+int transpiler_context_record_file_length_hint(t_transpiler_context *context, const char *name, size_t record_length);
+const t_transpiler_file_declaration *transpiler_context_get_files(const t_transpiler_context *context, size_t *count);
 
 #endif

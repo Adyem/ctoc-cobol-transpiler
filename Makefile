@@ -8,7 +8,7 @@ NAME        = ctoc_cobol_transpiler$(EXE_EXT)
 NAME_DEBUG  = ctoc_cobol_transpiler_debug$(EXE_EXT)
 TEST_NAME   = automated_tests$(EXE_EXT)
 
-SRC         = main.cpp runtime_scalar.cpp runtime_string.cpp runtime_file.cpp lexer.cpp lexer_token.cpp ast.cpp parser.cpp transpiler_diagnostics.cpp transpiler_context.cpp transpiler_pipeline.cpp transpiler_cli.cpp
+SRC         = main.cpp runtime_scalar.cpp runtime_string.cpp runtime_file.cpp lexer.cpp lexer_token.cpp ast.cpp parser.cpp transpiler_diagnostics.cpp transpiler_context.cpp transpiler_pipeline.cpp transpiler_cli.cpp transpiler_logging.cpp transpiler_semantics.cpp transpiler_codegen.cpp transpiler_cobol_types.cpp transpiler_cobol_procedure.cpp
 
 CC          = g++
 
@@ -91,6 +91,7 @@ TEST_SRC    = tests/test_main.cpp \
               tests/ast_tests.cpp \
               tests/lexer_tests.cpp \
               tests/parser_tests.cpp \
+              tests/semantics_tests.cpp \
               tests/runtime_int_tests.cpp \
               tests/runtime_char_tests.cpp \
               tests/runtime_string_tests.cpp \
@@ -100,8 +101,12 @@ TEST_SRC    = tests/test_main.cpp \
               tests/sample_inventory_tests.cpp \
               tests/grammar_doc_tests.cpp \
               tests/cobol_doc_tests.cpp \
+              tests/cli_doc_tests.cpp \
               tests/cli_tests.cpp \
-              tests/compiler_tests.cpp
+              tests/codegen_tests.cpp \
+              tests/cobol_type_tests.cpp \
+              tests/compiler_tests.cpp \
+              tests/logging_tests.cpp
 
 TEST_OBJS   = $(TEST_SRC:%.cpp=$(OBJ_DIR_TEST)/%.o)
 
