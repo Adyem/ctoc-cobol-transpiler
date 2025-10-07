@@ -117,7 +117,16 @@ TEST_SRC    = tests/test_main.cpp \
               tests/codegen_tests.cpp \
               tests/round_trip_tests.cpp \
               tests/cobol_type_tests.cpp \
-              tests/compiler_tests.cpp \
+              tests/compiler/compiler_test_support.cpp \
+              tests/compiler/c/build_tests.cpp \
+              tests/compiler/c/exit_tests.cpp \
+              tests/compiler/c/tests.cpp \
+              tests/compiler/cobol/return_numeric_tests.cpp \
+              tests/compiler/cobol/multi_module_tests.cpp \
+              tests/compiler/cobol/return_boolean_tests.cpp \
+              tests/compiler/cobol/return_character_tests.cpp \
+              tests/compiler/cobol/tests.cpp \
+              tests/compiler/tests.cpp \
               tests/logging_tests.cpp \
               tests/cobol_reverse_tests.cpp
 
