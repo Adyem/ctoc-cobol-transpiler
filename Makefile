@@ -93,6 +93,12 @@ TEST_SRC    = tests/test_main.cpp \
               tests/ast_tests.cpp \
               tests/lexer_tests.cpp \
               tests/parser_tests.cpp \
+             tests/parser_positive_program_tests.cpp \
+             tests/parser_positive_control_flow_tests.cpp \
+             tests/parser_positive_literal_tests.cpp \
+             tests/parser_negative_statement_tests.cpp \
+             tests/parser_negative_structure_tests.cpp \
+             tests/parser_negative_data_tests.cpp \
               tests/semantics_tests.cpp \
               tests/runtime_int_tests.cpp \
               tests/runtime_char_tests.cpp \
@@ -130,6 +136,7 @@ TEST_SRC    = tests/test_main.cpp \
               tests/compiler/cobol/return_boolean_tests.cpp \
               tests/compiler/cobol/return_character_tests.cpp \
               tests/compiler/cobol/record_writer_tests.cpp \
+              tests/compiler/cobol/integration_showcase_tests.cpp \
               tests/compiler/cobol/record_summary_tests.cpp \
               tests/compiler/cobol/reverse_control_flow_tests.cpp \
               tests/compiler/cobol/reverse_normalization_tests.cpp \

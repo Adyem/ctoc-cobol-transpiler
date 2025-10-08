@@ -27,6 +27,7 @@ typedef enum e_transpiler_diagnostic_level
 
 #define TRANSPILE_FUNCTION_NAME_MAX 64
 #define TRANSPILE_IDENTIFIER_MAX 64
+#define TRANSPILE_MODULE_NAME_MAX 64
 #define TRANSPILE_FILE_PATH_MAX 260
 
 typedef enum e_transpiler_function_return_mode
@@ -35,10 +36,18 @@ typedef enum e_transpiler_function_return_mode
     TRANSPILE_FUNCTION_RETURN_VALUE
 }   t_transpiler_function_return_mode;
 
+typedef enum e_transpiler_symbol_visibility
+{
+    TRANSPILE_SYMBOL_PRIVATE = 0,
+    TRANSPILE_SYMBOL_PUBLIC
+}   t_transpiler_symbol_visibility;
+
 typedef struct s_transpiler_function_signature
 {
     char name[TRANSPILE_FUNCTION_NAME_MAX];
+    char module[TRANSPILE_MODULE_NAME_MAX];
     t_transpiler_function_return_mode return_mode;
+    t_transpiler_symbol_visibility visibility;
 }   t_transpiler_function_signature;
 
 #define TRANSPILE_ERROR_FUNCTION_RETURNS_VALUE 1001
@@ -48,6 +57,11 @@ typedef struct s_transpiler_function_signature
 #define TRANSPILE_ERROR_FUNCTION_DUPLICATE_NAME 1005
 #define TRANSPILE_ERROR_FILE_DUPLICATE_NAME 1006
 #define TRANSPILE_ERROR_FILE_UNKNOWN 1007
+#define TRANSPILE_ERROR_MODULE_DUPLICATE_NAME 1008
+#define TRANSPILE_ERROR_MODULE_UNKNOWN 1009
+#define TRANSPILE_ERROR_MODULE_IMPORT_UNKNOWN 1010
+#define TRANSPILE_ERROR_MODULE_IMPORT_CYCLE 1011
+#define TRANSPILE_ERROR_FUNCTION_EXPORT_CONFLICT 1012
 
 typedef enum e_transpiler_file_role
 {
@@ -64,6 +78,22 @@ typedef struct s_transpiler_file_declaration
     size_t explicit_record_length;
     size_t inferred_record_length;
 }   t_transpiler_file_declaration;
+
+typedef struct s_transpiler_module_import
+{
+    char path[TRANSPILE_FILE_PATH_MAX];
+    size_t resolved_index;
+}   t_transpiler_module_import;
+
+typedef struct s_transpiler_module
+{
+    char name[TRANSPILE_MODULE_NAME_MAX];
+    char path[TRANSPILE_FILE_PATH_MAX];
+    t_transpiler_module_import *imports;
+    size_t import_count;
+    size_t import_capacity;
+    size_t initialization_rank;
+}   t_transpiler_module;
 
 typedef struct s_transpiler_entrypoint
 {
@@ -98,6 +128,12 @@ typedef struct s_transpiler_context
     t_transpiler_file_declaration *files;
     size_t file_count;
     size_t file_capacity;
+    t_transpiler_module *modules;
+    size_t module_count;
+    size_t module_capacity;
+    size_t *module_order;
+    size_t module_order_count;
+    size_t module_order_capacity;
     t_transpiler_entrypoint entrypoint;
 }   t_transpiler_context;
 
@@ -111,11 +147,19 @@ void transpiler_context_set_format_mode(t_transpiler_context *context, t_transpi
 void transpiler_context_set_diagnostic_level(t_transpiler_context *context, t_transpiler_diagnostic_level level);
 void transpiler_context_record_error(t_transpiler_context *context, int error_code);
 int transpiler_context_has_errors(const t_transpiler_context *context);
-int transpiler_context_register_function(t_transpiler_context *context, const char *name,
-    t_transpiler_function_return_mode return_mode);
+int transpiler_context_register_module(t_transpiler_context *context, const char *name, const char *path);
+const t_transpiler_module *transpiler_context_get_modules(const t_transpiler_context *context, size_t *count);
+int transpiler_context_register_module_import(t_transpiler_context *context, const char *module_name,
+    const char *import_path);
+int transpiler_context_scan_imports_for_module(t_transpiler_context *context, const char *module_name,
+    const char *source_text);
+int transpiler_context_compute_module_initialization_order(t_transpiler_context *context);
+const size_t *transpiler_context_get_module_initialization_order(const t_transpiler_context *context, size_t *count);
+int transpiler_context_register_function(t_transpiler_context *context, const char *module_name, const char *name,
+    t_transpiler_function_return_mode return_mode, t_transpiler_symbol_visibility visibility);
 const t_transpiler_function_signature *transpiler_context_find_function(const t_transpiler_context *context,
-    const char *name);
-int transpiler_context_register_entrypoint(t_transpiler_context *context, const char *name,
+    const char *module_name, const char *name);
+int transpiler_context_register_entrypoint(t_transpiler_context *context, const char *module_name, const char *name,
     t_transpiler_function_return_mode return_mode, const char *argc_identifier, const char *argv_identifier);
 const t_transpiler_entrypoint *transpiler_context_get_entrypoint(const t_transpiler_context *context);
 int transpiler_context_register_file(t_transpiler_context *context, const char *name, t_transpiler_file_role role,

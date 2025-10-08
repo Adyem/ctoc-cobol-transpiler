@@ -13,7 +13,7 @@ typedef struct s_test_case
     int (*execute)(void);
 }   t_test_case;
 
-#define FT_TEST(name) static int name(void)
+#define FT_TEST(name) int name(void); int name(void)
 
 int test_assert_failure(const char *expression, const char *file, int line);
 
