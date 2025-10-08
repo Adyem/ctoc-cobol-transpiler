@@ -50,6 +50,55 @@ alphanumeric data to libft-friendly buffers. The API comprises:
 All string buffers expand automatically using CMA-backed growth and guarantee a
 null-terminated `data` pointer so they remain compatible with libft routines.
 
+## Standard Library Subprograms
+
+Generated programs rely on a small catalog of COBOL subprograms to bridge
+between CBL-C semantics and the runtime helpers. The current catalog covers the
+following helpers:
+
+- `CBLC-STRLEN` accepts a by-reference alphanumeric buffer (up to 255
+  characters), the caller-declared length passed by value, and a trailing
+  by-reference numeric slot that receives the computed length. The subprogram
+  scans at most the caller-provided length, exits early on NUL bytes, trims
+  trailing spaces, and writes the resulting character count into the return
+  slot.
+- `CBLC-STRNLEN` accepts the same parameters as `CBLC-STRLEN` plus an explicit
+  request limit passed by value. It caps the scan to the minimum of the declared
+  length, requested length, and 255-character ceiling, exits early on NUL bytes,
+  trims trailing spaces within that window, and writes the resulting character
+  count into the trailing numeric slot.
+- `CBLC-STRCMP` compares two alphanumeric buffers (each up to 255 characters)
+  supplied by reference along with their caller-declared lengths passed by
+  value. It computes the lexicographic ordering consistent with ANSI COBOL
+  string comparisons and populates a signed numeric result in the trailing
+  return slot (`-1`, `0`, or `1`) while honoring the provided length limits.
+- `CBLC-STRCPY` copies from a caller-supplied source buffer (up to 255
+  characters) into a destination buffer passed by reference along with their
+  respective declared lengths. The subprogram blanks the destination up to its
+  declared size, copies characters until either length limit is reached, and
+  sets a numeric status flag in the trailing return slot (`0` for success,
+  `1` when truncation occurs).
+- `CBLC-STRNCPY` performs a bounded copy between caller-supplied alphanumeric
+  buffers (each up to 255 characters) using their declared lengths plus an
+  explicit request length. The routine blanks the destination, copies up to the
+  minimum of the declared lengths and request, pads with spaces when the source
+  is shorter, and writes a status flag to the trailing return slot (`0` for
+  success, `1` when the request exceeds the available source or destination
+  space).
+- `CBLC-SQRT` accepts a floating operand (`USAGE COMP-2`) by reference along
+  with a trailing floating result slot and numeric status flag. The helper
+  rejects negative operands by zeroing the result and returning status `1`,
+  otherwise computing the square root via `FUNCTION SQRT` and writing the
+  result with status `0`. Callers reference the helper through `std::sqrt` and
+  are expected to widen narrower numeric inputs before invocation.
+- Callers reference standard library helpers through the `std::` prefix (for
+  example, `std::strlen`, `std::strnlen`, `std::strcmp`, `std::strcpy`, `std::strncpy`, or `std::sqrt`), which resolves to the COBOL
+  subprogram names listed above and prevents collisions with user-defined
+  procedures.
+
+The standard library subprograms are emitted alongside generated code so COBOL
+callers can link against a stable ABI without duplicating helper logic.
+
 ## Record Helpers (`runtime_record`)
 
 COBOL records map to mutable buffers managed through `runtime_record`. Generated

@@ -16,6 +16,7 @@ const t_test_case *get_golden_file_tests(size_t *count);
 const t_test_case *get_runtime_int_tests(size_t *count);
 const t_test_case *get_runtime_char_tests(size_t *count);
 const t_test_case *get_runtime_string_tests(size_t *count);
+const t_test_case *get_standard_library_tests(size_t *count);
 const t_test_case *get_runtime_audit_tests(size_t *count);
 const t_test_case *get_runtime_record_tests(size_t *count);
 const t_test_case *get_runtime_file_tests(size_t *count);

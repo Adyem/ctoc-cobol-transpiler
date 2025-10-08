@@ -11,6 +11,123 @@ static size_t g_failed_tests = 0;
 static int g_checked_cobc = 0;
 static int g_has_cobc = 0;
 
+static int test_capture_stream_begin(t_test_output_capture *capture, int fd)
+{
+    int pipe_fds[2];
+
+    if (!capture)
+        return (FT_FAILURE);
+    capture->saved_fd = -1;
+    capture->pipe_read_fd = -1;
+    capture->target_fd = -1;
+    if (pipe(pipe_fds) < 0)
+        return (FT_FAILURE);
+    capture->saved_fd = dup(fd);
+    if (capture->saved_fd < 0)
+    {
+        close(pipe_fds[0]);
+        close(pipe_fds[1]);
+        return (FT_FAILURE);
+    }
+    if (dup2(pipe_fds[1], fd) < 0)
+    {
+        close(capture->saved_fd);
+        capture->saved_fd = -1;
+        close(pipe_fds[0]);
+        close(pipe_fds[1]);
+        return (FT_FAILURE);
+    }
+    close(pipe_fds[1]);
+    capture->pipe_read_fd = pipe_fds[0];
+    capture->target_fd = fd;
+    return (FT_SUCCESS);
+}
+
+static int test_capture_stream_end(t_test_output_capture *capture, int fd, char *buffer, size_t buffer_size,
+    ssize_t *length)
+{
+    char discard[64];
+    ssize_t total;
+    ssize_t chunk;
+    ssize_t remaining;
+
+    if (!capture || !buffer || buffer_size == 0)
+        return (FT_FAILURE);
+    if (capture->saved_fd < 0 || capture->pipe_read_fd < 0)
+        return (FT_FAILURE);
+    if (capture->target_fd != fd)
+    {
+        close(capture->saved_fd);
+        capture->saved_fd = -1;
+        close(capture->pipe_read_fd);
+        capture->pipe_read_fd = -1;
+        capture->target_fd = -1;
+        return (FT_FAILURE);
+    }
+    if (dup2(capture->saved_fd, fd) < 0)
+    {
+        close(capture->saved_fd);
+        capture->saved_fd = -1;
+        close(capture->pipe_read_fd);
+        capture->pipe_read_fd = -1;
+        return (FT_FAILURE);
+    }
+    close(capture->saved_fd);
+    capture->saved_fd = -1;
+    capture->target_fd = -1;
+    total = 0;
+    while (total + 1 < static_cast<ssize_t>(buffer_size))
+    {
+        remaining = static_cast<ssize_t>(buffer_size) - 1 - total;
+        chunk = read(capture->pipe_read_fd, buffer + total, static_cast<size_t>(remaining));
+        if (chunk < 0)
+        {
+            close(capture->pipe_read_fd);
+            capture->pipe_read_fd = -1;
+            return (FT_FAILURE);
+        }
+        if (chunk == 0)
+            break ;
+        total += chunk;
+        if (chunk < remaining)
+            break ;
+    }
+    buffer[total] = '\0';
+    if (length)
+        *length = total;
+    while (1)
+    {
+        chunk = read(capture->pipe_read_fd, discard, sizeof(discard));
+        if (chunk <= 0)
+            break ;
+    }
+    close(capture->pipe_read_fd);
+    capture->pipe_read_fd = -1;
+    return (FT_SUCCESS);
+}
+
+int test_capture_stdout_begin(t_test_output_capture *capture)
+{
+    return (test_capture_stream_begin(capture, 1));
+}
+
+int test_capture_stdout_end(t_test_output_capture *capture, char *buffer, size_t buffer_size,
+    ssize_t *length)
+{
+    return (test_capture_stream_end(capture, 1, buffer, buffer_size, length));
+}
+
+int test_capture_stderr_begin(t_test_output_capture *capture)
+{
+    return (test_capture_stream_begin(capture, 2));
+}
+
+int test_capture_stderr_end(t_test_output_capture *capture, char *buffer, size_t buffer_size,
+    ssize_t *length)
+{
+    return (test_capture_stream_end(capture, 2, buffer, buffer_size, length));
+}
+
 int test_cobc_available(void)
 {
     pid_t pid;

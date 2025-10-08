@@ -2,6 +2,7 @@
 #define TEST_SUPPORT_HPP
 
 #include <cstddef>
+#include <sys/types.h>
 
 #include "libft/Libft/libft.hpp"
 #include "libft/Printf/printf.hpp"
@@ -12,6 +13,13 @@ typedef struct s_test_case
     const char *name;
     int (*execute)(void);
 }   t_test_case;
+
+typedef struct s_test_output_capture
+{
+    int saved_fd;
+    int pipe_read_fd;
+    int target_fd;
+}   t_test_output_capture;
 
 #define FT_TEST(name) int name(void); int name(void)
 
@@ -58,6 +66,12 @@ void test_remove_file(const char *path);
 int run_test_case(const t_test_case *test);
 int run_test_suite(const t_test_case *tests, size_t count);
 void test_report_summary(void);
+int test_capture_stdout_begin(t_test_output_capture *capture);
+int test_capture_stdout_end(t_test_output_capture *capture, char *buffer, size_t buffer_size,
+    ssize_t *length);
+int test_capture_stderr_begin(t_test_output_capture *capture);
+int test_capture_stderr_end(t_test_output_capture *capture, char *buffer, size_t buffer_size,
+    ssize_t *length);
 
 #define FT_REQUIRE_COBC() \
     if (!test_cobc_available()) \

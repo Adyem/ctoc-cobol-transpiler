@@ -1,0 +1,37 @@
+#include "transpiler_standard_library.hpp"
+
+static const t_transpiler_standard_library_entry g_transpiler_standard_library_entries[] = {
+    {"std::strlen", "CBLC-STRLEN", transpiler_standard_library_generate_strlen},
+    {"std::strnlen", "CBLC-STRNLEN", transpiler_standard_library_generate_strnlen},
+    {"std::strcmp", "CBLC-STRCMP", transpiler_standard_library_generate_strcmp},
+    {"std::strcpy", "CBLC-STRCPY", transpiler_standard_library_generate_strcpy},
+    {"std::strncpy", "CBLC-STRNCPY", transpiler_standard_library_generate_strncpy},
+    {"std::sqrt", "CBLC-SQRT", transpiler_standard_library_generate_sqrt}
+};
+
+const t_transpiler_standard_library_entry *transpiler_standard_library_get_entries(size_t *count)
+{
+    if (count)
+        *count = sizeof(g_transpiler_standard_library_entries) / sizeof(g_transpiler_standard_library_entries[0]);
+    return (g_transpiler_standard_library_entries);
+}
+
+const t_transpiler_standard_library_entry *transpiler_standard_library_lookup(const char *qualified_name)
+{
+    const t_transpiler_standard_library_entry *entries;
+    size_t entry_count;
+    size_t index;
+
+    if (!qualified_name)
+        return (NULL);
+    entries = transpiler_standard_library_get_entries(&entry_count);
+    index = 0;
+    while (index < entry_count)
+    {
+        if (ft_strncmp(entries[index].qualified_name, qualified_name,
+                ft_strlen(entries[index].qualified_name) + 1) == 0)
+            return (&entries[index]);
+        index += 1;
+    }
+    return (NULL);
+}
