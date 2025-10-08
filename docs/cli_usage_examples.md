@@ -43,6 +43,14 @@ ctoc_cobol_transpiler --direction cblc-to-cobol --input input.cblc --output outp
 * `--warnings-as-errors` elevates every warning to an error so strict builds fail fast when potential issues surface.
 * `--help` prints a summary of options and exits successfully without running the pipeline.
 
+### Interpreting reported issues
+
+The parser tracks recoverable statement errors and resumes scanning at the next statement or paragraph boundary. You will see diagnostics for every invalid statement in one run instead of only the first failure.【F:parser.cpp†L165-L204】【F:parser.cpp†L553-L607】
+
+Semantic analysis records string widths and emits `TRANSPILE_ERROR_SEMANTIC_STRING_TRUNCATION` when a MOVE literal or identifier exceeds the target buffer so you can adjust the field length before retrying the build.【F:transpiler_semantics.cpp†L562-L601】
+
+When compiling multiple translation units, the transpiler context rejects subprogram registrations that would narrow an alphanumeric parameter. The CLI surfaces `TRANSPILE_ERROR_DATA_ITEM_PARAMETER_TRUNCATION` in that situation to guard against inadvertent truncation across module boundaries.【F:transpiler_context.cpp†L1143-L1183】
+
 ## Environment variable shortcut
 
 The `CTOC_DEFAULT_DIRECTION` environment variable supplies a fallback value for `--direction`. When exported, the flag becomes optional:

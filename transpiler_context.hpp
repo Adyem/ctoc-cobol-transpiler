@@ -62,6 +62,7 @@ typedef struct s_transpiler_function_signature
 #define TRANSPILE_ERROR_MODULE_IMPORT_UNKNOWN 1010
 #define TRANSPILE_ERROR_MODULE_IMPORT_CYCLE 1011
 #define TRANSPILE_ERROR_FUNCTION_EXPORT_CONFLICT 1012
+#define TRANSPILE_ERROR_DATA_ITEM_PARAMETER_TRUNCATION 1013
 
 typedef enum e_transpiler_file_role
 {
@@ -105,6 +106,21 @@ typedef struct s_transpiler_entrypoint
     char argv_identifier[TRANSPILE_IDENTIFIER_MAX];
 }   t_transpiler_entrypoint;
 
+typedef enum e_transpiler_data_item_kind
+{
+    TRANSPILE_DATA_ITEM_UNKNOWN = 0,
+    TRANSPILE_DATA_ITEM_ALPHANUMERIC,
+    TRANSPILE_DATA_ITEM_NUMERIC
+}   t_transpiler_data_item_kind;
+
+typedef struct s_transpiler_data_item
+{
+    char name[TRANSPILE_IDENTIFIER_MAX];
+    t_transpiler_data_item_kind kind;
+    size_t declared_length;
+    int has_caller_length;
+}   t_transpiler_data_item;
+
 typedef struct s_transpiler_context
 {
     t_transpiler_language source_language;
@@ -136,6 +152,9 @@ typedef struct s_transpiler_context
     size_t module_order_count;
     size_t module_order_capacity;
     t_transpiler_entrypoint entrypoint;
+    t_transpiler_data_item *data_items;
+    size_t data_item_count;
+    size_t data_item_capacity;
 }   t_transpiler_context;
 
 int transpiler_context_init(t_transpiler_context *context);
@@ -168,5 +187,9 @@ int transpiler_context_register_file(t_transpiler_context *context, const char *
     const char *path, size_t explicit_record_length);
 int transpiler_context_record_file_length_hint(t_transpiler_context *context, const char *name, size_t record_length);
 const t_transpiler_file_declaration *transpiler_context_get_files(const t_transpiler_context *context, size_t *count);
+int transpiler_context_register_data_item(t_transpiler_context *context, const char *name,
+    t_transpiler_data_item_kind kind, size_t declared_length);
+const t_transpiler_data_item *transpiler_context_find_data_item(const t_transpiler_context *context, const char *name);
+const t_transpiler_data_item *transpiler_context_get_data_items(const t_transpiler_context *context, size_t *count);
 
 #endif

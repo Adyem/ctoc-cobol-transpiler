@@ -200,41 +200,75 @@ static int transpiler_cobol_elementary_append_picture(t_transpiler_cobol_buffer 
         || element->kind == TRANSPILE_COBOL_ELEMENTARY_NUMERIC_UNSIGNED)
     {
         size_t digits;
+        int has_integral_digits;
 
         digits = element->length;
-        if (digits == 0)
+        has_integral_digits = digits > 0;
+        if (!has_integral_digits && element->scale == 0)
+        {
             digits = 1;
-        if (digits == 1)
-        {
-            if (transpiler_cobol_buffer_append_string(buffer, "PIC 9") != FT_SUCCESS)
-                return (FT_FAILURE);
+            has_integral_digits = 1;
         }
-        else
+        if (has_integral_digits)
         {
-            if (transpiler_cobol_buffer_append_string(buffer, "PIC 9(") != FT_SUCCESS)
-                return (FT_FAILURE);
-            if (transpiler_cobol_buffer_append_number_with_min_digits(buffer,
-                    static_cast<unsigned long long>(digits), 1) != FT_SUCCESS)
-                return (FT_FAILURE);
-            if (transpiler_cobol_buffer_append_string(buffer, ")") != FT_SUCCESS)
-                return (FT_FAILURE);
-        }
-        if (element->scale > 0)
-        {
-            if (element->scale == 1)
+            if (digits == 1)
             {
-                if (transpiler_cobol_buffer_append_string(buffer, "V9") != FT_SUCCESS)
+                if (transpiler_cobol_buffer_append_string(buffer, "PIC 9") != FT_SUCCESS)
                     return (FT_FAILURE);
             }
             else
             {
-                if (transpiler_cobol_buffer_append_string(buffer, "V9(") != FT_SUCCESS)
+                if (transpiler_cobol_buffer_append_string(buffer, "PIC 9(") != FT_SUCCESS)
                     return (FT_FAILURE);
                 if (transpiler_cobol_buffer_append_number_with_min_digits(buffer,
-                        static_cast<unsigned long long>(element->scale), 1) != FT_SUCCESS)
+                        static_cast<unsigned long long>(digits), 1) != FT_SUCCESS)
                     return (FT_FAILURE);
                 if (transpiler_cobol_buffer_append_string(buffer, ")") != FT_SUCCESS)
                     return (FT_FAILURE);
+            }
+        }
+        else
+        {
+            if (transpiler_cobol_buffer_append_string(buffer, "PIC") != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        if (element->scale > 0)
+        {
+            if (has_integral_digits)
+            {
+                if (element->scale == 1)
+                {
+                    if (transpiler_cobol_buffer_append_string(buffer, "V9") != FT_SUCCESS)
+                        return (FT_FAILURE);
+                }
+                else
+                {
+                    if (transpiler_cobol_buffer_append_string(buffer, "V9(") != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    if (transpiler_cobol_buffer_append_number_with_min_digits(buffer,
+                            static_cast<unsigned long long>(element->scale), 1) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    if (transpiler_cobol_buffer_append_string(buffer, ")") != FT_SUCCESS)
+                        return (FT_FAILURE);
+                }
+            }
+            else
+            {
+                if (element->scale == 1)
+                {
+                    if (transpiler_cobol_buffer_append_string(buffer, " V9") != FT_SUCCESS)
+                        return (FT_FAILURE);
+                }
+                else
+                {
+                    if (transpiler_cobol_buffer_append_string(buffer, " V9(") != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    if (transpiler_cobol_buffer_append_number_with_min_digits(buffer,
+                            static_cast<unsigned long long>(element->scale), 1) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    if (transpiler_cobol_buffer_append_string(buffer, ")") != FT_SUCCESS)
+                        return (FT_FAILURE);
+                }
             }
         }
         if (element->kind == TRANSPILE_COBOL_ELEMENTARY_NUMERIC_SIGNED)
@@ -273,6 +307,36 @@ int transpiler_cobol_describe_c_int(size_t digits, int is_signed, t_transpiler_c
         : TRANSPILE_COBOL_ELEMENTARY_NUMERIC_UNSIGNED;
     out->length = digits;
     out->scale = 0;
+    return (FT_SUCCESS);
+}
+
+int transpiler_cobol_describe_c_long(int is_signed, t_transpiler_cobol_elementary *out)
+{
+    return (transpiler_cobol_describe_c_int(18, is_signed, out));
+}
+
+int transpiler_cobol_describe_c_long_long(int is_signed, t_transpiler_cobol_elementary *out)
+{
+    return (transpiler_cobol_describe_c_int(36, is_signed, out));
+}
+
+int transpiler_cobol_describe_c_float(t_transpiler_cobol_elementary *out)
+{
+    if (!out)
+        return (FT_FAILURE);
+    out->kind = TRANSPILE_COBOL_ELEMENTARY_NUMERIC_SIGNED;
+    out->length = 9;
+    out->scale = 9;
+    return (FT_SUCCESS);
+}
+
+int transpiler_cobol_describe_c_double(t_transpiler_cobol_elementary *out)
+{
+    if (!out)
+        return (FT_FAILURE);
+    out->kind = TRANSPILE_COBOL_ELEMENTARY_NUMERIC_SIGNED;
+    out->length = 18;
+    out->scale = 18;
     return (FT_SUCCESS);
 }
 

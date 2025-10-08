@@ -48,6 +48,14 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Add golden samples exercising long, long long, and floating numeric arithmetic plus comparison operators.
 - [x] Imports/modules: enforce per-file symbol visibility, support `import "x.cblc"`, and guarantee deterministic module initialization order.
 - [x] Warning escalation flag: add a compiler/CLI flag that promotes all warnings (including conversion, overflow, and string-size diagnostics) to errors for strict build configurations.
+- [x] Model extended numeric picture clauses covering `PIC 9(18)` (long) and `PIC 9(36)` (long long) ranges.
+- [x] Parser error recovery: resynchronize on `;`/`}` to continue after errors and report multiple issues per pass.
+- [x] Define floating-point elementary item support and map `PIC V9` patterns to internal numeric types.
+- [x] Extend semantic analysis to validate operator compatibility for the expanded numeric domains.
+- [x] Capture length-aware alphanumeric items that retain the caller's declared size when passed by reference.
+- [x] Surface diagnostics when conversions between declared string lengths would truncate caller data.
+- [x] Ensure subprogram parameter binding preserves caller string lengths even when callee accepts larger buffers.
+- [x] Enforce type-safety checks for alphanumeric parameters so callees advertise buffers at least as large as each caller-provided `PIC X`, `PIC X(n)`, or `PIC X(255)` argument.
 
 ## Pending Features
 
@@ -55,18 +63,10 @@ are completed; keep completed items grouped separately from the remaining work t
 - [ ] Visibility rules: surface diagnostics for public/private types, fields, and functions, enforcing access at semantic analysis time.
 - [ ] Const/immutability: track const bindings and read-only fields, emitting diagnostics on attempted writes.
 - [ ] Source maps: retain CBL-C ↔ COBOL span mappings to power diagnostics and debugging outputs.
-- [ ] Parser error recovery: resynchronize on `;`/`}` to continue after errors and report multiple issues per pass.
 - [ ] Linter/formatter: produce a canonical, deterministic CBL-C pretty-printer for consistent diffs.
 - [ ] Copybook interop: support COPY includes, manage name collisions, and propagate declared lengths through the pipeline.
 
 ### Core Language Frontend
-- [ ] Model extended numeric picture clauses covering `PIC 9(18)` (long) and `PIC 9(36)` (long long) ranges.
-- [ ] Define floating-point elementary item support and map `PIC V9` patterns to internal numeric types.
-- [ ] Extend semantic analysis to validate operator compatibility for the expanded numeric domains.
-- [ ] Capture length-aware alphanumeric items that retain the caller's declared size when passed by reference.
-- [ ] Ensure subprogram parameter binding preserves caller string lengths even when callee accepts larger buffers.
-- [ ] Enforce type-safety checks for alphanumeric parameters so callees advertise buffers at least as large as each caller-provided `PIC X`, `PIC X(n)`, or `PIC X(255)` argument, emitting diagnostics when the callee's storage would truncate caller data.
-- [ ] Surface diagnostics when conversions between declared string lengths would truncate caller data.
 
 ### Numeric Operator Support
 

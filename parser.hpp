@@ -10,6 +10,7 @@ typedef struct s_parser
     t_lexer_token current;
     int has_current;
     int last_error;
+    size_t error_count;
 }   t_parser;
 
 void parser_init(t_parser *parser, const char *text);

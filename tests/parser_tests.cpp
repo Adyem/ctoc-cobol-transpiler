@@ -20,6 +20,7 @@ int test_parser_rejects_missing_procedure_division(void);
 int test_parser_rejects_procedure_division_without_period(void);
 int test_parser_rejects_data_item_without_level(void);
 int test_parser_rejects_data_items_without_section(void);
+int test_parser_reports_multiple_statement_errors(void);
 
 const t_test_case *get_parser_tests(size_t *count)
 {
@@ -43,7 +44,8 @@ const t_test_case *get_parser_tests(size_t *count)
         {"parser_rejects_missing_procedure_division", test_parser_rejects_missing_procedure_division},
         {"parser_rejects_procedure_division_without_period", test_parser_rejects_procedure_division_without_period},
         {"parser_rejects_data_item_without_level", test_parser_rejects_data_item_without_level},
-        {"parser_rejects_data_items_without_section", test_parser_rejects_data_items_without_section}
+        {"parser_rejects_data_items_without_section", test_parser_rejects_data_items_without_section},
+        {"parser_reports_multiple_statement_errors", test_parser_reports_multiple_statement_errors}
     };
 
     if (count)
