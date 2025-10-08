@@ -112,6 +112,8 @@ TEST_SRC    = tests/test_main.cpp \
               tests/contributing_doc_tests.cpp \
               tests/onboarding_doc_tests.cpp \
               tests/runtime_doc_tests.cpp \
+              tests/cli_parse_success_tests.cpp \
+              tests/cli_parse_failure_tests.cpp \
               tests/cli_tests.cpp \
               tests/ci_tests.cpp \
               tests/codegen_tests.cpp \
