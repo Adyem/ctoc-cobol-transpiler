@@ -61,6 +61,7 @@ FT_TEST(test_cobol_transpiled_reverse_normalization_executes)
     int command_length;
     const char *log_path;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     binary_path[0] = '\0';
     output_path[0] = '\0';
@@ -156,6 +157,7 @@ FT_TEST(test_cobol_transpiled_reverse_normalization_exit_status)
     int exit_status;
     const char *log_path;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     binary_path[0] = '\0';
     output_path[0] = '\0';

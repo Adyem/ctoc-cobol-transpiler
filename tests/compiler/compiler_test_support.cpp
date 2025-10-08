@@ -2,6 +2,7 @@
 
 #include "../test_support.hpp"
 
+#include <cerrno>
 #include <cstdlib>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -83,13 +84,58 @@ void test_cleanup_module_directory(const char *directory, const char *module_pat
 
 int test_run_command_capture_status(const char *command, int *exit_status)
 {
+    int pipe_fds[2];
+    pid_t pid;
+    char buffer[256];
+    ssize_t bytes_read;
     int status;
 
     if (!command || !exit_status)
         return (FT_FAILURE);
-    status = system(command);
-    if (status == -1)
+    if (pipe(pipe_fds) != 0)
         return (FT_FAILURE);
+    pid = fork();
+    if (pid < 0)
+    {
+        close(pipe_fds[0]);
+        close(pipe_fds[1]);
+        return (FT_FAILURE);
+    }
+    if (pid == 0)
+    {
+        if (dup2(pipe_fds[1], STDOUT_FILENO) < 0)
+            _exit(127);
+        if (dup2(pipe_fds[1], STDERR_FILENO) < 0)
+            _exit(127);
+        close(pipe_fds[0]);
+        close(pipe_fds[1]);
+        execl("/bin/sh", "sh", "-c", command, (char *)NULL);
+        _exit(127);
+    }
+    close(pipe_fds[1]);
+    while (1)
+    {
+        bytes_read = read(pipe_fds[0], buffer, sizeof(buffer));
+        if (bytes_read > 0)
+            continue ;
+        if (bytes_read == 0)
+            break ;
+        if (errno == EINTR)
+            continue ;
+        close(pipe_fds[0]);
+        while (waitpid(pid, &status, 0) < 0)
+        {
+            if (errno != EINTR)
+                return (FT_FAILURE);
+        }
+        return (FT_FAILURE);
+    }
+    close(pipe_fds[0]);
+    while (waitpid(pid, &status, 0) < 0)
+    {
+        if (errno != EINTR)
+            return (FT_FAILURE);
+    }
     if (WIFEXITED(status) == 0)
         return (FT_FAILURE);
     *exit_status = WEXITSTATUS(status);

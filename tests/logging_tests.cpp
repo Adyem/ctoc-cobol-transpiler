@@ -164,11 +164,72 @@ FT_TEST(test_logging_stage_progress_requires_verbose)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_logging_escalates_warnings_when_enabled)
+{
+    t_transpiler_context context;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    transpiler_context_set_diagnostic_level(&context, TRANSPILE_DIAGNOSTIC_NORMAL);
+    if (test_expect_success(transpiler_logging_emit(&context, TRANSPILE_SEVERITY_WARNING, 11, "warn"),
+        "warning emit should succeed for normal level") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 1,
+        "warning should record a diagnostic when escalation disabled") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.diagnostics.items[0].severity),
+        static_cast<int>(TRANSPILE_SEVERITY_WARNING),
+        "warning severity should remain warning when escalation disabled") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    if (test_expect_success(transpiler_context_init(&context), "context re-init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    transpiler_context_set_diagnostic_level(&context, TRANSPILE_DIAGNOSTIC_NORMAL);
+    transpiler_context_set_warnings_as_errors(&context, 1);
+    if (test_expect_success(transpiler_logging_emit(&context, TRANSPILE_SEVERITY_WARNING, 13, "warn"),
+        "warning emit should succeed with escalation") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 1,
+        "escalated warning should record a single diagnostic") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.diagnostics.items[0].severity),
+        static_cast<int>(TRANSPILE_SEVERITY_ERROR),
+        "escalated warning should be stored as error") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(context.last_error_code, 13,
+        "escalated warning should record error code") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
 const t_test_case *get_logging_tests(size_t *count)
 {
     static const t_test_case tests[] = {
         {"transpiler_logging_info_requires_verbose", test_logging_info_requires_verbose},
         {"transpiler_logging_warning_respects_silent_level", test_logging_warning_respects_silent_level},
+        {"transpiler_logging_escalates_warnings_when_enabled", test_logging_escalates_warnings_when_enabled},
         {"transpiler_logging_stage_failure_records_error", test_logging_stage_failure_records_error},
         {"transpiler_logging_stage_progress_requires_verbose", test_logging_stage_progress_requires_verbose}
     };

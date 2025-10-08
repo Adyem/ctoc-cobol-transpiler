@@ -72,6 +72,10 @@ filesystem synchronized.
 - **Purpose:** Supplies the companion subprogram that receives calls from the multi-module main routine so the CLI can emit multiple COBOL artifacts in a single run.
 - **Constructs:** Standalone program IDs, literal-initialized working-storage messages, console output, and `GOBACK` termination for callable modules.
 
+### `samples/cobol/numeric_precision.cob`
+- **Purpose:** Anchors the widened numeric arithmetic and comparison behavior expected from the forward compiler across `LONG`, `COMP-1`, and `COMP-2` analogs.
+- **Constructs:** Signed `PIC S9(9)` and `PIC S9(12)` integers, scaled decimal (`S9V9(4)`) fields, `COMPUTE` statements combining addition, subtraction, and multiplication, relational comparisons (`>=`, `>`, `=`, `NOT =`), and diagnostic `DISPLAY` calls for each branch.
+
 ### `samples/cobol/integration_showcase.cob`
 - **Purpose:** Serves as an end-to-end scenario that exercises the current forward pipeline by reading transactions, partitioning them into accepted and rejected logs, and reporting summary totals.
 - **Constructs:** Multiple file descriptors, sequential `READ` with `AT END` handling, arithmetic `ADD` updates, structured `IF`/`ELSE` blocks, repeated `PERFORM` paragraphs, and formatted `DISPLAY` output.

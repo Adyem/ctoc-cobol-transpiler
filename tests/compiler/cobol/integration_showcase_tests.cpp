@@ -136,6 +136,7 @@ FT_TEST(test_cobol_transpiled_integration_showcase_executes)
     const char *log_path;
     int command_length;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     binary_path[0] = '\0';
     output_path[0] = '\0';
@@ -322,6 +323,7 @@ FT_TEST(test_cobol_transpiled_integration_showcase_exit_status)
     int command_length;
     int exit_status;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     binary_path[0] = '\0';
     output_path[0] = '\0';
@@ -427,6 +429,7 @@ FT_TEST(test_cobol_transpiled_integration_showcase_compile_logs_clean)
     const char *log_path;
     int command_length;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     binary_path[0] = '\0';
     output_path[0] = '\0';

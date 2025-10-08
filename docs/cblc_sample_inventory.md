@@ -328,6 +328,60 @@ function void main() {
 }
 ```
 
+### `samples/cblc/numeric_precision.cblc`
+- **Purpose:** Locks down widened arithmetic and comparison behavior across long, long long, float, and double operands so numeric helper coverage stays in sync with the golden fixtures.
+- **Constructs:** Global accumulators, block-scoped temporaries, mixed-width arithmetic (`+`, `-`, `*`), relational comparisons (`>`, `>=`, `==`, `!=`), and console output that highlights each decision point.
+
+```cblc
+long day_total;
+long long year_total;
+long long threshold;
+float day_ratio;
+double combined_ratio;
+
+function void analyze_precision() {
+    long deposit;
+    long withdrawal;
+    long long bonus_pool;
+    float seasonal_rate;
+    double base_rate;
+
+    deposit = 125000;
+    withdrawal = 50000;
+    bonus_pool = 4000000000;
+    seasonal_rate = 1.25;
+    base_rate = 2.5;
+
+    day_total = deposit - withdrawal;
+    year_total = bonus_pool + day_total;
+    threshold = 5000000000;
+    day_ratio = seasonal_rate * 2.0;
+    combined_ratio = base_rate + day_ratio;
+
+    if (year_total >= threshold) {
+        display("YEAR ABOVE");
+    } else {
+        display("YEAR BELOW");
+    }
+
+    if (combined_ratio > base_rate) {
+        display("RATE INCREASED");
+    }
+
+    if (day_ratio != seasonal_rate) {
+        display("FLOAT SHIFT");
+    }
+
+    if (year_total > bonus_pool) {
+        display("BONUS REACHED");
+    }
+
+    if (day_total == 75000) {
+        display("DAY TARGET");
+    }
+}
+```
+
 ### `samples/cblc/multi_module_main.cblc`
 - **Purpose:** Demonstrates splitting a program across multiple translation units where the entrypoint resides in one file and helper routines live alongside it.
 - **Constructs:** Global integers shared within a unit, helper functions invoked from `main`, cross-file calls to external routines, arithmetic updates, and console output of computed values.

@@ -19,6 +19,7 @@ FT_TEST(test_reverse_control_flow_golden_cobol_executes)
     const char *log_path;
     int command_length;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     source_path[0] = '\0';
     binary_path[0] = '\0';
@@ -141,6 +142,7 @@ FT_TEST(test_reverse_control_flow_multi_module_executes)
     const char *log_path;
     int command_length;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     main_source_path[0] = '\0';
     worker_source_path[0] = '\0';

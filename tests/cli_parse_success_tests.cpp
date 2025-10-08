@@ -269,6 +269,55 @@ FT_TEST(test_cli_optional_configuration)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_cli_enables_warning_escalation)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cblc-to-cobol",
+        "--input",
+        "input.cblc",
+        "--output",
+        "output.cob",
+        "--warnings-as-errors"
+    };
+    t_transpiler_cli_options options;
+    t_transpiler_context context;
+
+    if (test_expect_success(transpiler_cli_parse(&options, 8, argv),
+            "transpiler_cli_parse should accept --warnings-as-errors") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_int_equal(options.warnings_as_errors, 1,
+            "warnings-as-errors flag should be enabled") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_init(&context),
+            "context init should succeed") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_cli_apply(&options, &context),
+            "transpiler_cli_apply should propagate warnings-as-errors") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(context.warnings_as_errors, 1,
+            "context should enable warning escalation") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    transpiler_cli_options_dispose(&options);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_cli_supports_multiple_inputs)
 {
     const char *argv[] = {
@@ -424,6 +473,7 @@ const t_test_case *get_cli_parse_success_tests(size_t *count)
         {"cli_direction_from_environment", test_cli_direction_from_environment},
         {"cli_help_short_circuits_validation", test_cli_help_short_circuits_validation},
         {"cli_optional_configuration", test_cli_optional_configuration},
+        {"cli_enables_warning_escalation", test_cli_enables_warning_escalation},
         {"cli_supports_multiple_inputs", test_cli_supports_multiple_inputs},
         {"cli_apply_propagates_multi_file_context", test_cli_apply_propagates_multi_file_context}
     };

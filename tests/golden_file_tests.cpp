@@ -197,6 +197,55 @@ FT_TEST(test_cblc_reverse_control_flow_matches_golden)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_cblc_numeric_precision_matches_golden)
+{
+    static const char expected[] =
+        "long day_total;\n"
+        "long long year_total;\n"
+        "long long threshold;\n"
+        "float day_ratio;\n"
+        "double combined_ratio;\n\n"
+        "function void analyze_precision() {\n"
+        "    long deposit;\n"
+        "    long withdrawal;\n"
+        "    long long bonus_pool;\n"
+        "    float seasonal_rate;\n"
+        "    double base_rate;\n\n"
+        "    deposit = 125000;\n"
+        "    withdrawal = 50000;\n"
+        "    bonus_pool = 4000000000;\n"
+        "    seasonal_rate = 1.25;\n"
+        "    base_rate = 2.5;\n\n"
+        "    day_total = deposit - withdrawal;\n"
+        "    year_total = bonus_pool + day_total;\n"
+        "    threshold = 5000000000;\n"
+        "    day_ratio = seasonal_rate * 2.0;\n"
+        "    combined_ratio = base_rate + day_ratio;\n\n"
+        "    if (year_total >= threshold) {\n"
+        "        display(\"YEAR ABOVE\");\n"
+        "    } else {\n"
+        "        display(\"YEAR BELOW\");\n"
+        "    }\n\n"
+        "    if (combined_ratio > base_rate) {\n"
+        "        display(\"RATE INCREASED\");\n"
+        "    }\n\n"
+        "    if (day_ratio != seasonal_rate) {\n"
+        "        display(\"FLOAT SHIFT\");\n"
+        "    }\n\n"
+        "    if (year_total > bonus_pool) {\n"
+        "        display(\"BONUS REACHED\");\n"
+        "    }\n\n"
+        "    if (day_total == 75000) {\n"
+        "        display(\"DAY TARGET\");\n"
+        "    }\n"
+        "}\n";
+
+    if (golden_expect_file_matches("samples/cblc/numeric_precision.cblc", expected,
+            "numeric_precision.cblc should match golden content") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_cobol_copy_file_matches_golden)
 {
     static const char expected[] =
@@ -365,6 +414,61 @@ FT_TEST(test_cobol_record_summary_matches_golden)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_cobol_numeric_precision_matches_golden)
+{
+    static const char expected[] =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. NUMERIC-PRECISION.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 DAY-TOTAL PIC S9(9) VALUE 0.\n"
+        "       01 YEAR-TOTAL PIC S9(12) VALUE 0.\n"
+        "       01 THRESHOLD PIC S9(12) VALUE 0.\n"
+        "       01 DAY-RATIO PIC S9V9(4) VALUE 0.\n"
+        "       01 COMBINED-RATIO PIC S9V9(4) VALUE 0.\n"
+        "       01 DEPOSIT PIC S9(9) VALUE 0.\n"
+        "       01 WITHDRAWAL PIC S9(9) VALUE 0.\n"
+        "       01 BONUS-POOL PIC S9(12) VALUE 0.\n"
+        "       01 SEASONAL-RATE PIC S9V9(4) VALUE 0.\n"
+        "       01 BASE-RATE PIC S9V9(4) VALUE 0.\n"
+        "       PROCEDURE DIVISION.\n"
+        "MAIN.\n"
+        "       MOVE 125000 TO DEPOSIT.\n"
+        "       MOVE 50000 TO WITHDRAWAL.\n"
+        "       MOVE 4000000000 TO BONUS-POOL.\n"
+        "       MOVE 5000000000 TO THRESHOLD.\n"
+        "       COMPUTE SEASONAL-RATE = 1.25.\n"
+        "       COMPUTE BASE-RATE = 2.5.\n"
+        "       COMPUTE DAY-TOTAL = DEPOSIT - WITHDRAWAL.\n"
+        "       COMPUTE YEAR-TOTAL = BONUS-POOL + DAY-TOTAL.\n"
+        "       COMPUTE DAY-RATIO = SEASONAL-RATE * 2.0.\n"
+        "       COMPUTE COMBINED-RATIO = BASE-RATE + DAY-RATIO.\n"
+        "       IF YEAR-TOTAL >= THRESHOLD\n"
+        "           DISPLAY \"YEAR ABOVE\"\n"
+        "       ELSE\n"
+        "           DISPLAY \"YEAR BELOW\"\n"
+        "       END-IF.\n"
+        "       IF COMBINED-RATIO > BASE-RATE\n"
+        "           DISPLAY \"RATE INCREASED\"\n"
+        "       END-IF.\n"
+        "       IF DAY-RATIO NOT = SEASONAL-RATE\n"
+        "           DISPLAY \"FLOAT SHIFT\"\n"
+        "       END-IF.\n"
+        "       IF YEAR-TOTAL > BONUS-POOL\n"
+        "           DISPLAY \"BONUS REACHED\"\n"
+        "       END-IF.\n"
+        "       IF DAY-TOTAL = 75000\n"
+        "           DISPLAY \"DAY TARGET\"\n"
+        "       END-IF.\n"
+        "       STOP RUN.\n"
+        "       END PROGRAM NUMERIC-PRECISION.\n";
+
+    if (golden_expect_file_matches("samples/cobol/numeric_precision.cob", expected,
+            "numeric_precision.cob should match golden content") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_cblc_multi_module_main_matches_golden)
 {
     static const char expected[] =
@@ -460,12 +564,14 @@ const t_test_case *get_golden_file_tests(size_t *count)
         {"cblc_reverse_constructs_matches_golden", test_cblc_reverse_constructs_matches_golden},
         {"cblc_reverse_normalization_matches_golden", test_cblc_reverse_normalization_matches_golden},
         {"cblc_reverse_control_flow_matches_golden", test_cblc_reverse_control_flow_matches_golden},
+        {"cblc_numeric_precision_matches_golden", test_cblc_numeric_precision_matches_golden},
         {"cblc_multi_module_main_matches_golden", test_cblc_multi_module_main_matches_golden},
         {"cblc_multi_module_worker_matches_golden", test_cblc_multi_module_worker_matches_golden},
         {"cobol_copy_file_matches_golden", test_cobol_copy_file_matches_golden},
         {"cobol_filter_prefix_matches_golden", test_cobol_filter_prefix_matches_golden},
         {"cobol_record_writer_matches_golden", test_cobol_record_writer_matches_golden},
         {"cobol_record_summary_matches_golden", test_cobol_record_summary_matches_golden},
+        {"cobol_numeric_precision_matches_golden", test_cobol_numeric_precision_matches_golden},
         {"cobol_multi_module_main_matches_golden", test_cobol_multi_module_main_matches_golden},
         {"cobol_multi_module_worker_matches_golden", test_cobol_multi_module_worker_matches_golden}
     };

@@ -232,6 +232,7 @@ int transpiler_cli_options_init(t_transpiler_cli_options *options)
     options->target_language = TRANSPILE_LANGUAGE_NONE;
     options->format_mode = TRANSPILE_FORMAT_DEFAULT;
     options->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
+    options->warnings_as_errors = 0;
     options->show_help = 0;
     return (FT_SUCCESS);
 }
@@ -255,6 +256,7 @@ void transpiler_cli_options_dispose(t_transpiler_cli_options *options)
     options->target_language = TRANSPILE_LANGUAGE_NONE;
     options->format_mode = TRANSPILE_FORMAT_DEFAULT;
     options->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
+    options->warnings_as_errors = 0;
     options->show_help = 0;
 }
 
@@ -341,6 +343,11 @@ static int transpiler_cli_parse_long_option(t_transpiler_cli_options *options, c
         }
         return (transpiler_cli_parse_diagnostics_value(argv[*index], options));
     }
+    if (ft_strncmp(argument, "--warnings-as-errors", 21) == 0 && ft_strlen(argument) == 20)
+    {
+        options->warnings_as_errors = 1;
+        return (FT_SUCCESS);
+    }
     pf_printf("Unknown option '%s'.\n", argument);
     return (FT_FAILURE);
 }
@@ -385,6 +392,7 @@ int transpiler_cli_apply(const t_transpiler_cli_options *options, t_transpiler_c
     transpiler_context_set_output_directory(context, options->output_directory);
     transpiler_context_set_format_mode(context, options->format_mode);
     transpiler_context_set_diagnostic_level(context, options->diagnostic_level);
+    transpiler_context_set_warnings_as_errors(context, options->warnings_as_errors);
     return (FT_SUCCESS);
 }
 
@@ -397,4 +405,5 @@ void transpiler_cli_print_usage(void)
     pf_printf("       Optional: --output-dir <directory> to override emission path base.\n");
     pf_printf("                 --format <default|minimal|pretty> to control COBOL layout.\n");
     pf_printf("                 --diagnostics <silent|normal|verbose> to tune logging.\n");
+    pf_printf("                 --warnings-as-errors to treat warnings as build errors.\n");
 }

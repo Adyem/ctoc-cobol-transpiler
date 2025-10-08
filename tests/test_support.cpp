@@ -1,5 +1,6 @@
 #include "test_support.hpp"
 
+#include <cerrno>
 #include <cstdlib>
 #include <fcntl.h>
 #include <sys/wait.h>
@@ -7,6 +8,37 @@
 
 static size_t g_total_tests = 0;
 static size_t g_failed_tests = 0;
+static int g_checked_cobc = 0;
+static int g_has_cobc = 0;
+
+int test_cobc_available(void)
+{
+    pid_t pid;
+    int status;
+
+    if (g_checked_cobc)
+        return (g_has_cobc);
+    g_checked_cobc = 1;
+    pid = fork();
+    if (pid < 0)
+        return (0);
+    if (pid == 0)
+    {
+        execl("/bin/sh", "sh", "-c", "cobc --version >/dev/null 2>&1", (char *)NULL);
+        _exit(127);
+    }
+    while (waitpid(pid, &status, 0) < 0)
+    {
+        if (errno != EINTR)
+            return (0);
+    }
+    if (WIFEXITED(status) == 0)
+        return (0);
+    if (WEXITSTATUS(status) != 0)
+        return (0);
+    g_has_cobc = 1;
+    return (g_has_cobc);
+}
 
 static void test_format_index(size_t value, char *buffer, size_t buffer_size)
 {
@@ -282,36 +314,80 @@ int test_read_text_file(const char *path, char *buffer, size_t buffer_size)
     return (FT_SUCCESS);
 }
 
-int test_run_command(const char *command)
+static int test_execute_command(const char *command, int expect_success)
 {
+    int pipe_fds[2];
+    pid_t pid;
+    char buffer[256];
+    ssize_t bytes_read;
     int status;
 
     if (!command)
         return (FT_FAILURE);
-    status = system(command);
-    if (status == -1)
+    if (pipe(pipe_fds) != 0)
         return (FT_FAILURE);
+    pid = fork();
+    if (pid < 0)
+    {
+        close(pipe_fds[0]);
+        close(pipe_fds[1]);
+        return (FT_FAILURE);
+    }
+    if (pid == 0)
+    {
+        if (dup2(pipe_fds[1], STDOUT_FILENO) < 0)
+            _exit(127);
+        if (dup2(pipe_fds[1], STDERR_FILENO) < 0)
+            _exit(127);
+        close(pipe_fds[0]);
+        close(pipe_fds[1]);
+        execl("/bin/sh", "sh", "-c", command, (char *)NULL);
+        _exit(127);
+    }
+    close(pipe_fds[1]);
+    while (1)
+    {
+        bytes_read = read(pipe_fds[0], buffer, sizeof(buffer));
+        if (bytes_read > 0)
+            continue ;
+        if (bytes_read == 0)
+            break ;
+        if (errno == EINTR)
+            continue ;
+        close(pipe_fds[0]);
+        while (waitpid(pid, &status, 0) < 0)
+        {
+            if (errno != EINTR)
+                return (FT_FAILURE);
+        }
+        return (FT_FAILURE);
+    }
+    close(pipe_fds[0]);
+    while (waitpid(pid, &status, 0) < 0)
+    {
+        if (errno != EINTR)
+            return (FT_FAILURE);
+    }
     if (WIFEXITED(status) == 0)
         return (FT_FAILURE);
-    if (WEXITSTATUS(status) != 0)
+    if (expect_success)
+    {
+        if (WEXITSTATUS(status) != 0)
+            return (FT_FAILURE);
+    }
+    else if (WEXITSTATUS(status) == 0)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
 
+int test_run_command(const char *command)
+{
+    return (test_execute_command(command, 1));
+}
+
 int test_run_command_expect_failure(const char *command)
 {
-    int status;
-
-    if (!command)
-        return (FT_FAILURE);
-    status = system(command);
-    if (status == -1)
-        return (FT_FAILURE);
-    if (WIFEXITED(status) == 0)
-        return (FT_FAILURE);
-    if (WEXITSTATUS(status) == 0)
-        return (FT_FAILURE);
-    return (FT_SUCCESS);
+    return (test_execute_command(command, 0));
 }
 
 void test_remove_file(const char *path)

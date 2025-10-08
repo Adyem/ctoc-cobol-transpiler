@@ -80,6 +80,7 @@ FT_TEST(test_cobol_transpiled_copy_file_executes)
     int command_length;
     const char *log_path;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     binary_path[0] = '\0';
     input_path[0] = '\0';
@@ -188,6 +189,7 @@ FT_TEST(test_cobol_transpiled_copy_file_exit_status)
     int exit_status;
     const char *log_path;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     binary_path[0] = '\0';
     input_path[0] = '\0';

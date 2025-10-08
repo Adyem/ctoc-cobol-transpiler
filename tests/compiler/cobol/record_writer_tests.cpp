@@ -72,6 +72,7 @@ FT_TEST(test_cobol_transpiled_record_writer_executes)
     int command_length;
     const char *log_path;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     binary_path[0] = '\0';
     report_path[0] = '\0';
@@ -165,6 +166,7 @@ FT_TEST(test_cobol_transpiled_record_writer_exit_status)
     int exit_status;
     const char *log_path;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     binary_path[0] = '\0';
     report_path[0] = '\0';

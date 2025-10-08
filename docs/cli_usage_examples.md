@@ -40,6 +40,7 @@ ctoc_cobol_transpiler --direction cblc-to-cobol --input input.cblc --output outp
 ```
 
 * `--diagnostics` switches the verbosity tier: `silent` hides non-fatal notes, `normal` shows errors and warnings, and `verbose` streams per-stage logging.
+* `--warnings-as-errors` elevates every warning to an error so strict builds fail fast when potential issues surface.
 * `--help` prints a summary of options and exits successfully without running the pipeline.
 
 ## Environment variable shortcut

@@ -42,15 +42,37 @@ static const char *transpiler_logging_get_severity_label(t_transpiler_severity s
     return ("unknown");
 }
 
+static t_transpiler_severity transpiler_logging_resolve_severity(const t_transpiler_context *context,
+    t_transpiler_severity severity)
+{
+    if (!context)
+        return (severity);
+    if (severity == TRANSPILE_SEVERITY_WARNING && context->warnings_as_errors)
+        return (TRANSPILE_SEVERITY_ERROR);
+    return (severity);
+}
+
 int transpiler_logging_emit(t_transpiler_context *context, t_transpiler_severity severity, int code, const char *message)
 {
+    t_transpiler_severity effective_severity;
+
     if (!context)
         return (FT_FAILURE);
     if (!message)
         return (FT_FAILURE);
-    if (transpiler_logging_should_store(context, severity) == 0)
+    effective_severity = transpiler_logging_resolve_severity(context, severity);
+    if (transpiler_logging_should_store(context, effective_severity) == 0)
         return (FT_SUCCESS);
-    return (transpiler_diagnostics_push(&context->diagnostics, severity, code, message));
+    if (transpiler_diagnostics_push(&context->diagnostics, effective_severity, code, message) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (effective_severity == TRANSPILE_SEVERITY_ERROR)
+    {
+        if (code != 0)
+            transpiler_context_record_error(context, code);
+        else
+            transpiler_context_record_error(context, FT_FAILURE);
+    }
+    return (FT_SUCCESS);
 }
 
 void transpiler_logging_stage_start(t_transpiler_context *context, const char *stage_name)

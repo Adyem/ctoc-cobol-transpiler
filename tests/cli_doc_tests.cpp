@@ -61,6 +61,7 @@ FT_TEST(test_cli_usage_lists_supported_flags)
         "--output-dir",
         "--format",
         "--diagnostics",
+        "--warnings-as-errors",
         "--help"
     };
     char buffer[32768];

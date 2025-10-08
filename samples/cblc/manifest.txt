@@ -5,6 +5,7 @@ samples/cblc/record_summary.cblc
 samples/cblc/reverse_constructs.cblc
 samples/cblc/reverse_normalization.cblc
 samples/cblc/reverse_control_flow.cblc
+samples/cblc/numeric_precision.cblc
 samples/cblc/integration_showcase.cblc
 samples/cblc/return_numeric.cblc
 samples/cblc/return_boolean.cblc
