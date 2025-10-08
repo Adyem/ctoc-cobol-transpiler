@@ -40,6 +40,9 @@ int main(void)
     tests = get_runtime_string_tests(&count);
     if (run_test_suite(tests, count) != FT_SUCCESS)
         status = FT_FAILURE;
+    tests = get_standard_library_tests(&count);
+    if (run_test_suite(tests, count) != FT_SUCCESS)
+        status = FT_FAILURE;
     tests = get_runtime_audit_tests(&count);
     if (run_test_suite(tests, count) != FT_SUCCESS)
         status = FT_FAILURE;

@@ -56,6 +56,12 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Surface diagnostics when conversions between declared string lengths would truncate caller data.
 - [x] Ensure subprogram parameter binding preserves caller string lengths even when callee accepts larger buffers.
 - [x] Enforce type-safety checks for alphanumeric parameters so callees advertise buffers at least as large as each caller-provided `PIC X`, `PIC X(n)`, or `PIC X(255)` argument.
+- [x] Provide a `CBLC-STRLEN` standard library subprogram that honors caller-declared lengths, trims trailing spaces, and returns the character count through a by-reference numeric slot.
+- [x] Provide a `CBLC-STRNLEN` standard library subprogram that accepts any alphanumeric operand, caps scanning at an explicit `PIC 9(9)` limit, and writes the resulting length into the trailing return slot while respecting the caller's original buffer declaration.
+- [x] Provide a `CBLC-STRCMP` standard library subprogram that compares two caller-supplied alphanumeric buffers using their declared lengths and writes a signed result into the trailing return slot.
+- [x] Provide a `CBLC-STRCPY` standard library subprogram that copies between caller-supplied alphanumeric buffers using their declared lengths, blanks the destination before copying, and reports truncation through a trailing status slot.
+- [x] Provide a `CBLC-STRNCPY` standard library subprogram that performs bounded copies between caller alphanumeric buffers using declared lengths plus an explicit request count, blanks the destination, pads with spaces, and reports truncation through a trailing status slot.
+- [x] Provide a `CBLC-SQRT` standard library subprogram that widens numeric operands to floating precision, rejects negative inputs, and returns the computed root via a trailing slot alongside a status flag.
 
 ## Pending Features
 
@@ -119,13 +125,7 @@ are completed; keep completed items grouped separately from the remaining work t
 
 ### Standard Library Subprogram Catalog
 
-- [ ] `strlen` helper: provide a generated subprogram that accepts `PIC X`, `PIC X(n)`, or `PIC X(255)` arguments, returns the caller-allocated length slot (passed as the trailing by-reference argument) typed as `PIC 9(9)` or wider, and guarantees the callee respects the original caller buffer size when computing the length.
-- [ ] `strcmp` helper: emit a subprogram that compares two alphanumeric operands (`PIC X`, `PIC X(n)`, `PIC X(255)`), returning a signed integral result (`PIC 9`, `PIC 9(4)`, or `PIC 9(9)`) via the trailing return slot, using lexicographic ordering consistent with libft/standard semantics while honoring caller-provided buffer lengths.
-- [ ] `sqrt` helper: implement a numeric subprogram that accepts operands declared as `float`, `double`, `PIC V9(n)`, `PIC V9(18)`, or integral widths up to `PIC 9(36)`, widens to floating precision, and writes the square root into the trailing return slot preserving COBOL scale/precision with diagnostic coverage for negative inputs.
 - [ ] `powerof` helper: add exponentiation support that handles integral bases (`PIC 9` through `PIC 9(36)`) and floating operands (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`), coercing arguments to the widest applicable type and materializing the result via the trailing return slot while surfacing overflow and precision diagnostics.
-- [ ] `strcpy` helper: generate a subprogram that copies from a source `PIC X`, `PIC X(n)`, or `PIC X(255)` into a destination buffer of equal or greater declared size, returning a `PIC 9(9)` status flag via the trailing slot to signal truncation while honoring caller-provided lengths during the copy.
-- [ ] `strncpy` helper: expose a bounded copy routine that accepts source and destination alphanumeric operands (same variants as `strcpy`) plus a `PIC 9(9)` length argument, ensuring the callee stops after the requested characters, pads with spaces when necessary, and reports truncation through the trailing return slot.
-- [ ] `strnlen` helper: provide a length computation that accepts any alphanumeric operand (`PIC X`, `PIC X(n)`, `PIC X(255)`), caps scanning at an explicit `PIC 9(9)` limit, and writes the resulting length into the trailing return slot while respecting the caller's original buffer declaration.
 - [ ] `strcat` helper: concatenate two alphanumeric operands (`PIC X`, `PIC X(n)`, `PIC X(255)`) into a destination buffer of sufficient size, surfacing truncation warnings when the destination declaration cannot hold the combined length, and materialize the resulting size via the trailing return slot.
 - [ ] `memcmp` helper: compare binary or alphanumeric buffers represented as `PIC X`, `PIC X(n)`, or `PIC X(255)` plus an explicit `PIC 9(9)` byte-count, returning a signed integral result (`PIC 9`, `PIC 9(4)`, or `PIC 9(9)`) and guaranteeing no reads beyond the caller-specified length.
 - [ ] `toupper`/`tolower` helpers: supply character-case normalization that accepts single-character `PIC X` items or varying-length alphanumeric buffers (`PIC X(n)`, `PIC X(255)`), mutates them in-place respecting caller-provided sizes, and returns a success flag (`PIC 9`) through the trailing slot.

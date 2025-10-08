@@ -150,14 +150,38 @@ FT_TEST(test_cli_rejects_unknown_option)
         "first.cob"
     };
     t_transpiler_cli_options options;
+    t_test_output_capture capture;
+    char buffer[256];
+    const char *expected_with_newline;
+    const char *expected_without_newline;
+    int status;
 
-    if (transpiler_cli_parse(&options, 9, argv) == FT_SUCCESS)
+    if (test_capture_stdout_begin(&capture) != FT_SUCCESS)
     {
-        transpiler_cli_options_dispose(&options);
-        pf_printf("Assertion failed: transpiler_cli_parse should reject unknown option\\n");
+        pf_printf("Assertion failed: test harness should capture stdout\n");
         return (FT_FAILURE);
     }
+    status = transpiler_cli_parse(&options, 9, argv);
     transpiler_cli_options_dispose(&options);
+    if (test_capture_stdout_end(&capture, buffer, sizeof(buffer), NULL) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: test harness should restore stdout\n");
+        return (FT_FAILURE);
+    }
+    if (status == FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: transpiler_cli_parse should reject unknown option\n");
+        return (FT_FAILURE);
+    }
+    expected_with_newline = "Unknown option '--unknown'.\n";
+    expected_without_newline = "Unknown option '--unknown'.";
+    if (ft_strncmp(buffer, expected_with_newline, ft_strlen(expected_with_newline)) != 0
+        || buffer[ft_strlen(expected_with_newline)] != '\0')
+    {
+        if (test_expect_cstring_equal(buffer, expected_without_newline,
+                "CLI should report unknown option") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
     return (FT_SUCCESS);
 }
 
@@ -314,14 +338,30 @@ FT_TEST(test_cli_rejects_missing_diagnostics_value)
         "--diagnostics"
     };
     t_transpiler_cli_options options;
+    t_test_output_capture capture;
+    char buffer[128];
+    int status;
 
-    if (transpiler_cli_parse(&options, 8, argv) == FT_SUCCESS)
+    if (test_capture_stdout_begin(&capture) != FT_SUCCESS)
     {
-        transpiler_cli_options_dispose(&options);
+        pf_printf("Assertion failed: test harness should capture stdout\\n");
+        return (FT_FAILURE);
+    }
+    status = transpiler_cli_parse(&options, 8, argv);
+    transpiler_cli_options_dispose(&options);
+    if (test_capture_stdout_end(&capture, buffer, sizeof(buffer), NULL) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: test harness should restore stdout\\n");
+        return (FT_FAILURE);
+    }
+    if (status == FT_SUCCESS)
+    {
         pf_printf("Assertion failed: transpiler_cli_parse should reject missing diagnostics value\\n");
         return (FT_FAILURE);
     }
-    transpiler_cli_options_dispose(&options);
+    if (test_expect_cstring_equal(buffer, "Missing value for --diagnostics option.\n",
+            "CLI should report missing diagnostics value") != FT_SUCCESS)
+        return (FT_FAILURE);
     return (FT_SUCCESS);
 }
 
