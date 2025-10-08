@@ -42,8 +42,9 @@ filesystem synchronized.
 ### `samples/cobol/reverse_control_flow.cob`
 - **Purpose:** Expands the reverse fixtures with combined conditional branches and looping constructs so complex control flow
   sequencing stays stable under round-trip testing.
-- **Constructs:** `IF NOT` conditionals, `PERFORM UNTIL` loops, `PERFORM VARYING` counters, sequential `MOVE` assignments, and
-  STOP statements spread across multiple procedure paragraphs.
+- **Constructs:** `IF NOT` conditionals, `PERFORM UNTIL` loops that update sentinel values through `MOVE`, `PERFORM VARYING`
+  counters, sequential `MOVE` assignments, numeric `DISPLAY` output, and STOP statements spread across multiple procedure
+  paragraphs.
 
 ### `samples/cobol/return_numeric.cob`
 - **Purpose:** Demonstrates value-returning helpers expressed as separate COBOL subprograms that accept arguments by reference

@@ -841,6 +841,32 @@ static int cobol_reverse_emit_write(t_transpiler_context *context, t_cblc_builde
     return (FT_SUCCESS);
 }
 
+static int cobol_reverse_emit_display(t_transpiler_context *context, t_cblc_builder *builder,
+    const t_ast_node *statement, size_t indentation)
+{
+    const t_ast_node *value_node;
+
+    (void)context;
+    if (!statement)
+        return (FT_FAILURE);
+    if (statement->kind != AST_NODE_DISPLAY_STATEMENT)
+        return (FT_FAILURE);
+    if (ast_node_child_count(statement) < 1)
+        return (FT_FAILURE);
+    value_node = ast_node_get_child(statement, 0);
+    if (cblc_builder_append_indentation(builder, indentation) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_string(builder, "display(") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_reverse_append_value(builder, value_node) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_string(builder, ");") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_newline(builder) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 static int cobol_reverse_emit_stop(t_transpiler_context *context, t_cblc_builder *builder,
     size_t indentation)
 {
@@ -875,6 +901,8 @@ static int cobol_reverse_emit_statement(t_transpiler_context *context, t_cblc_bu
         return (cobol_reverse_emit_read(context, builder, statement, indentation));
     if (statement->kind == AST_NODE_WRITE_STATEMENT)
         return (cobol_reverse_emit_write(context, builder, statement, indentation));
+    if (statement->kind == AST_NODE_DISPLAY_STATEMENT)
+        return (cobol_reverse_emit_display(context, builder, statement, indentation));
     if (statement->kind == AST_NODE_STOP_STATEMENT)
         return (cobol_reverse_emit_stop(context, builder, indentation));
     return (FT_FAILURE);

@@ -19,6 +19,14 @@ void test_cleanup_generated_artifacts(const char *binary_path, const char *outpu
     test_remove_file(binary_path);
 }
 
+void test_cleanup_example_artifacts_with_log(const char *source_path, const char *binary_path,
+    const char *output_path, const char *log_path)
+{
+    if (log_path)
+        test_remove_file(log_path);
+    test_cleanup_example_artifacts(source_path, binary_path, output_path);
+}
+
 int test_create_temp_directory(char *buffer, size_t buffer_size)
 {
     char template_path[256];
@@ -121,6 +129,39 @@ int test_expect_file_equals(const char *path, const char *expected)
     if (ft_strncmp(buffer, expected, ft_strlen(expected) + 1) != 0)
     {
         pf_printf("Assertion failed: file %s did not match expected content\n", path);
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+int test_expect_compiler_output_allowed(const char *path)
+{
+    char buffer[4096];
+    const char *warning;
+    size_t length;
+
+    if (!path)
+        return (FT_FAILURE);
+    if (test_read_text_file(path, buffer, sizeof(buffer)) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: expected to read compiler output from %s\n", path);
+        return (FT_FAILURE);
+    }
+    length = ft_strlen(buffer);
+    warning = "<command-line>: warning: \"_FORTIFY_SOURCE\" redefined";
+    if (length > 0 && !ft_strnstr(buffer, warning, length))
+    {
+        pf_printf("Assertion failed: compiler output should include expected warning message\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strnstr(buffer, "error:", length))
+    {
+        pf_printf("Assertion failed: compiler output should not report errors\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strnstr(buffer, "Error", length))
+    {
+        pf_printf("Assertion failed: compiler output should not contain fatal errors\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);

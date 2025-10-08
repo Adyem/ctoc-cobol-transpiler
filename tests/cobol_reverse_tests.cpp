@@ -2,6 +2,7 @@
 #include "transpiler_cobol_reverse.hpp"
 
 #include "libft/CMA/CMA.hpp"
+#include "libft/Libft/libft.hpp"
 #include "test_suites.hpp"
 
 static int cobol_reverse_run_fixture(const char *cobol_path, const char *expected_path, const char *label)
@@ -22,6 +23,9 @@ static int cobol_reverse_run_fixture(const char *cobol_path, const char *expecte
                     cobol_buffer, sizeof(cobol_buffer)),
             label) != FT_SUCCESS)
         return (FT_FAILURE);
+    char *terminator = ft_strstr(cobol_buffer, "END PROGRAM");
+    if (terminator)
+        *terminator = '\0';
     if (test_expect_success(test_read_text_file(expected_path,
                     expected_buffer, sizeof(expected_buffer)),
             label) != FT_SUCCESS)

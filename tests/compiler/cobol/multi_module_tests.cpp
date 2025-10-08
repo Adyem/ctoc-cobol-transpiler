@@ -186,6 +186,261 @@ FT_TEST(test_cobol_transpiled_multi_module_exit_status)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_cobol_transpiled_multi_module_compile_logs_clean)
+{
+    char directory[256];
+    char binary_path[256];
+    char output_path[256];
+    char compile_log_path[256];
+    char command[512];
+    char output_buffer[128];
+    const char *expected_output;
+    int command_length;
+    const char *log_path;
+
+    directory[0] = '\0';
+    binary_path[0] = '\0';
+    output_path[0] = '\0';
+    compile_log_path[0] = '\0';
+    log_path = NULL;
+    expected_output = "WORKER READY\n   1\n";
+    if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_join_path(directory, "multi_module_compile.log", compile_log_path,
+            sizeof(compile_log_path)) != FT_SUCCESS)
+    {
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    log_path = compile_log_path;
+    if (test_join_path(directory, "multi_module_compile.bin", binary_path,
+            sizeof(binary_path)) != FT_SUCCESS)
+    {
+        test_cleanup_example_artifacts_with_log(NULL, NULL, NULL, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_join_path(directory, "multi_module_compile.txt", output_path,
+            sizeof(output_path)) != FT_SUCCESS)
+    {
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, NULL, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s samples/cobol/multi_module_main.cob samples/cobol/multi_module_worker.cob > %s 2>&1",
+        binary_path, compile_log_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+    {
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_run_command(command) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: cobc should compile multi-module sample with captured log\n");
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_expect_compiler_output_allowed(log_path) != FT_SUCCESS)
+    {
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    command_length = pf_snprintf(command, sizeof(command),
+        "cd %s && ./multi_module_compile.bin > multi_module_compile.txt", directory);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+    {
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_run_command(command) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: multi-module binary should execute successfully after log check\n");
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+    {
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    {
+        pf_printf("Assertion failed: multi-module binary should emit banner and accumulator after log validation\n");
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+    test_remove_directory(directory);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cobol_transpiled_multi_module_separate_compile_logs_clean)
+{
+    char directory[256];
+    char module_path[256];
+    char binary_path[256];
+    char output_path[256];
+    char worker_log_path[256];
+    char main_log_path[256];
+    char command[512];
+    char output_buffer[128];
+    const char *expected_output;
+    int command_length;
+    const char *log_path;
+
+    directory[0] = '\0';
+    module_path[0] = '\0';
+    binary_path[0] = '\0';
+    output_path[0] = '\0';
+    worker_log_path[0] = '\0';
+    main_log_path[0] = '\0';
+    log_path = NULL;
+    expected_output = "WORKER READY\n   1\n";
+    if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_join_path(directory, "SHOW-BANNER.so", module_path, sizeof(module_path)) != FT_SUCCESS)
+    {
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_join_path(directory, "multi_module_worker_compile.log", worker_log_path,
+            sizeof(worker_log_path)) != FT_SUCCESS)
+    {
+        test_remove_file(module_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -m -free -o %s samples/cobol/multi_module_worker.cob > %s 2>&1",
+        module_path, worker_log_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+    {
+        test_remove_file(module_path);
+        test_remove_file(worker_log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_run_command(command) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: cobc should compile worker module with captured log\n");
+        test_remove_file(module_path);
+        test_remove_file(worker_log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_expect_compiler_output_allowed(worker_log_path) != FT_SUCCESS)
+    {
+        test_remove_file(module_path);
+        test_remove_file(worker_log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_join_path(directory, "multi_module_separate.bin", binary_path,
+            sizeof(binary_path)) != FT_SUCCESS)
+    {
+        test_remove_file(module_path);
+        test_remove_file(worker_log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_join_path(directory, "multi_module_separate.txt", output_path,
+            sizeof(output_path)) != FT_SUCCESS)
+    {
+        test_remove_file(module_path);
+        test_remove_file(worker_log_path);
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, NULL, NULL);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_join_path(directory, "multi_module_main_compile.log", main_log_path,
+            sizeof(main_log_path)) != FT_SUCCESS)
+    {
+        test_remove_file(module_path);
+        test_remove_file(worker_log_path);
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, NULL);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    log_path = main_log_path;
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s samples/cobol/multi_module_main.cob %s > %s 2>&1",
+        binary_path, module_path, main_log_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+    {
+        test_remove_file(module_path);
+        test_remove_file(worker_log_path);
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_run_command(command) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: cobc should link main program with worker module while capturing log\n");
+        test_remove_file(module_path);
+        test_remove_file(worker_log_path);
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_expect_compiler_output_allowed(log_path) != FT_SUCCESS)
+    {
+        test_remove_file(module_path);
+        test_remove_file(worker_log_path);
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    command_length = pf_snprintf(command, sizeof(command),
+        "cd %s && COB_LIBRARY_PATH=. ./multi_module_separate.bin > multi_module_separate.txt",
+        directory);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+    {
+        test_remove_file(module_path);
+        test_remove_file(worker_log_path);
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_run_command(command) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: multi-module binary should execute after separate compile log checks\n");
+        test_remove_file(module_path);
+        test_remove_file(worker_log_path);
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+    {
+        test_remove_file(module_path);
+        test_remove_file(worker_log_path);
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    {
+        pf_printf("Assertion failed: separate-module execution should emit banner and accumulator after log validation\n");
+        test_remove_file(module_path);
+        test_remove_file(worker_log_path);
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    test_remove_file(worker_log_path);
+    test_cleanup_example_artifacts_with_log(module_path, binary_path, output_path, log_path);
+    test_remove_directory(directory);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_cobol_transpiled_multi_module_compiles_separately)
 {
     const char *module_path;
@@ -367,6 +622,10 @@ const t_test_case *get_compiler_cobol_multi_module_tests(size_t *count)
             test_cobol_transpiled_multi_module_worker_matches_expected_text},
         {"cobol_transpiled_multi_module_executes", test_cobol_transpiled_multi_module_executes},
         {"cobol_transpiled_multi_module_exit_status", test_cobol_transpiled_multi_module_exit_status},
+        {"cobol_transpiled_multi_module_compile_logs_clean",
+            test_cobol_transpiled_multi_module_compile_logs_clean},
+        {"cobol_transpiled_multi_module_separate_compile_logs_clean",
+            test_cobol_transpiled_multi_module_separate_compile_logs_clean},
         {"cobol_transpiled_multi_module_compiles_separately",
             test_cobol_transpiled_multi_module_compiles_separately},
         {"cobol_transpiled_multi_module_executes_from_library_directory",

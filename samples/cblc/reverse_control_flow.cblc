@@ -1,19 +1,21 @@
 function void MAIN() {
-    if (!(FLAG == true)) {
-        while (!(COUNT > LIMIT)) {
-            LIMIT = COUNT;
+    if (!(CONTROL_FLAG == true)) {
+        while (!(PROGRESS_METER > PROGRESS_LIMIT)) {
+            PROGRESS_METER = 11;
         }
+        OUTPUT_VALUE = PROGRESS_METER;
     } else {
-        INDEX = 0;
-        while (!(INDEX >= LIMIT)) {
-            RESULT = INDEX;
-            INDEX++;
+        PROGRESS_INDEX = 0;
+        while (!(PROGRESS_INDEX >= PROGRESS_LIMIT)) {
+            OUTPUT_VALUE = PROGRESS_INDEX;
+            PROGRESS_INDEX++;
         }
     }
+    display(OUTPUT_VALUE);
     return ;
 }
 
-function void NEXT() {
-    FLAG = true;
+function void NEXT_PARAGRAPH() {
+    CONTROL_FLAG = true;
     return ;
 }
