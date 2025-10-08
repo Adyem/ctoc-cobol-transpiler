@@ -158,6 +158,31 @@ static int transpiler_context_files_reserve(t_transpiler_context *context, size_
     return (FT_SUCCESS);
 }
 
+static int transpiler_context_data_items_reserve(t_transpiler_context *context, size_t desired_capacity)
+{
+    t_transpiler_data_item *items;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (context->data_item_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    items = static_cast<t_transpiler_data_item *>(cma_calloc(desired_capacity,
+        sizeof(t_transpiler_data_item)));
+    if (!items)
+        return (FT_FAILURE);
+    if (context->data_items)
+    {
+        ft_memcpy(items, context->data_items,
+            context->data_item_count * sizeof(t_transpiler_data_item));
+        cma_free(context->data_items);
+    }
+    context->data_items = items;
+    context->data_item_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
 static int transpiler_context_assign_paths(const char ***storage, size_t *count,
     size_t *capacity, const char **paths, size_t path_count)
 {
@@ -221,6 +246,9 @@ int transpiler_context_init(t_transpiler_context *context)
     context->module_order_count = 0;
     context->module_order_capacity = 0;
     ft_bzero(&context->entrypoint, sizeof(context->entrypoint));
+    context->data_items = NULL;
+    context->data_item_count = 0;
+    context->data_item_capacity = 0;
     if (transpiler_diagnostics_init(&context->diagnostics) != FT_SUCCESS)
         return (FT_FAILURE);
     if (transpiler_context_functions_reserve(context, 4) != FT_SUCCESS)
@@ -255,6 +283,41 @@ int transpiler_context_init(t_transpiler_context *context)
     }
     if (transpiler_context_module_order_reserve(context, 4) != FT_SUCCESS)
     {
+        if (context->modules)
+        {
+            size_t index;
+
+            index = 0;
+            while (index < context->module_count)
+            {
+                transpiler_context_module_clear(&context->modules[index]);
+                index += 1;
+            }
+            cma_free(context->modules);
+        }
+        context->modules = NULL;
+        context->module_count = 0;
+        context->module_capacity = 0;
+        if (context->files)
+            cma_free(context->files);
+        context->files = NULL;
+        context->file_count = 0;
+        context->file_capacity = 0;
+        if (context->functions)
+            cma_free(context->functions);
+        context->functions = NULL;
+        context->function_count = 0;
+        context->function_capacity = 0;
+        transpiler_diagnostics_dispose(&context->diagnostics);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_data_items_reserve(context, 4) != FT_SUCCESS)
+    {
+        if (context->module_order)
+            cma_free(context->module_order);
+        context->module_order = NULL;
+        context->module_order_count = 0;
+        context->module_order_capacity = 0;
         if (context->modules)
         {
             size_t index;
@@ -330,6 +393,11 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->module_order = NULL;
     context->module_order_count = 0;
     context->module_order_capacity = 0;
+    if (context->data_items)
+        cma_free(context->data_items);
+    context->data_items = NULL;
+    context->data_item_count = 0;
+    context->data_item_capacity = 0;
     if (context->source_paths)
         cma_free(context->source_paths);
     context->source_paths = NULL;
@@ -1066,4 +1134,112 @@ const t_transpiler_file_declaration *transpiler_context_get_files(const t_transp
     if (count)
         *count = context->file_count;
     return (context->files);
+}
+
+int transpiler_context_register_data_item(t_transpiler_context *context, const char *name,
+    t_transpiler_data_item_kind kind, size_t declared_length)
+{
+    t_transpiler_data_item *item;
+    size_t index;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (!name)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < context->data_item_count)
+    {
+        if (ft_strncmp(context->data_items[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        {
+            size_t existing_length;
+            t_transpiler_data_item_kind existing_kind;
+
+            existing_length = context->data_items[index].declared_length;
+            existing_kind = context->data_items[index].kind;
+            context->data_items[index].kind = kind;
+            if (existing_kind == TRANSPILE_DATA_ITEM_ALPHANUMERIC
+                && kind == TRANSPILE_DATA_ITEM_ALPHANUMERIC
+                && existing_length > 0
+                && declared_length > 0
+                && declared_length < existing_length)
+            {
+                if (context->data_items[index].has_caller_length)
+                {
+                    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+                    pf_snprintf(message, sizeof(message),
+                        "subprogram data item '%s' (%lu characters) is smaller than caller buffer (%lu characters)",
+                        name,
+                        static_cast<unsigned long>(declared_length),
+                        static_cast<unsigned long>(existing_length));
+                    transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+                        TRANSPILE_ERROR_DATA_ITEM_PARAMETER_TRUNCATION, message);
+                    transpiler_context_record_error(context, TRANSPILE_ERROR_DATA_ITEM_PARAMETER_TRUNCATION);
+                    return (FT_FAILURE);
+                }
+                context->data_items[index].declared_length = declared_length;
+                context->data_items[index].has_caller_length = 1;
+                return (FT_SUCCESS);
+            }
+            if (declared_length > 0 && existing_length == 0)
+            {
+                context->data_items[index].declared_length = declared_length;
+                return (FT_SUCCESS);
+            }
+            if (existing_length > 0)
+            {
+                if (declared_length == 0 || declared_length > existing_length)
+                    declared_length = existing_length;
+            }
+            context->data_items[index].declared_length = declared_length;
+            return (FT_SUCCESS);
+        }
+        index += 1;
+    }
+    if (context->data_item_count >= context->data_item_capacity)
+    {
+        size_t desired_capacity;
+
+        desired_capacity = context->data_item_capacity;
+        if (desired_capacity == 0)
+            desired_capacity = 4;
+        else
+            desired_capacity *= 2;
+        if (transpiler_context_data_items_reserve(context, desired_capacity) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    item = &context->data_items[context->data_item_count];
+    ft_bzero(item, sizeof(*item));
+    ft_strlcpy(item->name, name, sizeof(item->name));
+    item->kind = kind;
+    item->declared_length = declared_length;
+    context->data_item_count += 1;
+    return (FT_SUCCESS);
+}
+
+const t_transpiler_data_item *transpiler_context_find_data_item(const t_transpiler_context *context, const char *name)
+{
+    size_t index;
+
+    if (!context)
+        return (NULL);
+    if (!name)
+        return (NULL);
+    index = 0;
+    while (index < context->data_item_count)
+    {
+        if (ft_strncmp(context->data_items[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+            return (&context->data_items[index]);
+        index += 1;
+    }
+    return (NULL);
+}
+
+const t_transpiler_data_item *transpiler_context_get_data_items(const t_transpiler_context *context, size_t *count)
+{
+    if (!context)
+        return (NULL);
+    if (count)
+        *count = context->data_item_count;
+    return (context->data_items);
 }

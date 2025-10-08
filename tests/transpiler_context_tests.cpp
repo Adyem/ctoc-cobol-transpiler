@@ -964,6 +964,108 @@ FT_TEST(test_transpiler_context_resolves_imports_by_path)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_transpiler_context_preserves_caller_declared_length)
+{
+    t_transpiler_context context;
+    const t_transpiler_data_item *item;
+
+    if (test_expect_success(transpiler_context_init(&context),
+            "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_data_item(&context,
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 12),
+            "initial declared length registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_data_item(&context,
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 5),
+            "caller length should update binding") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_data_item(&context,
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 18),
+            "wider callee buffers should not override caller length") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_data_item(&context,
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 0),
+            "zero length updates should preserve prior metadata") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    item = transpiler_context_find_data_item(&context, "SHARED-ARG");
+    if (!item)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected shared argument metadata to be registered\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(item->declared_length), 5,
+            "declared length should match caller-provided width") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_rejects_narrower_callee_length)
+{
+    t_transpiler_context context;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_data_item(&context,
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 12),
+            "initial registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_data_item(&context,
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 5),
+            "caller registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_register_data_item(&context,
+            "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 4) != FT_FAILURE)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected narrower callee length to be rejected\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(transpiler_context_has_errors(&context), 1,
+            "narrower callee binding should record an error") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 1,
+            "narrower length diagnostic should be recorded") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (context.diagnostics.items[0].code != TRANSPILE_ERROR_DATA_ITEM_PARAMETER_TRUNCATION)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected parameter truncation diagnostic\n");
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_transpiler_context_registers_file_declaration)
 {
     t_transpiler_context context;
@@ -1191,6 +1293,8 @@ const t_test_case *get_transpiler_context_tests(size_t *count)
         {"transpiler_context_rejects_empty_module_name", test_transpiler_context_rejects_empty_module_name},
         {"transpiler_context_rejects_empty_import_path", test_transpiler_context_rejects_empty_import_path},
         {"transpiler_context_resolves_imports_by_path", test_transpiler_context_resolves_imports_by_path},
+        {"transpiler_context_preserves_caller_declared_length", test_transpiler_context_preserves_caller_declared_length},
+        {"transpiler_context_rejects_narrower_callee_length", test_transpiler_context_rejects_narrower_callee_length},
         {"transpiler_context_registers_file_declaration", test_transpiler_context_registers_file_declaration},
         {"transpiler_context_tracks_record_length_hint", test_transpiler_context_tracks_record_length_hint},
         {"transpiler_context_records_multiple_io_paths", test_transpiler_context_records_multiple_io_paths},

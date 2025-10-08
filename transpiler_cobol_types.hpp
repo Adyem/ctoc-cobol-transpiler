@@ -38,6 +38,10 @@ typedef struct s_transpiler_cobol_group
 }   t_transpiler_cobol_group;
 
 int transpiler_cobol_describe_c_int(size_t digits, int is_signed, t_transpiler_cobol_elementary *out);
+int transpiler_cobol_describe_c_long(int is_signed, t_transpiler_cobol_elementary *out);
+int transpiler_cobol_describe_c_long_long(int is_signed, t_transpiler_cobol_elementary *out);
+int transpiler_cobol_describe_c_float(t_transpiler_cobol_elementary *out);
+int transpiler_cobol_describe_c_double(t_transpiler_cobol_elementary *out);
 int transpiler_cobol_describe_c_char_array(size_t length, t_transpiler_cobol_elementary *out);
 int transpiler_cobol_describe_c_bool(t_transpiler_cobol_elementary *out);
 

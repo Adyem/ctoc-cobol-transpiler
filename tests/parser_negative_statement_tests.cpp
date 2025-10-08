@@ -430,3 +430,36 @@ FT_TEST(test_parser_rejects_write_from_without_source)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
+
+FT_TEST(test_parser_reports_multiple_statement_errors)
+{
+    const char *source;
+    t_parser parser;
+    t_ast_node *program;
+    int status;
+    size_t error_count;
+
+    source = "IDENTIFICATION DIVISION.\n"
+        "PROGRAM-ID. SAMPLE.\n"
+        "ENVIRONMENT DIVISION.\n"
+        "DATA DIVISION.\n"
+        "WORKING-STORAGE SECTION.\n"
+        "01 RESULT PIC 9(4).\n"
+        "PROCEDURE DIVISION.\n"
+        "MAIN.\n"
+        "    OPEN FILE.\n"
+        "    OPEN FILE.\n"
+        "    STOP RUN.\n";
+    parser_init(&parser, source);
+    program = NULL;
+    status = parser_parse_program(&parser, &program);
+    error_count = parser.error_count;
+    parser_dispose(&parser);
+    if (program)
+        ast_node_destroy(program);
+    if (status != FT_FAILURE)
+        return (FT_FAILURE);
+    if (error_count != 2)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}

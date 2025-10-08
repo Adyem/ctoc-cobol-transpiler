@@ -23,6 +23,7 @@ This checklist helps new contributors install dependencies, set up the repositor
 ## Documentation & Workflow
 - [ ] Read `docs/contributing.md` for coding standards and review policies.
 - [ ] Skim `docs/runtime_api_reference.md` to understand available runtime helpers.
+- [ ] Review `docs/getting_started.md` for an end-to-end tour of the toolchain and recent feature additions.
 - [ ] Update relevant guides when adding new features or modifying workflows.
 
 Keep this checklist updated as the project evolves so newcomers can get productive quickly.
