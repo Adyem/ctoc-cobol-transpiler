@@ -9,13 +9,20 @@ FT_TEST(test_transpiler_context_registers_void_function)
 
     if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_expect_success(transpiler_context_register_function(&context, "worker", TRANSPILE_FUNCTION_RETURN_VOID),
-        "void function registration should succeed") != FT_SUCCESS)
+    if (test_expect_success(transpiler_context_register_module(&context, "worker_mod", NULL),
+        "module registration should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    signature = transpiler_context_find_function(&context, "worker");
+    if (test_expect_success(transpiler_context_register_function(&context, "worker_mod", "worker",
+            TRANSPILE_FUNCTION_RETURN_VOID, TRANSPILE_SYMBOL_PRIVATE),
+            "void function registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    signature = transpiler_context_find_function(&context, "worker_mod", "worker");
     if (!signature)
     {
         transpiler_context_dispose(&context);
@@ -45,14 +52,20 @@ FT_TEST(test_transpiler_context_registers_value_return_function)
 
     if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_expect_success(transpiler_context_register_function(&context, "compute",
-            TRANSPILE_FUNCTION_RETURN_VALUE),
+    if (test_expect_success(transpiler_context_register_module(&context, "compute_mod", NULL),
+            "module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_function(&context, "compute_mod", "compute",
+            TRANSPILE_FUNCTION_RETURN_VALUE, TRANSPILE_SYMBOL_PRIVATE),
             "value-returning function registration should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    signature = transpiler_context_find_function(&context, "compute");
+    signature = transpiler_context_find_function(&context, "compute_mod", "compute");
     if (!signature)
     {
         transpiler_context_dispose(&context);
@@ -82,7 +95,13 @@ FT_TEST(test_transpiler_context_registers_main_entrypoint)
 
     if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_expect_success(transpiler_context_register_entrypoint(&context, "main",
+    if (test_expect_success(transpiler_context_register_module(&context, "app_mod", NULL),
+            "module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_entrypoint(&context, "app_mod", "main",
             TRANSPILE_FUNCTION_RETURN_VOID, "argc", "argv"),
             "entrypoint registration should succeed") != FT_SUCCESS)
     {
@@ -143,14 +162,20 @@ FT_TEST(test_transpiler_context_entrypoint_registers_function_signature)
 
     if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_expect_success(transpiler_context_register_entrypoint(&context, "main",
+    if (test_expect_success(transpiler_context_register_module(&context, "app_mod", NULL),
+            "module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_entrypoint(&context, "app_mod", "main",
             TRANSPILE_FUNCTION_RETURN_VOID, "argc", "argv"),
             "entrypoint registration should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    signature = transpiler_context_find_function(&context, "main");
+    signature = transpiler_context_find_function(&context, "app_mod", "main");
     if (!signature)
     {
         transpiler_context_dispose(&context);
@@ -186,7 +211,13 @@ FT_TEST(test_transpiler_context_argument_mismatch_keeps_entrypoint_clear)
 
     if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (transpiler_context_register_entrypoint(&context, "main",
+    if (test_expect_success(transpiler_context_register_module(&context, "app_mod", NULL),
+            "module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_register_entrypoint(&context, "app_mod", "main",
             TRANSPILE_FUNCTION_RETURN_VOID, "argc", NULL) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
@@ -235,15 +266,21 @@ FT_TEST(test_transpiler_context_rejects_duplicate_function_registration)
 
     if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_expect_success(transpiler_context_register_function(&context, "worker",
-            TRANSPILE_FUNCTION_RETURN_VOID),
+    if (test_expect_success(transpiler_context_register_module(&context, "worker_mod", NULL),
+            "module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_function(&context, "worker_mod", "worker",
+            TRANSPILE_FUNCTION_RETURN_VOID, TRANSPILE_SYMBOL_PRIVATE),
             "initial function registration should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    if (transpiler_context_register_function(&context, "worker",
-            TRANSPILE_FUNCTION_RETURN_VOID) != FT_FAILURE)
+    if (transpiler_context_register_function(&context, "worker_mod", "worker",
+            TRANSPILE_FUNCTION_RETURN_VOID, TRANSPILE_SYMBOL_PRIVATE) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
         pf_printf("Assertion failed: expected duplicate function registration to fail\n");
@@ -284,7 +321,13 @@ FT_TEST(test_transpiler_context_rejects_non_main_entrypoint)
 
     if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (transpiler_context_register_entrypoint(&context, "bootstrap",
+    if (test_expect_success(transpiler_context_register_module(&context, "app_mod", NULL),
+            "module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_register_entrypoint(&context, "app_mod", "bootstrap",
             TRANSPILE_FUNCTION_RETURN_VOID, NULL, NULL) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
@@ -321,7 +364,13 @@ FT_TEST(test_transpiler_context_registers_main_without_arguments)
 
     if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_expect_success(transpiler_context_register_entrypoint(&context, "main",
+    if (test_expect_success(transpiler_context_register_module(&context, "app_mod", NULL),
+            "module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_entrypoint(&context, "app_mod", "main",
             TRANSPILE_FUNCTION_RETURN_VOID, NULL, NULL),
             "entrypoint registration without arguments should succeed") != FT_SUCCESS)
     {
@@ -381,7 +430,13 @@ FT_TEST(test_transpiler_context_rejects_argument_mismatch)
 
     if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (transpiler_context_register_entrypoint(&context, "main",
+    if (test_expect_success(transpiler_context_register_module(&context, "app_mod", NULL),
+            "module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_register_entrypoint(&context, "app_mod", "main",
             TRANSPILE_FUNCTION_RETURN_VOID, "argc", NULL) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
@@ -417,7 +472,13 @@ FT_TEST(test_transpiler_context_rejects_non_void_entrypoint)
 
     if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (transpiler_context_register_entrypoint(&context, "main",
+    if (test_expect_success(transpiler_context_register_module(&context, "app_mod", NULL),
+            "module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_register_entrypoint(&context, "app_mod", "main",
             TRANSPILE_FUNCTION_RETURN_VALUE, NULL, NULL) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
@@ -453,14 +514,20 @@ FT_TEST(test_transpiler_context_rejects_duplicate_entrypoint)
 
     if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_expect_success(transpiler_context_register_entrypoint(&context, "main",
+    if (test_expect_success(transpiler_context_register_module(&context, "app_mod", NULL),
+            "module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_entrypoint(&context, "app_mod", "main",
             TRANSPILE_FUNCTION_RETURN_VOID, NULL, NULL),
             "initial entrypoint registration should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    if (transpiler_context_register_entrypoint(&context, "main",
+    if (transpiler_context_register_entrypoint(&context, "app_mod", "main",
             TRANSPILE_FUNCTION_RETURN_VOID, NULL, NULL) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
@@ -482,6 +549,413 @@ FT_TEST(test_transpiler_context_rejects_duplicate_entrypoint)
     if (test_expect_int_equal(context.diagnostics.items[0].code,
             TRANSPILE_ERROR_ENTRYPOINT_DUPLICATE,
             "diagnostic should use duplicate entrypoint code") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_allows_private_duplicates)
+{
+    t_transpiler_context context;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_module(&context, "alpha_mod", NULL),
+            "first module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_module(&context, "beta_mod", NULL),
+            "second module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_function(&context, "alpha_mod", "shared",
+            TRANSPILE_FUNCTION_RETURN_VOID, TRANSPILE_SYMBOL_PRIVATE),
+            "first private function registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_function(&context, "beta_mod", "shared",
+            TRANSPILE_FUNCTION_RETURN_VOID, TRANSPILE_SYMBOL_PRIVATE),
+            "second private function registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.function_count), 2,
+            "private duplicates should register in both modules") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(transpiler_context_has_errors(&context), 0,
+            "private duplicates should not record errors") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_rejects_public_duplicate_exports)
+{
+    t_transpiler_context context;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_module(&context, "alpha_mod", NULL),
+            "first module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_module(&context, "beta_mod", NULL),
+            "second module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_function(&context, "alpha_mod", "shared",
+            TRANSPILE_FUNCTION_RETURN_VOID, TRANSPILE_SYMBOL_PUBLIC),
+            "first public function registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_register_function(&context, "beta_mod", "shared",
+            TRANSPILE_FUNCTION_RETURN_VOID, TRANSPILE_SYMBOL_PUBLIC) != FT_FAILURE)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected duplicate public export to be rejected\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 1,
+            "duplicate export should emit a diagnostic") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(context.diagnostics.items[0].code,
+            TRANSPILE_ERROR_FUNCTION_EXPORT_CONFLICT,
+            "duplicate export diagnostic should use export conflict code") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_scans_imports_and_orders_modules)
+{
+    t_transpiler_context context;
+    const t_transpiler_module *modules;
+    size_t module_count;
+    const size_t *order;
+    size_t order_count;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_module(&context, "worker_mod", NULL),
+            "worker module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_module(&context, "main_mod", NULL),
+            "main module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_scan_imports_for_module(&context, "main_mod",
+            "import \"worker_mod\";\n"),
+            "import scan should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    modules = transpiler_context_get_modules(&context, &module_count);
+    if (!modules)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected to query registered modules\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(module_count), 2,
+            "two modules should be registered") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(modules[0].import_count), 0,
+            "worker module should not record imports") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(modules[1].import_count), 1,
+            "main module should record one import") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_compute_module_initialization_order(&context),
+            "module order computation should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    order = transpiler_context_get_module_initialization_order(&context, &order_count);
+    if (!order)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected module order to be available\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(order_count), 2,
+            "module order should include both modules") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.modules[order[0]].name, "worker_mod",
+            "worker module should initialize before main") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.modules[order[1]].name, "main_mod",
+            "main module should initialize after dependencies") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_orders_modules_deterministically)
+{
+    t_transpiler_context context;
+    const size_t *order;
+    size_t order_count;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_module(&context, "delta_mod", NULL),
+            "delta module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_module(&context, "alpha_mod", NULL),
+            "alpha module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_module(&context, "charlie_mod", NULL),
+            "charlie module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_compute_module_initialization_order(&context),
+            "module order computation should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    order = transpiler_context_get_module_initialization_order(&context, &order_count);
+    if (!order)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected module order to be available\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(order_count), 3,
+            "module order should contain three modules") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.modules[order[0]].name, "alpha_mod",
+            "alpha should appear first when no dependencies exist") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.modules[order[1]].name, "charlie_mod",
+            "charlie should appear second in lexical order") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.modules[order[2]].name, "delta_mod",
+            "delta should appear last in lexical order") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_rejects_empty_module_name)
+{
+    t_transpiler_context context;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (transpiler_context_register_module(&context, "", NULL) != FT_FAILURE)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected empty module name to be rejected\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.module_count), 0,
+            "empty name should not register a module") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(transpiler_context_has_errors(&context), 0,
+            "blank module registration should not record diagnostics") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_rejects_empty_import_path)
+{
+    t_transpiler_context context;
+    const t_transpiler_module *modules;
+    size_t module_count;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_module(&context, "main_mod", NULL),
+            "module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_register_module_import(&context, "main_mod", "") != FT_FAILURE)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected empty import path to be rejected\n");
+        return (FT_FAILURE);
+    }
+    modules = transpiler_context_get_modules(&context, &module_count);
+    if (!modules)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected to inspect registered modules\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(module_count), 1,
+            "only one module should be registered") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(modules[0].import_count), 0,
+            "empty import should not add dependencies") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_resolves_imports_by_path)
+{
+    t_transpiler_context context;
+    const t_transpiler_module *modules;
+    size_t module_count;
+    const size_t *order;
+    size_t order_count;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_module(&context, "worker_mod", "modules/worker_mod.cblc"),
+            "worker module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_module(&context, "main_mod", "modules/main_mod.cblc"),
+            "main module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_scan_imports_for_module(&context, "main_mod",
+            "import \"modules/worker_mod.cblc\";\n"),
+            "import scan should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    modules = transpiler_context_get_modules(&context, &module_count);
+    if (!modules)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected to inspect registered modules\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(module_count), 2,
+            "two modules should be registered") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(modules[1].import_count), 1,
+            "main module should record a single path import") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_compute_module_initialization_order(&context),
+            "module order computation should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    order = transpiler_context_get_module_initialization_order(&context, &order_count);
+    if (!order)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected module order to be available\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(order_count), 2,
+            "module order should contain two entries") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(context.modules[order[0]].name, "worker_mod",
+            "worker module should run before main via path import") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(modules[1].imports[0].resolved_index), 0,
+            "path import should resolve to worker module index") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
@@ -710,6 +1184,13 @@ const t_test_case *get_transpiler_context_tests(size_t *count)
         {"transpiler_context_rejects_argument_mismatch", test_transpiler_context_rejects_argument_mismatch},
         {"transpiler_context_rejects_non_void_entrypoint", test_transpiler_context_rejects_non_void_entrypoint},
         {"transpiler_context_rejects_duplicate_entrypoint", test_transpiler_context_rejects_duplicate_entrypoint},
+        {"transpiler_context_allows_private_duplicates", test_transpiler_context_allows_private_duplicates},
+        {"transpiler_context_rejects_public_duplicate_exports", test_transpiler_context_rejects_public_duplicate_exports},
+        {"transpiler_context_scans_imports_and_orders_modules", test_transpiler_context_scans_imports_and_orders_modules},
+        {"transpiler_context_orders_modules_deterministically", test_transpiler_context_orders_modules_deterministically},
+        {"transpiler_context_rejects_empty_module_name", test_transpiler_context_rejects_empty_module_name},
+        {"transpiler_context_rejects_empty_import_path", test_transpiler_context_rejects_empty_import_path},
+        {"transpiler_context_resolves_imports_by_path", test_transpiler_context_resolves_imports_by_path},
         {"transpiler_context_registers_file_declaration", test_transpiler_context_registers_file_declaration},
         {"transpiler_context_tracks_record_length_hint", test_transpiler_context_tracks_record_length_hint},
         {"transpiler_context_records_multiple_io_paths", test_transpiler_context_records_multiple_io_paths},

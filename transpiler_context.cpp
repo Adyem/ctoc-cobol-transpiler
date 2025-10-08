@@ -4,6 +4,58 @@
 #include "libft/Printf/printf.hpp"
 #include "transpiler_context.hpp"
 
+static void transpiler_context_module_clear(t_transpiler_module *module)
+{
+    if (!module)
+        return ;
+    if (module->imports)
+        cma_free(module->imports);
+    module->imports = NULL;
+    module->import_count = 0;
+    module->import_capacity = 0;
+    module->name[0] = '\0';
+    module->path[0] = '\0';
+    module->initialization_rank = 0;
+}
+
+static int transpiler_context_string_is_blank(const char *value)
+{
+    if (!value)
+        return (1);
+    while (*value != '\0')
+    {
+        if (!ft_isspace(*value))
+            return (0);
+        value += 1;
+    }
+    return (1);
+}
+
+static int transpiler_context_module_imports_reserve(t_transpiler_module *module, size_t desired_capacity)
+{
+    t_transpiler_module_import *imports;
+
+    if (!module)
+        return (FT_FAILURE);
+    if (module->import_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    imports = static_cast<t_transpiler_module_import *>(cma_calloc(desired_capacity,
+        sizeof(t_transpiler_module_import)));
+    if (!imports)
+        return (FT_FAILURE);
+    if (module->imports)
+    {
+        ft_memcpy(imports, module->imports,
+            module->import_count * sizeof(t_transpiler_module_import));
+        cma_free(module->imports);
+    }
+    module->imports = imports;
+    module->import_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
 static int transpiler_context_functions_reserve(t_transpiler_context *context, size_t desired_capacity)
 {
     t_transpiler_function_signature *new_functions;
@@ -24,6 +76,60 @@ static int transpiler_context_functions_reserve(t_transpiler_context *context, s
     }
     context->functions = new_functions;
     context->function_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
+static int transpiler_context_modules_reserve(t_transpiler_context *context, size_t desired_capacity)
+{
+    t_transpiler_module *modules;
+    size_t index;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (context->module_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    modules = static_cast<t_transpiler_module *>(cma_calloc(desired_capacity,
+        sizeof(t_transpiler_module)));
+    if (!modules)
+        return (FT_FAILURE);
+    if (context->modules)
+    {
+        index = 0;
+        while (index < context->module_count)
+        {
+            modules[index] = context->modules[index];
+            index += 1;
+        }
+        cma_free(context->modules);
+    }
+    context->modules = modules;
+    context->module_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
+static int transpiler_context_module_order_reserve(t_transpiler_context *context, size_t desired_capacity)
+{
+    size_t *order;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (context->module_order_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    order = static_cast<size_t *>(cma_calloc(desired_capacity, sizeof(size_t)));
+    if (!order)
+        return (FT_FAILURE);
+    if (context->module_order)
+    {
+        ft_memcpy(order, context->module_order,
+            context->module_order_count * sizeof(size_t));
+        cma_free(context->module_order);
+    }
+    context->module_order = order;
+    context->module_order_capacity = desired_capacity;
     return (FT_SUCCESS);
 }
 
@@ -107,6 +213,12 @@ int transpiler_context_init(t_transpiler_context *context)
     context->files = NULL;
     context->file_count = 0;
     context->file_capacity = 0;
+    context->modules = NULL;
+    context->module_count = 0;
+    context->module_capacity = 0;
+    context->module_order = NULL;
+    context->module_order_count = 0;
+    context->module_order_capacity = 0;
     ft_bzero(&context->entrypoint, sizeof(context->entrypoint));
     if (transpiler_diagnostics_init(&context->diagnostics) != FT_SUCCESS)
         return (FT_FAILURE);
@@ -117,6 +229,51 @@ int transpiler_context_init(t_transpiler_context *context)
     }
     if (transpiler_context_files_reserve(context, 4) != FT_SUCCESS)
     {
+        if (context->functions)
+            cma_free(context->functions);
+        context->functions = NULL;
+        context->function_count = 0;
+        context->function_capacity = 0;
+        transpiler_diagnostics_dispose(&context->diagnostics);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_modules_reserve(context, 4) != FT_SUCCESS)
+    {
+        if (context->files)
+            cma_free(context->files);
+        context->files = NULL;
+        context->file_count = 0;
+        context->file_capacity = 0;
+        if (context->functions)
+            cma_free(context->functions);
+        context->functions = NULL;
+        context->function_count = 0;
+        context->function_capacity = 0;
+        transpiler_diagnostics_dispose(&context->diagnostics);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_module_order_reserve(context, 4) != FT_SUCCESS)
+    {
+        if (context->modules)
+        {
+            size_t index;
+
+            index = 0;
+            while (index < context->module_count)
+            {
+                transpiler_context_module_clear(&context->modules[index]);
+                index += 1;
+            }
+            cma_free(context->modules);
+        }
+        context->modules = NULL;
+        context->module_count = 0;
+        context->module_capacity = 0;
+        if (context->files)
+            cma_free(context->files);
+        context->files = NULL;
+        context->file_count = 0;
+        context->file_capacity = 0;
         if (context->functions)
             cma_free(context->functions);
         context->functions = NULL;
@@ -151,6 +308,26 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->files = NULL;
     context->file_count = 0;
     context->file_capacity = 0;
+    if (context->modules)
+    {
+        size_t index;
+
+        index = 0;
+        while (index < context->module_count)
+        {
+            transpiler_context_module_clear(&context->modules[index]);
+            index += 1;
+        }
+        cma_free(context->modules);
+    }
+    context->modules = NULL;
+    context->module_count = 0;
+    context->module_capacity = 0;
+    if (context->module_order)
+        cma_free(context->module_order);
+    context->module_order = NULL;
+    context->module_order_count = 0;
+    context->module_order_capacity = 0;
     if (context->source_paths)
         cma_free(context->source_paths);
     context->source_paths = NULL;
@@ -239,27 +416,439 @@ int transpiler_context_has_errors(const t_transpiler_context *context)
     return (0);
 }
 
-int transpiler_context_register_function(t_transpiler_context *context, const char *name,
-    t_transpiler_function_return_mode return_mode)
+static int transpiler_context_is_identifier_char(char value)
 {
-    t_transpiler_function_signature *signature;
+    if (value >= 'a' && value <= 'z')
+        return (1);
+    if (value >= 'A' && value <= 'Z')
+        return (1);
+    if (value >= '0' && value <= '9')
+        return (1);
+    if (value == '_')
+        return (1);
+    return (0);
+}
+
+static int transpiler_context_find_module_index_by_name(const t_transpiler_context *context, const char *name)
+{
+    size_t index;
+
+    if (!context)
+        return (-1);
+    if (!name)
+        return (-1);
+    index = 0;
+    while (index < context->module_count)
+    {
+        if (ft_strncmp(context->modules[index].name, name, TRANSPILE_MODULE_NAME_MAX) == 0)
+            return (static_cast<int>(index));
+        index += 1;
+    }
+    return (-1);
+}
+
+static int transpiler_context_find_module_index_by_path(const t_transpiler_context *context, const char *path)
+{
+    size_t index;
+
+    if (!context)
+        return (-1);
+    if (!path || path[0] == '\0')
+        return (-1);
+    index = 0;
+    while (index < context->module_count)
+    {
+        if (ft_strncmp(context->modules[index].path, path, TRANSPILE_FILE_PATH_MAX) == 0)
+            return (static_cast<int>(index));
+        index += 1;
+    }
+    return (-1);
+}
+
+static int transpiler_context_find_module_index(const t_transpiler_context *context, const char *identifier)
+{
+    int index;
+
+    index = transpiler_context_find_module_index_by_name(context, identifier);
+    if (index >= 0)
+        return (index);
+    return (transpiler_context_find_module_index_by_path(context, identifier));
+}
+
+int transpiler_context_register_module(t_transpiler_context *context, const char *name, const char *path)
+{
+    t_transpiler_module *module;
     char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
     size_t index;
 
     if (!context)
         return (FT_FAILURE);
-    if (!name)
+    if (transpiler_context_string_is_blank(name))
         return (FT_FAILURE);
+    if (path && transpiler_context_string_is_blank(path))
+        return (FT_FAILURE);
+    index = 0;
+    while (index < context->module_count)
+    {
+        if (ft_strncmp(context->modules[index].name, name, TRANSPILE_MODULE_NAME_MAX) == 0)
+        {
+            pf_snprintf(message, sizeof(message),
+                "module '%s' already registered", name);
+            transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+                TRANSPILE_ERROR_MODULE_DUPLICATE_NAME, message);
+            transpiler_context_record_error(context, TRANSPILE_ERROR_MODULE_DUPLICATE_NAME);
+            return (FT_FAILURE);
+        }
+        if (path && path[0] != '\0'
+            && ft_strncmp(context->modules[index].path, path, TRANSPILE_FILE_PATH_MAX) == 0)
+        {
+            pf_snprintf(message, sizeof(message),
+                "module path '%s' already registered", path);
+            transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+                TRANSPILE_ERROR_MODULE_DUPLICATE_NAME, message);
+            transpiler_context_record_error(context, TRANSPILE_ERROR_MODULE_DUPLICATE_NAME);
+            return (FT_FAILURE);
+        }
+        index += 1;
+    }
+    if (context->module_count >= context->module_capacity)
+    {
+        if (transpiler_context_modules_reserve(context, context->module_capacity * 2) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    module = &context->modules[context->module_count];
+    ft_bzero(module, sizeof(*module));
+    ft_strlcpy(module->name, name, sizeof(module->name));
+    if (path)
+        ft_strlcpy(module->path, path, sizeof(module->path));
+    module->imports = NULL;
+    module->import_count = 0;
+    module->import_capacity = 0;
+    module->initialization_rank = 0;
+    context->module_count += 1;
+    return (FT_SUCCESS);
+}
+
+const t_transpiler_module *transpiler_context_get_modules(const t_transpiler_context *context, size_t *count)
+{
+    if (!context)
+        return (NULL);
+    if (count)
+        *count = context->module_count;
+    return (context->modules);
+}
+
+int transpiler_context_register_module_import(t_transpiler_context *context, const char *module_name,
+    const char *import_path)
+{
+    t_transpiler_module *module;
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    int module_index;
+    size_t index;
+    size_t insert_index;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (transpiler_context_string_is_blank(module_name)
+        || transpiler_context_string_is_blank(import_path))
+        return (FT_FAILURE);
+    module_index = transpiler_context_find_module_index_by_name(context, module_name);
+    if (module_index < 0)
+    {
+        pf_snprintf(message, sizeof(message),
+            "module '%s' not registered", module_name);
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_MODULE_UNKNOWN, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_MODULE_UNKNOWN);
+        return (FT_FAILURE);
+    }
+    module = &context->modules[static_cast<size_t>(module_index)];
+    index = 0;
+    while (index < module->import_count)
+    {
+        if (ft_strncmp(module->imports[index].path, import_path, TRANSPILE_FILE_PATH_MAX) == 0)
+            return (FT_SUCCESS);
+        index += 1;
+    }
+    if (module->import_count >= module->import_capacity)
+    {
+        size_t desired;
+
+        desired = 4;
+        if (module->import_capacity > 0)
+            desired = module->import_capacity * 2;
+        if (transpiler_context_module_imports_reserve(module, desired) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    insert_index = module->import_count;
+    while (insert_index > 0
+        && ft_strncmp(module->imports[insert_index - 1].path, import_path, TRANSPILE_FILE_PATH_MAX) > 0)
+    {
+        module->imports[insert_index] = module->imports[insert_index - 1];
+        insert_index -= 1;
+    }
+    ft_strlcpy(module->imports[insert_index].path, import_path, TRANSPILE_FILE_PATH_MAX);
+    module->imports[insert_index].resolved_index = static_cast<size_t>(-1);
+    module->import_count += 1;
+    return (FT_SUCCESS);
+}
+
+int transpiler_context_scan_imports_for_module(t_transpiler_context *context, const char *module_name,
+    const char *source_text)
+{
+    const char *cursor;
+    char path[TRANSPILE_FILE_PATH_MAX];
+    size_t length;
+    int status;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (!module_name)
+        return (FT_FAILURE);
+    if (!source_text)
+        return (FT_SUCCESS);
+    cursor = source_text;
+    status = FT_SUCCESS;
+    while (cursor && *cursor != '\0')
+    {
+        if (*cursor == '/' && *(cursor + 1) == '/')
+        {
+            cursor += 2;
+            while (*cursor != '\0' && *cursor != '\n')
+                cursor += 1;
+            continue ;
+        }
+        if (ft_isspace(*cursor))
+        {
+            cursor += 1;
+            continue ;
+        }
+        if (ft_strncmp(cursor, "import", 6) == 0 && !transpiler_context_is_identifier_char(*(cursor + 6)))
+        {
+            const char *scan;
+
+            scan = cursor + 6;
+            while (*scan != '\0' && ft_isspace(*scan))
+                scan += 1;
+            if (*scan == '"')
+            {
+                scan += 1;
+                length = 0;
+                while (scan[length] != '\0' && scan[length] != '"')
+                {
+                    if (length + 1 >= sizeof(path))
+                        break ;
+                    path[length] = scan[length];
+                    length += 1;
+                }
+                if (scan[length] == '"' && length < sizeof(path))
+                {
+                    path[length] = '\0';
+                    scan += length + 1;
+                    while (*scan != '\0' && ft_isspace(*scan))
+                        scan += 1;
+                    if (*scan == ';')
+                        scan += 1;
+                    if (transpiler_context_register_module_import(context, module_name, path) != FT_SUCCESS)
+                        status = FT_FAILURE;
+                    cursor = scan;
+                    continue ;
+                }
+            }
+        }
+        while (*cursor != '\0' && *cursor != '\n')
+            cursor += 1;
+        if (*cursor == '\n')
+            cursor += 1;
+    }
+    return (status);
+}
+
+static int transpiler_context_module_visit(t_transpiler_context *context, size_t module_index,
+    int *states, size_t *order_position)
+{
+    t_transpiler_module *module;
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    size_t import_index;
+    int dependency_index;
+
+    if (!context || !states || !order_position)
+        return (FT_FAILURE);
+    if (states[module_index] == 1)
+    {
+        module = &context->modules[module_index];
+        pf_snprintf(message, sizeof(message),
+            "module '%s' has an import cycle", module->name);
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_MODULE_IMPORT_CYCLE, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_MODULE_IMPORT_CYCLE);
+        return (FT_FAILURE);
+    }
+    if (states[module_index] == 2)
+        return (FT_SUCCESS);
+    states[module_index] = 1;
+    module = &context->modules[module_index];
+    import_index = 0;
+    while (import_index < module->import_count)
+    {
+        dependency_index = transpiler_context_find_module_index(context, module->imports[import_index].path);
+        if (dependency_index < 0)
+        {
+            pf_snprintf(message, sizeof(message),
+                "module '%s' imports unknown module '%s'", module->name,
+                module->imports[import_index].path);
+            transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+                TRANSPILE_ERROR_MODULE_IMPORT_UNKNOWN, message);
+            transpiler_context_record_error(context, TRANSPILE_ERROR_MODULE_IMPORT_UNKNOWN);
+            return (FT_FAILURE);
+        }
+        module->imports[import_index].resolved_index = static_cast<size_t>(dependency_index);
+        if (transpiler_context_module_visit(context, static_cast<size_t>(dependency_index), states, order_position)
+            != FT_SUCCESS)
+            return (FT_FAILURE);
+        import_index += 1;
+    }
+    states[module_index] = 2;
+    if (*order_position >= context->module_order_capacity)
+    {
+        if (transpiler_context_module_order_reserve(context, context->module_order_capacity * 2) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    context->module_order[*order_position] = module_index;
+    context->modules[module_index].initialization_rank = *order_position;
+    *order_position += 1;
+    return (FT_SUCCESS);
+}
+
+int transpiler_context_compute_module_initialization_order(t_transpiler_context *context)
+{
+    size_t *sorted;
+    int *states;
+    size_t index;
+    size_t position;
+    size_t inner;
+    int status;
+
+    if (!context)
+        return (FT_FAILURE);
+    context->module_order_count = 0;
+    if (context->module_count == 0)
+        return (FT_SUCCESS);
+    if (transpiler_context_module_order_reserve(context, context->module_count) != FT_SUCCESS)
+        return (FT_FAILURE);
+    sorted = static_cast<size_t *>(cma_calloc(context->module_count, sizeof(size_t)));
+    if (!sorted)
+        return (FT_FAILURE);
+    states = static_cast<int *>(cma_calloc(context->module_count, sizeof(int)));
+    if (!states)
+    {
+        cma_free(sorted);
+        return (FT_FAILURE);
+    }
+    index = 0;
+    while (index < context->module_count)
+    {
+        sorted[index] = index;
+        states[index] = 0;
+        context->modules[index].initialization_rank = 0;
+        index += 1;
+    }
+    index = 0;
+    while (index < context->module_count)
+    {
+        inner = index;
+        while (inner > 0)
+        {
+            size_t current_index;
+            size_t previous_index;
+            int compare;
+
+            current_index = sorted[inner];
+            previous_index = sorted[inner - 1];
+            compare = ft_strncmp(context->modules[current_index].name,
+                context->modules[previous_index].name, TRANSPILE_MODULE_NAME_MAX);
+            if (compare >= 0)
+                break ;
+            sorted[inner] = previous_index;
+            sorted[inner - 1] = current_index;
+            inner -= 1;
+        }
+        index += 1;
+    }
+    position = 0;
+    status = FT_SUCCESS;
+    index = 0;
+    while (index < context->module_count && status == FT_SUCCESS)
+    {
+        if (transpiler_context_module_visit(context, sorted[index], states, &position) != FT_SUCCESS)
+            status = FT_FAILURE;
+        index += 1;
+    }
+    if (status == FT_SUCCESS)
+        context->module_order_count = position;
+    cma_free(states);
+    cma_free(sorted);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+const size_t *transpiler_context_get_module_initialization_order(const t_transpiler_context *context, size_t *count)
+{
+    if (!context)
+        return (NULL);
+    if (count)
+        *count = context->module_order_count;
+    return (context->module_order);
+}
+
+int transpiler_context_register_function(t_transpiler_context *context, const char *module_name, const char *name,
+    t_transpiler_function_return_mode return_mode, t_transpiler_symbol_visibility visibility)
+{
+    t_transpiler_function_signature *signature;
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    size_t index;
+    int module_index;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (transpiler_context_string_is_blank(module_name)
+        || transpiler_context_string_is_blank(name))
+        return (FT_FAILURE);
+    module_index = transpiler_context_find_module_index_by_name(context, module_name);
+    if (module_index < 0)
+    {
+        pf_snprintf(message, sizeof(message),
+            "module '%s' not registered", module_name);
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_MODULE_UNKNOWN, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_MODULE_UNKNOWN);
+        return (FT_FAILURE);
+    }
     index = 0;
     while (index < context->function_count)
     {
-        if (ft_strncmp(context->functions[index].name, name, TRANSPILE_FUNCTION_NAME_MAX) == 0)
+        if (ft_strncmp(context->functions[index].module, module_name, TRANSPILE_MODULE_NAME_MAX) == 0
+            && ft_strncmp(context->functions[index].name, name, TRANSPILE_FUNCTION_NAME_MAX) == 0)
         {
             pf_snprintf(message, sizeof(message),
-                "function '%s' already declared; choose a unique name", name);
+                "function '%s' already declared in module '%s'", name, module_name);
             transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
                 TRANSPILE_ERROR_FUNCTION_DUPLICATE_NAME, message);
             transpiler_context_record_error(context, TRANSPILE_ERROR_FUNCTION_DUPLICATE_NAME);
+            return (FT_FAILURE);
+        }
+        if (visibility == TRANSPILE_SYMBOL_PUBLIC
+            && context->functions[index].visibility == TRANSPILE_SYMBOL_PUBLIC
+            && ft_strncmp(context->functions[index].name, name, TRANSPILE_FUNCTION_NAME_MAX) == 0
+            && ft_strncmp(context->functions[index].module, module_name, TRANSPILE_MODULE_NAME_MAX) != 0)
+        {
+            pf_snprintf(message, sizeof(message),
+                "public function '%s' in module '%s' conflicts with export from module '%s'",
+                name, module_name, context->functions[index].module);
+            transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+                TRANSPILE_ERROR_FUNCTION_EXPORT_CONFLICT, message);
+            transpiler_context_record_error(context, TRANSPILE_ERROR_FUNCTION_EXPORT_CONFLICT);
             return (FT_FAILURE);
         }
         index += 1;
@@ -270,39 +859,44 @@ int transpiler_context_register_function(t_transpiler_context *context, const ch
             return (FT_FAILURE);
     }
     signature = &context->functions[context->function_count];
-    ft_strlcpy(signature->name, name, TRANSPILE_FUNCTION_NAME_MAX);
+    ft_strlcpy(signature->name, name, sizeof(signature->name));
+    ft_strlcpy(signature->module, module_name, sizeof(signature->module));
     signature->return_mode = return_mode;
+    signature->visibility = visibility;
     context->function_count += 1;
+    (void)module_index;
     return (FT_SUCCESS);
 }
 
 const t_transpiler_function_signature *transpiler_context_find_function(const t_transpiler_context *context,
-    const char *name)
+    const char *module_name, const char *name)
 {
     size_t index;
 
     if (!context)
         return (NULL);
-    if (!name)
+    if (!module_name || !name)
         return (NULL);
     index = 0;
     while (index < context->function_count)
     {
-        if (ft_strncmp(context->functions[index].name, name, TRANSPILE_FUNCTION_NAME_MAX) == 0)
+        if (ft_strncmp(context->functions[index].module, module_name, TRANSPILE_MODULE_NAME_MAX) == 0
+            && ft_strncmp(context->functions[index].name, name, TRANSPILE_FUNCTION_NAME_MAX) == 0)
             return (&context->functions[index]);
         index += 1;
     }
     return (NULL);
 }
 
-int transpiler_context_register_entrypoint(t_transpiler_context *context, const char *name,
+int transpiler_context_register_entrypoint(t_transpiler_context *context, const char *module_name, const char *name,
     t_transpiler_function_return_mode return_mode, const char *argc_identifier, const char *argv_identifier)
 {
     char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 
     if (!context)
         return (FT_FAILURE);
-    if (!name)
+    if (transpiler_context_string_is_blank(module_name)
+        || transpiler_context_string_is_blank(name))
         return (FT_FAILURE);
     if (context->entrypoint.present)
     {
@@ -340,7 +934,8 @@ int transpiler_context_register_entrypoint(t_transpiler_context *context, const 
         transpiler_context_record_error(context, TRANSPILE_ERROR_ENTRYPOINT_ARGUMENT_MISMATCH);
         return (FT_FAILURE);
     }
-    if (transpiler_context_register_function(context, name, return_mode) != FT_SUCCESS)
+    if (transpiler_context_register_function(context, module_name, name, return_mode,
+            TRANSPILE_SYMBOL_PUBLIC) != FT_SUCCESS)
         return (FT_FAILURE);
     ft_bzero(&context->entrypoint, sizeof(context->entrypoint));
     context->entrypoint.present = 1;

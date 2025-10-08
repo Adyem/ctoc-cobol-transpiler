@@ -38,7 +38,7 @@ static int sample_manifest_extract_line(const char *buffer, size_t *offset, char
 static int validate_manifest_entries(const char *manifest_path)
 {
     char manifest_buffer[1024];
-    char sample_buffer[2048];
+    char sample_buffer[4096];
     char line[256];
     size_t offset;
 

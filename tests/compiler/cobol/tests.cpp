@@ -11,6 +11,7 @@ const t_test_case *get_compiler_cobol_filter_prefix_tests(size_t *count);
 const t_test_case *get_compiler_cobol_copy_file_tests(size_t *count);
 const t_test_case *get_compiler_cobol_record_writer_tests(size_t *count);
 const t_test_case *get_compiler_cobol_record_summary_tests(size_t *count);
+const t_test_case *get_compiler_cobol_integration_showcase_tests(size_t *count);
 const t_test_case *get_compiler_cobol_reverse_control_flow_tests(size_t *count);
 const t_test_case *get_compiler_cobol_reverse_normalization_tests(size_t *count);
 const t_test_case *get_compiler_cobol_reverse_cli_tests(size_t *count);
@@ -27,6 +28,7 @@ const t_test_case *get_compiler_cobol_tests(size_t *count)
     const t_test_case *filter_prefix_tests;
     const t_test_case *copy_file_tests;
     const t_test_case *record_writer_tests;
+    const t_test_case *integration_showcase_tests;
     const t_test_case *reverse_control_flow_tests;
     const t_test_case *reverse_normalization_tests;
     const t_test_case *reverse_cli_tests;
@@ -38,6 +40,7 @@ const t_test_case *get_compiler_cobol_tests(size_t *count)
     size_t filter_prefix_count;
     size_t copy_file_count;
     size_t record_writer_count;
+    size_t integration_showcase_count;
     size_t reverse_control_flow_count;
     size_t reverse_normalization_count;
     size_t reverse_cli_count;
@@ -54,12 +57,13 @@ const t_test_case *get_compiler_cobol_tests(size_t *count)
         filter_prefix_tests = get_compiler_cobol_filter_prefix_tests(&filter_prefix_count);
         copy_file_tests = get_compiler_cobol_copy_file_tests(&copy_file_count);
         record_writer_tests = get_compiler_cobol_record_writer_tests(&record_writer_count);
+        integration_showcase_tests = get_compiler_cobol_integration_showcase_tests(&integration_showcase_count);
         reverse_control_flow_tests = get_compiler_cobol_reverse_control_flow_tests(&reverse_control_flow_count);
         reverse_normalization_tests = get_compiler_cobol_reverse_normalization_tests(&reverse_normalization_count);
         reverse_cli_tests = get_compiler_cobol_reverse_cli_tests(&reverse_cli_count);
         record_summary_tests = get_compiler_cobol_record_summary_tests(&record_summary_count);
         combined_count = numeric_count + multi_module_count + boolean_count + character_count
-            + filter_prefix_count + copy_file_count + record_writer_count
+            + filter_prefix_count + copy_file_count + record_writer_count + integration_showcase_count
             + reverse_control_flow_count + reverse_normalization_count + reverse_cli_count
             + record_summary_count;
         if (combined_count > 0)
@@ -122,6 +126,13 @@ const t_test_case *get_compiler_cobol_tests(size_t *count)
                 index += 1;
             }
             offset += record_writer_count;
+            index = 0;
+            while (index < integration_showcase_count)
+            {
+                combined[offset + index] = integration_showcase_tests[index];
+                index += 1;
+            }
+            offset += integration_showcase_count;
             index = 0;
             while (index < reverse_control_flow_count)
             {

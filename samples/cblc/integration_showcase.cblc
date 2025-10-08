@@ -1,0 +1,51 @@
+record Transaction {
+    char status[2];
+    int amount;
+};
+
+file transactions "transactions.dat";
+file accepted_log "accepted.txt";
+file rejected_log "rejected.txt";
+
+Transaction current;
+char accepted_marker[32];
+char rejected_marker[32];
+int accepted_count;
+int rejected_count;
+int total_amount;
+
+function void reset_state() {
+    accepted_count = 0;
+    rejected_count = 0;
+    total_amount = 0;
+    accepted_marker = "ACCEPTED ENTRY";
+    rejected_marker = "REJECTED ENTRY";
+}
+
+function void process_transactions() {
+    reset_state();
+    open(transactions, "r");
+    open(accepted_log, "w");
+    open(rejected_log, "w");
+    while (read(transactions, current)) {
+        if (starts_with(current.status, "A")) {
+            accepted_count = accepted_count + 1;
+            total_amount = total_amount + current.amount;
+            write(accepted_log, accepted_marker);
+        } else {
+            rejected_count = rejected_count + 1;
+            write(rejected_log, rejected_marker);
+        }
+    }
+    close(transactions);
+    close(accepted_log);
+    close(rejected_log);
+}
+
+function void main() {
+    display("INTEGRATION SHOWCASE");
+    process_transactions();
+    display(accepted_count);
+    display(rejected_count);
+    display(total_amount);
+}

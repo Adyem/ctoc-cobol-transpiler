@@ -45,8 +45,17 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Validate round-trip fidelity with golden input/output fixtures.
 - [x] Normalize identifiers, literal formats, and layout during re-emission to produce idiomatic CBL-C.
 - [x] Integrate continuous integration scripts (make targets) that build, run tests, and lint the codebase.
+- [x] Imports/modules: enforce per-file symbol visibility, support `import "x.cblc"`, and guarantee deterministic module initialization order.
 
 ## Pending Features
+
+### Core Language / Semantics
+- [ ] Visibility rules: surface diagnostics for public/private types, fields, and functions, enforcing access at semantic analysis time.
+- [ ] Const/immutability: track const bindings and read-only fields, emitting diagnostics on attempted writes.
+- [ ] Source maps: retain CBL-C ↔ COBOL span mappings to power diagnostics and debugging outputs.
+- [ ] Parser error recovery: resynchronize on `;`/`}` to continue after errors and report multiple issues per pass.
+- [ ] Linter/formatter: produce a canonical, deterministic CBL-C pretty-printer for consistent diffs.
+- [ ] Copybook interop: support COPY includes, manage name collisions, and propagate declared lengths through the pipeline.
 
 ### Core Language Frontend
 - [ ] Model extended numeric picture clauses covering `PIC 9(18)` (long) and `PIC 9(36)` (long long) ranges.
@@ -129,8 +138,39 @@ are completed; keep completed items grouped separately from the remaining work t
 - [ ] `sin`/`cos`/`tan` helpers: implement trigonometric routines that accept floating operands (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`) and optional integral inputs coerced to floating, returning floating results and tracking domain/precision diagnostics.
 - [ ] Additional numeric helpers: track future candidates such as `cbrt`, `hypot`, `min`/`max`, or `clamp` that should accept the same integral and floating domains defined above, ensuring the standard library surface mirrors common CBL-C idioms once return-slot plumbing lands.
 
+### Data / Encoding / I/O
+
+- [ ] EBCDIC/ASCII boundaries: introduce explicit transcoding points with configurable CCSID selection.
+- [ ] Indexed/relative files: add SELECT/ORGANIZATION handling, key definitions, READ NEXT traversal, and locking controls.
+- [ ] Collation/locale: provide locale-independent string comparison with an optional locale bridge.
+
+### Codegen / Backends
+
+- [ ] C backend: emit portable C from the shared IR to simplify native testing.
+- [ ] ABI spec: document calling conventions, return-slot rules, record layout, and alignment.
+- [ ] Deterministic builds: scrub timestamps and paths to guarantee reproducible output.
+- [ ] Parallel compilation: build a translation-unit DAG, cache per-file outputs, and support incremental rebuilds.
+
+### Runtime / Stdlib
+
+- [ ] Memory & safety: add bounds-checked string routines and a checked `memcpy` that falls back to `memmove`.
+- [ ] Dates/times: expose helpers for `yyyymmdd`, packed decimals, durations, and comparisons.
+- [ ] Sorting/search: provide keyed record sorting, SEARCH ALL wrappers, and comparator helpers.
+- [ ] CSV/line I/O: support parsing and emitting fixed or variable-length records.
+- [ ] Error model: define uniform status enums and propagate them through trailing return slots.
+
+### Diagnostics & Tooling
+
+- [ ] Unused/uninitialized analysis: warn on unused variables, unread writes, and definite-assignment gaps.
+- [ ] Dead-code detection: flag unreachable code following returns or constant-false branches.
+- [ ] Warning groups/flags: add `-Wconversion`, `-Woverflow`, `-Wstring-trunc`, `-Wshadow`, `-Wunused`, and `-Werror` controls.
+- [ ] Pretty diagnostics: include line snippets, caret ranges, and suggestion text in diagnostics.
+
 ### Reverse Pipeline (COBOL → CBL-C)
 
+- [ ] Comment preservation: carry comments as trivia and re-emit them near original anchors.
+- [ ] Layout fidelity knobs: provide "normalize" and "preserve" modes for regenerated source.
+- [ ] Copybook reconstruction: prefer re-emitting COPY directives instead of fully expanded fields when possible.
 - [ ] Recover long, long long, and floating-point picture clauses into canonical CBL-C type annotations.
 - [ ] Reconstruct string length metadata so regenerated CBL-C declarations reflect original caller sizes.
 - [ ] Emit operator forms that maintain precision across widened numeric ranges.
@@ -139,6 +179,11 @@ are completed; keep completed items grouped separately from the remaining work t
 
 ### Testing & Quality Gates
 
+- [ ] Fuzzing: add grammar-based and mutation fuzzers for the lexer and parser to guard against crashes.
+- [ ] Property tests: introduce round-trip and normalization idempotence suites.
+- [ ] Differential tests: compare runtime results between COBOL outputs and the alternative C backend.
+- [ ] Stress suites: cover huge records, deep nesting, long lines, and wide numerics.
+- [ ] Coverage in CI: enforce line and branch coverage thresholds as part of the release gates.
 - [ ] Add golden samples exercising long, long long, and floating numeric arithmetic plus comparison operators.
 - [ ] Add integration tests verifying subprogram calls respect original string lengths across translations.
 
