@@ -45,7 +45,9 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Validate round-trip fidelity with golden input/output fixtures.
 - [x] Normalize identifiers, literal formats, and layout during re-emission to produce idiomatic CBL-C.
 - [x] Integrate continuous integration scripts (make targets) that build, run tests, and lint the codebase.
+- [x] Add golden samples exercising long, long long, and floating numeric arithmetic plus comparison operators.
 - [x] Imports/modules: enforce per-file symbol visibility, support `import "x.cblc"`, and guarantee deterministic module initialization order.
+- [x] Warning escalation flag: add a compiler/CLI flag that promotes all warnings (including conversion, overflow, and string-size diagnostics) to errors for strict build configurations.
 
 ## Pending Features
 
@@ -69,6 +71,7 @@ are completed; keep completed items grouped separately from the remaining work t
 ### Numeric Operator Support
 
 #### Integral Operators
+
 - [ ] Addition (`+`): supports operands declared as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (mapped to `long`), and `PIC 9(36)` (mapped to `long long`); promotes mixed-width operands to the widest participating type, performs two's-complement math with overflow diagnostics, and emits COBOL that preserves sign and scale.
 - [ ] Subtraction (`-`): handles `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`) operands, widens to the widest type before subtraction, emits two's-complement semantics with overflow checks, and maintains COBOL sign/scale fidelity.
 - [ ] Multiplication (`*`): covers operands typed as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`); widens both operands before multiplying, reports overflow, and generates COBOL statements that retain sign and scaling.
@@ -113,9 +116,6 @@ are completed; keep completed items grouped separately from the remaining work t
 - [ ] `double` conversion warnings: surface diagnostics when `double` or `PIC V9(18)` values flow into integral widths, `float`/`PIC V9(n)`, boolean, or alphanumeric targets, capturing precision or magnitude loss.
 - [ ] Integral conversion warnings: report when `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), or `PIC 9(36)` (`long long`) values assign into floating (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`), boolean, or alphanumeric items, highlighting sign/overflow risks.
 - [ ] Boolean conversion warnings: emit diagnostics when boolean operands convert to or from numeric (`PIC 9`, `PIC 9(n)`, `PIC 9(18)`, `PIC 9(36)`, `float`, `double`, `PIC V9(n)`, `PIC V9(18)`) or alphanumeric types, ensuring callers handle non-zero truthiness semantics explicitly.
-
-#### Diagnostic Controls
-- [ ] Warning escalation flag: add a compiler/CLI flag that promotes all warnings (including conversion, overflow, and string-size diagnostics) to errors for strict build configurations.
 
 ### Standard Library Subprogram Catalog
 
@@ -184,7 +184,6 @@ are completed; keep completed items grouped separately from the remaining work t
 - [ ] Differential tests: compare runtime results between COBOL outputs and the alternative C backend.
 - [ ] Stress suites: cover huge records, deep nesting, long lines, and wide numerics.
 - [ ] Coverage in CI: enforce line and branch coverage thresholds as part of the release gates.
-- [ ] Add golden samples exercising long, long long, and floating numeric arithmetic plus comparison operators.
 - [ ] Add integration tests verifying subprogram calls respect original string lengths across translations.
 
 ### Stretch / Future Enhancements

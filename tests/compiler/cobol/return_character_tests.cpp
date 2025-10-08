@@ -65,6 +65,7 @@ FT_TEST(test_cobol_transpiled_return_character_executes)
     char output_buffer[128];
     int command_length;
 
+    FT_REQUIRE_COBC();
     binary_path = "test_transpiled_return_character.bin";
     output_path = "test_transpiled_return_character.txt";
     expected_output = "A\n";
@@ -118,6 +119,7 @@ FT_TEST(test_cobol_transpiled_return_character_exit_status)
     int command_length;
     int exit_status;
 
+    FT_REQUIRE_COBC();
     binary_path = "test_transpiled_return_character_status.bin";
     output_path = "test_transpiled_return_character_status.txt";
     expected_output = "A\n";
@@ -179,6 +181,7 @@ FT_TEST(test_cobol_transpiled_return_character_compile_logs_clean)
     int command_length;
     const char *log_path;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     binary_path[0] = '\0';
     output_path[0] = '\0';

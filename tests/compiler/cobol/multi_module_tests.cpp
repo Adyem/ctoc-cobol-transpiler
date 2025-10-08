@@ -82,6 +82,7 @@ FT_TEST(test_cobol_transpiled_multi_module_executes)
     const char *expected_output;
     int command_length;
 
+    FT_REQUIRE_COBC();
     binary_path = "test_transpiled_multi_module.bin";
     output_path = "test_transpiled_multi_module.txt";
     expected_output = "WORKER READY\n   1\n";
@@ -136,6 +137,7 @@ FT_TEST(test_cobol_transpiled_multi_module_exit_status)
     int command_length;
     int exit_status;
 
+    FT_REQUIRE_COBC();
     binary_path = "test_transpiled_multi_module_status.bin";
     output_path = "test_transpiled_multi_module_status.txt";
     expected_output = "WORKER READY\n   1\n";
@@ -198,6 +200,7 @@ FT_TEST(test_cobol_transpiled_multi_module_compile_logs_clean)
     int command_length;
     const char *log_path;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     binary_path[0] = '\0';
     output_path[0] = '\0';
@@ -296,6 +299,7 @@ FT_TEST(test_cobol_transpiled_multi_module_separate_compile_logs_clean)
     int command_length;
     const char *log_path;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     module_path[0] = '\0';
     binary_path[0] = '\0';
@@ -451,6 +455,7 @@ FT_TEST(test_cobol_transpiled_multi_module_compiles_separately)
     char output_buffer[128];
     int command_length;
 
+    FT_REQUIRE_COBC();
     module_path = "SHOW-BANNER.so";
     binary_path = "test_transpiled_multi_module_separate.bin";
     output_path = "test_transpiled_multi_module_separate.txt";
@@ -529,6 +534,7 @@ FT_TEST(test_cobol_transpiled_multi_module_executes_from_library_directory)
     int command_length;
     int exit_status;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     module_path[0] = '\0';
     binary_path[0] = '\0';

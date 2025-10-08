@@ -64,6 +64,7 @@ FT_TEST(test_cobol_sample_copy_file_executes)
     const char *expected_output;
     int command_length;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     binary_path[0] = '\0';
     input_path[0] = '\0';
@@ -141,6 +142,7 @@ FT_TEST(test_cobol_sample_record_writer_executes)
     const char *expected_output;
     int command_length;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     binary_path[0] = '\0';
     report_path[0] = '\0';
@@ -206,6 +208,7 @@ FT_TEST(test_cobol_sample_return_numeric_executes)
     const char *expected_output;
     int command_length;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     binary_path[0] = '\0';
     output_path[0] = '\0';
@@ -273,6 +276,7 @@ FT_TEST(test_cobol_sample_return_boolean_executes)
     const char *expected_output;
     int command_length;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     binary_path[0] = '\0';
     output_path[0] = '\0';
@@ -340,6 +344,7 @@ FT_TEST(test_cobol_sample_return_character_executes)
     const char *expected_output;
     int command_length;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     binary_path[0] = '\0';
     output_path[0] = '\0';
@@ -407,6 +412,7 @@ FT_TEST(test_cobol_sample_multi_module_executes)
     const char *expected_output;
     int command_length;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     binary_path[0] = '\0';
     output_path[0] = '\0';

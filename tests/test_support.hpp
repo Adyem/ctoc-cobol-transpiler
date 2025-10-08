@@ -51,11 +51,16 @@ int test_expect_token(const t_lexer_token *token, t_lexer_token_kind expected_ki
     const char *expected_lexeme, size_t expected_line, size_t expected_column);
 int test_write_text_file(const char *path, const char *contents);
 int test_read_text_file(const char *path, char *buffer, size_t buffer_size);
+int test_cobc_available(void);
 int test_run_command(const char *command);
 int test_run_command_expect_failure(const char *command);
 void test_remove_file(const char *path);
 int run_test_case(const t_test_case *test);
 int run_test_suite(const t_test_case *tests, size_t count);
 void test_report_summary(void);
+
+#define FT_REQUIRE_COBC() \
+    if (!test_cobc_available()) \
+        return (FT_SUCCESS);
 
 #endif

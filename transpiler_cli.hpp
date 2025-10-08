@@ -16,6 +16,7 @@ typedef struct s_transpiler_cli_options
     t_transpiler_language target_language;
     t_transpiler_format_mode format_mode;
     t_transpiler_diagnostic_level diagnostic_level;
+    int warnings_as_errors;
     int show_help;
 }   t_transpiler_cli_options;
 

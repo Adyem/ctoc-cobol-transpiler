@@ -206,6 +206,7 @@ int transpiler_context_init(t_transpiler_context *context)
     context->output_directory = NULL;
     context->format_mode = TRANSPILE_FORMAT_DEFAULT;
     context->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
+    context->warnings_as_errors = 0;
     context->last_error_code = FT_SUCCESS;
     context->functions = NULL;
     context->function_count = 0;
@@ -297,6 +298,7 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->output_directory = NULL;
     context->format_mode = TRANSPILE_FORMAT_DEFAULT;
     context->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
+    context->warnings_as_errors = 0;
     context->last_error_code = FT_SUCCESS;
     if (context->functions)
         cma_free(context->functions);
@@ -398,6 +400,13 @@ void transpiler_context_set_diagnostic_level(t_transpiler_context *context, t_tr
     context->diagnostic_level = level;
 }
 
+void transpiler_context_set_warnings_as_errors(t_transpiler_context *context, int warnings_as_errors)
+{
+    if (!context)
+        return ;
+    context->warnings_as_errors = warnings_as_errors;
+}
+
 void transpiler_context_record_error(t_transpiler_context *context, int error_code)
 {
     if (!context)
@@ -407,12 +416,22 @@ void transpiler_context_record_error(t_transpiler_context *context, int error_co
 
 int transpiler_context_has_errors(const t_transpiler_context *context)
 {
+    size_t index;
+
     if (!context)
         return (0);
     if (context->last_error_code != FT_SUCCESS)
         return (1);
-    if (context->diagnostics.count > 0)
-        return (1);
+    index = 0;
+    while (index < context->diagnostics.count)
+    {
+        if (context->diagnostics.items[index].severity == TRANSPILE_SEVERITY_ERROR)
+            return (1);
+        if (context->warnings_as_errors
+            && context->diagnostics.items[index].severity == TRANSPILE_SEVERITY_WARNING)
+            return (1);
+        index += 1;
+    }
     return (0);
 }
 
