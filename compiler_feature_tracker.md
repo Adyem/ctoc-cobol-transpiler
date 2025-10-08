@@ -61,7 +61,13 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Provide a `CBLC-STRCMP` standard library subprogram that compares two caller-supplied alphanumeric buffers using their declared lengths and writes a signed result into the trailing return slot.
 - [x] Provide a `CBLC-STRCPY` standard library subprogram that copies between caller-supplied alphanumeric buffers using their declared lengths, blanks the destination before copying, and reports truncation through a trailing status slot.
 - [x] Provide a `CBLC-STRNCPY` standard library subprogram that performs bounded copies between caller alphanumeric buffers using declared lengths plus an explicit request count, blanks the destination, pads with spaces, and reports truncation through a trailing status slot.
+- [x] Provide a `CBLC-STRCAT` standard library subprogram that concatenates two caller-supplied alphanumeric buffers using their declared lengths, respects the destination limit, reports truncation, and records the resulting size in the trailing return slot.
+- [x] Provide a `CBLC-MEMCMP` standard library subprogram that compares caller-supplied buffers using declared lengths plus an explicit byte-count, clamps reads to the narrowest limit, and writes a signed ordering result without overrunning inputs.
+- [x] Provide a `CBLC-POWEROF` standard library subprogram that raises caller-supplied operands to a caller-supplied exponent, widens to floating precision, rejects invalid domains, and reports status via a trailing numeric slot.
+- [x] Provide `CBLC-ATOI`, `CBLC-ATOL`, and `CBLC-ATOLL` standard library subprograms that convert caller-supplied alphanumeric buffers into signed numeric results, enforce digit-only input, clamp to declared widths, and report conversion status through a trailing numeric slot.
 - [x] Provide a `CBLC-SQRT` standard library subprogram that widens numeric operands to floating precision, rejects negative inputs, and returns the computed root via a trailing slot alongside a status flag.
+- [x] Provide `CBLC-TOUPPER` and `CBLC-TOLOWER` standard library subprograms that convert caller buffers between upper and lower case in place while respecting declared lengths and reporting status via a trailing numeric slot.
+- [x] Provide `CBLC-ISDIGIT` and `CBLC-ISALPHA` standard library subprograms that classify single-character operands without locale dependencies and report boolean results through trailing numeric slots.
 
 ## Pending Features
 
@@ -125,12 +131,6 @@ are completed; keep completed items grouped separately from the remaining work t
 
 ### Standard Library Subprogram Catalog
 
-- [ ] `powerof` helper: add exponentiation support that handles integral bases (`PIC 9` through `PIC 9(36)`) and floating operands (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`), coercing arguments to the widest applicable type and materializing the result via the trailing return slot while surfacing overflow and precision diagnostics.
-- [ ] `strcat` helper: concatenate two alphanumeric operands (`PIC X`, `PIC X(n)`, `PIC X(255)`) into a destination buffer of sufficient size, surfacing truncation warnings when the destination declaration cannot hold the combined length, and materialize the resulting size via the trailing return slot.
-- [ ] `memcmp` helper: compare binary or alphanumeric buffers represented as `PIC X`, `PIC X(n)`, or `PIC X(255)` plus an explicit `PIC 9(9)` byte-count, returning a signed integral result (`PIC 9`, `PIC 9(4)`, or `PIC 9(9)`) and guaranteeing no reads beyond the caller-specified length.
-- [ ] `toupper`/`tolower` helpers: supply character-case normalization that accepts single-character `PIC X` items or varying-length alphanumeric buffers (`PIC X(n)`, `PIC X(255)`), mutates them in-place respecting caller-provided sizes, and returns a success flag (`PIC 9`) through the trailing slot.
-- [ ] `isdigit`/`isalpha` helpers: furnish classification routines for single-character alphanumeric operands (`PIC X`), writing boolean (`PIC 9`) results through the trailing slot while avoiding locale dependencies.
-- [ ] `atoi`/`atol` helpers: convert numeric strings (`PIC X`, `PIC X(n)`, `PIC X(255)`) into integral results (`PIC 9(9)`, `PIC 9(18)`, `PIC 9(36)`), return conversion status via a `PIC 9` flag, and emit overflow/truncation diagnostics.
 - [ ] `strtod` helper: parse alphanumeric operands (`PIC X`, `PIC X(n)`, `PIC X(255)`) into floating representations (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`), populate the trailing return slot with the parsed value, and report range errors through diagnostics.
 - [ ] `fabs`/`abs` helpers: deliver absolute-value subprograms for integral (`PIC 9` through `PIC 9(36)`) and floating (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`) operands, writing results into the trailing return slot and propagating overflow diagnostics for minimum values.
 - [ ] `floor`/`ceil` helpers: provide rounding primitives that accept floating operands (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`) and optionally integral inputs, producing results in the same type domain within the trailing return slot while flagging scale adjustments.

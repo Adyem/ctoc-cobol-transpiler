@@ -1,12 +1,22 @@
 #include "transpiler_standard_library.hpp"
 
 static const t_transpiler_standard_library_entry g_transpiler_standard_library_entries[] = {
+    {"std::atoi", "CBLC-ATOI", transpiler_standard_library_generate_atoi},
+    {"std::atol", "CBLC-ATOL", transpiler_standard_library_generate_atol},
+    {"std::atoll", "CBLC-ATOLL", transpiler_standard_library_generate_atoll},
     {"std::strlen", "CBLC-STRLEN", transpiler_standard_library_generate_strlen},
     {"std::strnlen", "CBLC-STRNLEN", transpiler_standard_library_generate_strnlen},
     {"std::strcmp", "CBLC-STRCMP", transpiler_standard_library_generate_strcmp},
     {"std::strcpy", "CBLC-STRCPY", transpiler_standard_library_generate_strcpy},
     {"std::strncpy", "CBLC-STRNCPY", transpiler_standard_library_generate_strncpy},
-    {"std::sqrt", "CBLC-SQRT", transpiler_standard_library_generate_sqrt}
+    {"std::memcmp", "CBLC-MEMCMP", transpiler_standard_library_generate_memcmp},
+    {"std::strcat", "CBLC-STRCAT", transpiler_standard_library_generate_strcat},
+    {"std::pow", "CBLC-POWEROF", transpiler_standard_library_generate_powerof},
+    {"std::sqrt", "CBLC-SQRT", transpiler_standard_library_generate_sqrt},
+    {"std::toupper", "CBLC-TOUPPER", transpiler_standard_library_generate_toupper},
+    {"std::tolower", "CBLC-TOLOWER", transpiler_standard_library_generate_tolower},
+    {"std::isdigit", "CBLC-ISDIGIT", transpiler_standard_library_generate_isdigit},
+    {"std::isalpha", "CBLC-ISALPHA", transpiler_standard_library_generate_isalpha}
 };
 
 const t_transpiler_standard_library_entry *transpiler_standard_library_get_entries(size_t *count)
