@@ -167,6 +167,103 @@ FT_TEST(test_cobol_transpiled_return_character_exit_status)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_cobol_transpiled_return_character_compile_logs_clean)
+{
+    char directory[256];
+    char binary_path[256];
+    char output_path[256];
+    char compile_log_path[256];
+    char command[512];
+    char output_buffer[128];
+    const char *expected_output;
+    int command_length;
+    const char *log_path;
+
+    directory[0] = '\0';
+    binary_path[0] = '\0';
+    output_path[0] = '\0';
+    compile_log_path[0] = '\0';
+    log_path = NULL;
+    expected_output = "A\n";
+    if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_join_path(directory, "return_character_compile.log", compile_log_path,
+            sizeof(compile_log_path)) != FT_SUCCESS)
+    {
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    log_path = compile_log_path;
+    if (test_join_path(directory, "return_character_compile.bin", binary_path,
+            sizeof(binary_path)) != FT_SUCCESS)
+    {
+        test_cleanup_example_artifacts_with_log(NULL, NULL, NULL, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_join_path(directory, "return_character_compile.txt", output_path,
+            sizeof(output_path)) != FT_SUCCESS)
+    {
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, NULL, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s samples/cobol/return_character.cob > %s 2>&1",
+        binary_path, compile_log_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+    {
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_run_command(command) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: cobc should compile return_character sample while capturing log\n");
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_expect_compiler_output_allowed(log_path) != FT_SUCCESS)
+    {
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    command_length = pf_snprintf(command, sizeof(command),
+        "cd %s && ./return_character_compile.bin > return_character_compile.txt",
+        directory);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+    {
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_run_command(command) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: return_character binary should execute after log validation\n");
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+    {
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    {
+        pf_printf("Assertion failed: return_character binary should emit selected character after log validation\n");
+        test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
+    test_remove_directory(directory);
+    return (FT_SUCCESS);
+}
+
 const t_test_case *get_compiler_cobol_return_character_tests(size_t *count)
 {
     static const t_test_case tests[] = {
@@ -175,7 +272,9 @@ const t_test_case *get_compiler_cobol_return_character_tests(size_t *count)
         {"cobol_transpiled_return_character_matches_expected_text",
             test_cobol_transpiled_return_character_matches_expected_text},
         {"cobol_transpiled_return_character_executes", test_cobol_transpiled_return_character_executes},
-        {"cobol_transpiled_return_character_exit_status", test_cobol_transpiled_return_character_exit_status}
+        {"cobol_transpiled_return_character_exit_status", test_cobol_transpiled_return_character_exit_status},
+        {"cobol_transpiled_return_character_compile_logs_clean",
+            test_cobol_transpiled_return_character_compile_logs_clean}
     };
 
     if (count)

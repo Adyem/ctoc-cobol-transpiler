@@ -3,8 +3,10 @@
        ENVIRONMENT DIVISION.
        INPUT-OUTPUT SECTION.
        FILE-CONTROL.
-           SELECT SOURCE-FILE ASSIGN TO "source.dat".
-           SELECT TARGET-FILE ASSIGN TO "target.dat".
+           SELECT SOURCE-FILE ASSIGN TO "source.dat"
+               ORGANIZATION IS LINE SEQUENTIAL.
+           SELECT TARGET-FILE ASSIGN TO "target.dat"
+               ORGANIZATION IS LINE SEQUENTIAL.
        DATA DIVISION.
        FILE SECTION.
        FD  SOURCE-FILE.

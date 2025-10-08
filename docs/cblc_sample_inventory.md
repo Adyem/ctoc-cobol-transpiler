@@ -172,26 +172,29 @@ function void NORMALIZE_VALUES() {
 - **Purpose:** Locks down the recovered CBL-C for nested conditionals and loops so the reverse emitter preserves complex
   control-flow structure.
 - **Constructs:** `if` statements with negated conditions, `while` loops sourced from `PERFORM UNTIL` and `PERFORM VARYING`,
-  counter initialization with `++` increments, and trailing `return ;` statements for each recovered function.
+  literal sentinel assignments that mirror COBOL `MOVE` updates, numeric output routed through `display`, and trailing
+  `return ;` statements for each recovered function.
 
 ```cblc
 function void MAIN() {
-    if (!(FLAG == true)) {
-        while (!(COUNT > LIMIT)) {
-            LIMIT = COUNT;
+    if (!(CONTROL_FLAG == true)) {
+        while (!(PROGRESS_METER > PROGRESS_LIMIT)) {
+            PROGRESS_METER = 11;
         }
+        OUTPUT_VALUE = PROGRESS_METER;
     } else {
-        INDEX = 0;
-        while (!(INDEX >= LIMIT)) {
-            RESULT = INDEX;
-            INDEX++;
+        PROGRESS_INDEX = 0;
+        while (!(PROGRESS_INDEX >= PROGRESS_LIMIT)) {
+            OUTPUT_VALUE = PROGRESS_INDEX;
+            PROGRESS_INDEX++;
         }
     }
+    display(OUTPUT_VALUE);
     return ;
 }
 
-function void NEXT() {
-    FLAG = true;
+function void NEXT_PARAGRAPH() {
+    CONTROL_FLAG = true;
     return ;
 }
 ```

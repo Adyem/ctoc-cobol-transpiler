@@ -121,10 +121,17 @@ TEST_SRC    = tests/test_main.cpp \
               tests/compiler/c/build_tests.cpp \
               tests/compiler/c/exit_tests.cpp \
               tests/compiler/c/tests.cpp \
+              tests/compiler/cobol/copy_file_tests.cpp \
+              tests/compiler/cobol/filter_prefix_tests.cpp \
               tests/compiler/cobol/return_numeric_tests.cpp \
               tests/compiler/cobol/multi_module_tests.cpp \
               tests/compiler/cobol/return_boolean_tests.cpp \
               tests/compiler/cobol/return_character_tests.cpp \
+              tests/compiler/cobol/record_writer_tests.cpp \
+              tests/compiler/cobol/record_summary_tests.cpp \
+              tests/compiler/cobol/reverse_control_flow_tests.cpp \
+              tests/compiler/cobol/reverse_normalization_tests.cpp \
+              tests/compiler/cobol/reverse_cli_tests.cpp \
               tests/compiler/cobol/tests.cpp \
               tests/compiler/tests.cpp \
               tests/logging_tests.cpp \
