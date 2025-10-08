@@ -85,6 +85,67 @@ following helpers:
   is shorter, and writes a status flag to the trailing return slot (`0` for
   success, `1` when the request exceeds the available source or destination
   space).
+- `CBLC-MEMCMP` compares two caller-supplied buffers (each up to 255 characters)
+  using their declared lengths, an explicit byte-count limit, and a trailing
+  signed result slot. The helper clamps the comparison to the smallest of the
+  declared lengths, the caller-provided count, and the 255-byte ceiling, never
+  reads past those limits, and writes `-1`, `0`, or `1` into the result
+  depending on the ordering of the examined bytes.
+- `CBLC-STRCAT` appends two caller-supplied alphanumeric buffers (each up to
+  255 characters) into a destination buffer passed by reference along with its
+  declared length. The helper scans the destination to find the existing
+  content length, appends the left operand followed by the right operand while
+  respecting the destination limit, reports truncation through a numeric status
+  flag, and writes the resulting character count into the trailing return slot.
+- `CBLC-ATOI` converts a caller-supplied alphanumeric buffer (up to 255
+  characters) that is passed by reference alongside a declared length supplied
+  by value. The helper trims leading spaces, accepts an optional sign, validates
+  that the remaining characters are decimal digits, and accumulates the value in
+  a signed `PIC S9(9)` result slot. It clamps processing to the declared length,
+  rejects non-digit characters or values outside the ±999,999,999 range, and
+  reports success or failure through a trailing numeric status flag while
+  preserving the original buffer. Callers reference the helper through
+  `std::atoi`.
+- `CBLC-ATOL` extends `CBLC-ATOI` to emit signed `PIC S9(18)` results suitable
+  for widened integer domains. It accepts the same calling convention, enforces
+  digit-only input, rejects values outside the ±999,999,999,999,999,999 range,
+  and reports status via the trailing numeric slot. Callers reference the helper
+  through `std::atol`.
+- `CBLC-ATOLL` mirrors the above helpers but widens the trailing result slot to
+  `PIC S9(36)` so callers can capture extended integral domains required by the
+  transpiler. The routine trims leading spaces, honors an optional sign, scans
+  digits within the caller-declared length (up to 255 characters), rejects
+  trailing non-space content, and reports overflow or invalid input through the
+  status flag while leaving the input buffer untouched. Callers reference the
+  helper through `std::atoll`.
+- `CBLC-TOUPPER` mutates a caller-supplied alphanumeric buffer (up to 255
+  characters) in place, converting any lowercase ASCII letters to uppercase.
+  Callers pass the buffer by reference, the declared length by value, and a
+  trailing numeric status slot by reference. The helper scans no more than the
+  declared length (clamped to 255), stops on NUL bytes, updates letters via
+  `INSPECT ... CONVERTING`, and leaves the status flag at `0` to report
+  success.
+- `CBLC-TOLOWER` mirrors `CBLC-TOUPPER` but converts uppercase ASCII letters to
+  lowercase while leaving other characters untouched. It respects the declared
+  length (capped at 255), stops on NUL bytes, and returns status `0` in the
+  trailing slot.
+- `CBLC-ISDIGIT` accepts a single-character alphanumeric operand by reference
+  along with a trailing numeric slot. It moves the operand into a working
+  storage buffer, checks whether the value falls within the ASCII `'0'`–`'9'`
+  range, and writes `1` to the result when it does (otherwise `0`). The helper
+  leaves the operand unmodified so callers can reuse the character.
+- `CBLC-ISALPHA` shares the same calling convention as `CBLC-ISDIGIT` but
+  recognizes uppercase and lowercase ASCII letters. It reports `1` for values in
+  the `'A'`–`'Z'` or `'a'`–`'z'` ranges and `0` for any other character without
+  altering the input.
+- `CBLC-POWEROF` raises a caller-supplied base to a caller-supplied exponent.
+  Both operands are passed by reference as `USAGE COMP-2` values along with a
+  trailing floating result slot and numeric status flag. The helper rejects
+  zero bases paired with non-positive exponents and negative bases paired with
+  fractional exponents by zeroing the result and returning status `1`. Valid
+  inputs compute `base ** exponent`, storing the floating result and reporting
+  status `0` (size errors or overflow also return status `1`). Callers reference
+  the helper through `std::pow`.
 - `CBLC-SQRT` accepts a floating operand (`USAGE COMP-2`) by reference along
   with a trailing floating result slot and numeric status flag. The helper
   rejects negative operands by zeroing the result and returning status `1`,
@@ -92,7 +153,7 @@ following helpers:
   result with status `0`. Callers reference the helper through `std::sqrt` and
   are expected to widen narrower numeric inputs before invocation.
 - Callers reference standard library helpers through the `std::` prefix (for
-  example, `std::strlen`, `std::strnlen`, `std::strcmp`, `std::strcpy`, `std::strncpy`, or `std::sqrt`), which resolves to the COBOL
+  example, `std::strlen`, `std::strnlen`, `std::strcmp`, `std::strcpy`, `std::strncpy`, `std::strcat`, or `std::sqrt`), which resolves to the COBOL
   subprogram names listed above and prevents collisions with user-defined
   procedures.
 
