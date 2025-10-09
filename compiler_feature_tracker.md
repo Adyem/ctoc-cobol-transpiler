@@ -64,10 +64,14 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Provide a `CBLC-STRCAT` standard library subprogram that concatenates two caller-supplied alphanumeric buffers using their declared lengths, respects the destination limit, reports truncation, and records the resulting size in the trailing return slot.
 - [x] Provide a `CBLC-MEMCMP` standard library subprogram that compares caller-supplied buffers using declared lengths plus an explicit byte-count, clamps reads to the narrowest limit, and writes a signed ordering result without overrunning inputs.
 - [x] Provide a `CBLC-POWEROF` standard library subprogram that raises caller-supplied operands to a caller-supplied exponent, widens to floating precision, rejects invalid domains, and reports status via a trailing numeric slot.
+- [x] Provide a `CBLC-STRTOD` standard library subprogram that parses caller-supplied alphanumeric operands into floating results, honors declared lengths, and reports invalid input or range errors through a trailing status slot.
+- [x] Provide `CBLC-ABS` and `CBLC-FABS` standard library subprograms that return magnitudes for integral (`PIC S9(36) COMP-5`) and floating (`USAGE COMP-2`) operands, clamp to caller-declared ranges, and report overflow via trailing status slots.
+- [x] Provide `CBLC-FLOOR` and `CBLC-CEIL` standard library subprograms that round floating (`USAGE COMP-2`) operands toward their respective infinities, return the adjusted value through a trailing slot, and report fractional adjustments via a status flag.
 - [x] Provide `CBLC-ATOI`, `CBLC-ATOL`, and `CBLC-ATOLL` standard library subprograms that convert caller-supplied alphanumeric buffers into signed numeric results, enforce digit-only input, clamp to declared widths, and report conversion status through a trailing numeric slot.
 - [x] Provide a `CBLC-SQRT` standard library subprogram that widens numeric operands to floating precision, rejects negative inputs, and returns the computed root via a trailing slot alongside a status flag.
 - [x] Provide `CBLC-TOUPPER` and `CBLC-TOLOWER` standard library subprograms that convert caller buffers between upper and lower case in place while respecting declared lengths and reporting status via a trailing numeric slot.
 - [x] Provide `CBLC-ISDIGIT` and `CBLC-ISALPHA` standard library subprograms that classify single-character operands without locale dependencies and report boolean results through trailing numeric slots.
+- [x] Provide `CBLC-EXP` and `CBLC-LOG` standard library subprograms that compute exponentials and natural logarithms for floating operands, clamp invalid domains or overflow via trailing status slots, and expose the helpers through `std::exp` and `std::log`.
 
 ## Pending Features
 
@@ -131,10 +135,6 @@ are completed; keep completed items grouped separately from the remaining work t
 
 ### Standard Library Subprogram Catalog
 
-- [ ] `strtod` helper: parse alphanumeric operands (`PIC X`, `PIC X(n)`, `PIC X(255)`) into floating representations (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`), populate the trailing return slot with the parsed value, and report range errors through diagnostics.
-- [ ] `fabs`/`abs` helpers: deliver absolute-value subprograms for integral (`PIC 9` through `PIC 9(36)`) and floating (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`) operands, writing results into the trailing return slot and propagating overflow diagnostics for minimum values.
-- [ ] `floor`/`ceil` helpers: provide rounding primitives that accept floating operands (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`) and optionally integral inputs, producing results in the same type domain within the trailing return slot while flagging scale adjustments.
-- [ ] `exp`/`log` helpers: expose exponential and natural-log functions for floating (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`) operands with integral widening support, materializing the result through the trailing slot and emitting diagnostics for out-of-domain arguments or overflow.
 - [ ] `sin`/`cos`/`tan` helpers: implement trigonometric routines that accept floating operands (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`) and optional integral inputs coerced to floating, returning floating results and tracking domain/precision diagnostics.
 - [ ] Additional numeric helpers: track future candidates such as `cbrt`, `hypot`, `min`/`max`, or `clamp` that should accept the same integral and floating domains defined above, ensuring the standard library surface mirrors common CBL-C idioms once return-slot plumbing lands.
 

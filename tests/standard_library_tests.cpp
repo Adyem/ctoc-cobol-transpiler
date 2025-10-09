@@ -1043,6 +1043,17 @@ FT_TEST(test_standard_library_lookup_enforces_std_prefix)
 {
     const t_transpiler_standard_library_entry *entry;
 
+    entry = transpiler_standard_library_lookup("std::abs");
+    if (!entry)
+    {
+        pf_printf("Assertion failed: std::abs should resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-ABS", ft_strlen("CBLC-ABS") + 1) != 0)
+    {
+        pf_printf("Assertion failed: std::abs should map to CBLC-ABS program\n");
+        return (FT_FAILURE);
+    }
     entry = transpiler_standard_library_lookup("std::atoi");
     if (!entry)
     {
@@ -1074,6 +1085,61 @@ FT_TEST(test_standard_library_lookup_enforces_std_prefix)
     if (ft_strncmp(entry->program_name, "CBLC-ATOLL", ft_strlen("CBLC-ATOLL") + 1) != 0)
     {
         pf_printf("Assertion failed: std::atoll should map to CBLC-ATOLL program\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup("std::fabs");
+    if (!entry)
+    {
+        pf_printf("Assertion failed: std::fabs should resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-FABS", ft_strlen("CBLC-FABS") + 1) != 0)
+    {
+        pf_printf("Assertion failed: std::fabs should map to CBLC-FABS program\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup("std::floor");
+    if (!entry)
+    {
+        pf_printf("Assertion failed: std::floor should resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-FLOOR", ft_strlen("CBLC-FLOOR") + 1) != 0)
+    {
+        pf_printf("Assertion failed: std::floor should map to CBLC-FLOOR program\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup("std::ceil");
+    if (!entry)
+    {
+        pf_printf("Assertion failed: std::ceil should resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-CEIL", ft_strlen("CBLC-CEIL") + 1) != 0)
+    {
+        pf_printf("Assertion failed: std::ceil should map to CBLC-CEIL program\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup("std::exp");
+    if (!entry)
+    {
+        pf_printf("Assertion failed: std::exp should resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-EXP", ft_strlen("CBLC-EXP") + 1) != 0)
+    {
+        pf_printf("Assertion failed: std::exp should map to CBLC-EXP program\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup("std::log");
+    if (!entry)
+    {
+        pf_printf("Assertion failed: std::log should resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-LOG", ft_strlen("CBLC-LOG") + 1) != 0)
+    {
+        pf_printf("Assertion failed: std::log should map to CBLC-LOG program\n");
         return (FT_FAILURE);
     }
     entry = transpiler_standard_library_lookup("std::strlen");
@@ -1151,6 +1217,17 @@ FT_TEST(test_standard_library_lookup_enforces_std_prefix)
     if (ft_strncmp(entry->program_name, "CBLC-STRCAT", ft_strlen("CBLC-STRCAT") + 1) != 0)
     {
         pf_printf("Assertion failed: std::strcat should map to CBLC-STRCAT program\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup("std::strtod");
+    if (!entry)
+    {
+        pf_printf("Assertion failed: std::strtod should resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-STRTOD", ft_strlen("CBLC-STRTOD") + 1) != 0)
+    {
+        pf_printf("Assertion failed: std::strtod should map to CBLC-STRTOD program\n");
         return (FT_FAILURE);
     }
     entry = transpiler_standard_library_lookup("std::pow");
@@ -1261,6 +1338,30 @@ FT_TEST(test_standard_library_lookup_enforces_std_prefix)
         pf_printf("Assertion failed: unqualified strcat should not resolve to standard library entry\n");
         return (FT_FAILURE);
     }
+    entry = transpiler_standard_library_lookup("fabs");
+    if (entry)
+    {
+        pf_printf("Assertion failed: unqualified fabs should not resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup("floor");
+    if (entry)
+    {
+        pf_printf("Assertion failed: unqualified floor should not resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup("ceil");
+    if (entry)
+    {
+        pf_printf("Assertion failed: unqualified ceil should not resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup("strtod");
+    if (entry)
+    {
+        pf_printf("Assertion failed: unqualified strtod should not resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
     entry = transpiler_standard_library_lookup("sqrt");
     if (entry)
     {
@@ -1277,6 +1378,12 @@ FT_TEST(test_standard_library_lookup_enforces_std_prefix)
     if (entry)
     {
         pf_printf("Assertion failed: unqualified tolower should not resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup("abs");
+    if (entry)
+    {
+        pf_printf("Assertion failed: unqualified abs should not resolve to standard library entry\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -1330,89 +1437,124 @@ FT_TEST(test_standard_library_catalog_lists_all_entries)
         pf_printf("Assertion failed: catalog should return entry table\n");
         return (FT_FAILURE);
     }
-    if (count != 16)
+    if (count != 23)
     {
-        pf_printf("Assertion failed: catalog should report sixteen standard library entries but returned %u\n", static_cast<unsigned int>(count));
+        pf_printf("Assertion failed: catalog should report twenty-three standard library entries but returned %u\n", static_cast<unsigned int>(count));
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[0].qualified_name, "std::atoi", ft_strlen("std::atoi") + 1) != 0)
+    if (ft_strncmp(entries[0].qualified_name, "std::abs", ft_strlen("std::abs") + 1) != 0)
     {
-        pf_printf("Assertion failed: first catalog entry should be std::atoi\n");
+        pf_printf("Assertion failed: first catalog entry should be std::abs\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[1].qualified_name, "std::atol", ft_strlen("std::atol") + 1) != 0)
+    if (ft_strncmp(entries[1].qualified_name, "std::atoi", ft_strlen("std::atoi") + 1) != 0)
     {
-        pf_printf("Assertion failed: second catalog entry should be std::atol\n");
+        pf_printf("Assertion failed: second catalog entry should be std::atoi\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[2].qualified_name, "std::atoll", ft_strlen("std::atoll") + 1) != 0)
+    if (ft_strncmp(entries[2].qualified_name, "std::atol", ft_strlen("std::atol") + 1) != 0)
     {
-        pf_printf("Assertion failed: third catalog entry should be std::atoll\n");
+        pf_printf("Assertion failed: third catalog entry should be std::atol\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[3].qualified_name, "std::strlen", ft_strlen("std::strlen") + 1) != 0)
+    if (ft_strncmp(entries[3].qualified_name, "std::atoll", ft_strlen("std::atoll") + 1) != 0)
     {
-        pf_printf("Assertion failed: fourth catalog entry should be std::strlen\n");
+        pf_printf("Assertion failed: fourth catalog entry should be std::atoll\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[4].qualified_name, "std::strnlen", ft_strlen("std::strnlen") + 1) != 0)
+    if (ft_strncmp(entries[4].qualified_name, "std::fabs", ft_strlen("std::fabs") + 1) != 0)
     {
-        pf_printf("Assertion failed: fifth catalog entry should be std::strnlen\n");
+        pf_printf("Assertion failed: fifth catalog entry should be std::fabs\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[5].qualified_name, "std::strcmp", ft_strlen("std::strcmp") + 1) != 0)
+    if (ft_strncmp(entries[5].qualified_name, "std::floor", ft_strlen("std::floor") + 1) != 0)
     {
-        pf_printf("Assertion failed: sixth catalog entry should be std::strcmp\n");
+        pf_printf("Assertion failed: sixth catalog entry should be std::floor\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[6].qualified_name, "std::strcpy", ft_strlen("std::strcpy") + 1) != 0)
+    if (ft_strncmp(entries[6].qualified_name, "std::ceil", ft_strlen("std::ceil") + 1) != 0)
     {
-        pf_printf("Assertion failed: seventh catalog entry should be std::strcpy\n");
+        pf_printf("Assertion failed: seventh catalog entry should be std::ceil\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[7].qualified_name, "std::strncpy", ft_strlen("std::strncpy") + 1) != 0)
+    if (ft_strncmp(entries[7].qualified_name, "std::exp", ft_strlen("std::exp") + 1) != 0)
     {
-        pf_printf("Assertion failed: eighth catalog entry should be std::strncpy\n");
+        pf_printf("Assertion failed: eighth catalog entry should be std::exp\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[8].qualified_name, "std::memcmp", ft_strlen("std::memcmp") + 1) != 0)
+    if (ft_strncmp(entries[8].qualified_name, "std::log", ft_strlen("std::log") + 1) != 0)
     {
-        pf_printf("Assertion failed: ninth catalog entry should be std::memcmp\n");
+        pf_printf("Assertion failed: ninth catalog entry should be std::log\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[9].qualified_name, "std::strcat", ft_strlen("std::strcat") + 1) != 0)
+    if (ft_strncmp(entries[9].qualified_name, "std::strlen", ft_strlen("std::strlen") + 1) != 0)
     {
-        pf_printf("Assertion failed: tenth catalog entry should be std::strcat\n");
+        pf_printf("Assertion failed: tenth catalog entry should be std::strlen\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[10].qualified_name, "std::pow", ft_strlen("std::pow") + 1) != 0)
+    if (ft_strncmp(entries[10].qualified_name, "std::strnlen", ft_strlen("std::strnlen") + 1) != 0)
     {
-        pf_printf("Assertion failed: eleventh catalog entry should be std::pow\n");
+        pf_printf("Assertion failed: eleventh catalog entry should be std::strnlen\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[11].qualified_name, "std::sqrt", ft_strlen("std::sqrt") + 1) != 0)
+    if (ft_strncmp(entries[11].qualified_name, "std::strcmp", ft_strlen("std::strcmp") + 1) != 0)
     {
-        pf_printf("Assertion failed: twelfth catalog entry should be std::sqrt\n");
+        pf_printf("Assertion failed: twelfth catalog entry should be std::strcmp\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[12].qualified_name, "std::toupper", ft_strlen("std::toupper") + 1) != 0)
+    if (ft_strncmp(entries[12].qualified_name, "std::strcpy", ft_strlen("std::strcpy") + 1) != 0)
     {
-        pf_printf("Assertion failed: thirteenth catalog entry should be std::toupper\n");
+        pf_printf("Assertion failed: thirteenth catalog entry should be std::strcpy\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[13].qualified_name, "std::tolower", ft_strlen("std::tolower") + 1) != 0)
+    if (ft_strncmp(entries[13].qualified_name, "std::strncpy", ft_strlen("std::strncpy") + 1) != 0)
     {
-        pf_printf("Assertion failed: fourteenth catalog entry should be std::tolower\n");
+        pf_printf("Assertion failed: fourteenth catalog entry should be std::strncpy\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[14].qualified_name, "std::isdigit", ft_strlen("std::isdigit") + 1) != 0)
+    if (ft_strncmp(entries[14].qualified_name, "std::memcmp", ft_strlen("std::memcmp") + 1) != 0)
     {
-        pf_printf("Assertion failed: fifteenth catalog entry should be std::isdigit\n");
+        pf_printf("Assertion failed: fifteenth catalog entry should be std::memcmp\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[15].qualified_name, "std::isalpha", ft_strlen("std::isalpha") + 1) != 0)
+    if (ft_strncmp(entries[15].qualified_name, "std::strcat", ft_strlen("std::strcat") + 1) != 0)
     {
-        pf_printf("Assertion failed: sixteenth catalog entry should be std::isalpha\n");
+        pf_printf("Assertion failed: sixteenth catalog entry should be std::strcat\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entries[16].qualified_name, "std::strtod", ft_strlen("std::strtod") + 1) != 0)
+    {
+        pf_printf("Assertion failed: seventeenth catalog entry should be std::strtod\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entries[17].qualified_name, "std::pow", ft_strlen("std::pow") + 1) != 0)
+    {
+        pf_printf("Assertion failed: eighteenth catalog entry should be std::pow\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entries[18].qualified_name, "std::sqrt", ft_strlen("std::sqrt") + 1) != 0)
+    {
+        pf_printf("Assertion failed: nineteenth catalog entry should be std::sqrt\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entries[19].qualified_name, "std::toupper", ft_strlen("std::toupper") + 1) != 0)
+    {
+        pf_printf("Assertion failed: twentieth catalog entry should be std::toupper\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entries[20].qualified_name, "std::tolower", ft_strlen("std::tolower") + 1) != 0)
+    {
+        pf_printf("Assertion failed: twenty-first catalog entry should be std::tolower\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entries[21].qualified_name, "std::isdigit", ft_strlen("std::isdigit") + 1) != 0)
+    {
+        pf_printf("Assertion failed: twenty-second catalog entry should be std::isdigit\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entries[22].qualified_name, "std::isalpha", ft_strlen("std::isalpha") + 1) != 0)
+    {
+        pf_printf("Assertion failed: twenty-third catalog entry should be std::isalpha\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -1420,6 +1562,16 @@ FT_TEST(test_standard_library_catalog_lists_all_entries)
 
 FT_TEST(test_standard_library_generators_validate_out_parameter)
 {
+    if (transpiler_standard_library_generate_abs(NULL) != FT_FAILURE)
+    {
+        pf_printf("Assertion failed: abs generator should reject NULL output pointer\n");
+        return (FT_FAILURE);
+    }
+    if (transpiler_standard_library_generate_fabs(NULL) != FT_FAILURE)
+    {
+        pf_printf("Assertion failed: fabs generator should reject NULL output pointer\n");
+        return (FT_FAILURE);
+    }
     if (transpiler_standard_library_generate_strlen(NULL) != FT_FAILURE)
     {
         pf_printf("Assertion failed: strlen generator should reject NULL output pointer\n");
@@ -1453,6 +1605,21 @@ FT_TEST(test_standard_library_generators_validate_out_parameter)
     if (transpiler_standard_library_generate_strcat(NULL) != FT_FAILURE)
     {
         pf_printf("Assertion failed: strcat generator should reject NULL output pointer\n");
+        return (FT_FAILURE);
+    }
+    if (transpiler_standard_library_generate_strtod(NULL) != FT_FAILURE)
+    {
+        pf_printf("Assertion failed: strtod generator should reject NULL output pointer\n");
+        return (FT_FAILURE);
+    }
+    if (transpiler_standard_library_generate_exp(NULL) != FT_FAILURE)
+    {
+        pf_printf("Assertion failed: exp generator should reject NULL output pointer\n");
+        return (FT_FAILURE);
+    }
+    if (transpiler_standard_library_generate_log(NULL) != FT_FAILURE)
+    {
+        pf_printf("Assertion failed: log generator should reject NULL output pointer\n");
         return (FT_FAILURE);
     }
     if (transpiler_standard_library_generate_powerof(NULL) != FT_FAILURE)
@@ -3211,6 +3378,868 @@ FT_TEST(test_standard_library_strcat_generates_expected_text)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_standard_library_abs_generates_expected_text)
+{
+    char *program_text;
+    const char *expected_text;
+    int status;
+
+    program_text = NULL;
+    expected_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. CBLC-ABS.\n"
+        "       DATA DIVISION.\n"
+        "       LINKAGE SECTION.\n"
+        "       01 LNK-OPERAND PIC S9(36) COMP-5.\n"
+        "       01 LNK-RESULT PIC S9(36) COMP-5.\n"
+        "       01 LNK-STATUS PIC 9.\n"
+        "       PROCEDURE DIVISION USING BY REFERENCE LNK-OPERAND\n"
+        "           BY REFERENCE LNK-RESULT BY REFERENCE LNK-STATUS.\n"
+        "       MAIN.\n"
+        "           MOVE 0 TO LNK-STATUS.\n"
+        "           MOVE LNK-OPERAND TO LNK-RESULT.\n"
+        "           IF LNK-RESULT < 0\n"
+        "               COMPUTE LNK-RESULT = 0 - LNK-RESULT\n"
+        "                   ON SIZE ERROR\n"
+        "                       MOVE 1 TO LNK-STATUS\n"
+        "                       MOVE 0 TO LNK-RESULT\n"
+        "               END-COMPUTE\n"
+        "           END-IF.\n"
+        "           GOBACK.\n"
+        "       END PROGRAM CBLC-ABS.\n";
+    if (test_expect_success(transpiler_standard_library_generate_abs(&program_text),
+            "abs generator should succeed") != FT_SUCCESS)
+    {
+        if (program_text)
+            cma_free(program_text);
+        return (FT_FAILURE);
+    }
+    status = test_expect_cstring_equal(program_text, expected_text,
+        "abs generator should emit expected COBOL subprogram");
+    if (program_text)
+        cma_free(program_text);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_fabs_generates_expected_text)
+{
+    char *program_text;
+    const char *expected_text;
+    int status;
+
+    program_text = NULL;
+    expected_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. CBLC-FABS.\n"
+        "       DATA DIVISION.\n"
+        "       LINKAGE SECTION.\n"
+        "       01 LNK-OPERAND USAGE COMP-2.\n"
+        "       01 LNK-RESULT USAGE COMP-2.\n"
+        "       01 LNK-STATUS PIC 9.\n"
+        "       PROCEDURE DIVISION USING BY REFERENCE LNK-OPERAND\n"
+        "           BY REFERENCE LNK-RESULT BY REFERENCE LNK-STATUS.\n"
+        "       MAIN.\n"
+        "           MOVE 0 TO LNK-STATUS.\n"
+        "           COMPUTE LNK-RESULT = FUNCTION ABS(LNK-OPERAND).\n"
+        "           GOBACK.\n"
+        "       END PROGRAM CBLC-FABS.\n";
+    if (test_expect_success(transpiler_standard_library_generate_fabs(&program_text),
+            "fabs generator should succeed") != FT_SUCCESS)
+    {
+        if (program_text)
+            cma_free(program_text);
+        return (FT_FAILURE);
+    }
+    status = test_expect_cstring_equal(program_text, expected_text,
+        "fabs generator should emit expected COBOL subprogram");
+    if (program_text)
+        cma_free(program_text);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_floor_generates_expected_text)
+{
+    char *program_text;
+    const char *expected_text;
+    int status;
+
+    program_text = NULL;
+    expected_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. CBLC-FLOOR.\n"
+        "       DATA DIVISION.\n"
+        "       LINKAGE SECTION.\n"
+        "       01 LNK-OPERAND USAGE COMP-2.\n"
+        "       01 LNK-RESULT USAGE COMP-2.\n"
+        "       01 LNK-STATUS PIC 9.\n"
+        "       PROCEDURE DIVISION USING BY REFERENCE LNK-OPERAND\n"
+        "           BY REFERENCE LNK-RESULT BY REFERENCE LNK-STATUS.\n"
+        "       MAIN.\n"
+        "           MOVE 0 TO LNK-STATUS.\n"
+        "           COMPUTE LNK-RESULT = FUNCTION INTEGER-PART(LNK-OPERAND).\n"
+        "           IF LNK-OPERAND NOT = LNK-RESULT\n"
+        "               MOVE 1 TO LNK-STATUS\n"
+        "               IF LNK-OPERAND < 0\n"
+        "                   COMPUTE LNK-RESULT = LNK-RESULT - 1\n"
+        "               END-IF\n"
+        "           END-IF.\n"
+        "           GOBACK.\n"
+        "       END PROGRAM CBLC-FLOOR.\n";
+    if (test_expect_success(transpiler_standard_library_generate_floor(&program_text),
+            "floor generator should succeed") != FT_SUCCESS)
+    {
+        if (program_text)
+            cma_free(program_text);
+        return (FT_FAILURE);
+    }
+    status = test_expect_cstring_equal(program_text, expected_text,
+        "floor generator should emit expected COBOL subprogram");
+    if (program_text)
+        cma_free(program_text);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_ceil_generates_expected_text)
+{
+    char *program_text;
+    const char *expected_text;
+    int status;
+
+    program_text = NULL;
+    expected_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. CBLC-CEIL.\n"
+        "       DATA DIVISION.\n"
+        "       LINKAGE SECTION.\n"
+        "       01 LNK-OPERAND USAGE COMP-2.\n"
+        "       01 LNK-RESULT USAGE COMP-2.\n"
+        "       01 LNK-STATUS PIC 9.\n"
+        "       PROCEDURE DIVISION USING BY REFERENCE LNK-OPERAND\n"
+        "           BY REFERENCE LNK-RESULT BY REFERENCE LNK-STATUS.\n"
+        "       MAIN.\n"
+        "           MOVE 0 TO LNK-STATUS.\n"
+        "           COMPUTE LNK-RESULT = FUNCTION INTEGER-PART(LNK-OPERAND).\n"
+        "           IF LNK-OPERAND NOT = LNK-RESULT\n"
+        "               MOVE 1 TO LNK-STATUS\n"
+        "               IF LNK-OPERAND > 0\n"
+        "                   COMPUTE LNK-RESULT = LNK-RESULT + 1\n"
+        "               END-IF\n"
+        "           END-IF.\n"
+        "           GOBACK.\n"
+        "       END PROGRAM CBLC-CEIL.\n";
+    if (test_expect_success(transpiler_standard_library_generate_ceil(&program_text),
+            "ceil generator should succeed") != FT_SUCCESS)
+    {
+        if (program_text)
+            cma_free(program_text);
+        return (FT_FAILURE);
+    }
+    status = test_expect_cstring_equal(program_text, expected_text,
+        "ceil generator should emit expected COBOL subprogram");
+    if (program_text)
+        cma_free(program_text);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_exp_generates_expected_text)
+{
+    char *program_text;
+    const char *expected_text;
+    int status;
+
+    program_text = NULL;
+    expected_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. CBLC-EXP.\n"
+        "       DATA DIVISION.\n"
+        "       LINKAGE SECTION.\n"
+        "       01 LNK-OPERAND USAGE COMP-2.\n"
+        "       01 LNK-RESULT USAGE COMP-2.\n"
+        "       01 LNK-STATUS PIC 9.\n"
+        "       PROCEDURE DIVISION USING BY REFERENCE LNK-OPERAND\n"
+        "           BY REFERENCE LNK-RESULT BY REFERENCE LNK-STATUS.\n"
+        "       MAIN.\n"
+        "           MOVE 0 TO LNK-STATUS.\n"
+        "           COMPUTE LNK-RESULT = FUNCTION EXP(LNK-OPERAND)\n"
+        "               ON SIZE ERROR\n"
+        "                   MOVE 1 TO LNK-STATUS\n"
+        "                   MOVE 0 TO LNK-RESULT\n"
+        "           END-COMPUTE.\n"
+        "           GOBACK.\n"
+        "       END PROGRAM CBLC-EXP.\n";
+    if (test_expect_success(transpiler_standard_library_generate_exp(&program_text),
+            "exp generator should succeed") != FT_SUCCESS)
+    {
+        if (program_text)
+            cma_free(program_text);
+        return (FT_FAILURE);
+    }
+    status = test_expect_cstring_equal(program_text, expected_text,
+        "exp generator should emit expected COBOL subprogram");
+    if (program_text)
+        cma_free(program_text);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_log_generates_expected_text)
+{
+    char *program_text;
+    const char *expected_text;
+    int status;
+
+    program_text = NULL;
+    expected_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. CBLC-LOG.\n"
+        "       DATA DIVISION.\n"
+        "       LINKAGE SECTION.\n"
+        "       01 LNK-OPERAND USAGE COMP-2.\n"
+        "       01 LNK-RESULT USAGE COMP-2.\n"
+        "       01 LNK-STATUS PIC 9.\n"
+        "       PROCEDURE DIVISION USING BY REFERENCE LNK-OPERAND\n"
+        "           BY REFERENCE LNK-RESULT BY REFERENCE LNK-STATUS.\n"
+        "       MAIN.\n"
+        "           MOVE 0 TO LNK-STATUS.\n"
+        "           IF LNK-OPERAND <= 0\n"
+        "               MOVE 1 TO LNK-STATUS\n"
+        "               MOVE 0 TO LNK-RESULT\n"
+        "               GOBACK\n"
+        "           END-IF.\n"
+        "           COMPUTE LNK-RESULT = FUNCTION LOG(LNK-OPERAND)\n"
+        "               ON SIZE ERROR\n"
+        "                   MOVE 1 TO LNK-STATUS\n"
+        "                   MOVE 0 TO LNK-RESULT\n"
+        "           END-COMPUTE.\n"
+        "           GOBACK.\n"
+        "       END PROGRAM CBLC-LOG.\n";
+    if (test_expect_success(transpiler_standard_library_generate_log(&program_text),
+            "log generator should succeed") != FT_SUCCESS)
+    {
+        if (program_text)
+            cma_free(program_text);
+        return (FT_FAILURE);
+    }
+    status = test_expect_cstring_equal(program_text, expected_text,
+        "log generator should emit expected COBOL subprogram");
+    if (program_text)
+        cma_free(program_text);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_strtod_generates_expected_text)
+{
+    char *program_text;
+    const char *expected_text;
+    int status;
+
+    program_text = NULL;
+    expected_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. CBLC-STRTOD.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 IDX PIC 9(9) VALUE 000000000.\n"
+        "       01 SCAN-LIMIT PIC 9(9) VALUE 000000000.\n"
+        "       01 ACTUAL-LENGTH PIC 9(9) VALUE 000000000.\n"
+        "       01 START-INDEX PIC 9(9) VALUE 000000001.\n"
+        "       01 END-INDEX PIC 9(9) VALUE 000000000.\n"
+        "       01 NORMALIZED-LENGTH PIC 9(9) VALUE 000000000.\n"
+        "       01 NORMALIZED-BUFFER PIC X(255) VALUE SPACES.\n"
+        "       01 CURRENT-CHAR PIC X VALUE SPACE.\n"
+        "       01 HAS-ANY-DIGIT PIC 9 VALUE 0.\n"
+        "       01 HAS-DECIMAL PIC 9 VALUE 0.\n"
+        "       01 HAS-EXPONENT PIC 9 VALUE 0.\n"
+        "       01 EXPONENT-DIGITS PIC 9(9) VALUE 000000000.\n"
+        "       01 EXPECT-EXPONENT-SIGN PIC 9 VALUE 0.\n"
+        "       LINKAGE SECTION.\n"
+        "       01 LNK-SOURCE PIC X(255).\n"
+        "       01 LNK-SOURCE-LENGTH PIC S9(9) COMP-5.\n"
+        "       01 LNK-RESULT USAGE COMP-2.\n"
+        "       01 LNK-STATUS PIC 9.\n"
+        "       PROCEDURE DIVISION USING BY REFERENCE LNK-SOURCE\n"
+        "           BY VALUE LNK-SOURCE-LENGTH BY REFERENCE LNK-RESULT\n"
+        "           BY REFERENCE LNK-STATUS.\n"
+        "       MAIN.\n"
+        "           MOVE 0 TO LNK-STATUS.\n"
+        "           MOVE 0 TO LNK-RESULT.\n"
+        "           MOVE LNK-SOURCE-LENGTH TO SCAN-LIMIT.\n"
+        "           IF SCAN-LIMIT > 255\n"
+        "               MOVE 255 TO SCAN-LIMIT\n"
+        "           END-IF.\n"
+        "           MOVE 0 TO ACTUAL-LENGTH.\n"
+        "           MOVE 0 TO IDX.\n"
+        "           PERFORM VARYING IDX FROM 1 BY 1 UNTIL IDX > SCAN-LIMIT\n"
+        "               IF LNK-SOURCE(IDX:1) = LOW-VALUE\n"
+        "                   EXIT PERFORM\n"
+        "               END-IF\n"
+        "               MOVE IDX TO ACTUAL-LENGTH\n"
+        "           END-PERFORM.\n"
+        "           IF ACTUAL-LENGTH = 0\n"
+        "               MOVE SCAN-LIMIT TO ACTUAL-LENGTH\n"
+        "           END-IF.\n"
+        "           MOVE 1 TO START-INDEX.\n"
+        "           PERFORM VARYING START-INDEX FROM 1 BY 1 UNTIL START-INDEX > ACTUAL-LENGTH\n"
+        "               IF LNK-SOURCE(START-INDEX:1) NOT = SPACE\n"
+        "                   EXIT PERFORM\n"
+        "               END-IF\n"
+        "           END-PERFORM.\n"
+        "           IF START-INDEX > ACTUAL-LENGTH\n"
+        "               MOVE 1 TO LNK-STATUS\n"
+        "               MOVE 0 TO LNK-RESULT\n"
+        "               GOBACK\n"
+        "           END-IF.\n"
+        "           MOVE ACTUAL-LENGTH TO END-INDEX.\n"
+        "           PERFORM UNTIL END-INDEX < START-INDEX\n"
+        "               MOVE LNK-SOURCE(END-INDEX:1) TO CURRENT-CHAR\n"
+        "               IF CURRENT-CHAR NOT = SPACE AND CURRENT-CHAR NOT = LOW-VALUE\n"
+        "                   EXIT PERFORM\n"
+        "               END-IF\n"
+        "               COMPUTE END-INDEX = END-INDEX - 1\n"
+        "           END-PERFORM.\n"
+        "           IF END-INDEX < START-INDEX\n"
+        "               MOVE 1 TO LNK-STATUS\n"
+        "               MOVE 0 TO LNK-RESULT\n"
+        "               GOBACK\n"
+        "           END-IF.\n"
+        "           MOVE 0 TO NORMALIZED-LENGTH.\n"
+        "           MOVE SPACES TO NORMALIZED-BUFFER.\n"
+        "           MOVE 0 TO HAS-ANY-DIGIT.\n"
+        "           MOVE 0 TO HAS-DECIMAL.\n"
+        "           MOVE 0 TO HAS-EXPONENT.\n"
+        "           MOVE 0 TO EXPONENT-DIGITS.\n"
+        "           MOVE 0 TO EXPECT-EXPONENT-SIGN.\n"
+        "           PERFORM VARYING IDX FROM START-INDEX BY 1 UNTIL IDX > END-INDEX\n"
+        "               MOVE LNK-SOURCE(IDX:1) TO CURRENT-CHAR\n"
+        "               IF CURRENT-CHAR = SPACE OR CURRENT-CHAR = LOW-VALUE\n"
+        "                   MOVE 1 TO LNK-STATUS\n"
+        "                   MOVE 0 TO LNK-RESULT\n"
+        "                   GOBACK\n"
+        "               END-IF\n"
+        "               EVALUATE TRUE\n"
+        "                   WHEN CURRENT-CHAR >= \"0\" AND CURRENT-CHAR <= \"9\"\n"
+        "                       IF NORMALIZED-LENGTH >= 255\n"
+        "                           MOVE 1 TO LNK-STATUS\n"
+        "                           MOVE 0 TO LNK-RESULT\n"
+        "                           GOBACK\n"
+        "                       END-IF\n"
+        "                       ADD 1 TO NORMALIZED-LENGTH\n"
+        "                       MOVE CURRENT-CHAR TO NORMALIZED-BUFFER(NORMALIZED-LENGTH:1)\n"
+        "                       MOVE 1 TO HAS-ANY-DIGIT\n"
+        "                       IF HAS-EXPONENT = 1\n"
+        "                           ADD 1 TO EXPONENT-DIGITS\n"
+        "                       END-IF\n"
+        "                       MOVE 0 TO EXPECT-EXPONENT-SIGN\n"
+        "                   WHEN CURRENT-CHAR = \".\"\n"
+        "                       IF HAS-DECIMAL = 1 OR HAS-EXPONENT = 1\n"
+        "                           MOVE 1 TO LNK-STATUS\n"
+        "                           MOVE 0 TO LNK-RESULT\n"
+        "                           GOBACK\n"
+        "                       END-IF\n"
+        "                       IF NORMALIZED-LENGTH >= 255\n"
+        "                           MOVE 1 TO LNK-STATUS\n"
+        "                           MOVE 0 TO LNK-RESULT\n"
+        "                           GOBACK\n"
+        "                       END-IF\n"
+        "                       ADD 1 TO NORMALIZED-LENGTH\n"
+        "                       MOVE \".\" TO NORMALIZED-BUFFER(NORMALIZED-LENGTH:1)\n"
+        "                       MOVE 1 TO HAS-DECIMAL\n"
+        "                   WHEN CURRENT-CHAR = \"E\" OR CURRENT-CHAR = \"e\"\n"
+        "                       IF HAS-EXPONENT = 1 OR HAS-ANY-DIGIT = 0\n"
+        "                           MOVE 1 TO LNK-STATUS\n"
+        "                           MOVE 0 TO LNK-RESULT\n"
+        "                           GOBACK\n"
+        "                       END-IF\n"
+        "                       IF NORMALIZED-LENGTH >= 255\n"
+        "                           MOVE 1 TO LNK-STATUS\n"
+        "                           MOVE 0 TO LNK-RESULT\n"
+        "                           GOBACK\n"
+        "                       END-IF\n"
+        "                       ADD 1 TO NORMALIZED-LENGTH\n"
+        "                       MOVE \"E\" TO NORMALIZED-BUFFER(NORMALIZED-LENGTH:1)\n"
+        "                       MOVE 1 TO HAS-EXPONENT\n"
+        "                       MOVE 0 TO EXPONENT-DIGITS\n"
+        "                       MOVE 1 TO EXPECT-EXPONENT-SIGN\n"
+        "                   WHEN CURRENT-CHAR = \"+\" OR CURRENT-CHAR = \"-\"\n"
+        "                       IF NORMALIZED-LENGTH = 0\n"
+        "                           IF NORMALIZED-LENGTH >= 255\n"
+        "                               MOVE 1 TO LNK-STATUS\n"
+        "                               MOVE 0 TO LNK-RESULT\n"
+        "                               GOBACK\n"
+        "                           END-IF\n"
+        "                           ADD 1 TO NORMALIZED-LENGTH\n"
+        "                           MOVE CURRENT-CHAR TO NORMALIZED-BUFFER(NORMALIZED-LENGTH:1)\n"
+        "                       ELSE\n"
+        "                           IF EXPECT-EXPONENT-SIGN = 1\n"
+        "                               IF NORMALIZED-LENGTH >= 255\n"
+        "                                   MOVE 1 TO LNK-STATUS\n"
+        "                                   MOVE 0 TO LNK-RESULT\n"
+        "                                   GOBACK\n"
+        "                               END-IF\n"
+        "                               ADD 1 TO NORMALIZED-LENGTH\n"
+        "                               MOVE CURRENT-CHAR TO NORMALIZED-BUFFER(NORMALIZED-LENGTH:1)\n"
+        "                               MOVE 0 TO EXPECT-EXPONENT-SIGN\n"
+        "                           ELSE\n"
+        "                               MOVE 1 TO LNK-STATUS\n"
+        "                               MOVE 0 TO LNK-RESULT\n"
+        "                               GOBACK\n"
+        "                           END-IF\n"
+        "                       END-IF\n"
+        "                   WHEN OTHER\n"
+        "                       MOVE 1 TO LNK-STATUS\n"
+        "                       MOVE 0 TO LNK-RESULT\n"
+        "                       GOBACK\n"
+        "               END-EVALUATE\n"
+        "           END-PERFORM.\n"
+        "           IF NORMALIZED-LENGTH = 0\n"
+        "               MOVE 1 TO LNK-STATUS\n"
+        "               MOVE 0 TO LNK-RESULT\n"
+        "               GOBACK\n"
+        "           END-IF.\n"
+        "           IF HAS-ANY-DIGIT = 0\n"
+        "               MOVE 1 TO LNK-STATUS\n"
+        "               MOVE 0 TO LNK-RESULT\n"
+        "               GOBACK\n"
+        "           END-IF.\n"
+        "           IF HAS-EXPONENT = 1 AND EXPONENT-DIGITS = 0\n"
+        "               MOVE 1 TO LNK-STATUS\n"
+        "               MOVE 0 TO LNK-RESULT\n"
+        "               GOBACK\n"
+        "           END-IF.\n"
+        "           IF EXPECT-EXPONENT-SIGN = 1\n"
+        "               MOVE 1 TO LNK-STATUS\n"
+        "               MOVE 0 TO LNK-RESULT\n"
+        "               GOBACK\n"
+        "           END-IF.\n"
+        "           COMPUTE LNK-RESULT = FUNCTION NUMVAL(NORMALIZED-BUFFER(1:NORMALIZED-LENGTH))\n"
+        "               ON SIZE ERROR\n"
+        "                   MOVE 1 TO LNK-STATUS\n"
+        "                   MOVE 0 TO LNK-RESULT\n"
+        "                   GOBACK\n"
+        "           END-COMPUTE.\n"
+        "           MOVE 0 TO LNK-STATUS.\n"
+        "           GOBACK.\n"
+        "       END PROGRAM CBLC-STRTOD.\n";
+    if (test_expect_success(transpiler_standard_library_generate_strtod(&program_text),
+            "strtod generator should succeed") != FT_SUCCESS)
+    {
+        if (program_text)
+            cma_free(program_text);
+        return (FT_FAILURE);
+    }
+    status = test_expect_cstring_equal(program_text, expected_text,
+        "strtod generator should emit expected COBOL subprogram");
+    if (program_text)
+        cma_free(program_text);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_strtod_parses_scientific_notation)
+{
+    const char *library_path;
+    const char *driver_path;
+    const char *binary_path;
+    const char *output_path;
+    const char *driver_text;
+    char *library_text;
+    char command[512];
+    char output_buffer[128];
+    int command_length;
+    int status;
+
+    FT_REQUIRE_COBC();
+    library_path = "stdlib_strtod_val_lib.cob";
+    driver_path = "stdlib_strtod_val_drv.cob";
+    binary_path = "stdlib_strtod_val.bin";
+    output_path = "stdlib_strtod_val.txt";
+    driver_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. STRTOD-VALID-DRIVER.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 SOURCE-BUFFER PIC X(255) VALUE \"  -12.5E+1\".\n"
+        "       01 DECLARED-LENGTH PIC S9(9) COMP-5 VALUE +9.\n"
+        "       01 RESULT-VALUE USAGE COMP-2 VALUE 0.\n"
+        "       01 STATUS-FLAG PIC 9 VALUE 9.\n"
+        "       01 RESULT-DISPLAY PIC -9(4).9(4).\n"
+        "       PROCEDURE DIVISION.\n"
+        "           CALL 'CBLC-STRTOD' USING BY REFERENCE SOURCE-BUFFER\n"
+        "               BY VALUE DECLARED-LENGTH BY REFERENCE RESULT-VALUE\n"
+        "               BY REFERENCE STATUS-FLAG.\n"
+        "           MOVE RESULT-VALUE TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-FLAG.\n"
+        "           STOP RUN.\n"
+        "       END PROGRAM STRTOD-VALID-DRIVER.\n";
+    library_text = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_standard_library_generate_strtod(&library_text),
+            "strtod generator should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(library_path, library_text) != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s %s %s", binary_path, driver_path, library_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(output_buffer, "-0125.0000\n0\n",
+            "strtod helper should parse scientific notation and report success") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (library_text)
+        cma_free(library_text);
+    test_cleanup_generated_artifacts(binary_path, output_path);
+    test_remove_file(library_path);
+    test_remove_file(driver_path);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_strtod_rejects_invalid_input)
+{
+    const char *library_path;
+    const char *driver_path;
+    const char *binary_path;
+    const char *output_path;
+    const char *driver_text;
+    char *library_text;
+    char command[512];
+    char output_buffer[128];
+    int command_length;
+    int status;
+
+    FT_REQUIRE_COBC();
+    library_path = "stdlib_strtod_inv_lib.cob";
+    driver_path = "stdlib_strtod_inv_drv.cob";
+    binary_path = "stdlib_strtod_inv.bin";
+    output_path = "stdlib_strtod_inv.txt";
+    driver_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. STRTOD-INVALID-DRIVER.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 SOURCE-BUFFER PIC X(255) VALUE \"123A45\".\n"
+        "       01 DECLARED-LENGTH PIC S9(9) COMP-5 VALUE +6.\n"
+        "       01 RESULT-VALUE USAGE COMP-2 VALUE 123.\n"
+        "       01 STATUS-FLAG PIC 9 VALUE 0.\n"
+        "       01 RESULT-DISPLAY PIC -9(4).9(4).\n"
+        "       PROCEDURE DIVISION.\n"
+        "           CALL 'CBLC-STRTOD' USING BY REFERENCE SOURCE-BUFFER\n"
+        "               BY VALUE DECLARED-LENGTH BY REFERENCE RESULT-VALUE\n"
+        "               BY REFERENCE STATUS-FLAG.\n"
+        "           MOVE RESULT-VALUE TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-FLAG.\n"
+        "           STOP RUN.\n"
+        "       END PROGRAM STRTOD-INVALID-DRIVER.\n";
+    library_text = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_standard_library_generate_strtod(&library_text),
+            "strtod generator should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(library_path, library_text) != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s %s %s", binary_path, driver_path, library_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(output_buffer, " 0000.0000\n1\n",
+            "strtod helper should reject invalid characters and report failure") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (library_text)
+        cma_free(library_text);
+    test_cleanup_generated_artifacts(binary_path, output_path);
+    test_remove_file(library_path);
+    test_remove_file(driver_path);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_abs_executes_for_common_cases)
+{
+    const char *library_path;
+    const char *driver_path;
+    const char *binary_path;
+    const char *output_path;
+    const char *driver_text;
+    char *library_text;
+    char command[512];
+    char output_buffer[256];
+    int command_length;
+    int status;
+
+    FT_REQUIRE_COBC();
+    library_path = "stdlib_abs_common_lib.cob";
+    driver_path = "stdlib_abs_common_drv.cob";
+    binary_path = "stdlib_abs_common.bin";
+    output_path = "stdlib_abs_common.txt";
+    driver_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. ABS-COMMON-DRIVER.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 OPERAND-POS PIC S9(36) COMP-5 VALUE +123.\n"
+        "       01 RESULT-POS PIC S9(36) COMP-5 VALUE +0.\n"
+        "       01 STATUS-POS PIC 9 VALUE 9.\n"
+        "       01 DISPLAY-POS PIC -9(9).\n"
+        "       01 OPERAND-NEG PIC S9(36) COMP-5 VALUE -456.\n"
+        "       01 RESULT-NEG PIC S9(36) COMP-5 VALUE +0.\n"
+        "       01 STATUS-NEG PIC 9 VALUE 9.\n"
+        "       01 DISPLAY-NEG PIC -9(9).\n"
+        "       01 OPERAND-ZRO PIC S9(36) COMP-5 VALUE +0.\n"
+        "       01 RESULT-ZRO PIC S9(36) COMP-5 VALUE +999.\n"
+        "       01 STATUS-ZRO PIC 9 VALUE 9.\n"
+        "       01 DISPLAY-ZRO PIC -9(9).\n"
+        "       PROCEDURE DIVISION.\n"
+        "           CALL 'CBLC-ABS' USING BY REFERENCE OPERAND-POS\n"
+        "               BY REFERENCE RESULT-POS BY REFERENCE STATUS-POS.\n"
+        "           MOVE RESULT-POS TO DISPLAY-POS.\n"
+        "           DISPLAY DISPLAY-POS.\n"
+        "           DISPLAY STATUS-POS.\n"
+        "           CALL 'CBLC-ABS' USING BY REFERENCE OPERAND-NEG\n"
+        "               BY REFERENCE RESULT-NEG BY REFERENCE STATUS-NEG.\n"
+        "           MOVE RESULT-NEG TO DISPLAY-NEG.\n"
+        "           DISPLAY DISPLAY-NEG.\n"
+        "           DISPLAY STATUS-NEG.\n"
+        "           CALL 'CBLC-ABS' USING BY REFERENCE OPERAND-ZRO\n"
+        "               BY REFERENCE RESULT-ZRO BY REFERENCE STATUS-ZRO.\n"
+        "           MOVE RESULT-ZRO TO DISPLAY-ZRO.\n"
+        "           DISPLAY DISPLAY-ZRO.\n"
+        "           DISPLAY STATUS-ZRO.\n"
+        "           STOP RUN.\n"
+        "       END PROGRAM ABS-COMMON-DRIVER.\n";
+    library_text = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_standard_library_generate_abs(&library_text),
+            "abs generator should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(library_path, library_text) != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s %s %s", binary_path, driver_path, library_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(output_buffer, "+000000123\n0\n+000000456\n0\n+000000000\n0\n",
+            "abs helper should return magnitudes and report success") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (library_text)
+        cma_free(library_text);
+    test_cleanup_generated_artifacts(binary_path, output_path);
+    test_remove_file(library_path);
+    test_remove_file(driver_path);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_abs_reports_overflow_for_min_value)
+{
+    const char *library_path;
+    const char *driver_path;
+    const char *binary_path;
+    const char *output_path;
+    const char *driver_text;
+    char *library_text;
+    char command[512];
+    char output_buffer[128];
+    int command_length;
+    int status;
+
+    FT_REQUIRE_COBC();
+    library_path = "stdlib_abs_min_lib.cob";
+    driver_path = "stdlib_abs_min_drv.cob";
+    binary_path = "stdlib_abs_min.bin";
+    output_path = "stdlib_abs_min.txt";
+    driver_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. ABS-MIN-DRIVER.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 OPERAND-MIN PIC S9(36) COMP-5 VALUE -9223372036854775808.\n"
+        "       01 RESULT-MIN PIC S9(36) COMP-5 VALUE +777.\n"
+        "       01 STATUS-MIN PIC 9 VALUE 0.\n"
+        "       01 DISPLAY-MIN PIC -9(19).\n"
+        "       PROCEDURE DIVISION.\n"
+        "           CALL 'CBLC-ABS' USING BY REFERENCE OPERAND-MIN\n"
+        "               BY REFERENCE RESULT-MIN BY REFERENCE STATUS-MIN.\n"
+        "           MOVE RESULT-MIN TO DISPLAY-MIN.\n"
+        "           DISPLAY DISPLAY-MIN.\n"
+        "           DISPLAY STATUS-MIN.\n"
+        "           STOP RUN.\n"
+        "       END PROGRAM ABS-MIN-DRIVER.\n";
+    library_text = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_standard_library_generate_abs(&library_text),
+            "abs generator should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(library_path, library_text) != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s %s %s", binary_path, driver_path, library_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(output_buffer, "+0000000000000000000\n1\n",
+            "abs helper should flag overflow for minimum negative value") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (library_text)
+        cma_free(library_text);
+    test_cleanup_generated_artifacts(binary_path, output_path);
+    test_remove_file(library_path);
+    test_remove_file(driver_path);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_fabs_executes_for_negative_and_positive_operands)
+{
+    const char *library_path;
+    const char *driver_path;
+    const char *binary_path;
+    const char *output_path;
+    const char *driver_text;
+    char *library_text;
+    char command[512];
+    char output_buffer[128];
+    int command_length;
+    int status;
+
+    FT_REQUIRE_COBC();
+    library_path = "stdlib_fabs_lib.cob";
+    driver_path = "stdlib_fabs_drv.cob";
+    binary_path = "stdlib_fabs.bin";
+    output_path = "stdlib_fabs.txt";
+    driver_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. FABS-DRIVER.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 OPERAND-NEG USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-NEG USAGE COMP-2 VALUE 0.\n"
+        "       01 STATUS-NEG PIC 9 VALUE 9.\n"
+        "       01 DISPLAY-NEG PIC 9(4).9(4).\n"
+        "       01 OPERAND-POS USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-POS USAGE COMP-2 VALUE 0.\n"
+        "       01 STATUS-POS PIC 9 VALUE 9.\n"
+        "       01 DISPLAY-POS PIC 9(4).9(4).\n"
+        "       PROCEDURE DIVISION.\n"
+        "           MOVE -12.5 TO OPERAND-NEG.\n"
+        "           CALL 'CBLC-FABS' USING BY REFERENCE OPERAND-NEG\n"
+        "               BY REFERENCE RESULT-NEG BY REFERENCE STATUS-NEG.\n"
+        "           MOVE RESULT-NEG TO DISPLAY-NEG.\n"
+        "           DISPLAY DISPLAY-NEG.\n"
+        "           DISPLAY STATUS-NEG.\n"
+        "           MOVE 3.25 TO OPERAND-POS.\n"
+        "           CALL 'CBLC-FABS' USING BY REFERENCE OPERAND-POS\n"
+        "               BY REFERENCE RESULT-POS BY REFERENCE STATUS-POS.\n"
+        "           MOVE RESULT-POS TO DISPLAY-POS.\n"
+        "           DISPLAY DISPLAY-POS.\n"
+        "           DISPLAY STATUS-POS.\n"
+        "           STOP RUN.\n"
+        "       END PROGRAM FABS-DRIVER.\n";
+    library_text = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_standard_library_generate_fabs(&library_text),
+            "fabs generator should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(library_path, library_text) != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s %s %s", binary_path, driver_path, library_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(output_buffer, "0012.5000\n0\n0003.2500\n0\n",
+            "fabs helper should return magnitudes for floating operands") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (library_text)
+        cma_free(library_text);
+    test_cleanup_generated_artifacts(binary_path, output_path);
+    test_remove_file(library_path);
+    test_remove_file(driver_path);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_standard_library_strcat_executes_without_truncation)
 {
     const char *library_path;
@@ -4070,6 +5099,498 @@ cleanup:
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_standard_library_floor_executes_for_diverse_operands)
+{
+    const char *library_path;
+    const char *driver_path;
+    const char *binary_path;
+    const char *output_path;
+    const char *driver_text;
+    char *library_text;
+    char command[512];
+    char output_buffer[128];
+    int command_length;
+    int status;
+
+    FT_REQUIRE_COBC();
+    library_path = "stdlib_floor_lib.cob";
+    driver_path = "stdlib_floor_drv.cob";
+    binary_path = "stdlib_floor.bin";
+    output_path = "stdlib_floor.txt";
+    driver_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. FLOOR-DRIVER.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 OPERAND-POS USAGE COMP-2 VALUE 0.\n"
+        "       01 OPERAND-NEG USAGE COMP-2 VALUE 0.\n"
+        "       01 OPERAND-INT USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-POS USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-NEG USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-INT USAGE COMP-2 VALUE 0.\n"
+        "       01 STATUS-POS PIC 9 VALUE 9.\n"
+        "       01 STATUS-NEG PIC 9 VALUE 9.\n"
+        "       01 STATUS-INT PIC 9 VALUE 9.\n"
+        "       01 RESULT-DISPLAY PIC -9(4).9(4).\n"
+        "       PROCEDURE DIVISION.\n"
+        "           MOVE 5.75 TO OPERAND-POS.\n"
+        "           CALL 'CBLC-FLOOR' USING BY REFERENCE OPERAND-POS\n"
+        "               BY REFERENCE RESULT-POS BY REFERENCE STATUS-POS.\n"
+        "           MOVE RESULT-POS TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-POS.\n"
+        "           MOVE -2.25 TO OPERAND-NEG.\n"
+        "           CALL 'CBLC-FLOOR' USING BY REFERENCE OPERAND-NEG\n"
+        "               BY REFERENCE RESULT-NEG BY REFERENCE STATUS-NEG.\n"
+        "           MOVE RESULT-NEG TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-NEG.\n"
+        "           MOVE 4 TO OPERAND-INT.\n"
+        "           CALL 'CBLC-FLOOR' USING BY REFERENCE OPERAND-INT\n"
+        "               BY REFERENCE RESULT-INT BY REFERENCE STATUS-INT.\n"
+        "           MOVE RESULT-INT TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-INT.\n"
+        "           STOP RUN.\n"
+        "       END PROGRAM FLOOR-DRIVER.\n";
+    library_text = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_standard_library_generate_floor(&library_text),
+            "floor generator should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(library_path, library_text) != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s %s %s", binary_path, driver_path, library_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(output_buffer, " 0005.0000\n1\n-0003.0000\n1\n 0004.0000\n0\n",
+            "floor helper should round toward negative infinity and flag fractional inputs") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (library_text)
+        cma_free(library_text);
+    test_cleanup_generated_artifacts(binary_path, output_path);
+    test_remove_file(library_path);
+    test_remove_file(driver_path);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_ceil_executes_for_diverse_operands)
+{
+    const char *library_path;
+    const char *driver_path;
+    const char *binary_path;
+    const char *output_path;
+    const char *driver_text;
+    char *library_text;
+    char command[512];
+    char output_buffer[128];
+    int command_length;
+    int status;
+
+    FT_REQUIRE_COBC();
+    library_path = "stdlib_ceil_lib.cob";
+    driver_path = "stdlib_ceil_drv.cob";
+    binary_path = "stdlib_ceil.bin";
+    output_path = "stdlib_ceil.txt";
+    driver_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. CEIL-DRIVER.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 OPERAND-POS USAGE COMP-2 VALUE 0.\n"
+        "       01 OPERAND-NEG USAGE COMP-2 VALUE 0.\n"
+        "       01 OPERAND-INT USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-POS USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-NEG USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-INT USAGE COMP-2 VALUE 0.\n"
+        "       01 STATUS-POS PIC 9 VALUE 9.\n"
+        "       01 STATUS-NEG PIC 9 VALUE 9.\n"
+        "       01 STATUS-INT PIC 9 VALUE 9.\n"
+        "       01 RESULT-DISPLAY PIC -9(4).9(4).\n"
+        "       PROCEDURE DIVISION.\n"
+        "           MOVE 5.25 TO OPERAND-POS.\n"
+        "           CALL 'CBLC-CEIL' USING BY REFERENCE OPERAND-POS\n"
+        "               BY REFERENCE RESULT-POS BY REFERENCE STATUS-POS.\n"
+        "           MOVE RESULT-POS TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-POS.\n"
+        "           MOVE -2.75 TO OPERAND-NEG.\n"
+        "           CALL 'CBLC-CEIL' USING BY REFERENCE OPERAND-NEG\n"
+        "               BY REFERENCE RESULT-NEG BY REFERENCE STATUS-NEG.\n"
+        "           MOVE RESULT-NEG TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-NEG.\n"
+        "           MOVE 4 TO OPERAND-INT.\n"
+        "           CALL 'CBLC-CEIL' USING BY REFERENCE OPERAND-INT\n"
+        "               BY REFERENCE RESULT-INT BY REFERENCE STATUS-INT.\n"
+        "           MOVE RESULT-INT TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-INT.\n"
+        "           STOP RUN.\n"
+        "       END PROGRAM CEIL-DRIVER.\n";
+    library_text = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_standard_library_generate_ceil(&library_text),
+            "ceil generator should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(library_path, library_text) != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s %s %s", binary_path, driver_path, library_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(output_buffer, " 0006.0000\n1\n-0002.0000\n1\n 0004.0000\n0\n",
+            "ceil helper should round toward positive infinity and flag fractional inputs") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (library_text)
+        cma_free(library_text);
+    test_cleanup_generated_artifacts(binary_path, output_path);
+    test_remove_file(library_path);
+    test_remove_file(driver_path);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_exp_executes_for_positive_and_negative_operands)
+{
+    const char *library_path;
+    const char *driver_path;
+    const char *binary_path;
+    const char *output_path;
+    const char *driver_text;
+    char *library_text;
+    char command[512];
+    char output_buffer[128];
+    int command_length;
+    int status;
+
+    FT_REQUIRE_COBC();
+    library_path = "stdlib_exp_lib.cob";
+    driver_path = "stdlib_exp_drv.cob";
+    binary_path = "stdlib_exp.bin";
+    output_path = "stdlib_exp.txt";
+    driver_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. EXP-DRIVER.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 OPERAND-POS USAGE COMP-2 VALUE 0.\n"
+        "       01 OPERAND-NEG USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-POS USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-NEG USAGE COMP-2 VALUE 0.\n"
+        "       01 STATUS-POS PIC 9 VALUE 9.\n"
+        "       01 STATUS-NEG PIC 9 VALUE 9.\n"
+        "       01 RESULT-DISPLAY PIC 9(4).9(4).\n"
+        "       PROCEDURE DIVISION.\n"
+        "           MOVE 1 TO OPERAND-POS.\n"
+        "           CALL 'CBLC-EXP' USING BY REFERENCE OPERAND-POS\n"
+        "               BY REFERENCE RESULT-POS BY REFERENCE STATUS-POS.\n"
+        "           MOVE RESULT-POS TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-POS.\n"
+        "           MOVE -1 TO OPERAND-NEG.\n"
+        "           CALL 'CBLC-EXP' USING BY REFERENCE OPERAND-NEG\n"
+        "               BY REFERENCE RESULT-NEG BY REFERENCE STATUS-NEG.\n"
+        "           MOVE RESULT-NEG TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-NEG.\n"
+        "           STOP RUN.\n"
+        "       END PROGRAM EXP-DRIVER.\n";
+    library_text = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_standard_library_generate_exp(&library_text),
+            "exp generator should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(library_path, library_text) != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s %s %s", binary_path, driver_path, library_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(output_buffer, "0002.7183\n0\n0000.3679\n0\n",
+            "exp helper should compute exponentials for positive and negative operands") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (library_text)
+        cma_free(library_text);
+    test_cleanup_generated_artifacts(binary_path, output_path);
+    test_remove_file(library_path);
+    test_remove_file(driver_path);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_exp_reports_overflow_for_large_operand)
+{
+    const char *library_path;
+    const char *driver_path;
+    const char *binary_path;
+    const char *output_path;
+    const char *driver_text;
+    char *library_text;
+    char command[512];
+    char output_buffer[128];
+    int command_length;
+    int status;
+
+    FT_REQUIRE_COBC();
+    library_path = "stdlib_exp_overflow_lib.cob";
+    driver_path = "stdlib_exp_overflow_drv.cob";
+    binary_path = "stdlib_exp_overflow.bin";
+    output_path = "stdlib_exp_overflow.txt";
+    driver_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. EXP-OVERFLOW-DRIVER.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 OPERAND-LARGE USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-LARGE USAGE COMP-2 VALUE 123.\n"
+        "       01 STATUS-LARGE PIC 9 VALUE 0.\n"
+        "       01 RESULT-DISPLAY PIC 9(4).9(4).\n"
+        "       PROCEDURE DIVISION.\n"
+        "           MOVE 1000 TO OPERAND-LARGE.\n"
+        "           CALL 'CBLC-EXP' USING BY REFERENCE OPERAND-LARGE\n"
+        "               BY REFERENCE RESULT-LARGE BY REFERENCE STATUS-LARGE.\n"
+        "           MOVE RESULT-LARGE TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-LARGE.\n"
+        "           STOP RUN.\n"
+        "       END PROGRAM EXP-OVERFLOW-DRIVER.\n";
+    library_text = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_standard_library_generate_exp(&library_text),
+            "exp generator should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(library_path, library_text) != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s %s %s", binary_path, driver_path, library_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(output_buffer, "0000.0000\n1\n",
+            "exp helper should detect overflow and report failure") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (library_text)
+        cma_free(library_text);
+    test_cleanup_generated_artifacts(binary_path, output_path);
+    test_remove_file(library_path);
+    test_remove_file(driver_path);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_log_executes_for_positive_operands)
+{
+    const char *library_path;
+    const char *driver_path;
+    const char *binary_path;
+    const char *output_path;
+    const char *driver_text;
+    char *library_text;
+    char command[512];
+    char output_buffer[128];
+    int command_length;
+    int status;
+
+    FT_REQUIRE_COBC();
+    library_path = "stdlib_log_lib.cob";
+    driver_path = "stdlib_log_drv.cob";
+    binary_path = "stdlib_log.bin";
+    output_path = "stdlib_log.txt";
+    driver_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. LOG-DRIVER.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 OPERAND-E USAGE COMP-2 VALUE 0.\n"
+        "       01 OPERAND-FRACTION USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-E USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-FRACTION USAGE COMP-2 VALUE 0.\n"
+        "       01 STATUS-E PIC 9 VALUE 9.\n"
+        "       01 STATUS-FRACTION PIC 9 VALUE 9.\n"
+        "       01 RESULT-DISPLAY PIC -9(4).9(4).\n"
+        "       PROCEDURE DIVISION.\n"
+        "           MOVE 2.718281828 TO OPERAND-E.\n"
+        "           CALL 'CBLC-LOG' USING BY REFERENCE OPERAND-E\n"
+        "               BY REFERENCE RESULT-E BY REFERENCE STATUS-E.\n"
+        "           MOVE RESULT-E TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-E.\n"
+        "           MOVE 0.5 TO OPERAND-FRACTION.\n"
+        "           CALL 'CBLC-LOG' USING BY REFERENCE OPERAND-FRACTION\n"
+        "               BY REFERENCE RESULT-FRACTION BY REFERENCE STATUS-FRACTION.\n"
+        "           MOVE RESULT-FRACTION TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-FRACTION.\n"
+        "           STOP RUN.\n"
+        "       END PROGRAM LOG-DRIVER.\n";
+    library_text = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_standard_library_generate_log(&library_text),
+            "log generator should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(library_path, library_text) != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s %s %s", binary_path, driver_path, library_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(output_buffer, " 0001.0000\n0\n-0000.6931\n0\n",
+            "log helper should compute natural logarithms for positive operands") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (library_text)
+        cma_free(library_text);
+    test_cleanup_generated_artifacts(binary_path, output_path);
+    test_remove_file(library_path);
+    test_remove_file(driver_path);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_log_rejects_non_positive_operand)
+{
+    const char *library_path;
+    const char *driver_path;
+    const char *binary_path;
+    const char *output_path;
+    const char *driver_text;
+    char *library_text;
+    char command[512];
+    char output_buffer[128];
+    int command_length;
+    int status;
+
+    FT_REQUIRE_COBC();
+    library_path = "stdlib_log_invalid_lib.cob";
+    driver_path = "stdlib_log_invalid_drv.cob";
+    binary_path = "stdlib_log_invalid.bin";
+    output_path = "stdlib_log_invalid.txt";
+    driver_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. LOG-INVALID-DRIVER.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 OPERAND-NONPOSITIVE USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-NONPOSITIVE USAGE COMP-2 VALUE 123.\n"
+        "       01 STATUS-FLAG PIC 9 VALUE 0.\n"
+        "       01 RESULT-DISPLAY PIC -9(4).9(4).\n"
+        "       PROCEDURE DIVISION.\n"
+        "           MOVE 0 TO OPERAND-NONPOSITIVE.\n"
+        "           CALL 'CBLC-LOG' USING BY REFERENCE OPERAND-NONPOSITIVE\n"
+        "               BY REFERENCE RESULT-NONPOSITIVE BY REFERENCE STATUS-FLAG.\n"
+        "           MOVE RESULT-NONPOSITIVE TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-FLAG.\n"
+        "           STOP RUN.\n"
+        "       END PROGRAM LOG-INVALID-DRIVER.\n";
+    library_text = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_standard_library_generate_log(&library_text),
+            "log generator should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(library_path, library_text) != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s %s %s", binary_path, driver_path, library_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(output_buffer, " 0000.0000\n1\n",
+            "log helper should reject non-positive operands and zero the result") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (library_text)
+        cma_free(library_text);
+    test_cleanup_generated_artifacts(binary_path, output_path);
+    test_remove_file(library_path);
+    test_remove_file(driver_path);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_standard_library_sqrt_executes_for_positive_operand)
 {
     const char *library_path;
@@ -4245,6 +5766,24 @@ const t_test_case *get_standard_library_tests(size_t *count)
         {"standard_library_strcat_generates_expected_text", test_standard_library_strcat_generates_expected_text},
         {"standard_library_strcat_executes_without_truncation", test_standard_library_strcat_executes_without_truncation},
         {"standard_library_strcat_reports_truncation", test_standard_library_strcat_reports_truncation},
+        {"standard_library_strtod_generates_expected_text", test_standard_library_strtod_generates_expected_text},
+        {"standard_library_strtod_parses_scientific_notation", test_standard_library_strtod_parses_scientific_notation},
+        {"standard_library_strtod_rejects_invalid_input", test_standard_library_strtod_rejects_invalid_input},
+        {"standard_library_abs_generates_expected_text", test_standard_library_abs_generates_expected_text},
+        {"standard_library_abs_executes_for_common_cases", test_standard_library_abs_executes_for_common_cases},
+        {"standard_library_abs_reports_overflow_for_min_value", test_standard_library_abs_reports_overflow_for_min_value},
+        {"standard_library_fabs_generates_expected_text", test_standard_library_fabs_generates_expected_text},
+        {"standard_library_fabs_executes_for_negative_and_positive_operands", test_standard_library_fabs_executes_for_negative_and_positive_operands},
+        {"standard_library_floor_generates_expected_text", test_standard_library_floor_generates_expected_text},
+        {"standard_library_floor_executes_for_diverse_operands", test_standard_library_floor_executes_for_diverse_operands},
+        {"standard_library_ceil_generates_expected_text", test_standard_library_ceil_generates_expected_text},
+        {"standard_library_ceil_executes_for_diverse_operands", test_standard_library_ceil_executes_for_diverse_operands},
+        {"standard_library_exp_generates_expected_text", test_standard_library_exp_generates_expected_text},
+        {"standard_library_exp_executes_for_positive_and_negative_operands", test_standard_library_exp_executes_for_positive_and_negative_operands},
+        {"standard_library_exp_reports_overflow_for_large_operand", test_standard_library_exp_reports_overflow_for_large_operand},
+        {"standard_library_log_generates_expected_text", test_standard_library_log_generates_expected_text},
+        {"standard_library_log_executes_for_positive_operands", test_standard_library_log_executes_for_positive_operands},
+        {"standard_library_log_rejects_non_positive_operand", test_standard_library_log_rejects_non_positive_operand},
         {"standard_library_powerof_generates_expected_text", test_standard_library_powerof_generates_expected_text},
         {"standard_library_powerof_handles_fractional_exponent", test_standard_library_powerof_handles_fractional_exponent},
         {"standard_library_powerof_rejects_invalid_domain", test_standard_library_powerof_rejects_invalid_domain},
