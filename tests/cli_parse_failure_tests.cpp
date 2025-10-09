@@ -1,7 +1,41 @@
+#include <cstddef>
+
 #include "transpiler_cli.hpp"
 
 #include "test_suites.hpp"
 #include "cli_test_registry.hpp"
+
+static int expect_cli_parse_failure(const char **argv, size_t argc,
+    const char *expected_output, const char *assertion)
+{
+    t_transpiler_cli_options options;
+    t_test_output_capture stdout_capture;
+    char buffer[512];
+    int status;
+
+    if (!argv || !expected_output || !assertion)
+        return (FT_FAILURE);
+    if (test_capture_stdout_begin(&stdout_capture) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: test harness should capture stdout\\n");
+        return (FT_FAILURE);
+    }
+    status = transpiler_cli_parse(&options, static_cast<int>(argc), argv);
+    transpiler_cli_options_dispose(&options);
+    if (test_capture_stdout_end(&stdout_capture, buffer, sizeof(buffer), NULL) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: test harness should restore stdout\\n");
+        return (FT_FAILURE);
+    }
+    if (status == FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: %s\\n", assertion);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(buffer, expected_output, assertion) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
 
 FT_TEST(test_cli_rejects_mismatched_path_counts)
 {
@@ -16,16 +50,12 @@ FT_TEST(test_cli_rejects_mismatched_path_counts)
         "--output",
         "only.cob"
     };
-    t_transpiler_cli_options options;
+    size_t argc;
 
-    if (transpiler_cli_parse(&options, 9, argv) == FT_SUCCESS)
-    {
-        transpiler_cli_options_dispose(&options);
-        pf_printf("Assertion failed: transpiler_cli_parse should reject mismatched path counts\\n");
-        return (FT_FAILURE);
-    }
-    transpiler_cli_options_dispose(&options);
-    return (FT_SUCCESS);
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Input and output file counts must match (got 2 inputs and 1 outputs).\n",
+        "CLI should reject mismatched path counts"));
 }
 
 FT_TEST(test_cli_rejects_unknown_direction)
@@ -39,16 +69,12 @@ FT_TEST(test_cli_rejects_unknown_direction)
         "--output",
         "first.cob"
     };
-    t_transpiler_cli_options options;
+    size_t argc;
 
-    if (transpiler_cli_parse(&options, 7, argv) == FT_SUCCESS)
-    {
-        transpiler_cli_options_dispose(&options);
-        pf_printf("Assertion failed: transpiler_cli_parse should reject unknown direction\\n");
-        return (FT_FAILURE);
-    }
-    transpiler_cli_options_dispose(&options);
-    return (FT_SUCCESS);
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Unknown direction 'invalid-direction'. Expected 'cblc-to-cobol' or 'cobol-to-cblc'.\n",
+        "CLI should reject unknown direction"));
 }
 
 FT_TEST(test_cli_rejects_missing_direction_value)
@@ -61,16 +87,12 @@ FT_TEST(test_cli_rejects_missing_direction_value)
         "--output",
         "first.cob"
     };
-    t_transpiler_cli_options options;
+    size_t argc;
 
-    if (transpiler_cli_parse(&options, 7, argv) == FT_SUCCESS)
-    {
-        transpiler_cli_options_dispose(&options);
-        pf_printf("Assertion failed: transpiler_cli_parse should reject missing direction value\\n");
-        return (FT_FAILURE);
-    }
-    transpiler_cli_options_dispose(&options);
-    return (FT_SUCCESS);
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Unknown direction '--input'. Expected 'cblc-to-cobol' or 'cobol-to-cblc'.\n",
+        "CLI should reject missing direction value"));
 }
 
 FT_TEST(test_cli_requires_direction_without_environment)
@@ -82,16 +104,12 @@ FT_TEST(test_cli_requires_direction_without_environment)
         "--output",
         "first.cob"
     };
-    t_transpiler_cli_options options;
+    size_t argc;
 
-    if (transpiler_cli_parse(&options, 5, argv) == FT_SUCCESS)
-    {
-        transpiler_cli_options_dispose(&options);
-        pf_printf("Assertion failed: transpiler_cli_parse should require direction without CTOC_DEFAULT_DIRECTION\\n");
-        return (FT_FAILURE);
-    }
-    transpiler_cli_options_dispose(&options);
-    return (FT_SUCCESS);
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Missing required --direction option or CTOC_DEFAULT_DIRECTION environment variable.\n",
+        "CLI should require direction without CTOC_DEFAULT_DIRECTION"));
 }
 
 FT_TEST(test_cli_requires_input_path)
@@ -103,16 +121,12 @@ FT_TEST(test_cli_requires_input_path)
         "--output",
         "first.cob"
     };
-    t_transpiler_cli_options options;
+    size_t argc;
 
-    if (transpiler_cli_parse(&options, 5, argv) == FT_SUCCESS)
-    {
-        transpiler_cli_options_dispose(&options);
-        pf_printf("Assertion failed: transpiler_cli_parse should require at least one input path\\n");
-        return (FT_FAILURE);
-    }
-    transpiler_cli_options_dispose(&options);
-    return (FT_SUCCESS);
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Missing required --input option.\n",
+        "CLI should require input path"));
 }
 
 FT_TEST(test_cli_requires_output_path)
@@ -124,16 +138,12 @@ FT_TEST(test_cli_requires_output_path)
         "--input",
         "first.cblc"
     };
-    t_transpiler_cli_options options;
+    size_t argc;
 
-    if (transpiler_cli_parse(&options, 5, argv) == FT_SUCCESS)
-    {
-        transpiler_cli_options_dispose(&options);
-        pf_printf("Assertion failed: transpiler_cli_parse should require at least one output path\\n");
-        return (FT_FAILURE);
-    }
-    transpiler_cli_options_dispose(&options);
-    return (FT_SUCCESS);
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Missing required --output option.\n",
+        "CLI should require output path"));
 }
 
 FT_TEST(test_cli_rejects_unknown_option)
@@ -149,40 +159,12 @@ FT_TEST(test_cli_rejects_unknown_option)
         "--output",
         "first.cob"
     };
-    t_transpiler_cli_options options;
-    t_test_output_capture capture;
-    char buffer[256];
-    const char *expected_with_newline;
-    const char *expected_without_newline;
-    int status;
+    size_t argc;
 
-    if (test_capture_stdout_begin(&capture) != FT_SUCCESS)
-    {
-        pf_printf("Assertion failed: test harness should capture stdout\n");
-        return (FT_FAILURE);
-    }
-    status = transpiler_cli_parse(&options, 9, argv);
-    transpiler_cli_options_dispose(&options);
-    if (test_capture_stdout_end(&capture, buffer, sizeof(buffer), NULL) != FT_SUCCESS)
-    {
-        pf_printf("Assertion failed: test harness should restore stdout\n");
-        return (FT_FAILURE);
-    }
-    if (status == FT_SUCCESS)
-    {
-        pf_printf("Assertion failed: transpiler_cli_parse should reject unknown option\n");
-        return (FT_FAILURE);
-    }
-    expected_with_newline = "Unknown option '--unknown'.\n";
-    expected_without_newline = "Unknown option '--unknown'.";
-    if (ft_strncmp(buffer, expected_with_newline, ft_strlen(expected_with_newline)) != 0
-        || buffer[ft_strlen(expected_with_newline)] != '\0')
-    {
-        if (test_expect_cstring_equal(buffer, expected_without_newline,
-                "CLI should report unknown option") != FT_SUCCESS)
-            return (FT_FAILURE);
-    }
-    return (FT_SUCCESS);
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Unknown option '--unknown'.\n",
+        "CLI should report unknown option"));
 }
 
 FT_TEST(test_cli_rejects_invalid_format)
@@ -198,16 +180,12 @@ FT_TEST(test_cli_rejects_invalid_format)
         "--output",
         "first.cob"
     };
-    t_transpiler_cli_options options;
+    size_t argc;
 
-    if (transpiler_cli_parse(&options, 9, argv) == FT_SUCCESS)
-    {
-        transpiler_cli_options_dispose(&options);
-        pf_printf("Assertion failed: transpiler_cli_parse should reject unknown format\\n");
-        return (FT_FAILURE);
-    }
-    transpiler_cli_options_dispose(&options);
-    return (FT_SUCCESS);
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Unknown format 'fancy'. Expected 'default', 'minimal', or 'pretty'.\n",
+        "CLI should reject unknown format"));
 }
 
 FT_TEST(test_cli_rejects_invalid_diagnostics)
@@ -223,16 +201,12 @@ FT_TEST(test_cli_rejects_invalid_diagnostics)
         "--output",
         "first.cob"
     };
-    t_transpiler_cli_options options;
+    size_t argc;
 
-    if (transpiler_cli_parse(&options, 9, argv) == FT_SUCCESS)
-    {
-        transpiler_cli_options_dispose(&options);
-        pf_printf("Assertion failed: transpiler_cli_parse should reject unknown diagnostics level\\n");
-        return (FT_FAILURE);
-    }
-    transpiler_cli_options_dispose(&options);
-    return (FT_SUCCESS);
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Unknown diagnostics level 'extreme'. Expected 'silent', 'normal', or 'verbose'.\n",
+        "CLI should reject unknown diagnostics"));
 }
 
 FT_TEST(test_cli_rejects_missing_input_value)
@@ -243,16 +217,12 @@ FT_TEST(test_cli_rejects_missing_input_value)
         "cblc-to-cobol",
         "--input"
     };
-    t_transpiler_cli_options options;
+    size_t argc;
 
-    if (transpiler_cli_parse(&options, 4, argv) == FT_SUCCESS)
-    {
-        transpiler_cli_options_dispose(&options);
-        pf_printf("Assertion failed: transpiler_cli_parse should reject missing input value\\n");
-        return (FT_FAILURE);
-    }
-    transpiler_cli_options_dispose(&options);
-    return (FT_SUCCESS);
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Missing value for --input option.\n",
+        "CLI should reject missing input value"));
 }
 
 FT_TEST(test_cli_rejects_missing_output_value)
@@ -265,16 +235,12 @@ FT_TEST(test_cli_rejects_missing_output_value)
         "first.cblc",
         "--output"
     };
-    t_transpiler_cli_options options;
+    size_t argc;
 
-    if (transpiler_cli_parse(&options, 6, argv) == FT_SUCCESS)
-    {
-        transpiler_cli_options_dispose(&options);
-        pf_printf("Assertion failed: transpiler_cli_parse should reject missing output value\\n");
-        return (FT_FAILURE);
-    }
-    transpiler_cli_options_dispose(&options);
-    return (FT_SUCCESS);
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Missing value for --output option.\n",
+        "CLI should reject missing output value"));
 }
 
 FT_TEST(test_cli_rejects_missing_output_directory_value)
@@ -289,16 +255,12 @@ FT_TEST(test_cli_rejects_missing_output_directory_value)
         "first.cob",
         "--output-dir"
     };
-    t_transpiler_cli_options options;
+    size_t argc;
 
-    if (transpiler_cli_parse(&options, 8, argv) == FT_SUCCESS)
-    {
-        transpiler_cli_options_dispose(&options);
-        pf_printf("Assertion failed: transpiler_cli_parse should reject missing output directory value\\n");
-        return (FT_FAILURE);
-    }
-    transpiler_cli_options_dispose(&options);
-    return (FT_SUCCESS);
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Missing value for --output-dir option.\n",
+        "CLI should reject missing output directory value"));
 }
 
 FT_TEST(test_cli_rejects_missing_format_value)
@@ -313,16 +275,12 @@ FT_TEST(test_cli_rejects_missing_format_value)
         "first.cob",
         "--format"
     };
-    t_transpiler_cli_options options;
+    size_t argc;
 
-    if (transpiler_cli_parse(&options, 8, argv) == FT_SUCCESS)
-    {
-        transpiler_cli_options_dispose(&options);
-        pf_printf("Assertion failed: transpiler_cli_parse should reject missing format value\\n");
-        return (FT_FAILURE);
-    }
-    transpiler_cli_options_dispose(&options);
-    return (FT_SUCCESS);
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Missing value for --format option.\n",
+        "CLI should reject missing format value"));
 }
 
 FT_TEST(test_cli_rejects_missing_diagnostics_value)
@@ -337,32 +295,12 @@ FT_TEST(test_cli_rejects_missing_diagnostics_value)
         "first.cob",
         "--diagnostics"
     };
-    t_transpiler_cli_options options;
-    t_test_output_capture capture;
-    char buffer[128];
-    int status;
+    size_t argc;
 
-    if (test_capture_stdout_begin(&capture) != FT_SUCCESS)
-    {
-        pf_printf("Assertion failed: test harness should capture stdout\\n");
-        return (FT_FAILURE);
-    }
-    status = transpiler_cli_parse(&options, 8, argv);
-    transpiler_cli_options_dispose(&options);
-    if (test_capture_stdout_end(&capture, buffer, sizeof(buffer), NULL) != FT_SUCCESS)
-    {
-        pf_printf("Assertion failed: test harness should restore stdout\\n");
-        return (FT_FAILURE);
-    }
-    if (status == FT_SUCCESS)
-    {
-        pf_printf("Assertion failed: transpiler_cli_parse should reject missing diagnostics value\\n");
-        return (FT_FAILURE);
-    }
-    if (test_expect_cstring_equal(buffer, "Missing value for --diagnostics option.\n",
-            "CLI should report missing diagnostics value") != FT_SUCCESS)
-        return (FT_FAILURE);
-    return (FT_SUCCESS);
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Missing value for --diagnostics option.\n",
+        "CLI should report missing diagnostics value"));
 }
 
 const t_test_case *get_cli_parse_failure_tests(size_t *count)

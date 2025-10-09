@@ -65,7 +65,7 @@ static int validate_inventory_mentions(const char *manifest_path, const char *in
     char line[256];
     size_t offset;
     char manifest_buffer[1024];
-    char inventory_buffer[16384];
+    char inventory_buffer[32768];
     size_t inventory_length;
 
     if (test_read_text_file(manifest_path, manifest_buffer, sizeof(manifest_buffer)) != FT_SUCCESS)
@@ -176,8 +176,8 @@ static int sample_basename_exists(const char *needle, char names[][64], size_t c
 
 static int validate_sample_pairs_match(void)
 {
-    char cobol_names[16][64];
-    char cblc_names[16][64];
+    char cobol_names[32][64];
+    char cblc_names[32][64];
     size_t cobol_count;
     size_t cblc_count;
     size_t index;

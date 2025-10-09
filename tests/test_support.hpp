@@ -39,6 +39,10 @@ int test_assert_failure(const char *expression, const char *file, int line);
     if (test_expect_int_equal((actual), (expected), (message)) != FT_SUCCESS) \
         return (FT_FAILURE);
 
+#define FT_ASSERT_SIZE_T_EQUAL(actual, expected, message) \
+    if (test_expect_size_t_equal((actual), (expected), (message)) != FT_SUCCESS) \
+        return (FT_FAILURE);
+
 #define FT_ASSERT_CHAR_EQUAL(actual, expected, message) \
     if (test_expect_char_equal((actual), (expected), (message)) != FT_SUCCESS) \
         return (FT_FAILURE);
@@ -53,6 +57,7 @@ int test_assert_failure(const char *expression, const char *file, int line);
 
 int test_expect_success(int status, const char *message);
 int test_expect_int_equal(int actual, int expected, const char *message);
+int test_expect_size_t_equal(size_t actual, size_t expected, const char *message);
 int test_expect_char_equal(char actual, char expected, const char *message);
 int test_expect_cstring_equal(const char *actual, const char *expected, const char *message);
 int test_expect_token(const t_lexer_token *token, t_lexer_token_kind expected_kind,

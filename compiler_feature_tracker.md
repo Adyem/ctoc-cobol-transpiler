@@ -75,13 +75,13 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Provide `CBLC-SIN`, `CBLC-COS`, and `CBLC-TAN` standard library subprograms that compute trigonometric results for floating operands (and widened integral inputs), apply COBOL intrinsic functions, and surface status codes for overflow or other domain issues through trailing numeric slots.
 - [x] Visibility rules: surface diagnostics for public/private types, fields, and functions, enforcing access at semantic analysis time.
 - [x] Source maps: retain CBL-C ↔ COBOL span mappings to power diagnostics and debugging outputs.
+- [x] Linter/formatter: produce a canonical, deterministic CBL-C pretty-printer for consistent diffs.
 
 ## Pending Features
 
 ### Core Language / Semantics
 - [x] Const/immutability: track const bindings and read-only fields, emitting diagnostics on attempted writes.
-- [ ] Linter/formatter: produce a canonical, deterministic CBL-C pretty-printer for consistent diffs.
-- [ ] Copybook interop: support COPY includes, manage name collisions, and propagate declared lengths through the pipeline.
+- [x] Copybook interop: support COPY includes, manage name collisions, and propagate declared lengths through the pipeline.
 
 ### Core Language Frontend
 
@@ -184,7 +184,7 @@ are completed; keep completed items grouped separately from the remaining work t
 - [ ] Differential tests: compare runtime results between COBOL outputs and the alternative C backend.
 - [ ] Stress suites: cover huge records, deep nesting, long lines, and wide numerics.
 - [ ] Coverage in CI: enforce line and branch coverage thresholds as part of the release gates.
-- [ ] Add integration tests verifying subprogram calls respect original string lengths across translations.
+- [x] Add integration tests verifying subprogram calls respect original string lengths across translations.
 
 ### Stretch / Future Enhancements
 - [ ] Extend the grammar to support advanced numeric picture clauses, OCCURS tables, and paragraph factoring.

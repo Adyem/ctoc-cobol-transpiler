@@ -10,7 +10,7 @@ TEST_NAME   = automated_tests$(EXE_EXT)
 PYTHON      ?= python3
 LINT_SCRIPT  = scripts/lint_sources.py
 
-SRC         = main.cpp runtime_scalar.cpp runtime_string.cpp runtime_record.cpp runtime_file.cpp lexer.cpp lexer_token.cpp ast.cpp parser.cpp transpiler_diagnostics.cpp transpiler_context.cpp transpiler_pipeline.cpp transpiler_cli.cpp transpiler_logging.cpp transpiler_semantics.cpp transpiler_codegen.cpp transpiler_cobol_types.cpp transpiler_cobol_procedure.cpp transpiler_cobol_reverse.cpp transpiler_standard_library.cpp transpiler_standard_library_strlen.cpp transpiler_standard_library_strnlen.cpp transpiler_standard_library_strcmp.cpp transpiler_standard_library_strcpy.cpp transpiler_standard_library_strncpy.cpp transpiler_standard_library_memcmp.cpp transpiler_standard_library_strcat.cpp transpiler_standard_library_strtod.cpp transpiler_standard_library_abs.cpp transpiler_standard_library_fabs.cpp transpiler_standard_library_floor.cpp transpiler_standard_library_ceil.cpp transpiler_standard_library_exp.cpp transpiler_standard_library_log.cpp transpiler_standard_library_sin.cpp transpiler_standard_library_cos.cpp transpiler_standard_library_tan.cpp transpiler_standard_library_atoi.cpp transpiler_standard_library_atol.cpp transpiler_standard_library_atoll.cpp transpiler_standard_library_powerof.cpp transpiler_standard_library_sqrt.cpp transpiler_standard_library_toupper.cpp transpiler_standard_library_tolower.cpp transpiler_standard_library_isdigit.cpp transpiler_standard_library_isalpha.cpp
+SRC         = main.cpp runtime_scalar.cpp runtime_string.cpp runtime_record.cpp runtime_file.cpp lexer.cpp lexer_token.cpp ast.cpp parser.cpp transpiler_diagnostics.cpp transpiler_context.cpp transpiler_pipeline.cpp transpiler_cli.cpp cblc_formatter.cpp transpiler_logging.cpp transpiler_semantics.cpp transpiler_codegen.cpp transpiler_cobol_types.cpp transpiler_cobol_procedure.cpp transpiler_cobol_reverse.cpp transpiler_standard_library.cpp transpiler_standard_library_strlen.cpp transpiler_standard_library_strnlen.cpp transpiler_standard_library_strcmp.cpp transpiler_standard_library_strcpy.cpp transpiler_standard_library_strncpy.cpp transpiler_standard_library_memcmp.cpp transpiler_standard_library_strcat.cpp transpiler_standard_library_strtod.cpp transpiler_standard_library_abs.cpp transpiler_standard_library_fabs.cpp transpiler_standard_library_floor.cpp transpiler_standard_library_ceil.cpp transpiler_standard_library_exp.cpp transpiler_standard_library_log.cpp transpiler_standard_library_sin.cpp transpiler_standard_library_cos.cpp transpiler_standard_library_tan.cpp transpiler_standard_library_atoi.cpp transpiler_standard_library_atol.cpp transpiler_standard_library_atoll.cpp transpiler_standard_library_powerof.cpp transpiler_standard_library_sqrt.cpp transpiler_standard_library_toupper.cpp transpiler_standard_library_tolower.cpp transpiler_standard_library_isdigit.cpp transpiler_standard_library_isalpha.cpp
 
 CC          = g++
 
@@ -48,6 +48,8 @@ endif
 
 LIBFT_DIR   = ./libft
 SUBMODULE_SENTINEL = $(LIBFT_DIR)/Makefile
+BUILD_LOG_DIR = ./build_logs
+LIBFT_BUILD_LOG = $(BUILD_LOG_DIR)/libft_build.log
 
 OBJ_DIR         = ./objs
 OBJ_DIR_DEBUG   = ./objs_debug
@@ -145,7 +147,8 @@ TEST_SRC    = tests/test_main.cpp \
               tests/compiler/cobol/tests.cpp \
               tests/compiler/tests.cpp \
               tests/logging_tests.cpp \
-              tests/cobol_reverse_tests.cpp
+              tests/cobol_reverse_tests.cpp \
+              tests/cblc_formatter_tests.cpp
 
 TEST_OBJS   = $(TEST_SRC:%.cpp=$(OBJ_DIR_TEST)/%.o)
 
@@ -157,6 +160,9 @@ dirs:
 	-$(MKDIR) $(OBJ_DIR)
 	-$(MKDIR) $(OBJ_DIR_DEBUG)
 	-$(MKDIR) $(OBJ_DIR_TEST)
+
+$(BUILD_LOG_DIR):
+	-$(MKDIR) $(BUILD_LOG_DIR)
 
 install_cobc:
 	@if ! command -v cobc >/dev/null 2>&1; then \
@@ -181,8 +187,10 @@ $(TEST_NAME): $(LIBFT) $(TEST_OBJS) $(OBJS_NO_MAIN)
 	$(CC) $(CFLAGS) $(TEST_OBJS) $(OBJS_NO_MAIN) -o $@ $(LDFLAGS)
 
 
-$(LIBFT): ensure_libft
-	$(MAKE) -C $(LIBFT_DIR) $(if $(DEBUG), debug)
+$(LIBFT): ensure_libft | $(BUILD_LOG_DIR)
+	@printf 'Building libft (log: %s)\n' "$(LIBFT_BUILD_LOG)"
+	@$(MAKE) -C $(LIBFT_DIR) $(if $(DEBUG), debug) > $(LIBFT_BUILD_LOG) 2>&1 || \
+		{ status=$$?; printf 'libft build failed. Showing log:\n'; cat $(LIBFT_BUILD_LOG); exit $$status; }
 
 initialize:
 	git submodule update --init --recursive
@@ -207,6 +215,8 @@ clean:
 	-$(RM) test_example_compiler.c test_example_compiler.bin test_example_compiler.txt
 	-$(RM) test_example_invalid_compiler.c test_example_invalid_compiler.bin test_example_invalid_compiler.log
 	-$(RM) test_runtime_file.txt
+	-$(RM) $(LIBFT_BUILD_LOG)
+	-$(RMDIR) $(BUILD_LOG_DIR)
 	@if [ -f $(SUBMODULE_SENTINEL) ]; then \
 		$(MAKE) -C $(LIBFT_DIR) fclean; \
 	else \

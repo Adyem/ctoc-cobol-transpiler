@@ -1446,6 +1446,59 @@ static int parser_parse_data_item(t_parser *parser, t_ast_node *section)
     return (parser_set_success(parser));
 }
 
+static int parser_parse_copybook_include(t_parser *parser, t_ast_node *section)
+{
+    t_ast_node *include_node;
+    t_ast_node *name_node;
+
+    if (!parser)
+        return (FT_FAILURE);
+    if (!section)
+        return (FT_FAILURE);
+    include_node = parser_create_node(parser, AST_NODE_COPYBOOK_INCLUDE);
+    if (!include_node)
+        return (FT_FAILURE);
+    if (parser_expect(parser, LEXER_TOKEN_KEYWORD_COPY, NULL) != FT_SUCCESS)
+    {
+        ast_node_destroy(include_node);
+        return (FT_FAILURE);
+    }
+    if (parser_parse_identifier_node(parser, &name_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(include_node);
+        return (FT_FAILURE);
+    }
+    if (parser_add_child(parser, include_node, name_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(include_node);
+        return (FT_FAILURE);
+    }
+    if (!parser->has_current)
+    {
+        ast_node_destroy(include_node);
+        return (parser_set_error(parser));
+    }
+    if (parser->current.kind != LEXER_TOKEN_PERIOD)
+    {
+        if (parser_skip_until_period(parser) != FT_SUCCESS)
+        {
+            ast_node_destroy(include_node);
+            return (FT_FAILURE);
+        }
+    }
+    if (parser_expect(parser, LEXER_TOKEN_PERIOD, NULL) != FT_SUCCESS)
+    {
+        ast_node_destroy(include_node);
+        return (FT_FAILURE);
+    }
+    if (parser_add_child(parser, section, include_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(include_node);
+        return (FT_FAILURE);
+    }
+    return (parser_set_success(parser));
+}
+
 static int parser_skip_file_section(t_parser *parser)
 {
     if (!parser)
@@ -1506,9 +1559,19 @@ static int parser_parse_working_storage_section(t_parser *parser, t_ast_node *da
         ast_node_destroy(section);
         return (FT_FAILURE);
     }
-    while (parser->has_current && parser->current.kind == LEXER_TOKEN_NUMERIC_LITERAL)
+    while (parser->has_current
+        && (parser->current.kind == LEXER_TOKEN_NUMERIC_LITERAL
+            || parser->current.kind == LEXER_TOKEN_KEYWORD_COPY))
     {
-        if (parser_parse_data_item(parser, section) != FT_SUCCESS)
+        if (parser->current.kind == LEXER_TOKEN_NUMERIC_LITERAL)
+        {
+            if (parser_parse_data_item(parser, section) != FT_SUCCESS)
+            {
+                ast_node_destroy(section);
+                return (FT_FAILURE);
+            }
+        }
+        else if (parser_parse_copybook_include(parser, section) != FT_SUCCESS)
         {
             ast_node_destroy(section);
             return (FT_FAILURE);

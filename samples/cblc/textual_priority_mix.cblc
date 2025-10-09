@@ -1,0 +1,33 @@
+char warehouse_code[8];
+char priority_level;
+int pending_orders;
+bool expedite;
+
+function void report_schedule() {
+    warehouse_code = "NW-01";
+    priority_level = 'B';
+    pending_orders = 18;
+    expedite = false;
+
+    if (priority_level == 'A') {
+        expedite = true;
+    } else {
+        if (pending_orders > 20) {
+            expedite = true;
+        }
+    }
+
+    if (expedite) {
+        display("EXPEDITE");
+    } else {
+        display("SCHEDULED");
+    }
+
+    display(warehouse_code);
+    display(priority_level);
+    display(pending_orders);
+}
+
+function void main() {
+    report_schedule();
+}

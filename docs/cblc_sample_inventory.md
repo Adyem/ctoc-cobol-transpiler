@@ -412,6 +412,257 @@ function void show_banner() {
 ```
 
 
+### `samples/cblc/project_scheduler/project_scheduler_loader.cblc`
+- **Purpose:** Seeds the project scheduler backlog with string-based timing metadata so other modules can consume normalized numeric values.
+- **Constructs:** Standard library calls (`std::strcpy`, `std::atoi`, `std::strcmp`), local character buffers, integer accumulation, conditional adjustments, and a non-void return that surfaces the computed total minutes to callers.
+
+```cblc
+function int load_backlog_minutes()
+{
+    char first_minutes[8];
+    char second_minutes[8];
+    char third_minutes[8];
+    char phase_label[16];
+    int total;
+    int parsed;
+
+    std::strcpy(first_minutes, "120");
+    std::strcpy(second_minutes, "090");
+    std::strcpy(third_minutes, "045");
+    std::strcpy(phase_label, "ASSEMBLY");
+
+    parsed = std::atoi(first_minutes);
+    total = parsed;
+
+    parsed = std::atoi(second_minutes);
+    total = total + parsed;
+
+    parsed = std::atoi(third_minutes);
+    total = total + parsed;
+
+    if (std::strcmp(phase_label, "ASSEMBLY") == 0)
+    {
+        total = total + 15;
+    }
+
+    return (total);
+}
+```
+
+### `samples/cblc/project_scheduler/project_scheduler_metrics.cblc`
+- **Purpose:** Converts the backlog duration into a floating-point prioritization score that blends elapsed minutes with descriptive string length analysis.
+- **Constructs:** Standard library calls (`std::strcpy`, `std::strlen`, `std::fabs`, `std::sqrt`), intermediate double precision scalars, and a non-void helper that other modules reuse.
+
+```cblc
+function double compute_priority_score(int total_minutes)
+{
+    double minutes;
+    double baseline;
+    double offset;
+    double root;
+    char phase_label[32];
+    int label_length;
+    double score;
+
+    minutes = total_minutes;
+    baseline = 300.0;
+
+    std::strcpy(phase_label, "Consolidated Review");
+    label_length = std::strlen(phase_label);
+
+    offset = std::fabs(minutes - baseline);
+    root = std::sqrt(minutes);
+    score = offset + label_length + root;
+
+    return (score);
+}
+```
+
+### `samples/cblc/project_scheduler/project_scheduler_presenter.cblc`
+- **Purpose:** Coordinates the loader and metrics helpers to build a presentation string and emit consolidated scheduling diagnostics.
+- **Constructs:** Module imports, shared global buffers, standard library usage (`std::strcpy`, `std::strcat`, `std::strlen`, `std::strcmp`), conditional suffix logic, and chained helper invocations.
+
+```cblc
+import "project_scheduler_loader.cblc";
+import "project_scheduler_metrics.cblc";
+
+char summary[256];
+char headline[32];
+char detail[32];
+char stage[32];
+int guard;
+int stage_length;
+int total_minutes;
+double score;
+
+function void present_schedule()
+{
+    std::strcpy(headline, "Draft Roadmap");
+    std::strcpy(detail, "Assemble Budget");
+    std::strcpy(stage, "Schedule Review");
+
+    total_minutes = load_backlog_minutes();
+    score = compute_priority_score(total_minutes);
+
+    summary = "SCHEDULE SUMMARY:";
+    std::strcat(summary, " ");
+    std::strcat(summary, headline);
+    std::strcat(summary, " / ");
+    std::strcat(summary, detail);
+    std::strcat(summary, " / ");
+    std::strcat(summary, stage);
+
+    stage_length = std::strlen(stage);
+    if (stage_length > 12)
+    {
+        std::strcat(summary, "!");
+    }
+    else
+    {
+        std::strcat(summary, ".");
+    }
+
+    guard = std::strcmp(detail, "Assemble Budget");
+    if (guard == 0)
+    {
+        std::strcat(summary, " READY");
+    }
+
+    display(summary);
+    display(total_minutes);
+    display(score);
+}
+```
+
+### `samples/cblc/project_scheduler/project_scheduler_main.cblc`
+- **Purpose:** Supplies the entrypoint that stitches the presenter module into the multi-file call chain so the CLI can emit every translation unit in one run.
+- **Constructs:** Module import for the presenter helper and a minimal `main` entrypoint that delegates to `present_schedule`.
+
+```cblc
+import "project_scheduler_presenter.cblc";
+
+function void main()
+{
+    present_schedule();
+}
+```
+
+### `samples/cblc/floating_point_mix.cblc`
+- **Purpose:** Showcases float and double scalars working together with boolean flags to document mixed precision arithmetic.
+- **Constructs:** Global floating-point declarations, helper function performing addition and comparisons, boolean toggles, and console output of intermediate values.
+
+```cblc
+float seasonal_average;
+float current_reading;
+double yearly_projection;
+double combined_projection;
+bool trending_up;
+
+function void analyze_readings() {
+    seasonal_average = 21.5;
+    current_reading = 24.0;
+    yearly_projection = 18.75;
+    combined_projection = 0.0;
+    trending_up = false;
+
+    combined_projection = yearly_projection + current_reading;
+    if (current_reading > seasonal_average) {
+        trending_up = true;
+    }
+
+    if (trending_up) {
+        display("TREND UP");
+    } else {
+        display("TREND FLAT");
+    }
+
+    display(seasonal_average);
+    display(current_reading);
+    display(combined_projection);
+}
+
+function void main() {
+    analyze_readings();
+}
+```
+
+### `samples/cblc/mixed_numeric_types.cblc`
+- **Purpose:** Demonstrates int, long, and long long scalars alongside a boolean sentinel for overflow-style thresholds.
+- **Constructs:** Global integer declarations spanning multiple widths, cumulative arithmetic, relational checks, ternary-style branch pairs, and value logging.
+
+```cblc
+int order_count;
+long regional_total;
+long long national_total;
+bool exceeded_limit;
+
+function void track_totals() {
+    order_count = 45;
+    regional_total = 250000;
+    national_total = 5000000000;
+    exceeded_limit = false;
+
+    national_total = national_total + regional_total;
+    if (national_total > 5250000000) {
+        exceeded_limit = true;
+    }
+
+    if (exceeded_limit) {
+        display("LIMIT EXCEEDED");
+    } else {
+        display("LIMIT OK");
+    }
+
+    display(order_count);
+    display(regional_total);
+    display(national_total);
+}
+
+function void main() {
+    track_totals();
+}
+```
+
+### `samples/cblc/textual_priority_mix.cblc`
+- **Purpose:** Combines character buffers, single-character flags, integers, and booleans to highlight textual state paired with numeric counters.
+- **Constructs:** Global char array and scalar declarations, nested conditional branches updating a boolean, and sequential displays of string, character, and integer values.
+
+```cblc
+char warehouse_code[8];
+char priority_level;
+int pending_orders;
+bool expedite;
+
+function void report_schedule() {
+    warehouse_code = "NW-01";
+    priority_level = 'B';
+    pending_orders = 18;
+    expedite = false;
+
+    if (priority_level == 'A') {
+        expedite = true;
+    } else {
+        if (pending_orders > 20) {
+            expedite = true;
+        }
+    }
+
+    if (expedite) {
+        display("EXPEDITE");
+    } else {
+        display("SCHEDULED");
+    }
+
+    display(warehouse_code);
+    display(priority_level);
+    display(pending_orders);
+}
+
+function void main() {
+    report_schedule();
+}
+```
+
 ## Maintenance Checklist
 
 1. Add a new `.cblc` file under `samples/cblc` when introducing language features that need sample coverage.

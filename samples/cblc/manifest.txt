@@ -12,3 +12,10 @@ samples/cblc/return_boolean.cblc
 samples/cblc/return_character.cblc
 samples/cblc/multi_module_main.cblc
 samples/cblc/multi_module_worker.cblc
+samples/cblc/floating_point_mix.cblc
+samples/cblc/mixed_numeric_types.cblc
+samples/cblc/textual_priority_mix.cblc
+samples/cblc/project_scheduler/project_scheduler_loader.cblc
+samples/cblc/project_scheduler/project_scheduler_metrics.cblc
+samples/cblc/project_scheduler/project_scheduler_presenter.cblc
+samples/cblc/project_scheduler/project_scheduler_main.cblc

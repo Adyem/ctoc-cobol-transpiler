@@ -31,7 +31,7 @@ ctoc_cobol_transpiler --direction cobol-to-cblc --input samples/cobol/copy_file.
 ```
 
 * `--output-dir` overrides the directory that hosts generated files. When omitted, the tool writes next to the provided `--output` path.
-* `--format` accepts `default`, `minimal`, or `pretty` to toggle whitespace and alignment policies in emitted COBOL.
+* `--format` accepts `default`, `minimal`, or `pretty` to toggle whitespace and alignment policies. `pretty` now feeds generated CBL-C through the canonical formatter so braces, indentation, and operator spacing remain consistent across runs.
 
 ## Diagnostics and help
 
