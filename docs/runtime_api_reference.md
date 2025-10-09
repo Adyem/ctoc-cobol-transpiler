@@ -118,6 +118,51 @@ following helpers:
   trailing non-space content, and reports overflow or invalid input through the
   status flag while leaving the input buffer untouched. Callers reference the
   helper through `std::atoll`.
+- `CBLC-STRTOD` converts caller-supplied alphanumeric buffers (up to 255
+  characters) into floating results using COBOL's `FUNCTION NUMVAL`. The helper
+  trims leading and trailing spaces, validates optional signs, decimal points,
+  and scientific-notation exponents, and refuses embedded spaces or invalid
+  characters. It respects the caller-declared length, caps scanning at 255
+  characters, writes the parsed floating value into the trailing `USAGE COMP-2`
+  slot, and reports domain or range errors through a trailing numeric status
+  flag. Callers reference the helper through `std::strtod`.
+- `CBLC-ABS` accepts a caller-supplied signed integral operand by reference
+  along with trailing slots for the absolute-value result (`PIC S9(36) COMP-5`)
+  and a numeric status flag. The helper copies the operand into the result,
+  negates it when the value is negative, and uses `ON SIZE ERROR` handling to
+  detect overflow for the minimum representable value. On overflow it zeroes the
+  result and returns status `1`; otherwise it writes the magnitude and returns
+  status `0`. Callers reference the helper through `std::abs`.
+- `CBLC-FABS` mirrors `CBLC-ABS` for floating operands. Callers pass the source
+  `USAGE COMP-2` value, a trailing floating result slot, and a numeric status
+  flag by reference. The helper computes the absolute value via `FUNCTION ABS`,
+  stores the magnitude, and reports success with status `0`. Callers reference
+  the helper through `std::fabs`.
+- `CBLC-FLOOR` rounds a caller-supplied floating operand (`USAGE COMP-2`) toward
+  negative infinity. Callers provide the source value, a trailing result slot,
+  and a numeric status flag by reference. The helper copies the integer part of
+  the operand into the result, decrements by one for negative values with
+  fractional components, and writes status `1` when it had to adjust the value
+  (otherwise `0`). Callers reference the helper through `std::floor`.
+- `CBLC-CEIL` rounds a caller-supplied floating operand (`USAGE COMP-2`) toward
+  positive infinity. Callers provide the operand, a trailing result slot, and a
+  numeric status flag by reference. The helper copies the integer part of the
+  operand into the result, increments by one for positive values with fractional
+  components, and writes status `1` when an adjustment occurs (otherwise `0`).
+  Callers reference the helper through `std::ceil`.
+- `CBLC-EXP` widens a caller-supplied floating operand (`USAGE COMP-2`) through
+  `FUNCTION EXP` to produce the mathematical exponential. Callers provide the
+  operand, a trailing floating result slot, and a numeric status flag by
+  reference. The helper initializes status to `0`, stores the computed
+  exponential in the result, and raises status `1` while zeroing the output when
+  COBOL signals a size error (overflow). Callers reference the helper through
+  `std::exp`.
+- `CBLC-LOG` computes the natural logarithm of a caller-supplied floating
+  operand (`USAGE COMP-2`). Callers provide the operand, a trailing floating
+  result slot, and a numeric status flag by reference. The helper rejects
+  non-positive inputs by returning status `1` with a zeroed result, otherwise it
+  invokes `FUNCTION LOG` and reports overflow through the same status flag.
+  Callers reference the helper through `std::log`.
 - `CBLC-TOUPPER` mutates a caller-supplied alphanumeric buffer (up to 255
   characters) in place, converting any lowercase ASCII letters to uppercase.
   Callers pass the buffer by reference, the declared length by value, and a
