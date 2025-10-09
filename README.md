@@ -7,6 +7,7 @@ The CTOC COBOL Transpiler lets you author business logic in a lightweight C-styl
 - Convert between `.cblc` and `.cob` sources while preserving file I/O declarations, record layouts, and procedure structure.
 - Track COBOL picture clauses for integers and floating-point numbers, producing consistent type descriptors across translation units.
 - Recover from parser errors to report multiple syntax issues in one run, and emit semantic diagnostics when alphanumeric data would be truncated or when subprogram bindings narrow parameters.
+- Capture bidirectional source maps so diagnostics and debugging tools can jump between generated COBOL and originating CBL-C statements.
 - Package reusable helpers in separate translation units and share data through explicit function parameters, mirroring the way you would compose modules in C.
 
 ## Quick Start

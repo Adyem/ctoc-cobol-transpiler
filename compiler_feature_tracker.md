@@ -72,13 +72,14 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Provide `CBLC-TOUPPER` and `CBLC-TOLOWER` standard library subprograms that convert caller buffers between upper and lower case in place while respecting declared lengths and reporting status via a trailing numeric slot.
 - [x] Provide `CBLC-ISDIGIT` and `CBLC-ISALPHA` standard library subprograms that classify single-character operands without locale dependencies and report boolean results through trailing numeric slots.
 - [x] Provide `CBLC-EXP` and `CBLC-LOG` standard library subprograms that compute exponentials and natural logarithms for floating operands, clamp invalid domains or overflow via trailing status slots, and expose the helpers through `std::exp` and `std::log`.
+- [x] Provide `CBLC-SIN`, `CBLC-COS`, and `CBLC-TAN` standard library subprograms that compute trigonometric results for floating operands (and widened integral inputs), apply COBOL intrinsic functions, and surface status codes for overflow or other domain issues through trailing numeric slots.
+- [x] Visibility rules: surface diagnostics for public/private types, fields, and functions, enforcing access at semantic analysis time.
+- [x] Source maps: retain CBL-C ↔ COBOL span mappings to power diagnostics and debugging outputs.
 
 ## Pending Features
 
 ### Core Language / Semantics
-- [ ] Visibility rules: surface diagnostics for public/private types, fields, and functions, enforcing access at semantic analysis time.
-- [ ] Const/immutability: track const bindings and read-only fields, emitting diagnostics on attempted writes.
-- [ ] Source maps: retain CBL-C ↔ COBOL span mappings to power diagnostics and debugging outputs.
+- [x] Const/immutability: track const bindings and read-only fields, emitting diagnostics on attempted writes.
 - [ ] Linter/formatter: produce a canonical, deterministic CBL-C pretty-printer for consistent diffs.
 - [ ] Copybook interop: support COPY includes, manage name collisions, and propagate declared lengths through the pipeline.
 
@@ -135,7 +136,6 @@ are completed; keep completed items grouped separately from the remaining work t
 
 ### Standard Library Subprogram Catalog
 
-- [ ] `sin`/`cos`/`tan` helpers: implement trigonometric routines that accept floating operands (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`) and optional integral inputs coerced to floating, returning floating results and tracking domain/precision diagnostics.
 - [ ] Additional numeric helpers: track future candidates such as `cbrt`, `hypot`, `min`/`max`, or `clamp` that should accept the same integral and floating domains defined above, ensuring the standard library surface mirrors common CBL-C idioms once return-slot plumbing lands.
 
 ### Data / Encoding / I/O

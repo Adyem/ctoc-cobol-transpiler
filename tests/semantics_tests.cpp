@@ -76,7 +76,8 @@ static t_ast_node *semantics_create_picture_node(const char *text)
     return (node);
 }
 
-static t_ast_node *semantics_build_program_with_storage(const char *storage_name, const char *picture_text)
+static t_ast_node *semantics_build_program_with_storage_level(const char *storage_name,
+    const char *picture_text, const char *level_text)
 {
     t_ast_node *program;
     t_ast_node *data_division;
@@ -118,7 +119,9 @@ static t_ast_node *semantics_build_program_with_storage(const char *storage_name
         semantics_destroy_program(program);
         return (NULL);
     }
-    level_literal = semantics_create_literal_node("01", LEXER_TOKEN_NUMERIC_LITERAL);
+    if (!level_text)
+        level_text = "01";
+    level_literal = semantics_create_literal_node(level_text, LEXER_TOKEN_NUMERIC_LITERAL);
     if (!level_literal)
     {
         ast_node_destroy(data_item);
@@ -174,7 +177,13 @@ static t_ast_node *semantics_build_program_with_storage(const char *storage_name
     return (program);
 }
 
-static int semantics_add_data_item(t_ast_node *program, const char *name, const char *picture_text)
+static t_ast_node *semantics_build_program_with_storage(const char *storage_name, const char *picture_text)
+{
+    return (semantics_build_program_with_storage_level(storage_name, picture_text, NULL));
+}
+
+static int semantics_add_data_item_with_level(t_ast_node *program, const char *name,
+    const char *picture_text, const char *level_text)
 {
     t_ast_node *data_division;
     t_ast_node *working_storage;
@@ -220,7 +229,9 @@ static int semantics_add_data_item(t_ast_node *program, const char *name, const 
     data_item = ast_node_create(AST_NODE_DATA_ITEM);
     if (!data_item)
         return (FT_FAILURE);
-    level_literal = semantics_create_literal_node("01", LEXER_TOKEN_NUMERIC_LITERAL);
+    if (!level_text)
+        level_text = "01";
+    level_literal = semantics_create_literal_node(level_text, LEXER_TOKEN_NUMERIC_LITERAL);
     if (!level_literal)
     {
         ast_node_destroy(data_item);
@@ -267,6 +278,11 @@ static int semantics_add_data_item(t_ast_node *program, const char *name, const 
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
+}
+
+static int semantics_add_data_item(t_ast_node *program, const char *name, const char *picture_text)
+{
+    return (semantics_add_data_item_with_level(program, name, picture_text, NULL));
 }
 
 static int semantics_attach_procedure_with_move(t_ast_node *program, const char *source_name, const char *target_name,
@@ -500,6 +516,75 @@ FT_TEST(test_semantics_detects_duplicate_data_item)
     return (status);
 }
 
+FT_TEST(test_semantics_rejects_move_into_read_only_item)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage_level("CONST-TARGET", "PIC X(5)", "78");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move(program, "IGNORED", "CONST-TARGET", 1) != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) != FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 1
+            && context.last_error_code == TRANSPILE_ERROR_SEMANTIC_IMMUTABLE_TARGET)
+            status = FT_SUCCESS;
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_allows_move_from_read_only_item)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage_level("CONST-SOURCE", "PIC X(5)", "78");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "TARGET-FIELD", "PIC X(10)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move(program, "CONST-SOURCE", "TARGET-FIELD", 0) != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) == FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 0)
+            status = FT_SUCCESS;
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
 FT_TEST(test_semantics_records_alphanumeric_length_in_context)
 {
     t_transpiler_context context;
@@ -678,6 +763,8 @@ const t_test_case *get_semantics_tests(size_t *count)
         {"semantics_accepts_declared_move", test_semantics_accepts_declared_move},
         {"semantics_rejects_undeclared_identifier", test_semantics_rejects_undeclared_identifier},
         {"semantics_detects_duplicate_data_item", test_semantics_detects_duplicate_data_item},
+        {"semantics_rejects_move_into_read_only_item", test_semantics_rejects_move_into_read_only_item},
+        {"semantics_allows_move_from_read_only_item", test_semantics_allows_move_from_read_only_item},
         {"semantics_records_alphanumeric_length_in_context", test_semantics_records_alphanumeric_length_in_context},
         {"semantics_rejects_type_mismatch_move", test_semantics_rejects_type_mismatch_move},
         {"semantics_rejects_truncating_identifier_move", test_semantics_rejects_truncating_identifier_move},

@@ -183,6 +183,59 @@ static int transpiler_context_data_items_reserve(t_transpiler_context *context, 
     return (FT_SUCCESS);
 }
 
+static int transpiler_context_source_maps_reserve(t_transpiler_context *context, size_t desired_capacity)
+{
+    t_transpiler_source_map_entry *maps;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (context->source_map_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 8)
+        desired_capacity = 8;
+    maps = static_cast<t_transpiler_source_map_entry *>(cma_calloc(desired_capacity,
+        sizeof(t_transpiler_source_map_entry)));
+    if (!maps)
+        return (FT_FAILURE);
+    if (context->source_maps)
+    {
+        ft_memcpy(maps, context->source_maps,
+            context->source_map_count * sizeof(t_transpiler_source_map_entry));
+        cma_free(context->source_maps);
+    }
+    context->source_maps = maps;
+    context->source_map_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
+static int transpiler_context_span_is_valid(const t_transpiler_source_span *span)
+{
+    if (!span)
+        return (0);
+    if (transpiler_context_string_is_blank(span->path))
+        return (0);
+    if (span->end_line < span->start_line)
+        return (0);
+    if (span->end_line == span->start_line && span->end_column < span->start_column)
+        return (0);
+    return (1);
+}
+
+static int transpiler_context_span_contains(const t_transpiler_source_span *span, size_t line, size_t column)
+{
+    if (!span)
+        return (0);
+    if (line < span->start_line)
+        return (0);
+    if (line > span->end_line)
+        return (0);
+    if (line == span->start_line && column < span->start_column)
+        return (0);
+    if (line == span->end_line && column > span->end_column)
+        return (0);
+    return (1);
+}
+
 static int transpiler_context_assign_paths(const char ***storage, size_t *count,
     size_t *capacity, const char **paths, size_t path_count)
 {
@@ -249,6 +302,9 @@ int transpiler_context_init(t_transpiler_context *context)
     context->data_items = NULL;
     context->data_item_count = 0;
     context->data_item_capacity = 0;
+    context->source_maps = NULL;
+    context->source_map_count = 0;
+    context->source_map_capacity = 0;
     if (transpiler_diagnostics_init(&context->diagnostics) != FT_SUCCESS)
         return (FT_FAILURE);
     if (transpiler_context_functions_reserve(context, 4) != FT_SUCCESS)
@@ -346,6 +402,46 @@ int transpiler_context_init(t_transpiler_context *context)
         transpiler_diagnostics_dispose(&context->diagnostics);
         return (FT_FAILURE);
     }
+    if (transpiler_context_source_maps_reserve(context, 8) != FT_SUCCESS)
+    {
+        if (context->data_items)
+            cma_free(context->data_items);
+        context->data_items = NULL;
+        context->data_item_count = 0;
+        context->data_item_capacity = 0;
+        if (context->module_order)
+            cma_free(context->module_order);
+        context->module_order = NULL;
+        context->module_order_count = 0;
+        context->module_order_capacity = 0;
+        if (context->modules)
+        {
+            size_t index;
+
+            index = 0;
+            while (index < context->module_count)
+            {
+                transpiler_context_module_clear(&context->modules[index]);
+                index += 1;
+            }
+            cma_free(context->modules);
+        }
+        context->modules = NULL;
+        context->module_count = 0;
+        context->module_capacity = 0;
+        if (context->files)
+            cma_free(context->files);
+        context->files = NULL;
+        context->file_count = 0;
+        context->file_capacity = 0;
+        if (context->functions)
+            cma_free(context->functions);
+        context->functions = NULL;
+        context->function_count = 0;
+        context->function_capacity = 0;
+        transpiler_diagnostics_dispose(&context->diagnostics);
+        return (FT_FAILURE);
+    }
     return (FT_SUCCESS);
 }
 
@@ -408,6 +504,11 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->target_paths = NULL;
     context->target_count = 0;
     context->target_capacity = 0;
+    if (context->source_maps)
+        cma_free(context->source_maps);
+    context->source_maps = NULL;
+    context->source_map_count = 0;
+    context->source_map_capacity = 0;
     ft_bzero(&context->entrypoint, sizeof(context->entrypoint));
 }
 
@@ -975,6 +1076,37 @@ const t_transpiler_function_signature *transpiler_context_find_function(const t_
     return (NULL);
 }
 
+const t_transpiler_function_signature *transpiler_context_resolve_function_access(t_transpiler_context *context,
+    const char *requesting_module, const char *module_name, const char *name)
+{
+    const t_transpiler_function_signature *signature;
+    const char *requester_label;
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+    if (!context)
+        return (NULL);
+    if (transpiler_context_string_is_blank(module_name)
+        || transpiler_context_string_is_blank(name))
+        return (NULL);
+    signature = transpiler_context_find_function(context, module_name, name);
+    if (!signature)
+        return (NULL);
+    if (transpiler_context_string_is_blank(requesting_module))
+        return (signature);
+    if (ft_strncmp(requesting_module, module_name, TRANSPILE_MODULE_NAME_MAX) == 0)
+        return (signature);
+    if (signature->visibility == TRANSPILE_SYMBOL_PUBLIC)
+        return (signature);
+    requester_label = requesting_module;
+    pf_snprintf(message, sizeof(message),
+        "module '%s' cannot access private function '%s' exported by module '%s'",
+        requester_label, name, module_name);
+    transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+        TRANSPILE_ERROR_FUNCTION_PRIVATE_ACCESS, message);
+    transpiler_context_record_error(context, TRANSPILE_ERROR_FUNCTION_PRIVATE_ACCESS);
+    return (NULL);
+}
+
 int transpiler_context_register_entrypoint(t_transpiler_context *context, const char *module_name, const char *name,
     t_transpiler_function_return_mode return_mode, const char *argc_identifier, const char *argv_identifier)
 {
@@ -1137,7 +1269,7 @@ const t_transpiler_file_declaration *transpiler_context_get_files(const t_transp
 }
 
 int transpiler_context_register_data_item(t_transpiler_context *context, const char *name,
-    t_transpiler_data_item_kind kind, size_t declared_length)
+    t_transpiler_data_item_kind kind, size_t declared_length, int is_read_only)
 {
     t_transpiler_data_item *item;
     size_t index;
@@ -1157,6 +1289,8 @@ int transpiler_context_register_data_item(t_transpiler_context *context, const c
             existing_length = context->data_items[index].declared_length;
             existing_kind = context->data_items[index].kind;
             context->data_items[index].kind = kind;
+            if (is_read_only)
+                context->data_items[index].is_read_only = 1;
             if (existing_kind == TRANSPILE_DATA_ITEM_ALPHANUMERIC
                 && kind == TRANSPILE_DATA_ITEM_ALPHANUMERIC
                 && existing_length > 0
@@ -1213,6 +1347,7 @@ int transpiler_context_register_data_item(t_transpiler_context *context, const c
     ft_strlcpy(item->name, name, sizeof(item->name));
     item->kind = kind;
     item->declared_length = declared_length;
+    item->is_read_only = is_read_only ? 1 : 0;
     context->data_item_count += 1;
     return (FT_SUCCESS);
 }
@@ -1242,4 +1377,87 @@ const t_transpiler_data_item *transpiler_context_get_data_items(const t_transpil
     if (count)
         *count = context->data_item_count;
     return (context->data_items);
+}
+
+int transpiler_context_record_source_map_entry(t_transpiler_context *context,
+    const t_transpiler_source_span *cblc_span, const t_transpiler_source_span *cobol_span)
+{
+    t_transpiler_source_map_entry *entry;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (!transpiler_context_span_is_valid(cblc_span))
+        return (FT_FAILURE);
+    if (!transpiler_context_span_is_valid(cobol_span))
+        return (FT_FAILURE);
+    if (transpiler_context_source_maps_reserve(context, context->source_map_count + 1) != FT_SUCCESS)
+        return (FT_FAILURE);
+    entry = &context->source_maps[context->source_map_count];
+    ft_bzero(entry, sizeof(*entry));
+    ft_strlcpy(entry->cblc_span.path, cblc_span->path, TRANSPILE_FILE_PATH_MAX);
+    entry->cblc_span.start_line = cblc_span->start_line;
+    entry->cblc_span.start_column = cblc_span->start_column;
+    entry->cblc_span.end_line = cblc_span->end_line;
+    entry->cblc_span.end_column = cblc_span->end_column;
+    ft_strlcpy(entry->cobol_span.path, cobol_span->path, TRANSPILE_FILE_PATH_MAX);
+    entry->cobol_span.start_line = cobol_span->start_line;
+    entry->cobol_span.start_column = cobol_span->start_column;
+    entry->cobol_span.end_line = cobol_span->end_line;
+    entry->cobol_span.end_column = cobol_span->end_column;
+    context->source_map_count += 1;
+    return (FT_SUCCESS);
+}
+
+const t_transpiler_source_map_entry *transpiler_context_get_source_maps(const t_transpiler_context *context,
+    size_t *count)
+{
+    if (!context)
+        return (NULL);
+    if (count)
+        *count = context->source_map_count;
+    return (context->source_maps);
+}
+
+const t_transpiler_source_map_entry *transpiler_context_map_cblc_to_cobol(const t_transpiler_context *context,
+    const char *path, size_t line, size_t column)
+{
+    size_t index;
+
+    if (!context)
+        return (NULL);
+    if (transpiler_context_string_is_blank(path))
+        return (NULL);
+    index = 0;
+    while (index < context->source_map_count)
+    {
+        if (ft_strncmp(context->source_maps[index].cblc_span.path, path, TRANSPILE_FILE_PATH_MAX) == 0
+            && transpiler_context_span_contains(&context->source_maps[index].cblc_span, line, column))
+        {
+            return (&context->source_maps[index]);
+        }
+        index += 1;
+    }
+    return (NULL);
+}
+
+const t_transpiler_source_map_entry *transpiler_context_map_cobol_to_cblc(const t_transpiler_context *context,
+    const char *path, size_t line, size_t column)
+{
+    size_t index;
+
+    if (!context)
+        return (NULL);
+    if (transpiler_context_string_is_blank(path))
+        return (NULL);
+    index = 0;
+    while (index < context->source_map_count)
+    {
+        if (ft_strncmp(context->source_maps[index].cobol_span.path, path, TRANSPILE_FILE_PATH_MAX) == 0
+            && transpiler_context_span_contains(&context->source_maps[index].cobol_span, line, column))
+        {
+            return (&context->source_maps[index]);
+        }
+        index += 1;
+    }
+    return (NULL);
 }

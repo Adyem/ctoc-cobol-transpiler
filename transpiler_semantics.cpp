@@ -19,6 +19,7 @@ typedef struct s_transpiler_semantic_data_item
     char name[TRANSPILE_IDENTIFIER_MAX];
     t_transpiler_semantic_data_kind kind;
     size_t declared_length;
+    int is_read_only;
 }   t_transpiler_semantic_data_item;
 
 typedef struct s_transpiler_semantic_scope
@@ -71,6 +72,7 @@ static int transpiler_semantics_scope_reserve(t_transpiler_semantic_scope *scope
         ft_strlcpy(new_items[index].name, scope->items[index].name, TRANSPILE_IDENTIFIER_MAX);
         new_items[index].kind = scope->items[index].kind;
         new_items[index].declared_length = scope->items[index].declared_length;
+        new_items[index].is_read_only = scope->items[index].is_read_only;
         index += 1;
     }
     if (scope->items)
@@ -112,7 +114,7 @@ static int transpiler_semantics_emit_error(t_transpiler_context *context, int co
 }
 
 static int transpiler_semantics_register_data_item(t_transpiler_semantic_scope *scope, t_transpiler_context *context,
-    const char *name, t_transpiler_semantic_data_kind kind, size_t declared_length)
+    const char *name, t_transpiler_semantic_data_kind kind, size_t declared_length, int is_read_only)
 {
     char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
     const t_transpiler_semantic_data_item *existing;
@@ -145,12 +147,14 @@ static int transpiler_semantics_register_data_item(t_transpiler_semantic_scope *
     ft_strlcpy(item->name, name, TRANSPILE_IDENTIFIER_MAX);
     item->kind = kind;
     item->declared_length = declared_length;
+    item->is_read_only = is_read_only;
     if (transpiler_context_register_data_item(context, name,
-            transpiler_semantics_convert_kind(kind), declared_length) != FT_SUCCESS)
+            transpiler_semantics_convert_kind(kind), declared_length, is_read_only) != FT_SUCCESS)
     {
         item->name[0] = '\0';
         item->kind = TRANSPILE_SEMANTIC_DATA_UNKNOWN;
         item->declared_length = 0;
+        item->is_read_only = 0;
         return (FT_FAILURE);
     }
     scope->item_count += 1;
@@ -345,10 +349,12 @@ static int transpiler_semantics_collect_data_items(const t_ast_node *section, t_
         {
             const t_ast_node *name_node;
             const t_ast_node *picture_node;
+            const t_ast_node *level_node;
             size_t name_index;
 
             name_node = NULL;
             picture_node = NULL;
+            level_node = NULL;
             name_index = 0;
             while (name_index < ast_node_child_count(child))
             {
@@ -359,15 +365,27 @@ static int transpiler_semantics_collect_data_items(const t_ast_node *section, t_
                     name_node = candidate;
                 else if (candidate && candidate->kind == AST_NODE_PICTURE_CLAUSE)
                     picture_node = candidate;
+                else if (candidate && candidate->kind == AST_NODE_LITERAL && !level_node)
+                    level_node = candidate;
                 name_index += 1;
             }
             if (name_node && name_node->token.lexeme)
             {
                 t_transpiler_semantic_data_kind kind;
                 size_t declared_length;
+                int is_read_only;
 
                 kind = TRANSPILE_SEMANTIC_DATA_UNKNOWN;
                 declared_length = 0;
+                is_read_only = 0;
+                if (level_node && level_node->token.lexeme)
+                {
+                    int level_value;
+
+                    level_value = ft_atoi(level_node->token.lexeme);
+                    if (level_value == 78)
+                        is_read_only = 1;
+                }
                 if (picture_node && picture_node->token.lexeme)
                 {
                     kind = transpiler_semantics_classify_picture(picture_node->token.lexeme);
@@ -375,7 +393,7 @@ static int transpiler_semantics_collect_data_items(const t_ast_node *section, t_
                         declared_length = transpiler_semantics_picture_alphanumeric_length(picture_node->token.lexeme);
                 }
                 if (transpiler_semantics_register_data_item(scope, context, name_node->token.lexeme,
-                        kind, declared_length) != FT_SUCCESS)
+                        kind, declared_length, is_read_only) != FT_SUCCESS)
                     status = FT_FAILURE;
             }
             else
@@ -441,7 +459,7 @@ static int transpiler_semantics_collect_scope(const t_ast_node *program, t_trans
 
 static int transpiler_semantics_validate_identifier_use(const t_transpiler_semantic_scope *scope,
     t_transpiler_context *context, const t_ast_node *identifier, int is_target,
-    t_transpiler_semantic_data_kind *out_kind, size_t *out_length)
+    t_transpiler_semantic_data_kind *out_kind, size_t *out_length, int *out_is_read_only)
 {
     char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
     const t_transpiler_semantic_data_item *item;
@@ -469,6 +487,8 @@ static int transpiler_semantics_validate_identifier_use(const t_transpiler_seman
         *out_kind = item->kind;
     if (out_length)
         *out_length = item->declared_length;
+    if (out_is_read_only)
+        *out_is_read_only = item->is_read_only;
     return (FT_SUCCESS);
 }
 
@@ -481,6 +501,7 @@ static int transpiler_semantics_validate_move_statement(const t_ast_node *move_n
     t_transpiler_semantic_data_kind source_kind;
     size_t target_length;
     size_t source_length;
+    int target_is_read_only;
     int status;
 
     if (!move_node)
@@ -497,6 +518,7 @@ static int transpiler_semantics_validate_move_statement(const t_ast_node *move_n
     source_kind = TRANSPILE_SEMANTIC_DATA_UNKNOWN;
     target_length = 0;
     source_length = 0;
+    target_is_read_only = 0;
     status = FT_SUCCESS;
     if (!target || target->kind != AST_NODE_IDENTIFIER)
     {
@@ -508,12 +530,12 @@ static int transpiler_semantics_validate_move_statement(const t_ast_node *move_n
         status = FT_FAILURE;
     }
     else if (transpiler_semantics_validate_identifier_use(scope, context, target, 1,
-            &target_kind, &target_length) != FT_SUCCESS)
+            &target_kind, &target_length, &target_is_read_only) != FT_SUCCESS)
         status = FT_FAILURE;
     if (source && source->kind == AST_NODE_IDENTIFIER)
     {
         if (transpiler_semantics_validate_identifier_use(scope, context, source, 0,
-                &source_kind, &source_length) != FT_SUCCESS)
+                &source_kind, &source_length, NULL) != FT_SUCCESS)
             status = FT_FAILURE;
     }
     else if (source && source->kind == AST_NODE_LITERAL)
@@ -525,6 +547,17 @@ static int transpiler_semantics_validate_move_statement(const t_ast_node *move_n
         pf_snprintf(message, sizeof(message),
             "MOVE source must be an identifier or literal");
         transpiler_semantics_emit_error(context, TRANSPILE_ERROR_SEMANTIC_INVALID_MOVE, message);
+        status = FT_FAILURE;
+    }
+    if (target_is_read_only)
+    {
+        char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+        const char *target_name;
+
+        target_name = (target && target->token.lexeme) ? target->token.lexeme : "<target>";
+        pf_snprintf(message, sizeof(message),
+            "MOVE target '%s' is read-only and cannot be modified", target_name);
+        transpiler_semantics_emit_error(context, TRANSPILE_ERROR_SEMANTIC_IMMUTABLE_TARGET, message);
         status = FT_FAILURE;
     }
     if (target_kind != TRANSPILE_SEMANTIC_DATA_UNKNOWN
