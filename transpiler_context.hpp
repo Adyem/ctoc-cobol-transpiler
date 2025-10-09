@@ -63,6 +63,7 @@ typedef struct s_transpiler_function_signature
 #define TRANSPILE_ERROR_MODULE_IMPORT_CYCLE 1011
 #define TRANSPILE_ERROR_FUNCTION_EXPORT_CONFLICT 1012
 #define TRANSPILE_ERROR_DATA_ITEM_PARAMETER_TRUNCATION 1013
+#define TRANSPILE_ERROR_FUNCTION_PRIVATE_ACCESS 1014
 
 typedef enum e_transpiler_file_role
 {
@@ -119,7 +120,23 @@ typedef struct s_transpiler_data_item
     t_transpiler_data_item_kind kind;
     size_t declared_length;
     int has_caller_length;
+    int is_read_only;
 }   t_transpiler_data_item;
+
+typedef struct s_transpiler_source_span
+{
+    char path[TRANSPILE_FILE_PATH_MAX];
+    size_t start_line;
+    size_t start_column;
+    size_t end_line;
+    size_t end_column;
+}   t_transpiler_source_span;
+
+typedef struct s_transpiler_source_map_entry
+{
+    t_transpiler_source_span cblc_span;
+    t_transpiler_source_span cobol_span;
+}   t_transpiler_source_map_entry;
 
 typedef struct s_transpiler_context
 {
@@ -155,6 +172,9 @@ typedef struct s_transpiler_context
     t_transpiler_data_item *data_items;
     size_t data_item_count;
     size_t data_item_capacity;
+    t_transpiler_source_map_entry *source_maps;
+    size_t source_map_count;
+    size_t source_map_capacity;
 }   t_transpiler_context;
 
 int transpiler_context_init(t_transpiler_context *context);
@@ -180,6 +200,8 @@ int transpiler_context_register_function(t_transpiler_context *context, const ch
     t_transpiler_function_return_mode return_mode, t_transpiler_symbol_visibility visibility);
 const t_transpiler_function_signature *transpiler_context_find_function(const t_transpiler_context *context,
     const char *module_name, const char *name);
+const t_transpiler_function_signature *transpiler_context_resolve_function_access(t_transpiler_context *context,
+    const char *requesting_module, const char *module_name, const char *name);
 int transpiler_context_register_entrypoint(t_transpiler_context *context, const char *module_name, const char *name,
     t_transpiler_function_return_mode return_mode, const char *argc_identifier, const char *argv_identifier);
 const t_transpiler_entrypoint *transpiler_context_get_entrypoint(const t_transpiler_context *context);
@@ -188,8 +210,16 @@ int transpiler_context_register_file(t_transpiler_context *context, const char *
 int transpiler_context_record_file_length_hint(t_transpiler_context *context, const char *name, size_t record_length);
 const t_transpiler_file_declaration *transpiler_context_get_files(const t_transpiler_context *context, size_t *count);
 int transpiler_context_register_data_item(t_transpiler_context *context, const char *name,
-    t_transpiler_data_item_kind kind, size_t declared_length);
+    t_transpiler_data_item_kind kind, size_t declared_length, int is_read_only);
 const t_transpiler_data_item *transpiler_context_find_data_item(const t_transpiler_context *context, const char *name);
 const t_transpiler_data_item *transpiler_context_get_data_items(const t_transpiler_context *context, size_t *count);
+int transpiler_context_record_source_map_entry(t_transpiler_context *context,
+    const t_transpiler_source_span *cblc_span, const t_transpiler_source_span *cobol_span);
+const t_transpiler_source_map_entry *transpiler_context_get_source_maps(const t_transpiler_context *context,
+    size_t *count);
+const t_transpiler_source_map_entry *transpiler_context_map_cblc_to_cobol(const t_transpiler_context *context,
+    const char *path, size_t line, size_t column);
+const t_transpiler_source_map_entry *transpiler_context_map_cobol_to_cblc(const t_transpiler_context *context,
+    const char *path, size_t line, size_t column);
 
 #endif

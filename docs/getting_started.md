@@ -47,9 +47,17 @@ The COBOL type descriptor helpers were extended to describe long, long long, flo
 
 Semantic analysis computes literal and identifier lengths and emits a dedicated error when a MOVE would truncate an alphanumeric target.【F:transpiler_semantics.cpp†L562-L601】 The error message reports both the source and target widths so you can resize fields or adjust literals with immediate feedback.
 
+### Read-only Data Item Enforcement
+
+Level-78 WORKING-STORAGE constants are now registered as immutable bindings, and semantic analysis rejects MOVE statements that attempt to overwrite them.【F:transpiler_semantics.cpp†L459-L577】 The diagnostics stream reports `TRANSPILE_ERROR_SEMANTIC_IMMUTABLE_TARGET` with the offending identifier so you can redirect the write to a mutable buffer or drop the stray assignment.【F:tests/semantics_tests.cpp†L483-L544】
+
 ### Subprogram Parameter Length Checks
 
 The transpiler context tracks caller-observed buffer widths and rejects subprogram registrations that would narrow an alphanumeric parameter, preventing accidental truncation at call boundaries.【F:transpiler_context.cpp†L1143-L1183】 When triggered, the diagnostics stream includes the offending item name alongside caller and callee lengths.
+
+### Bidirectional Source Maps
+
+Source maps now capture the relationship between generated CBL-C output and the originating COBOL statements so tooling can surface diagnostics against either language. The transpiler context exposes helpers to register spans for each translation unit, enumerate the table, and query in both directions when you need to locate the corresponding code snippet.【F:transpiler_context.cpp†L1198-L1313】 Regression tests cover successful registration, reverse lookups, and invalid span rejection so the context stays reliable as new stages adopt the mapping APIs.【F:tests/transpiler_context_tests.cpp†L1432-L1572】
 
 ## Where to Learn More
 

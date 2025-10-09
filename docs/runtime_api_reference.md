@@ -163,6 +163,21 @@ following helpers:
   non-positive inputs by returning status `1` with a zeroed result, otherwise it
   invokes `FUNCTION LOG` and reports overflow through the same status flag.
   Callers reference the helper through `std::log`.
+- `CBLC-SIN` accepts a floating operand (`USAGE COMP-2`) by reference together
+  with trailing result and status slots. The helper sets status to `0`, applies
+  `FUNCTION SIN` to produce the result, and records status `1` with a zeroed
+  output if COBOL signals a size error during evaluation. Callers reference the
+  helper through `std::sin`.
+- `CBLC-COS` mirrors `CBLC-SIN` but computes `FUNCTION COS` for the supplied
+  operand. It writes the cosine into the result slot, maintains a `0` status for
+  successful evaluations, and switches the status to `1` while zeroing the
+  result when a size error occurs. Callers reference the helper through
+  `std::cos`.
+- `CBLC-TAN` evaluates `FUNCTION TAN` for a caller-provided floating operand,
+  storing the result and returning status `0` when finite. Inputs that cause
+  COBOL to raise a size error (for example, values near odd multiples of
+  `PI/2`) yield a zeroed result and status `1`. Callers reference the helper
+  through `std::tan`.
 - `CBLC-TOUPPER` mutates a caller-supplied alphanumeric buffer (up to 255
   characters) in place, converting any lowercase ASCII letters to uppercase.
   Callers pass the buffer by reference, the declared length by value, and a

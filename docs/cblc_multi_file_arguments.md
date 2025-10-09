@@ -108,4 +108,8 @@ function void report_status(bool flag) {
 
 These patterns scale to larger programs: translate every reusable helper into a
 separate module, declare the parameters it expects, and `import` that module in
-any translation unit that needs access to its subfunctions.
+any translation unit that needs access to its subfunctions.  Keep helper
+functions `private` when they should only be invoked inside their home module;
+calls from other translation units now trigger a
+`TRANSPILE_ERROR_FUNCTION_PRIVATE_ACCESS` diagnostic so you can tighten the
+module boundary before shipping.

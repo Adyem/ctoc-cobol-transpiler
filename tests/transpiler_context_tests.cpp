@@ -654,6 +654,154 @@ FT_TEST(test_transpiler_context_rejects_public_duplicate_exports)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_transpiler_context_allows_private_access_within_module)
+{
+    t_transpiler_context context;
+    const t_transpiler_function_signature *signature;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_module(&context, "alpha_mod", NULL),
+            "module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_function(&context, "alpha_mod", "helper",
+            TRANSPILE_FUNCTION_RETURN_VOID, TRANSPILE_SYMBOL_PRIVATE),
+            "private helper registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    signature = transpiler_context_resolve_function_access(&context, "alpha_mod", "alpha_mod", "helper");
+    if (!signature)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: private helper should be accessible inside its module\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 0,
+            "private self-access should not emit diagnostics") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(transpiler_context_has_errors(&context), 0,
+            "private self-access should not record errors") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_rejects_private_access_across_modules)
+{
+    t_transpiler_context context;
+    const t_transpiler_function_signature *signature;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_module(&context, "alpha_mod", NULL),
+            "first module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_module(&context, "beta_mod", NULL),
+            "second module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_function(&context, "alpha_mod", "helper",
+            TRANSPILE_FUNCTION_RETURN_VOID, TRANSPILE_SYMBOL_PRIVATE),
+            "private helper registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    signature = transpiler_context_resolve_function_access(&context, "beta_mod", "alpha_mod", "helper");
+    if (signature)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: cross-module private access should be rejected\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 1,
+            "private access rejection should emit one diagnostic") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(context.diagnostics.items[0].code,
+            TRANSPILE_ERROR_FUNCTION_PRIVATE_ACCESS,
+            "private access rejection should use dedicated error code") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(transpiler_context_has_errors(&context), 1,
+            "private access rejection should record errors") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_allows_public_access_across_modules)
+{
+    t_transpiler_context context;
+    const t_transpiler_function_signature *signature;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_module(&context, "alpha_mod", NULL),
+            "first module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_module(&context, "beta_mod", NULL),
+            "second module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_function(&context, "alpha_mod", "helper",
+            TRANSPILE_FUNCTION_RETURN_VOID, TRANSPILE_SYMBOL_PUBLIC),
+            "public helper registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    signature = transpiler_context_resolve_function_access(&context, "beta_mod", "alpha_mod", "helper");
+    if (!signature)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: cross-module public access should be permitted\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 0,
+            "public access should not emit diagnostics") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(transpiler_context_has_errors(&context), 0,
+            "public access should not record errors") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_transpiler_context_scans_imports_and_orders_modules)
 {
     t_transpiler_context context;
@@ -973,28 +1121,28 @@ FT_TEST(test_transpiler_context_preserves_caller_declared_length)
             "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_expect_success(transpiler_context_register_data_item(&context,
-                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 12),
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 12, 0),
             "initial declared length registration should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     if (test_expect_success(transpiler_context_register_data_item(&context,
-                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 5),
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 5, 0),
             "caller length should update binding") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     if (test_expect_success(transpiler_context_register_data_item(&context,
-                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 18),
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 18, 0),
             "wider callee buffers should not override caller length") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     if (test_expect_success(transpiler_context_register_data_item(&context,
-                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 0),
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 0, 0),
             "zero length updates should preserve prior metadata") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
@@ -1024,21 +1172,21 @@ FT_TEST(test_transpiler_context_rejects_narrower_callee_length)
     if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_expect_success(transpiler_context_register_data_item(&context,
-                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 12),
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 12, 0),
             "initial registration should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     if (test_expect_success(transpiler_context_register_data_item(&context,
-                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 5),
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 5, 0),
             "caller registration should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     if (transpiler_context_register_data_item(&context,
-            "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 4) != FT_FAILURE)
+            "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 4, 0) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
         pf_printf("Assertion failed: expected narrower callee length to be rejected\n");
@@ -1060,6 +1208,44 @@ FT_TEST(test_transpiler_context_rejects_narrower_callee_length)
     {
         transpiler_context_dispose(&context);
         pf_printf("Assertion failed: expected parameter truncation diagnostic\n");
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_records_read_only_flag)
+{
+    t_transpiler_context context;
+    const t_transpiler_data_item *item;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_data_item(&context,
+                "IMMUTABLE-ITEM", TRANSPILE_DATA_ITEM_NUMERIC, 0, 1),
+            "read-only data item registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_data_item(&context,
+                "IMMUTABLE-ITEM", TRANSPILE_DATA_ITEM_NUMERIC, 0, 0),
+            "additional registrations should preserve read-only flag") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    item = transpiler_context_find_data_item(&context, "IMMUTABLE-ITEM");
+    if (!item)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected immutable data item to be registered\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(item->is_read_only, 1,
+            "read-only flag should be preserved across registrations") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     transpiler_context_dispose(&context);
@@ -1272,6 +1458,108 @@ FT_TEST(test_transpiler_context_rejects_mismatched_io_paths)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_transpiler_context_records_source_map_entry)
+{
+    t_transpiler_context context;
+    t_transpiler_source_span cblc_span;
+    t_transpiler_source_span cobol_span;
+    const t_transpiler_source_map_entry *entry;
+    const t_transpiler_source_map_entry *reverse_entry;
+    size_t map_count;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    ft_bzero(&cblc_span, sizeof(cblc_span));
+    ft_bzero(&cobol_span, sizeof(cobol_span));
+    ft_strlcpy(cblc_span.path, "modern.cblc", TRANSPILE_FILE_PATH_MAX);
+    cblc_span.start_line = 7;
+    cblc_span.start_column = 3;
+    cblc_span.end_line = 9;
+    cblc_span.end_column = 14;
+    ft_strlcpy(cobol_span.path, "legacy.cob", TRANSPILE_FILE_PATH_MAX);
+    cobol_span.start_line = 42;
+    cobol_span.start_column = 11;
+    cobol_span.end_line = 44;
+    cobol_span.end_column = 27;
+    if (test_expect_success(transpiler_context_record_source_map_entry(&context, &cblc_span, &cobol_span),
+            "source map registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    entry = transpiler_context_map_cblc_to_cobol(&context, "modern.cblc", 8, 5);
+    if (!entry)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected to locate cblc to cobol mapping\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(entry->cobol_span.path, "legacy.cob",
+            "mapped cobol span should expose registered path") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    reverse_entry = transpiler_context_map_cobol_to_cblc(&context, "legacy.cob", 43, 13);
+    if (!reverse_entry)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected to locate cobol to cblc mapping\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(reverse_entry->cblc_span.path, "modern.cblc",
+            "mapped cblc span should expose registered path") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_get_source_maps(&context, &map_count);
+    if (test_expect_int_equal(static_cast<int>(map_count), 1,
+            "context should track a single source map entry") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_rejects_invalid_source_map_span)
+{
+    t_transpiler_context context;
+    t_transpiler_source_span cblc_span;
+    t_transpiler_source_span cobol_span;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    ft_bzero(&cblc_span, sizeof(cblc_span));
+    ft_bzero(&cobol_span, sizeof(cobol_span));
+    ft_strlcpy(cblc_span.path, "broken.cblc", TRANSPILE_FILE_PATH_MAX);
+    cblc_span.start_line = 5;
+    cblc_span.start_column = 2;
+    cblc_span.end_line = 4;
+    cblc_span.end_column = 20;
+    ft_strlcpy(cobol_span.path, "broken.cob", TRANSPILE_FILE_PATH_MAX);
+    cobol_span.start_line = 8;
+    cobol_span.start_column = 1;
+    cobol_span.end_line = 9;
+    cobol_span.end_column = 30;
+    if (transpiler_context_record_source_map_entry(&context, &cblc_span, &cobol_span) != FT_FAILURE)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected invalid span registration to fail\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.source_map_count), 0,
+            "context should not retain rejected source map entry") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
 const t_test_case *get_transpiler_context_tests(size_t *count)
 {
     static const t_test_case tests[] = {
@@ -1288,6 +1576,9 @@ const t_test_case *get_transpiler_context_tests(size_t *count)
         {"transpiler_context_rejects_duplicate_entrypoint", test_transpiler_context_rejects_duplicate_entrypoint},
         {"transpiler_context_allows_private_duplicates", test_transpiler_context_allows_private_duplicates},
         {"transpiler_context_rejects_public_duplicate_exports", test_transpiler_context_rejects_public_duplicate_exports},
+        {"transpiler_context_allows_private_access_within_module", test_transpiler_context_allows_private_access_within_module},
+        {"transpiler_context_rejects_private_access_across_modules", test_transpiler_context_rejects_private_access_across_modules},
+        {"transpiler_context_allows_public_access_across_modules", test_transpiler_context_allows_public_access_across_modules},
         {"transpiler_context_scans_imports_and_orders_modules", test_transpiler_context_scans_imports_and_orders_modules},
         {"transpiler_context_orders_modules_deterministically", test_transpiler_context_orders_modules_deterministically},
         {"transpiler_context_rejects_empty_module_name", test_transpiler_context_rejects_empty_module_name},
@@ -1298,7 +1589,9 @@ const t_test_case *get_transpiler_context_tests(size_t *count)
         {"transpiler_context_registers_file_declaration", test_transpiler_context_registers_file_declaration},
         {"transpiler_context_tracks_record_length_hint", test_transpiler_context_tracks_record_length_hint},
         {"transpiler_context_records_multiple_io_paths", test_transpiler_context_records_multiple_io_paths},
-        {"transpiler_context_rejects_mismatched_io_paths", test_transpiler_context_rejects_mismatched_io_paths}
+        {"transpiler_context_rejects_mismatched_io_paths", test_transpiler_context_rejects_mismatched_io_paths},
+        {"transpiler_context_records_source_map_entry", test_transpiler_context_records_source_map_entry},
+        {"transpiler_context_rejects_invalid_source_map_span", test_transpiler_context_rejects_invalid_source_map_span}
     };
 
     if (count)

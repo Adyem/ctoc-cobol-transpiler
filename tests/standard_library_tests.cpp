@@ -1142,6 +1142,39 @@ FT_TEST(test_standard_library_lookup_enforces_std_prefix)
         pf_printf("Assertion failed: std::log should map to CBLC-LOG program\n");
         return (FT_FAILURE);
     }
+    entry = transpiler_standard_library_lookup("std::sin");
+    if (!entry)
+    {
+        pf_printf("Assertion failed: std::sin should resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-SIN", ft_strlen("CBLC-SIN") + 1) != 0)
+    {
+        pf_printf("Assertion failed: std::sin should map to CBLC-SIN program\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup("std::cos");
+    if (!entry)
+    {
+        pf_printf("Assertion failed: std::cos should resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-COS", ft_strlen("CBLC-COS") + 1) != 0)
+    {
+        pf_printf("Assertion failed: std::cos should map to CBLC-COS program\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup("std::tan");
+    if (!entry)
+    {
+        pf_printf("Assertion failed: std::tan should resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-TAN", ft_strlen("CBLC-TAN") + 1) != 0)
+    {
+        pf_printf("Assertion failed: std::tan should map to CBLC-TAN program\n");
+        return (FT_FAILURE);
+    }
     entry = transpiler_standard_library_lookup("std::strlen");
     if (!entry)
     {
@@ -1437,9 +1470,9 @@ FT_TEST(test_standard_library_catalog_lists_all_entries)
         pf_printf("Assertion failed: catalog should return entry table\n");
         return (FT_FAILURE);
     }
-    if (count != 23)
+    if (count != 26)
     {
-        pf_printf("Assertion failed: catalog should report twenty-three standard library entries but returned %u\n", static_cast<unsigned int>(count));
+        pf_printf("Assertion failed: catalog should report twenty-six standard library entries but returned %u\n", static_cast<unsigned int>(count));
         return (FT_FAILURE);
     }
     if (ft_strncmp(entries[0].qualified_name, "std::abs", ft_strlen("std::abs") + 1) != 0)
@@ -1487,74 +1520,89 @@ FT_TEST(test_standard_library_catalog_lists_all_entries)
         pf_printf("Assertion failed: ninth catalog entry should be std::log\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[9].qualified_name, "std::strlen", ft_strlen("std::strlen") + 1) != 0)
+    if (ft_strncmp(entries[9].qualified_name, "std::sin", ft_strlen("std::sin") + 1) != 0)
     {
-        pf_printf("Assertion failed: tenth catalog entry should be std::strlen\n");
+        pf_printf("Assertion failed: tenth catalog entry should be std::sin\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[10].qualified_name, "std::strnlen", ft_strlen("std::strnlen") + 1) != 0)
+    if (ft_strncmp(entries[10].qualified_name, "std::cos", ft_strlen("std::cos") + 1) != 0)
     {
-        pf_printf("Assertion failed: eleventh catalog entry should be std::strnlen\n");
+        pf_printf("Assertion failed: eleventh catalog entry should be std::cos\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[11].qualified_name, "std::strcmp", ft_strlen("std::strcmp") + 1) != 0)
+    if (ft_strncmp(entries[11].qualified_name, "std::tan", ft_strlen("std::tan") + 1) != 0)
     {
-        pf_printf("Assertion failed: twelfth catalog entry should be std::strcmp\n");
+        pf_printf("Assertion failed: twelfth catalog entry should be std::tan\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[12].qualified_name, "std::strcpy", ft_strlen("std::strcpy") + 1) != 0)
+    if (ft_strncmp(entries[12].qualified_name, "std::strlen", ft_strlen("std::strlen") + 1) != 0)
     {
-        pf_printf("Assertion failed: thirteenth catalog entry should be std::strcpy\n");
+        pf_printf("Assertion failed: thirteenth catalog entry should be std::strlen\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[13].qualified_name, "std::strncpy", ft_strlen("std::strncpy") + 1) != 0)
+    if (ft_strncmp(entries[13].qualified_name, "std::strnlen", ft_strlen("std::strnlen") + 1) != 0)
     {
-        pf_printf("Assertion failed: fourteenth catalog entry should be std::strncpy\n");
+        pf_printf("Assertion failed: fourteenth catalog entry should be std::strnlen\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[14].qualified_name, "std::memcmp", ft_strlen("std::memcmp") + 1) != 0)
+    if (ft_strncmp(entries[14].qualified_name, "std::strcmp", ft_strlen("std::strcmp") + 1) != 0)
     {
-        pf_printf("Assertion failed: fifteenth catalog entry should be std::memcmp\n");
+        pf_printf("Assertion failed: fifteenth catalog entry should be std::strcmp\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[15].qualified_name, "std::strcat", ft_strlen("std::strcat") + 1) != 0)
+    if (ft_strncmp(entries[15].qualified_name, "std::strcpy", ft_strlen("std::strcpy") + 1) != 0)
     {
-        pf_printf("Assertion failed: sixteenth catalog entry should be std::strcat\n");
+        pf_printf("Assertion failed: sixteenth catalog entry should be std::strcpy\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[16].qualified_name, "std::strtod", ft_strlen("std::strtod") + 1) != 0)
+    if (ft_strncmp(entries[16].qualified_name, "std::strncpy", ft_strlen("std::strncpy") + 1) != 0)
     {
-        pf_printf("Assertion failed: seventeenth catalog entry should be std::strtod\n");
+        pf_printf("Assertion failed: seventeenth catalog entry should be std::strncpy\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[17].qualified_name, "std::pow", ft_strlen("std::pow") + 1) != 0)
+    if (ft_strncmp(entries[17].qualified_name, "std::memcmp", ft_strlen("std::memcmp") + 1) != 0)
     {
-        pf_printf("Assertion failed: eighteenth catalog entry should be std::pow\n");
+        pf_printf("Assertion failed: eighteenth catalog entry should be std::memcmp\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[18].qualified_name, "std::sqrt", ft_strlen("std::sqrt") + 1) != 0)
+    if (ft_strncmp(entries[18].qualified_name, "std::strcat", ft_strlen("std::strcat") + 1) != 0)
     {
-        pf_printf("Assertion failed: nineteenth catalog entry should be std::sqrt\n");
+        pf_printf("Assertion failed: nineteenth catalog entry should be std::strcat\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[19].qualified_name, "std::toupper", ft_strlen("std::toupper") + 1) != 0)
+    if (ft_strncmp(entries[19].qualified_name, "std::strtod", ft_strlen("std::strtod") + 1) != 0)
     {
-        pf_printf("Assertion failed: twentieth catalog entry should be std::toupper\n");
+        pf_printf("Assertion failed: twentieth catalog entry should be std::strtod\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[20].qualified_name, "std::tolower", ft_strlen("std::tolower") + 1) != 0)
+    if (ft_strncmp(entries[20].qualified_name, "std::pow", ft_strlen("std::pow") + 1) != 0)
     {
-        pf_printf("Assertion failed: twenty-first catalog entry should be std::tolower\n");
+        pf_printf("Assertion failed: twenty-first catalog entry should be std::pow\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[21].qualified_name, "std::isdigit", ft_strlen("std::isdigit") + 1) != 0)
+    if (ft_strncmp(entries[21].qualified_name, "std::sqrt", ft_strlen("std::sqrt") + 1) != 0)
     {
-        pf_printf("Assertion failed: twenty-second catalog entry should be std::isdigit\n");
+        pf_printf("Assertion failed: twenty-second catalog entry should be std::sqrt\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[22].qualified_name, "std::isalpha", ft_strlen("std::isalpha") + 1) != 0)
+    if (ft_strncmp(entries[22].qualified_name, "std::toupper", ft_strlen("std::toupper") + 1) != 0)
     {
-        pf_printf("Assertion failed: twenty-third catalog entry should be std::isalpha\n");
+        pf_printf("Assertion failed: twenty-third catalog entry should be std::toupper\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entries[23].qualified_name, "std::tolower", ft_strlen("std::tolower") + 1) != 0)
+    {
+        pf_printf("Assertion failed: twenty-fourth catalog entry should be std::tolower\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entries[24].qualified_name, "std::isdigit", ft_strlen("std::isdigit") + 1) != 0)
+    {
+        pf_printf("Assertion failed: twenty-fifth catalog entry should be std::isdigit\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entries[25].qualified_name, "std::isalpha", ft_strlen("std::isalpha") + 1) != 0)
+    {
+        pf_printf("Assertion failed: twenty-sixth catalog entry should be std::isalpha\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -1620,6 +1668,21 @@ FT_TEST(test_standard_library_generators_validate_out_parameter)
     if (transpiler_standard_library_generate_log(NULL) != FT_FAILURE)
     {
         pf_printf("Assertion failed: log generator should reject NULL output pointer\n");
+        return (FT_FAILURE);
+    }
+    if (transpiler_standard_library_generate_sin(NULL) != FT_FAILURE)
+    {
+        pf_printf("Assertion failed: sin generator should reject NULL output pointer\n");
+        return (FT_FAILURE);
+    }
+    if (transpiler_standard_library_generate_cos(NULL) != FT_FAILURE)
+    {
+        pf_printf("Assertion failed: cos generator should reject NULL output pointer\n");
+        return (FT_FAILURE);
+    }
+    if (transpiler_standard_library_generate_tan(NULL) != FT_FAILURE)
+    {
+        pf_printf("Assertion failed: tan generator should reject NULL output pointer\n");
         return (FT_FAILURE);
     }
     if (transpiler_standard_library_generate_powerof(NULL) != FT_FAILURE)
@@ -4398,6 +4461,132 @@ cleanup:
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_standard_library_sin_generates_expected_text)
+{
+    char *program_text;
+    const char *expected_text;
+    int status;
+
+    program_text = NULL;
+    expected_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. CBLC-SIN.\n"
+        "       DATA DIVISION.\n"
+        "       LINKAGE SECTION.\n"
+        "       01 LNK-OPERAND USAGE COMP-2.\n"
+        "       01 LNK-RESULT USAGE COMP-2.\n"
+        "       01 LNK-STATUS PIC 9.\n"
+        "       PROCEDURE DIVISION USING BY REFERENCE LNK-OPERAND\n"
+        "           BY REFERENCE LNK-RESULT BY REFERENCE LNK-STATUS.\n"
+        "       MAIN.\n"
+        "           MOVE 0 TO LNK-STATUS.\n"
+        "           COMPUTE LNK-RESULT = FUNCTION SIN(LNK-OPERAND)\n"
+        "               ON SIZE ERROR\n"
+        "                   MOVE 1 TO LNK-STATUS\n"
+        "                   MOVE 0 TO LNK-RESULT\n"
+        "           END-COMPUTE.\n"
+        "           GOBACK.\n"
+        "       END PROGRAM CBLC-SIN.\n";
+    if (test_expect_success(transpiler_standard_library_generate_sin(&program_text),
+            "sin generator should succeed") != FT_SUCCESS)
+    {
+        if (program_text)
+            cma_free(program_text);
+        return (FT_FAILURE);
+    }
+    status = test_expect_cstring_equal(program_text, expected_text,
+        "sin generator should emit expected COBOL subprogram");
+    if (program_text)
+        cma_free(program_text);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_cos_generates_expected_text)
+{
+    char *program_text;
+    const char *expected_text;
+    int status;
+
+    program_text = NULL;
+    expected_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. CBLC-COS.\n"
+        "       DATA DIVISION.\n"
+        "       LINKAGE SECTION.\n"
+        "       01 LNK-OPERAND USAGE COMP-2.\n"
+        "       01 LNK-RESULT USAGE COMP-2.\n"
+        "       01 LNK-STATUS PIC 9.\n"
+        "       PROCEDURE DIVISION USING BY REFERENCE LNK-OPERAND\n"
+        "           BY REFERENCE LNK-RESULT BY REFERENCE LNK-STATUS.\n"
+        "       MAIN.\n"
+        "           MOVE 0 TO LNK-STATUS.\n"
+        "           COMPUTE LNK-RESULT = FUNCTION COS(LNK-OPERAND)\n"
+        "               ON SIZE ERROR\n"
+        "                   MOVE 1 TO LNK-STATUS\n"
+        "                   MOVE 0 TO LNK-RESULT\n"
+        "           END-COMPUTE.\n"
+        "           GOBACK.\n"
+        "       END PROGRAM CBLC-COS.\n";
+    if (test_expect_success(transpiler_standard_library_generate_cos(&program_text),
+            "cos generator should succeed") != FT_SUCCESS)
+    {
+        if (program_text)
+            cma_free(program_text);
+        return (FT_FAILURE);
+    }
+    status = test_expect_cstring_equal(program_text, expected_text,
+        "cos generator should emit expected COBOL subprogram");
+    if (program_text)
+        cma_free(program_text);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_tan_generates_expected_text)
+{
+    char *program_text;
+    const char *expected_text;
+    int status;
+
+    program_text = NULL;
+    expected_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. CBLC-TAN.\n"
+        "       DATA DIVISION.\n"
+        "       LINKAGE SECTION.\n"
+        "       01 LNK-OPERAND USAGE COMP-2.\n"
+        "       01 LNK-RESULT USAGE COMP-2.\n"
+        "       01 LNK-STATUS PIC 9.\n"
+        "       PROCEDURE DIVISION USING BY REFERENCE LNK-OPERAND\n"
+        "           BY REFERENCE LNK-RESULT BY REFERENCE LNK-STATUS.\n"
+        "       MAIN.\n"
+        "           MOVE 0 TO LNK-STATUS.\n"
+        "           COMPUTE LNK-RESULT = FUNCTION TAN(LNK-OPERAND)\n"
+        "               ON SIZE ERROR\n"
+        "                   MOVE 1 TO LNK-STATUS\n"
+        "                   MOVE 0 TO LNK-RESULT\n"
+        "           END-COMPUTE.\n"
+        "           GOBACK.\n"
+        "       END PROGRAM CBLC-TAN.\n";
+    if (test_expect_success(transpiler_standard_library_generate_tan(&program_text),
+            "tan generator should succeed") != FT_SUCCESS)
+    {
+        if (program_text)
+            cma_free(program_text);
+        return (FT_FAILURE);
+    }
+    status = test_expect_cstring_equal(program_text, expected_text,
+        "tan generator should emit expected COBOL subprogram");
+    if (program_text)
+        cma_free(program_text);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_standard_library_powerof_generates_expected_text)
 {
     char *program_text;
@@ -5591,6 +5780,279 @@ cleanup:
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_standard_library_sin_executes_for_representative_operands)
+{
+    const char *library_path;
+    const char *driver_path;
+    const char *binary_path;
+    const char *output_path;
+    const char *driver_text;
+    char *library_text;
+    char command[512];
+    char output_buffer[128];
+    int command_length;
+    int status;
+
+    FT_REQUIRE_COBC();
+    library_path = "stdlib_sin_lib.cob";
+    driver_path = "stdlib_sin_drv.cob";
+    binary_path = "stdlib_sin.bin";
+    output_path = "stdlib_sin.txt";
+    driver_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. SIN-DRIVER.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 OPERAND-ZERO USAGE COMP-2 VALUE 0.\n"
+        "       01 OPERAND-PI-HALF USAGE COMP-2 VALUE 0.\n"
+        "       01 OPERAND-NEG-PI-HALF USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-ZERO USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-PI-HALF USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-NEG-PI-HALF USAGE COMP-2 VALUE 0.\n"
+        "       01 STATUS-ZERO PIC 9 VALUE 9.\n"
+        "       01 STATUS-PI-HALF PIC 9 VALUE 9.\n"
+        "       01 STATUS-NEG-PI-HALF PIC 9 VALUE 9.\n"
+        "       01 RESULT-DISPLAY PIC -9(4).9(4).\n"
+        "       PROCEDURE DIVISION.\n"
+        "           MOVE 0 TO OPERAND-ZERO.\n"
+        "           CALL 'CBLC-SIN' USING BY REFERENCE OPERAND-ZERO\n"
+        "               BY REFERENCE RESULT-ZERO BY REFERENCE STATUS-ZERO.\n"
+        "           MOVE RESULT-ZERO TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-ZERO.\n"
+        "           COMPUTE OPERAND-PI-HALF = FUNCTION PI / 2.\n"
+        "           CALL 'CBLC-SIN' USING BY REFERENCE OPERAND-PI-HALF\n"
+        "               BY REFERENCE RESULT-PI-HALF BY REFERENCE STATUS-PI-HALF.\n"
+        "           MOVE RESULT-PI-HALF TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-PI-HALF.\n"
+        "           COMPUTE OPERAND-NEG-PI-HALF = 0 - OPERAND-PI-HALF.\n"
+        "           CALL 'CBLC-SIN' USING BY REFERENCE OPERAND-NEG-PI-HALF\n"
+        "               BY REFERENCE RESULT-NEG-PI-HALF BY REFERENCE STATUS-NEG-PI-HALF.\n"
+        "           MOVE RESULT-NEG-PI-HALF TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-NEG-PI-HALF.\n"
+        "           STOP RUN.\n"
+        "       END PROGRAM SIN-DRIVER.\n";
+    library_text = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_standard_library_generate_sin(&library_text),
+            "sin generator should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(library_path, library_text) != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s %s %s", binary_path, driver_path, library_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(output_buffer, " 0000.0000\n0\n 0001.0000\n0\n-0001.0000\n0\n",
+            "sin helper should compute expected values for key angles") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (library_text)
+        cma_free(library_text);
+    test_cleanup_generated_artifacts(binary_path, output_path);
+    test_remove_file(library_path);
+    test_remove_file(driver_path);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_cos_executes_for_representative_operands)
+{
+    const char *library_path;
+    const char *driver_path;
+    const char *binary_path;
+    const char *output_path;
+    const char *driver_text;
+    char *library_text;
+    char command[512];
+    char output_buffer[128];
+    int command_length;
+    int status;
+
+    FT_REQUIRE_COBC();
+    library_path = "stdlib_cos_lib.cob";
+    driver_path = "stdlib_cos_drv.cob";
+    binary_path = "stdlib_cos.bin";
+    output_path = "stdlib_cos.txt";
+    driver_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. COS-DRIVER.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 OPERAND-ZERO USAGE COMP-2 VALUE 0.\n"
+        "       01 OPERAND-PI USAGE COMP-2 VALUE 0.\n"
+        "       01 OPERAND-PI-HALF USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-ZERO USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-PI USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-PI-HALF USAGE COMP-2 VALUE 0.\n"
+        "       01 STATUS-ZERO PIC 9 VALUE 9.\n"
+        "       01 STATUS-PI PIC 9 VALUE 9.\n"
+        "       01 STATUS-PI-HALF PIC 9 VALUE 9.\n"
+        "       01 RESULT-DISPLAY PIC -9(4).9(4).\n"
+        "       PROCEDURE DIVISION.\n"
+        "           MOVE 0 TO OPERAND-ZERO.\n"
+        "           CALL 'CBLC-COS' USING BY REFERENCE OPERAND-ZERO\n"
+        "               BY REFERENCE RESULT-ZERO BY REFERENCE STATUS-ZERO.\n"
+        "           MOVE RESULT-ZERO TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-ZERO.\n"
+        "           COMPUTE OPERAND-PI = FUNCTION PI.\n"
+        "           CALL 'CBLC-COS' USING BY REFERENCE OPERAND-PI\n"
+        "               BY REFERENCE RESULT-PI BY REFERENCE STATUS-PI.\n"
+        "           MOVE RESULT-PI TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-PI.\n"
+        "           COMPUTE OPERAND-PI-HALF = FUNCTION PI / 2.\n"
+        "           CALL 'CBLC-COS' USING BY REFERENCE OPERAND-PI-HALF\n"
+        "               BY REFERENCE RESULT-PI-HALF BY REFERENCE STATUS-PI-HALF.\n"
+        "           MOVE RESULT-PI-HALF TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-PI-HALF.\n"
+        "           STOP RUN.\n"
+        "       END PROGRAM COS-DRIVER.\n";
+    library_text = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_standard_library_generate_cos(&library_text),
+            "cos generator should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(library_path, library_text) != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s %s %s", binary_path, driver_path, library_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(output_buffer, " 0001.0000\n0\n-0001.0000\n0\n 0000.0000\n0\n",
+            "cos helper should compute expected values for key angles") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (library_text)
+        cma_free(library_text);
+    test_cleanup_generated_artifacts(binary_path, output_path);
+    test_remove_file(library_path);
+    test_remove_file(driver_path);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_tan_executes_for_representative_operands)
+{
+    const char *library_path;
+    const char *driver_path;
+    const char *binary_path;
+    const char *output_path;
+    const char *driver_text;
+    char *library_text;
+    char command[512];
+    char output_buffer[128];
+    int command_length;
+    int status;
+
+    FT_REQUIRE_COBC();
+    library_path = "stdlib_tan_lib.cob";
+    driver_path = "stdlib_tan_drv.cob";
+    binary_path = "stdlib_tan.bin";
+    output_path = "stdlib_tan.txt";
+    driver_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. TAN-DRIVER.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 OPERAND-ZERO USAGE COMP-2 VALUE 0.\n"
+        "       01 OPERAND-PI-QUARTER USAGE COMP-2 VALUE 0.\n"
+        "       01 OPERAND-NEG-PI-QUARTER USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-ZERO USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-PI-QUARTER USAGE COMP-2 VALUE 0.\n"
+        "       01 RESULT-NEG-PI-QUARTER USAGE COMP-2 VALUE 0.\n"
+        "       01 STATUS-ZERO PIC 9 VALUE 9.\n"
+        "       01 STATUS-PI-QUARTER PIC 9 VALUE 9.\n"
+        "       01 STATUS-NEG-PI-QUARTER PIC 9 VALUE 9.\n"
+        "       01 RESULT-DISPLAY PIC -9(4).9(4).\n"
+        "       PROCEDURE DIVISION.\n"
+        "           MOVE 0 TO OPERAND-ZERO.\n"
+        "           CALL 'CBLC-TAN' USING BY REFERENCE OPERAND-ZERO\n"
+        "               BY REFERENCE RESULT-ZERO BY REFERENCE STATUS-ZERO.\n"
+        "           MOVE RESULT-ZERO TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-ZERO.\n"
+        "           COMPUTE OPERAND-PI-QUARTER = FUNCTION PI / 4.\n"
+        "           CALL 'CBLC-TAN' USING BY REFERENCE OPERAND-PI-QUARTER\n"
+        "               BY REFERENCE RESULT-PI-QUARTER BY REFERENCE STATUS-PI-QUARTER.\n"
+        "           MOVE RESULT-PI-QUARTER TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-PI-QUARTER.\n"
+        "           COMPUTE OPERAND-NEG-PI-QUARTER = 0 - OPERAND-PI-QUARTER.\n"
+        "           CALL 'CBLC-TAN' USING BY REFERENCE OPERAND-NEG-PI-QUARTER\n"
+        "               BY REFERENCE RESULT-NEG-PI-QUARTER BY REFERENCE STATUS-NEG-PI-QUARTER.\n"
+        "           MOVE RESULT-NEG-PI-QUARTER TO RESULT-DISPLAY.\n"
+        "           DISPLAY RESULT-DISPLAY.\n"
+        "           DISPLAY STATUS-NEG-PI-QUARTER.\n"
+        "           STOP RUN.\n"
+        "       END PROGRAM TAN-DRIVER.\n";
+    library_text = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_standard_library_generate_tan(&library_text),
+            "tan generator should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(library_path, library_text) != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command),
+        "cobc -x -free -o %s %s %s", binary_path, driver_path, library_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(output_buffer, " 0000.0000\n0\n 0001.0000\n0\n-0001.0000\n0\n",
+            "tan helper should compute expected values for key angles") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (library_text)
+        cma_free(library_text);
+    test_cleanup_generated_artifacts(binary_path, output_path);
+    test_remove_file(library_path);
+    test_remove_file(driver_path);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_standard_library_sqrt_executes_for_positive_operand)
 {
     const char *library_path;
@@ -5784,6 +6246,12 @@ const t_test_case *get_standard_library_tests(size_t *count)
         {"standard_library_log_generates_expected_text", test_standard_library_log_generates_expected_text},
         {"standard_library_log_executes_for_positive_operands", test_standard_library_log_executes_for_positive_operands},
         {"standard_library_log_rejects_non_positive_operand", test_standard_library_log_rejects_non_positive_operand},
+        {"standard_library_sin_generates_expected_text", test_standard_library_sin_generates_expected_text},
+        {"standard_library_cos_generates_expected_text", test_standard_library_cos_generates_expected_text},
+        {"standard_library_tan_generates_expected_text", test_standard_library_tan_generates_expected_text},
+        {"standard_library_sin_executes_for_representative_operands", test_standard_library_sin_executes_for_representative_operands},
+        {"standard_library_cos_executes_for_representative_operands", test_standard_library_cos_executes_for_representative_operands},
+        {"standard_library_tan_executes_for_representative_operands", test_standard_library_tan_executes_for_representative_operands},
         {"standard_library_powerof_generates_expected_text", test_standard_library_powerof_generates_expected_text},
         {"standard_library_powerof_handles_fractional_exponent", test_standard_library_powerof_handles_fractional_exponent},
         {"standard_library_powerof_rejects_invalid_domain", test_standard_library_powerof_rejects_invalid_domain},

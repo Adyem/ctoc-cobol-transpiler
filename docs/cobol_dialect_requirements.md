@@ -33,6 +33,8 @@ so new work can stay aligned with the agreed subset.
   passed back through reference parameters or WORKING-STORAGE records.
 - Programs expose a single `void main()` entrypoint. When `argc`/`argv` are present they are
   copied into WORKING-STORAGE so COBOL paragraphs operate on the mirrored argument data.
+- Level-78 WORKING-STORAGE constants remain immutable; MOVE statements that target them are
+  rejected during semantic analysis so accidental writes surface immediately.【F:transpiler_semantics.cpp†L459-L577】
 
 ## Unsupported Features (Require Future Investigation)
 
