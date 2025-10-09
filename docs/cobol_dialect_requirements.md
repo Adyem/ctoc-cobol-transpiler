@@ -15,6 +15,9 @@ so new work can stay aligned with the agreed subset.
 - **Arithmetic:** ADD, SUBTRACT, MULTIPLY, DIVIDE, COMPUTE, and simple MOVE statements are
   assumed to behave per ANSI-85 with integer operands. Floating-point and packed decimal
   arithmetic are not required for the current corpus.
+- **Copybooks:** Simple `COPY copybook-name.` directives (without `REPLACING`) are supported as
+  long as the copybook's data items are registered with the driver so declared lengths and
+  immutability flags propagate into semantic analysis.
 
 ## Runtime & Formatting Expectations
 
@@ -24,8 +27,8 @@ so new work can stay aligned with the agreed subset.
   identifiers remain portable.
 - Source formatting follows fixed-format columns with area A beginning in column 8; generated
   listings use 4-space indentation within area B for readability.
-- Generated programs assume a CONTIGUOUS literal area; COPY REPLACING and other advanced
-  library features are not needed.
+- Generated programs assume a CONTIGUOUS literal area; `COPY REPLACING` and other advanced
+  library features remain unsupported.
 
 ## Procedural Conventions
 

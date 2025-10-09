@@ -285,6 +285,44 @@ static int semantics_add_data_item(t_ast_node *program, const char *name, const 
     return (semantics_add_data_item_with_level(program, name, picture_text, NULL));
 }
 
+static int semantics_add_copybook_include(t_ast_node *program, const char *copybook_name)
+{
+    t_ast_node *data_division;
+    t_ast_node *working_storage;
+    t_ast_node *include_node;
+    t_ast_node *name_node;
+
+    if (!program)
+        return (FT_FAILURE);
+    data_division = ast_node_get_child(program, 0);
+    if (!data_division)
+        return (FT_FAILURE);
+    working_storage = ast_node_get_child(data_division, 0);
+    if (!working_storage)
+        return (FT_FAILURE);
+    include_node = ast_node_create(AST_NODE_COPYBOOK_INCLUDE);
+    if (!include_node)
+        return (FT_FAILURE);
+    name_node = semantics_create_identifier_node(copybook_name);
+    if (!name_node)
+    {
+        ast_node_destroy(include_node);
+        return (FT_FAILURE);
+    }
+    if (ast_node_add_child(include_node, name_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(name_node);
+        ast_node_destroy(include_node);
+        return (FT_FAILURE);
+    }
+    if (ast_node_add_child(working_storage, include_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(include_node);
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
 static int semantics_attach_procedure_with_move(t_ast_node *program, const char *source_name, const char *target_name,
     int use_literal_source)
 {
@@ -510,6 +548,129 @@ FT_TEST(test_semantics_detects_duplicate_data_item)
                 context.diagnostics.items[0].severity == TRANSPILE_SEVERITY_ERROR)
                 status = FT_SUCCESS;
         }
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_registers_copybook_items)
+{
+    t_transpiler_context context;
+    t_transpiler_copybook_item copy_items[1];
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    ft_bzero(copy_items, sizeof(copy_items));
+    ft_strlcpy(copy_items[0].name, "COPY-TARGET", sizeof(copy_items[0].name));
+    copy_items[0].kind = TRANSPILE_DATA_ITEM_ALPHANUMERIC;
+    copy_items[0].declared_length = 8;
+    copy_items[0].is_read_only = 0;
+    if (transpiler_context_register_copybook(&context, "CUSTOM-COPY", copy_items, 1) != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    program = semantics_build_program_with_storage("LOCAL-SOURCE", "PIC X(8)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_copybook_include(program, "CUSTOM-COPY") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move(program, "LOCAL-SOURCE", "COPY-TARGET", 0) != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) == FT_SUCCESS
+        && transpiler_context_has_errors(&context) == 0)
+        status = FT_SUCCESS;
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_reports_unknown_copybook)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("LOCAL-SOURCE", "PIC X(8)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_copybook_include(program, "MISSING-COPY") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) != FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 1
+            && context.diagnostics.count >= 1
+            && context.diagnostics.items[0].code == TRANSPILE_ERROR_SEMANTIC_UNKNOWN_COPYBOOK)
+            status = FT_SUCCESS;
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_detects_copybook_duplicate_data_item)
+{
+    t_transpiler_context context;
+    t_transpiler_copybook_item copy_items[1];
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    ft_bzero(copy_items, sizeof(copy_items));
+    ft_strlcpy(copy_items[0].name, "SHARED", sizeof(copy_items[0].name));
+    copy_items[0].kind = TRANSPILE_DATA_ITEM_ALPHANUMERIC;
+    copy_items[0].declared_length = 4;
+    copy_items[0].is_read_only = 0;
+    if (transpiler_context_register_copybook(&context, "SHARED-COPY", copy_items, 1) != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    program = semantics_build_program_with_storage("SHARED", "PIC X(4)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_copybook_include(program, "SHARED-COPY") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) != FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 1
+            && context.diagnostics.count >= 1
+            && context.diagnostics.items[0].code == TRANSPILE_ERROR_SEMANTIC_DUPLICATE_DATA_ITEM)
+            status = FT_SUCCESS;
     }
     semantics_destroy_program(program);
     transpiler_context_dispose(&context);
@@ -768,7 +929,10 @@ const t_test_case *get_semantics_tests(size_t *count)
         {"semantics_records_alphanumeric_length_in_context", test_semantics_records_alphanumeric_length_in_context},
         {"semantics_rejects_type_mismatch_move", test_semantics_rejects_type_mismatch_move},
         {"semantics_rejects_truncating_identifier_move", test_semantics_rejects_truncating_identifier_move},
-        {"semantics_rejects_truncating_literal_move", test_semantics_rejects_truncating_literal_move}
+        {"semantics_rejects_truncating_literal_move", test_semantics_rejects_truncating_literal_move},
+        {"semantics_registers_copybook_items", test_semantics_registers_copybook_items},
+        {"semantics_reports_unknown_copybook", test_semantics_reports_unknown_copybook},
+        {"semantics_detects_copybook_duplicate_data_item", test_semantics_detects_copybook_duplicate_data_item}
     };
 
     if (count)

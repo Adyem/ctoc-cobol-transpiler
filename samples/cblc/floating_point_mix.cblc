@@ -1,0 +1,32 @@
+float seasonal_average;
+float current_reading;
+double yearly_projection;
+double combined_projection;
+bool trending_up;
+
+function void analyze_readings() {
+    seasonal_average = 21.5;
+    current_reading = 24.0;
+    yearly_projection = 18.75;
+    combined_projection = 0.0;
+    trending_up = false;
+
+    combined_projection = yearly_projection + current_reading;
+    if (current_reading > seasonal_average) {
+        trending_up = true;
+    }
+
+    if (trending_up) {
+        display("TREND UP");
+    } else {
+        display("TREND FLAT");
+    }
+
+    display(seasonal_average);
+    display(current_reading);
+    display(combined_projection);
+}
+
+function void main() {
+    analyze_readings();
+}

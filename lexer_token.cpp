@@ -51,6 +51,7 @@ static const t_keyword_entry g_keyword_table[] = {
     {"ASSIGN", LEXER_TOKEN_KEYWORD_ASSIGN},
     {"TO", LEXER_TOKEN_KEYWORD_TO},
     {"FD", LEXER_TOKEN_KEYWORD_FD},
+    {"COPY", LEXER_TOKEN_KEYWORD_COPY},
     {"PIC", LEXER_TOKEN_KEYWORD_PIC},
     {"VALUE", LEXER_TOKEN_KEYWORD_VALUE},
     {"IF", LEXER_TOKEN_KEYWORD_IF},

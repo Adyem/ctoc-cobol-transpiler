@@ -10,6 +10,7 @@
 #define TRANSPILE_ERROR_SEMANTIC_TYPE_MISMATCH 2004
 #define TRANSPILE_ERROR_SEMANTIC_STRING_TRUNCATION 2005
 #define TRANSPILE_ERROR_SEMANTIC_IMMUTABLE_TARGET 2006
+#define TRANSPILE_ERROR_SEMANTIC_UNKNOWN_COPYBOOK 2007
 
 int transpiler_semantics_analyze_program(t_transpiler_context *context, const t_ast_node *program);
 

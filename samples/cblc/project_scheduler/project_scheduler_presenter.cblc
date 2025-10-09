@@ -1,0 +1,59 @@
+import "project_scheduler_loader.cblc";
+import "project_scheduler_metrics.cblc";
+
+char summary[256];
+char headline[32];
+char detail[32];
+char stage[32];
+int guard;
+int stage_length;
+int total_minutes;
+double score;
+
+function void build_summary_text()
+{
+    summary = "SCHEDULE SUMMARY:";
+    std::strcat(summary, " ");
+    std::strcat(summary, headline);
+    std::strcat(summary, " / ");
+    std::strcat(summary, detail);
+    std::strcat(summary, " / ");
+    std::strcat(summary, stage);
+
+    stage_length = std::strlen(stage);
+    if (stage_length > 12)
+    {
+        std::strcat(summary, "!");
+    }
+    else
+    {
+        std::strcat(summary, ".");
+    }
+
+    guard = std::strcmp(detail, "Assemble Budget");
+    if (guard == 0)
+    {
+        std::strcat(summary, " READY");
+    }
+}
+
+function void prepare_source_data()
+{
+    std::strcpy(headline, "Draft Roadmap");
+    std::strcpy(detail, "Assemble Budget");
+    std::strcpy(stage, "Schedule Review");
+}
+
+function void present_schedule()
+{
+    prepare_source_data();
+
+    total_minutes = load_backlog_minutes();
+    score = compute_priority_score(total_minutes);
+
+    build_summary_text();
+
+    display(summary);
+    display(total_minutes);
+    display(score);
+}

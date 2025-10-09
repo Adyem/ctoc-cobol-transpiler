@@ -64,6 +64,7 @@ typedef struct s_transpiler_function_signature
 #define TRANSPILE_ERROR_FUNCTION_EXPORT_CONFLICT 1012
 #define TRANSPILE_ERROR_DATA_ITEM_PARAMETER_TRUNCATION 1013
 #define TRANSPILE_ERROR_FUNCTION_PRIVATE_ACCESS 1014
+#define TRANSPILE_ERROR_COPYBOOK_DUPLICATE 1015
 
 typedef enum e_transpiler_file_role
 {
@@ -123,6 +124,21 @@ typedef struct s_transpiler_data_item
     int is_read_only;
 }   t_transpiler_data_item;
 
+typedef struct s_transpiler_copybook_item
+{
+    char name[TRANSPILE_IDENTIFIER_MAX];
+    t_transpiler_data_item_kind kind;
+    size_t declared_length;
+    int is_read_only;
+}   t_transpiler_copybook_item;
+
+typedef struct s_transpiler_copybook
+{
+    char name[TRANSPILE_IDENTIFIER_MAX];
+    t_transpiler_copybook_item *items;
+    size_t item_count;
+}   t_transpiler_copybook;
+
 typedef struct s_transpiler_source_span
 {
     char path[TRANSPILE_FILE_PATH_MAX];
@@ -175,6 +191,9 @@ typedef struct s_transpiler_context
     t_transpiler_source_map_entry *source_maps;
     size_t source_map_count;
     size_t source_map_capacity;
+    t_transpiler_copybook *copybooks;
+    size_t copybook_count;
+    size_t copybook_capacity;
 }   t_transpiler_context;
 
 int transpiler_context_init(t_transpiler_context *context);
@@ -212,6 +231,9 @@ const t_transpiler_file_declaration *transpiler_context_get_files(const t_transp
 int transpiler_context_register_data_item(t_transpiler_context *context, const char *name,
     t_transpiler_data_item_kind kind, size_t declared_length, int is_read_only);
 const t_transpiler_data_item *transpiler_context_find_data_item(const t_transpiler_context *context, const char *name);
+int transpiler_context_register_copybook(t_transpiler_context *context, const char *name,
+    const t_transpiler_copybook_item *items, size_t item_count);
+const t_transpiler_copybook *transpiler_context_find_copybook(const t_transpiler_context *context, const char *name);
 const t_transpiler_data_item *transpiler_context_get_data_items(const t_transpiler_context *context, size_t *count);
 int transpiler_context_record_source_map_entry(t_transpiler_context *context,
     const t_transpiler_source_span *cblc_span, const t_transpiler_source_span *cobol_span);

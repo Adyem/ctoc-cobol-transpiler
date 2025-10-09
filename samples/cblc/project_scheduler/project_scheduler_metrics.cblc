@@ -1,0 +1,22 @@
+function double compute_priority_score(int total_minutes)
+{
+    double minutes;
+    double baseline;
+    double offset;
+    double root;
+    char phase_label[32];
+    int label_length;
+    double score;
+
+    minutes = total_minutes;
+    baseline = 300.0;
+
+    std::strcpy(phase_label, "Consolidated Review");
+    label_length = std::strlen(phase_label);
+
+    offset = std::fabs(minutes - baseline);
+    root = std::sqrt(minutes);
+    score = offset + label_length + root;
+
+    return (score);
+}

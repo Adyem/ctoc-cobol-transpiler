@@ -1,0 +1,30 @@
+int order_count;
+long regional_total;
+long long national_total;
+bool exceeded_limit;
+
+function void track_totals() {
+    order_count = 45;
+    regional_total = 250000;
+    national_total = 5000000000;
+    exceeded_limit = false;
+
+    national_total = national_total + regional_total;
+    if (national_total > 5250000000) {
+        exceeded_limit = true;
+    }
+
+    if (exceeded_limit) {
+        display("LIMIT EXCEEDED");
+    } else {
+        display("LIMIT OK");
+    }
+
+    display(order_count);
+    display(regional_total);
+    display(national_total);
+}
+
+function void main() {
+    track_totals();
+}

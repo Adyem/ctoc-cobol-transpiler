@@ -1,0 +1,6 @@
+import "project_scheduler_presenter.cblc";
+
+function void main()
+{
+    present_schedule();
+}

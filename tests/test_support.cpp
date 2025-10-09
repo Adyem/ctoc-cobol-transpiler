@@ -277,6 +277,15 @@ int test_expect_int_equal(int actual, int expected, const char *message)
     return (FT_FAILURE);
 }
 
+int test_expect_size_t_equal(size_t actual, size_t expected, const char *message)
+{
+    if (actual == expected)
+        return (FT_SUCCESS);
+    if (message)
+        pf_printf("Assertion failed: %s (expected %zu, got %zu)\n", message, expected, actual);
+    return (FT_FAILURE);
+}
+
 int test_expect_char_equal(char actual, char expected, const char *message)
 {
     if (actual == expected)

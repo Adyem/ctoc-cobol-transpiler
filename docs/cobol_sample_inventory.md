@@ -72,6 +72,22 @@ filesystem synchronized.
 - **Purpose:** Supplies the companion subprogram that receives calls from the multi-module main routine so the CLI can emit multiple COBOL artifacts in a single run.
 - **Constructs:** Standalone program IDs, literal-initialized working-storage messages, console output, and `GOBACK` termination for callable modules.
 
+### `samples/cobol/project_scheduler/project_scheduler_loader.cob`
+- **Purpose:** Mirrors the backlog loader in the multi-file CBL-C project by converting string durations into a numeric total with an optional phase adjustment.
+- **Constructs:** `FUNCTION NUMVAL` conversions, string working-storage slots, conditional `ADD` updates, linkage parameters for returning computed totals, and `GOBACK` termination for reuse as a subprogram.
+
+### `samples/cobol/project_scheduler/project_scheduler_metrics.cob`
+- **Purpose:** Implements the prioritization math for the scheduler sample so the COBOL output demonstrates floating-point arithmetic and intrinsic function usage.
+- **Constructs:** `COMPUTE` statements targeting `PIC S9V9(4)` accumulators, `FUNCTION ABS`, `FUNCTION SQRT`, literal string metadata, `BY VALUE`/`BY REFERENCE` linkage parameters, and `GOBACK` flow control.
+
+### `samples/cobol/project_scheduler/project_scheduler_presenter.cob`
+- **Purpose:** Coordinates calls into the loader and metrics subprograms while assembling a concatenated status line that echoes the multi-file control flow.
+- **Constructs:** External `CALL` statements, `STRING` concatenation, equality checks against alphanumeric fields, formatted numeric displays, and repeated `GOBACK` termination.
+
+### `samples/cobol/project_scheduler/project_scheduler_main.cob`
+- **Purpose:** Provides the entrypoint program that kicks off the presenter helper so the full multi-module workflow can be executed from a single invocation.
+- **Constructs:** Minimal working-storage, `CALL` into the presenter subprogram, and `STOP RUN` termination.
+
 ### `samples/cobol/numeric_precision.cob`
 - **Purpose:** Anchors the widened numeric arithmetic and comparison behavior expected from the forward compiler across `LONG`, `COMP-1`, and `COMP-2` analogs.
 - **Constructs:** Signed `PIC S9(9)` and `PIC S9(12)` integers, scaled decimal (`S9V9(4)`) fields, `COMPUTE` statements combining addition, subtraction, and multiplication, relational comparisons (`>=`, `>`, `=`, `NOT =`), and diagnostic `DISPLAY` calls for each branch.
@@ -80,6 +96,18 @@ filesystem synchronized.
 - **Purpose:** Serves as an end-to-end scenario that exercises the current forward pipeline by reading transactions, partitioning them into accepted and rejected logs, and reporting summary totals.
 - **Constructs:** Multiple file descriptors, sequential `READ` with `AT END` handling, arithmetic `ADD` updates, structured `IF`/`ELSE` blocks, repeated `PERFORM` paragraphs, and formatted `DISPLAY` output.
 
+
+### `samples/cobol/floating_point_mix.cob`
+- **Purpose:** Mirrors the floating-point CBL-C sample with COMP-1 style calculations that blend seasonal readings and yearly projections.
+- **Constructs:** `COMPUTE` statements combining decimal values, boolean-style flag bytes represented as characters, and formatted `DISPLAY` output for intermediate totals.
+
+### `samples/cobol/mixed_numeric_types.cob`
+- **Purpose:** Provides integer-width coverage matching the mixed numeric CBL-C example so signed accumulators at multiple scales have COBOL fixtures.
+- **Constructs:** Signed `PIC S9(n)` fields at varying lengths, additive `COMPUTE` logic, conditional flag updates, and numeric `DISPLAY` buffers.
+
+### `samples/cobol/textual_priority_mix.cob`
+- **Purpose:** Demonstrates combining textual buffers with numeric counters and flag bytes to track scheduling decisions.
+- **Constructs:** Alphanumeric working-storage items, nested `IF` statements governing flag updates, and sequential `DISPLAY` operations for strings, characters, and zero-padded numbers.
 
 ## Maintenance Checklist
 

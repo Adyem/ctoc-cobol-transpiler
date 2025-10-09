@@ -208,6 +208,31 @@ static int transpiler_context_source_maps_reserve(t_transpiler_context *context,
     return (FT_SUCCESS);
 }
 
+static int transpiler_context_copybooks_reserve(t_transpiler_context *context, size_t desired_capacity)
+{
+    t_transpiler_copybook *copybooks;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (context->copybook_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    copybooks = static_cast<t_transpiler_copybook *>(cma_calloc(desired_capacity,
+        sizeof(t_transpiler_copybook)));
+    if (!copybooks)
+        return (FT_FAILURE);
+    if (context->copybooks)
+    {
+        ft_memcpy(copybooks, context->copybooks,
+            context->copybook_count * sizeof(t_transpiler_copybook));
+        cma_free(context->copybooks);
+    }
+    context->copybooks = copybooks;
+    context->copybook_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
 static int transpiler_context_span_is_valid(const t_transpiler_source_span *span)
 {
     if (!span)
@@ -305,6 +330,9 @@ int transpiler_context_init(t_transpiler_context *context)
     context->source_maps = NULL;
     context->source_map_count = 0;
     context->source_map_capacity = 0;
+    context->copybooks = NULL;
+    context->copybook_count = 0;
+    context->copybook_capacity = 0;
     if (transpiler_diagnostics_init(&context->diagnostics) != FT_SUCCESS)
         return (FT_FAILURE);
     if (transpiler_context_functions_reserve(context, 4) != FT_SUCCESS)
@@ -509,6 +537,24 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->source_maps = NULL;
     context->source_map_count = 0;
     context->source_map_capacity = 0;
+    if (context->copybooks)
+    {
+        size_t index;
+
+        index = 0;
+        while (index < context->copybook_count)
+        {
+            if (context->copybooks[index].items)
+                cma_free(context->copybooks[index].items);
+            context->copybooks[index].items = NULL;
+            context->copybooks[index].item_count = 0;
+            index += 1;
+        }
+        cma_free(context->copybooks);
+    }
+    context->copybooks = NULL;
+    context->copybook_count = 0;
+    context->copybook_capacity = 0;
     ft_bzero(&context->entrypoint, sizeof(context->entrypoint));
 }
 
@@ -1295,6 +1341,19 @@ int transpiler_context_register_data_item(t_transpiler_context *context, const c
                 && kind == TRANSPILE_DATA_ITEM_ALPHANUMERIC
                 && existing_length > 0
                 && declared_length > 0
+                && declared_length > existing_length)
+            {
+                if (!context->data_items[index].has_caller_length)
+                {
+                    context->data_items[index].declared_length = declared_length;
+                    context->data_items[index].has_caller_length = 1;
+                }
+                return (FT_SUCCESS);
+            }
+            if (existing_kind == TRANSPILE_DATA_ITEM_ALPHANUMERIC
+                && kind == TRANSPILE_DATA_ITEM_ALPHANUMERIC
+                && existing_length > 0
+                && declared_length > 0
                 && declared_length < existing_length)
             {
                 if (context->data_items[index].has_caller_length)
@@ -1365,6 +1424,84 @@ const t_transpiler_data_item *transpiler_context_find_data_item(const t_transpil
     {
         if (ft_strncmp(context->data_items[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
             return (&context->data_items[index]);
+        index += 1;
+    }
+    return (NULL);
+}
+
+int transpiler_context_register_copybook(t_transpiler_context *context, const char *name,
+    const t_transpiler_copybook_item *items, size_t item_count)
+{
+    t_transpiler_copybook *copybook;
+    size_t index;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (transpiler_context_string_is_blank(name))
+        return (FT_FAILURE);
+    if (item_count > 0 && !items)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < context->copybook_count)
+    {
+        if (ft_strncmp(context->copybooks[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        {
+            char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+            pf_snprintf(message, sizeof(message),
+                "copybook '%s' registered multiple times", name);
+            transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+                TRANSPILE_ERROR_COPYBOOK_DUPLICATE, message);
+            transpiler_context_record_error(context, TRANSPILE_ERROR_COPYBOOK_DUPLICATE);
+            return (FT_FAILURE);
+        }
+        index += 1;
+    }
+    if (context->copybook_count >= context->copybook_capacity)
+    {
+        size_t desired_capacity;
+
+        desired_capacity = context->copybook_capacity == 0 ? 4 : context->copybook_capacity * 2;
+        if (transpiler_context_copybooks_reserve(context, desired_capacity) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    copybook = &context->copybooks[context->copybook_count];
+    ft_bzero(copybook, sizeof(*copybook));
+    ft_strlcpy(copybook->name, name, sizeof(copybook->name));
+    if (item_count > 0)
+    {
+        copybook->items = static_cast<t_transpiler_copybook_item *>(cma_calloc(item_count,
+            sizeof(t_transpiler_copybook_item)));
+        if (!copybook->items)
+        {
+            copybook->name[0] = '\0';
+            return (FT_FAILURE);
+        }
+        index = 0;
+        while (index < item_count)
+        {
+            copybook->items[index] = items[index];
+            index += 1;
+        }
+    }
+    copybook->item_count = item_count;
+    context->copybook_count += 1;
+    return (FT_SUCCESS);
+}
+
+const t_transpiler_copybook *transpiler_context_find_copybook(const t_transpiler_context *context, const char *name)
+{
+    size_t index;
+
+    if (!context)
+        return (NULL);
+    if (transpiler_context_string_is_blank(name))
+        return (NULL);
+    index = 0;
+    while (index < context->copybook_count)
+    {
+        if (ft_strncmp(context->copybooks[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+            return (&context->copybooks[index]);
         index += 1;
     }
     return (NULL);

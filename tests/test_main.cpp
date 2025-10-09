@@ -58,6 +58,9 @@ int main(void)
     tests = get_logging_tests(&count);
     if (run_test_suite(tests, count) != FT_SUCCESS)
         status = FT_FAILURE;
+    tests = get_cblc_formatter_tests(&count);
+    if (run_test_suite(tests, count) != FT_SUCCESS)
+        status = FT_FAILURE;
     tests = get_transpiler_context_tests(&count);
     if (run_test_suite(tests, count) != FT_SUCCESS)
         status = FT_FAILURE;

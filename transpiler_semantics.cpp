@@ -30,6 +30,9 @@ typedef struct s_transpiler_semantic_scope
 }   t_transpiler_semantic_scope;
 
 static t_transpiler_data_item_kind transpiler_semantics_convert_kind(t_transpiler_semantic_data_kind kind);
+static t_transpiler_semantic_data_kind transpiler_semantics_kind_from_context(t_transpiler_data_item_kind kind);
+static int transpiler_semantics_register_copybook(const t_ast_node *node,
+    t_transpiler_semantic_scope *scope, t_transpiler_context *context);
 
 static void transpiler_semantics_scope_init(t_transpiler_semantic_scope *scope)
 {
@@ -327,6 +330,15 @@ static t_transpiler_data_item_kind transpiler_semantics_convert_kind(t_transpile
     return (TRANSPILE_DATA_ITEM_UNKNOWN);
 }
 
+static t_transpiler_semantic_data_kind transpiler_semantics_kind_from_context(t_transpiler_data_item_kind kind)
+{
+    if (kind == TRANSPILE_DATA_ITEM_ALPHANUMERIC)
+        return (TRANSPILE_SEMANTIC_DATA_ALPHANUMERIC);
+    if (kind == TRANSPILE_DATA_ITEM_NUMERIC)
+        return (TRANSPILE_SEMANTIC_DATA_NUMERIC);
+    return (TRANSPILE_SEMANTIC_DATA_UNKNOWN);
+}
+
 static int transpiler_semantics_collect_data_items(const t_ast_node *section, t_transpiler_semantic_scope *scope,
     t_transpiler_context *context)
 {
@@ -406,6 +418,60 @@ static int transpiler_semantics_collect_data_items(const t_ast_node *section, t_
                 status = FT_FAILURE;
             }
         }
+        else if (child && child->kind == AST_NODE_COPYBOOK_INCLUDE)
+        {
+            if (transpiler_semantics_register_copybook(child, scope, context) != FT_SUCCESS)
+                status = FT_FAILURE;
+        }
+        index += 1;
+    }
+    return (status);
+}
+
+static int transpiler_semantics_register_copybook(const t_ast_node *node,
+    t_transpiler_semantic_scope *scope, t_transpiler_context *context)
+{
+    const t_transpiler_copybook *copybook;
+    const t_ast_node *name_node;
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    size_t index;
+    int status;
+
+    if (!node)
+        return (FT_FAILURE);
+    if (!scope)
+        return (FT_FAILURE);
+    if (!context)
+        return (FT_FAILURE);
+    name_node = ast_node_get_child(node, 0);
+    if (!name_node || name_node->kind != AST_NODE_IDENTIFIER || !name_node->token.lexeme)
+    {
+        pf_snprintf(message, sizeof(message),
+            "COPY directive is missing a copybook identifier");
+        transpiler_semantics_emit_error(context, TRANSPILE_ERROR_SEMANTIC_INVALID_MOVE, message);
+        return (FT_FAILURE);
+    }
+    copybook = transpiler_context_find_copybook(context, name_node->token.lexeme);
+    if (!copybook)
+    {
+        pf_snprintf(message, sizeof(message),
+            "copybook '%s' is not registered in the current compilation context",
+            name_node->token.lexeme);
+        transpiler_semantics_emit_error(context, TRANSPILE_ERROR_SEMANTIC_UNKNOWN_COPYBOOK, message);
+        return (FT_FAILURE);
+    }
+    status = FT_SUCCESS;
+    index = 0;
+    while (index < copybook->item_count)
+    {
+        const t_transpiler_copybook_item *item;
+        t_transpiler_semantic_data_kind kind;
+
+        item = &copybook->items[index];
+        kind = transpiler_semantics_kind_from_context(item->kind);
+        if (transpiler_semantics_register_data_item(scope, context, item->name,
+                kind, item->declared_length, item->is_read_only) != FT_SUCCESS)
+            status = FT_FAILURE;
         index += 1;
     }
     return (status);

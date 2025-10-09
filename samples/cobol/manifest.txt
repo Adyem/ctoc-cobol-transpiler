@@ -12,3 +12,10 @@ samples/cobol/return_boolean.cob
 samples/cobol/return_character.cob
 samples/cobol/multi_module_main.cob
 samples/cobol/multi_module_worker.cob
+samples/cobol/floating_point_mix.cob
+samples/cobol/mixed_numeric_types.cob
+samples/cobol/textual_priority_mix.cob
+samples/cobol/project_scheduler/project_scheduler_loader.cob
+samples/cobol/project_scheduler/project_scheduler_metrics.cob
+samples/cobol/project_scheduler/project_scheduler_presenter.cob
+samples/cobol/project_scheduler/project_scheduler_main.cob

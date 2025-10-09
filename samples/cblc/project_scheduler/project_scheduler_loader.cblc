@@ -1,0 +1,30 @@
+function int load_backlog_minutes()
+{
+    char first_minutes[8];
+    char second_minutes[8];
+    char third_minutes[8];
+    char phase_label[16];
+    int total;
+    int parsed;
+
+    std::strcpy(first_minutes, "120");
+    std::strcpy(second_minutes, "090");
+    std::strcpy(third_minutes, "045");
+    std::strcpy(phase_label, "ASSEMBLY");
+
+    parsed = std::atoi(first_minutes);
+    total = parsed;
+
+    parsed = std::atoi(second_minutes);
+    total = total + parsed;
+
+    parsed = std::atoi(third_minutes);
+    total = total + parsed;
+
+    if (std::strcmp(phase_label, "ASSEMBLY") == 0)
+    {
+        total = total + 15;
+    }
+
+    return (total);
+}
