@@ -4,11 +4,14 @@
 #include "libft/Libft/libft.hpp"
 
 static int parser_parse_statement(t_parser *parser, t_ast_node *sequence);
+static int parser_parse_assignment_statement(t_parser *parser, t_ast_node *sequence);
+static int parser_is_statement_start(t_parser *parser);
 static int parser_parse_statement_sequence_until(t_parser *parser, t_ast_node *parent,
     const t_lexer_token_kind *terminators, size_t terminator_count, int allow_paragraph_break);
 static int parser_set_error(t_parser *parser);
 static int parser_set_success(t_parser *parser);
 static int parser_advance(t_parser *parser);
+static int parser_peek_kind(t_parser *parser, t_lexer_token_kind *out_kind);
 static t_ast_node *parser_create_node(t_parser *parser, t_ast_node_kind kind);
 
 static int parser_picture_buffer_append(char **buffer, size_t *length, size_t *capacity,
@@ -170,26 +173,39 @@ static void parser_record_recoverable_error(t_parser *parser)
     parser->last_error = FT_FAILURE;
 }
 
-static int parser_is_statement_start_kind(t_lexer_token_kind kind)
+static int parser_is_statement_start(t_parser *parser)
 {
-    if (kind == LEXER_TOKEN_KEYWORD_MOVE)
+    t_lexer_token_kind next_kind;
+
+    if (!parser)
+        return (0);
+    if (!parser->has_current)
+        return (0);
+    if (parser->current.kind == LEXER_TOKEN_KEYWORD_MOVE)
         return (1);
-    if (kind == LEXER_TOKEN_KEYWORD_IF)
+    if (parser->current.kind == LEXER_TOKEN_KEYWORD_IF)
         return (1);
-    if (kind == LEXER_TOKEN_KEYWORD_PERFORM)
+    if (parser->current.kind == LEXER_TOKEN_KEYWORD_PERFORM)
         return (1);
-    if (kind == LEXER_TOKEN_KEYWORD_OPEN)
+    if (parser->current.kind == LEXER_TOKEN_KEYWORD_OPEN)
         return (1);
-    if (kind == LEXER_TOKEN_KEYWORD_CLOSE)
+    if (parser->current.kind == LEXER_TOKEN_KEYWORD_CLOSE)
         return (1);
-    if (kind == LEXER_TOKEN_KEYWORD_READ)
+    if (parser->current.kind == LEXER_TOKEN_KEYWORD_READ)
         return (1);
-    if (kind == LEXER_TOKEN_KEYWORD_WRITE)
+    if (parser->current.kind == LEXER_TOKEN_KEYWORD_WRITE)
         return (1);
-    if (kind == LEXER_TOKEN_KEYWORD_DISPLAY)
+    if (parser->current.kind == LEXER_TOKEN_KEYWORD_DISPLAY)
         return (1);
-    if (kind == LEXER_TOKEN_KEYWORD_STOP)
+    if (parser->current.kind == LEXER_TOKEN_KEYWORD_STOP)
         return (1);
+    if (parser->current.kind == LEXER_TOKEN_IDENTIFIER)
+    {
+        if (parser_peek_kind(parser, &next_kind) != FT_SUCCESS)
+            return (0);
+        if (next_kind == LEXER_TOKEN_ASSIGN)
+            return (1);
+    }
     return (0);
 }
 
@@ -219,6 +235,22 @@ static int parser_advance(t_parser *parser)
     if (lexer_next_token(&parser->lexer, &parser->current) != FT_SUCCESS)
         return (parser_set_error(parser));
     parser->has_current = 1;
+    return (parser_set_success(parser));
+}
+
+static int parser_peek_kind(t_parser *parser, t_lexer_token_kind *out_kind)
+{
+    t_lexer lexer_copy;
+    t_lexer_token token;
+
+    if (!parser)
+        return (FT_FAILURE);
+    if (!out_kind)
+        return (FT_FAILURE);
+    lexer_copy = parser->lexer;
+    if (lexer_next_token(&lexer_copy, &token) != FT_SUCCESS)
+        return (parser_set_error(parser));
+    *out_kind = token.kind;
     return (parser_set_success(parser));
 }
 
@@ -357,9 +389,11 @@ static int parser_parse_literal_node(t_parser *parser, t_ast_node **out_node)
     return (parser_set_success(parser));
 }
 
-static int parser_parse_value_node(t_parser *parser, t_ast_node **out_node)
+static int parser_parse_primary_value(t_parser *parser, t_ast_node **out_node)
 {
     if (!parser)
+        return (FT_FAILURE);
+    if (!out_node)
         return (FT_FAILURE);
     if (!parser->has_current)
         return (parser_set_error(parser));
@@ -371,6 +405,143 @@ static int parser_parse_value_node(t_parser *parser, t_ast_node **out_node)
         || parser->current.kind == LEXER_TOKEN_KEYWORD_FALSE)
         return (parser_parse_literal_node(parser, out_node));
     return (parser_set_error(parser));
+}
+
+static int parser_parse_value_node(t_parser *parser, t_ast_node **out_node)
+{
+    t_ast_node *result;
+
+    if (!parser)
+        return (FT_FAILURE);
+    if (!out_node)
+        return (FT_FAILURE);
+    if (parser_parse_primary_value(parser, &result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    while (parser->has_current && parser->current.kind == LEXER_TOKEN_PLUS)
+    {
+        t_ast_node *operator_node;
+        t_ast_node *expression;
+        t_ast_node *right;
+        t_ast_node *previous;
+        t_lexer_token operator_token;
+
+        operator_token = parser->current;
+        if (parser_advance(parser) != FT_SUCCESS)
+        {
+            ast_node_destroy(result);
+            return (FT_FAILURE);
+        }
+        if (parser_parse_primary_value(parser, &right) != FT_SUCCESS)
+        {
+            ast_node_destroy(result);
+            return (FT_FAILURE);
+        }
+        operator_node = parser_create_node(parser, AST_NODE_ARITHMETIC_OPERATOR);
+        if (!operator_node)
+        {
+            ast_node_destroy(result);
+            ast_node_destroy(right);
+            return (FT_FAILURE);
+        }
+        if (ast_node_set_token(operator_node, &operator_token) != FT_SUCCESS)
+        {
+            ast_node_destroy(operator_node);
+            ast_node_destroy(result);
+            ast_node_destroy(right);
+            return (parser_set_error(parser));
+        }
+        expression = parser_create_node(parser, AST_NODE_ARITHMETIC_EXPRESSION);
+        if (!expression)
+        {
+            ast_node_destroy(operator_node);
+            ast_node_destroy(result);
+            ast_node_destroy(right);
+            return (FT_FAILURE);
+        }
+        previous = result;
+        if (ast_node_add_child(expression, previous) != FT_SUCCESS)
+        {
+            ast_node_destroy(expression);
+            ast_node_destroy(operator_node);
+            ast_node_destroy(previous);
+            ast_node_destroy(right);
+            return (FT_FAILURE);
+        }
+        if (ast_node_add_child(expression, operator_node) != FT_SUCCESS)
+        {
+            ast_node_destroy(expression);
+            ast_node_destroy(operator_node);
+            ast_node_destroy(right);
+            return (FT_FAILURE);
+        }
+        if (ast_node_add_child(expression, right) != FT_SUCCESS)
+        {
+            ast_node_destroy(expression);
+            ast_node_destroy(right);
+            return (FT_FAILURE);
+        }
+        result = expression;
+    }
+    *out_node = result;
+    return (parser_set_success(parser));
+}
+
+static int parser_parse_assignment_statement(t_parser *parser, t_ast_node *sequence)
+{
+    t_ast_node *assignment_node;
+    t_ast_node *target_node;
+    t_ast_node *value_node;
+
+    assignment_node = parser_create_node(parser, AST_NODE_ASSIGNMENT_STATEMENT);
+    if (!assignment_node)
+        return (FT_FAILURE);
+    if (parser_parse_identifier_node(parser, &target_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(assignment_node);
+        return (FT_FAILURE);
+    }
+    if (parser_expect(parser, LEXER_TOKEN_ASSIGN, NULL) != FT_SUCCESS)
+    {
+        ast_node_destroy(target_node);
+        ast_node_destroy(assignment_node);
+        return (FT_FAILURE);
+    }
+    if (parser_parse_value_node(parser, &value_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(target_node);
+        ast_node_destroy(assignment_node);
+        return (FT_FAILURE);
+    }
+    if (parser_add_child(parser, assignment_node, value_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(target_node);
+        ast_node_destroy(assignment_node);
+        return (FT_FAILURE);
+    }
+    if (parser_add_child(parser, assignment_node, target_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(assignment_node);
+        return (FT_FAILURE);
+    }
+    if (parser->has_current && parser->current.kind == LEXER_TOKEN_SEMICOLON)
+    {
+        if (parser_expect(parser, LEXER_TOKEN_SEMICOLON, NULL) != FT_SUCCESS)
+        {
+            ast_node_destroy(assignment_node);
+            return (FT_FAILURE);
+        }
+    }
+    else if (parser->has_current && parser->current.kind == LEXER_TOKEN_PERIOD)
+    {
+        if (parser_expect(parser, LEXER_TOKEN_PERIOD, NULL) != FT_SUCCESS)
+        {
+            ast_node_destroy(assignment_node);
+            return (FT_FAILURE);
+        }
+    }
+    if (parser_add_child(parser, sequence, assignment_node) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (parser_set_success(parser));
 }
 
 static int parser_parse_move_statement(t_parser *parser, t_ast_node *sequence)
@@ -449,7 +620,14 @@ static int parser_is_sequence_terminator(t_parser *parser,
         index += 1;
     }
     if (allow_paragraph_break && parser->current.kind == LEXER_TOKEN_IDENTIFIER)
-        return (1);
+    {
+        t_lexer_token_kind next_kind;
+
+        if (parser_peek_kind(parser, &next_kind) != FT_SUCCESS)
+            return (1);
+        if (next_kind == LEXER_TOKEN_PERIOD)
+            return (1);
+    }
     return (0);
 }
 
@@ -581,8 +759,15 @@ static int parser_synchronize_statement_sequence(t_parser *parser,
             index += 1;
         }
         if (allow_paragraph_break && parser->current.kind == LEXER_TOKEN_IDENTIFIER)
-            return (FT_SUCCESS);
-        if (parser_is_statement_start_kind(parser->current.kind))
+        {
+            t_lexer_token_kind next_kind;
+
+            if (parser_peek_kind(parser, &next_kind) != FT_SUCCESS)
+                return (FT_SUCCESS);
+            if (next_kind == LEXER_TOKEN_PERIOD)
+                return (FT_SUCCESS);
+        }
+        if (parser_is_statement_start(parser))
             return (FT_SUCCESS);
         if (parser_advance(parser) != FT_SUCCESS)
             return (FT_FAILURE);
@@ -1168,6 +1353,15 @@ static int parser_parse_statement(t_parser *parser, t_ast_node *sequence)
         return (parser_parse_display_statement(parser, sequence));
     if (parser->current.kind == LEXER_TOKEN_KEYWORD_STOP)
         return (parser_parse_stop_statement(parser, sequence));
+    if (parser->current.kind == LEXER_TOKEN_IDENTIFIER)
+    {
+        t_lexer_token_kind next_kind;
+
+        if (parser_peek_kind(parser, &next_kind) != FT_SUCCESS)
+            return (parser_set_error(parser));
+        if (next_kind == LEXER_TOKEN_ASSIGN)
+            return (parser_parse_assignment_statement(parser, sequence));
+    }
     return (parser_set_error(parser));
 }
 

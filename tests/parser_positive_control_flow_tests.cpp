@@ -26,7 +26,7 @@ FT_TEST(test_parser_parses_control_flow_statements)
         "WORKING-STORAGE SECTION.\n"
         "PROCEDURE DIVISION.\n"
         "MAIN.\n"
-        "    IF NOT FLAG = \"Y\"\n"
+        "    IF NOT FLAG == \"Y\"\n"
         "        PERFORM UNTIL COUNT > LIMIT\n"
         "            MOVE COUNT TO LIMIT\n"
         "        END-PERFORM\n"

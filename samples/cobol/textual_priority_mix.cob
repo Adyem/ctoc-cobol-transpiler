@@ -13,14 +13,14 @@ MAIN.
        MOVE 'B' TO PRIORITY-LEVEL.
        MOVE 18 TO PENDING-ORDERS.
        MOVE 'N' TO EXPEDITE.
-       IF PRIORITY-LEVEL = 'A'
+       IF PRIORITY-LEVEL == 'A'
            MOVE 'Y' TO EXPEDITE
        ELSE
            IF PENDING-ORDERS > 20
                MOVE 'Y' TO EXPEDITE
            END-IF
        END-IF.
-       IF EXPEDITE = 'Y'
+       IF EXPEDITE == 'Y'
            DISPLAY "EXPEDITE"
        ELSE
            DISPLAY "SCHEDULED"

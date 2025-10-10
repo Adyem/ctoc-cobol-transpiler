@@ -69,8 +69,64 @@ FT_TEST(test_parser_rejects_incomplete_if_statement)
         "01 FLAG PIC X.\n"
         "PROCEDURE DIVISION.\n"
         "MAIN.\n"
-        "    IF FLAG = 'Y'\n"
+        "    IF FLAG == 'Y'\n"
         "        MOVE 'N' TO FLAG\n";
+    parser_init(&parser, source);
+    program = NULL;
+    status = parser_parse_program(&parser, &program);
+    parser_dispose(&parser);
+    if (program)
+        ast_node_destroy(program);
+    if (status == FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_parser_rejects_single_equals_condition)
+{
+    const char *source;
+    t_parser parser;
+    t_ast_node *program;
+    int status;
+
+    source = "IDENTIFICATION DIVISION.\n"
+        "PROGRAM-ID. SAMPLE.\n"
+        "ENVIRONMENT DIVISION.\n"
+        "DATA DIVISION.\n"
+        "WORKING-STORAGE SECTION.\n"
+        "01 FLAG PIC X.\n"
+        "PROCEDURE DIVISION.\n"
+        "MAIN.\n"
+        "    IF FLAG = 'Y'\n"
+        "        DISPLAY FLAG\n"
+        "    END-IF.\n";
+    parser_init(&parser, source);
+    program = NULL;
+    status = parser_parse_program(&parser, &program);
+    parser_dispose(&parser);
+    if (program)
+        ast_node_destroy(program);
+    if (status == FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_parser_rejects_assignment_without_expression)
+{
+    const char *source;
+    t_parser parser;
+    t_ast_node *program;
+    int status;
+
+    source = "IDENTIFICATION DIVISION.\n"
+        "PROGRAM-ID. SAMPLE.\n"
+        "ENVIRONMENT DIVISION.\n"
+        "DATA DIVISION.\n"
+        "WORKING-STORAGE SECTION.\n"
+        "01 TOTAL PIC 9(4).\n"
+        "PROCEDURE DIVISION.\n"
+        "MAIN.\n"
+        "    TOTAL = ;\n";
     parser_init(&parser, source);
     program = NULL;
     status = parser_parse_program(&parser, &program);
@@ -178,7 +234,7 @@ FT_TEST(test_parser_rejects_perform_until_without_end)
         "01 FLAG PIC X.\n"
         "PROCEDURE DIVISION.\n"
         "MAIN.\n"
-        "    PERFORM UNTIL FLAG = 'Y'\n"
+        "    PERFORM UNTIL FLAG == 'Y'\n"
         "        MOVE 'Y' TO FLAG.\n";
     parser_init(&parser, source);
     program = NULL;
@@ -207,7 +263,7 @@ FT_TEST(test_parser_rejects_perform_varying_without_by_clause)
         "01 LIMIT PIC 9(4).\n"
         "PROCEDURE DIVISION.\n"
         "MAIN.\n"
-        "    PERFORM VARYING INDEX FROM 0 UNTIL INDEX = LIMIT\n"
+        "    PERFORM VARYING INDEX FROM 0 UNTIL INDEX == LIMIT\n"
         "        MOVE 1 TO INDEX\n"
         "    END-PERFORM.\n";
     parser_init(&parser, source);

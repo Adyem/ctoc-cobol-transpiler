@@ -22,12 +22,12 @@
 MAIN.
            OPEN INPUT SOURCE-FILE.
            OPEN OUTPUT TARGET-FILE.
-           PERFORM UNTIL EOF-FLAG = 'Y'
+           PERFORM UNTIL EOF-FLAG == 'Y'
                READ SOURCE-FILE
                    AT END
                        MOVE 'Y' TO EOF-FLAG
                    NOT AT END
-                       IF SOURCE-LINE(1:5) = PREFIX(1:5)
+                       IF SOURCE-LINE(1:5) == PREFIX(1:5)
                            MOVE SOURCE-RECORD TO TARGET-RECORD
                            WRITE TARGET-RECORD
                        END-IF

@@ -76,7 +76,10 @@ statement           ::= assignment_statement
                       | ';'
 
 assignment_statement ::= identifier assignment_tail
-assignment_tail     ::= '=' expression ';'
+assignment_tail     ::= '=' expression terminator?
+terminator          ::= ';' | '.'
+
+> **Note:** A single `=` always denotes assignment. Equality and inequality comparisons use the `==` and `!=` operators, respectively.
                       | '++' ';'
                       | '--' ';'
 

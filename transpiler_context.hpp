@@ -112,7 +112,8 @@ typedef enum e_transpiler_data_item_kind
 {
     TRANSPILE_DATA_ITEM_UNKNOWN = 0,
     TRANSPILE_DATA_ITEM_ALPHANUMERIC,
-    TRANSPILE_DATA_ITEM_NUMERIC
+    TRANSPILE_DATA_ITEM_NUMERIC,
+    TRANSPILE_DATA_ITEM_FLOATING
 }   t_transpiler_data_item_kind;
 
 typedef struct s_transpiler_data_item

@@ -473,7 +473,7 @@ static int cobol_reverse_append_condition(t_cblc_builder *builder, const t_ast_n
 static int cobol_reverse_emit_statement_sequence(t_transpiler_context *context, t_cblc_builder *builder,
     const t_ast_node *sequence, size_t indentation);
 
-static int cobol_reverse_emit_move(t_transpiler_context *context, t_cblc_builder *builder,
+static int cobol_reverse_emit_assignment(t_transpiler_context *context, t_cblc_builder *builder,
     const t_ast_node *statement, size_t indentation)
 {
     const t_ast_node *source;
@@ -483,6 +483,9 @@ static int cobol_reverse_emit_move(t_transpiler_context *context, t_cblc_builder
     if (!builder)
         return (FT_FAILURE);
     if (!statement)
+        return (FT_FAILURE);
+    if (statement->kind != AST_NODE_MOVE_STATEMENT
+        && statement->kind != AST_NODE_ASSIGNMENT_STATEMENT)
         return (FT_FAILURE);
     if (ast_node_child_count(statement) < 2)
         return (FT_FAILURE);
@@ -885,8 +888,9 @@ static int cobol_reverse_emit_statement(t_transpiler_context *context, t_cblc_bu
 {
     if (!statement)
         return (FT_FAILURE);
-    if (statement->kind == AST_NODE_MOVE_STATEMENT)
-        return (cobol_reverse_emit_move(context, builder, statement, indentation));
+    if (statement->kind == AST_NODE_MOVE_STATEMENT
+        || statement->kind == AST_NODE_ASSIGNMENT_STATEMENT)
+        return (cobol_reverse_emit_assignment(context, builder, statement, indentation));
     if (statement->kind == AST_NODE_IF_STATEMENT)
         return (cobol_reverse_emit_if(context, builder, statement, indentation));
     if (statement->kind == AST_NODE_PERFORM_UNTIL_STATEMENT)

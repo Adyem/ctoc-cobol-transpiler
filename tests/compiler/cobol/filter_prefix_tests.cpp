@@ -16,7 +16,7 @@ FT_TEST(test_cobol_transpiled_filter_prefix_fixture_contains_expected_sections)
             "ORGANIZATION IS LINE SEQUENTIAL.") != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_cobol_fixture_contains(path,
-            "IF SOURCE-LINE(1:5) = PREFIX(1:5)") != FT_SUCCESS)
+            "IF SOURCE-LINE(1:5) == PREFIX(1:5)") != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_cobol_fixture_contains(path, "WRITE TARGET-RECORD") != FT_SUCCESS)
         return (FT_FAILURE);
@@ -54,12 +54,12 @@ FT_TEST(test_cobol_transpiled_filter_prefix_matches_expected_text)
         "MAIN.\n"
         "           OPEN INPUT SOURCE-FILE.\n"
         "           OPEN OUTPUT TARGET-FILE.\n"
-        "           PERFORM UNTIL EOF-FLAG = 'Y'\n"
+        "           PERFORM UNTIL EOF-FLAG == 'Y'\n"
         "               READ SOURCE-FILE\n"
         "                   AT END\n"
         "                       MOVE 'Y' TO EOF-FLAG\n"
         "                   NOT AT END\n"
-        "                       IF SOURCE-LINE(1:5) = PREFIX(1:5)\n"
+        "                       IF SOURCE-LINE(1:5) == PREFIX(1:5)\n"
         "                           MOVE SOURCE-RECORD TO TARGET-RECORD\n"
         "                           WRITE TARGET-RECORD\n"
         "                       END-IF\n"

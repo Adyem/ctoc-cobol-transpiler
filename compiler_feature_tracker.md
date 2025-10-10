@@ -89,7 +89,7 @@ are completed; keep completed items grouped separately from the remaining work t
 
 #### Integral Operators
 
-- [ ] Addition (`+`): supports operands declared as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (mapped to `long`), and `PIC 9(36)` (mapped to `long long`); promotes mixed-width operands to the widest participating type, performs two's-complement math with overflow diagnostics, and emits COBOL that preserves sign and scale.
+- [x] Addition (`+`): supports operands declared as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (mapped to `long`), and `PIC 9(36)` (mapped to `long long`); promotes mixed-width operands to the widest participating type, performs two's-complement math with overflow diagnostics, and emits COBOL that preserves sign and scale.
 - [ ] Subtraction (`-`): handles `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`) operands, widens to the widest type before subtraction, emits two's-complement semantics with overflow checks, and maintains COBOL sign/scale fidelity.
 - [ ] Multiplication (`*`): covers operands typed as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`); widens both operands before multiplying, reports overflow, and generates COBOL statements that retain sign and scaling.
 - [ ] Division (`/`): accepts `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`) operands, widens before division, ensures two's-complement quotient semantics with overflow/zero diagnostics, and preserves COBOL sign/scale.
@@ -98,22 +98,22 @@ are completed; keep completed items grouped separately from the remaining work t
 - [ ] Unary minus (`-`): negates operands declared as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`), widens prior to negation, diagnoses overflow on minimum values, and preserves COBOL sign handling.
 - [ ] Absolute value (`ABS`): handles `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`) operands, widens before evaluating magnitude, diagnoses overflow on minimum values, and emits COBOL preserving sign/scale.
 - [ ] Equality comparison (`==`): evaluates operands declared as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`), widens operands to the broadest width, mirrors two's-complement equality rules, and allows comparison interop with floating (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`) and alphanumeric (`PIC X`, `PIC X(n)`) items by dispatching to the libft/standard `strcmp` helpers for string-aware semantics.
-- [ ] Equality comparison (`=`): compares operands typed as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`), widens operands, and emits COBOL comparisons matching two's-complement semantics.
+- [x] Equality comparison (`==`): compares operands typed as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`), widens operands, and emits COBOL comparisons matching two's-complement semantics.
 - [ ] Inequality comparison (`<>`): supports mixed operands among `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`), widens operands, and mirrors COBOL inequality semantics.
-- [ ] Less-than comparison (`<`): handles ordering between `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`) operands, widens operands, and emits COBOL preserving signed ordering.
-- [ ] Less-or-equal comparison (`<=`): supports comparisons among `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`), widens operands, and preserves COBOL signed ordering.
-- [ ] Greater-than comparison (`>`): covers operands declared as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`), widens operands, and emits COBOL preserving signed ordering.
-- [ ] Greater-or-equal comparison (`>=`): compares `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`) operands, widens operands, and preserves COBOL signed ordering.
+- [x] Less-than comparison (`<`): handles ordering between `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`) operands, widens operands, and emits COBOL preserving signed ordering.
+- [x] Less-or-equal comparison (`<=`): supports comparisons among `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`), widens operands, and preserves COBOL signed ordering.
+- [x] Greater-than comparison (`>`): covers operands declared as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`), widens operands, and emits COBOL preserving signed ordering.
+- [x] Greater-or-equal comparison (`>=`): compares `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`) operands, widens operands, and preserves COBOL signed ordering.
 
 #### Floating Operators
-- [ ] Addition (`+`): accepts operands declared as `float`, `double`, `PIC V9(n)` (single precision), and `PIC V9(18)` (double precision) alongside any integral width (`PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)`, `PIC 9(36)`), coerces integrals to floating, respects COBOL precision/scale, and propagates overflow/underflow diagnostics.
+- [x] Addition (`+`): accepts operands declared as `float`, `double`, `PIC V9(n)` (single precision), and `PIC V9(18)` (double precision) alongside any integral width (`PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)`, `PIC 9(36)`), coerces integrals to floating, respects COBOL precision/scale, and propagates overflow/underflow diagnostics.
 - [ ] Subtraction (`-`): supports `float`, `double`, `PIC V9(n)`, and `PIC V9(18)` operands mixed with integrals (`PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)`, `PIC 9(36)`), coerces integrals to floating, preserves COBOL precision/scale semantics, and reports overflow/underflow.
 - [ ] Multiplication (`*`): handles `float`, `double`, `PIC V9(n)`, and `PIC V9(18)` operands with optional integrals (`PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)`, `PIC 9(36)`), coerces integrals to floating, respects COBOL precision/scale, and propagates overflow/underflow diagnostics.
 - [ ] Division (`/`): accepts `float`, `double`, `PIC V9(n)`, and `PIC V9(18)` operands, optionally mixed with integrals (`PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)`, `PIC 9(36)`), coerces integrals to floating, applies COBOL precision/scale rules, and reports overflow/underflow and division-by-zero conditions.
 - [ ] Unary plus (`+`): normalizes sign for `float`, `double`, `PIC V9(n)`, and `PIC V9(18)` operands (and coerced integrals), preserving magnitude while tracking special values for diagnostics.
 - [ ] Unary minus (`-`): negates `float`, `double`, `PIC V9(n)`, and `PIC V9(18)` operands (and coerced integrals), carrying forward special value diagnostics and COBOL precision expectations.
 - [ ] Absolute value (`ABS`): accepts `float`, `double`, `PIC V9(n)`, and `PIC V9(18)` operands (or coerced integrals), returns magnitude while preserving scale metadata and propagating special value diagnostics.
-- [ ] Equality comparison (`=`): compares `float`, `double`, `PIC V9(n)`, and `PIC V9(18)` operands (with coerced integrals), respecting COBOL precision/scale rounding and surfacing special value diagnostics.
+- [ ] Equality comparison (`==`): compares `float`, `double`, `PIC V9(n)`, and `PIC V9(18)` operands (with coerced integrals), respecting COBOL precision/scale rounding and surfacing special value diagnostics.
 - [ ] Inequality comparison (`<>`): supports `float`, `double`, `PIC V9(n)`, and `PIC V9(18)` operands (with coerced integrals), honoring COBOL rounding expectations and diagnostics for special values.
 - [ ] Less-than comparison (`<`): handles `float`, `double`, `PIC V9(n)`, and `PIC V9(18)` operands (with coerced integrals), applying COBOL ordering rules with diagnostic propagation.
 - [ ] Less-or-equal comparison (`<=`): supports `float`, `double`, `PIC V9(n)`, and `PIC V9(18)` operands (with coerced integrals), honoring COBOL ordering and diagnostics for special values.
@@ -124,6 +124,9 @@ are completed; keep completed items grouped separately from the remaining work t
 - [ ] Banker-style rounding helper: offers explicit banker-rounding support for `float`, `double`, `PIC V9(n)`, and `PIC V9(18)` results (with coerced integrals), aligning with COBOL precision/scale and propagating overflow/underflow diagnostics.
 
 #### Assignment Semantics
+- [x] `=` assignment operator: parse identifier `=` expression statements in CBL-C, lower them through the existing MOVE infrastructure, and ensure single `=` lexemes never tokenize as comparisons.
+- [x] Numeric and floating `=` assignments: allow arithmetic results to flow into numeric and floating targets, propagating overflow, truncation, and special-value diagnostics while preserving variable immutability guarantees.
+- [x] Alphanumeric and boolean `=` assignments: accept string and boolean operands, enforce declared-length safety, and honor read-only bindings so assignments cannot clobber protected storage.
 - [ ] Integral widening assignments: allow implicit promotion from smaller integral types into `long`/`long long`, tracking two's-complement semantics and flagging overflow diagnostics when widening cannot be represented.
 - [ ] Floating-to-integral assignments: require explicit conversion steps when assigning floating results into integral targets, truncating toward zero per COBOL rules and surfacing truncation diagnostics.
 - [ ] Decimal scale preservation: when moving between floating and fixed-point items, preserve declared decimal scaling factors and emit diagnostics when scaling adjustments would truncate or overflow.
