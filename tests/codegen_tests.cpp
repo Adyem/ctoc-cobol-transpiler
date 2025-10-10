@@ -155,7 +155,7 @@ FT_TEST(test_transpiler_codegen_formats_if_else)
     if (test_expect_cstring_equal(procedure_text,
             "       PROCEDURE DIVISION.\n"
             "       MAIN.\n"
-            "           IF FLAG = 'Y'\n"
+            "           IF FLAG == 'Y'\n"
             "               MOVE INPUT-REC TO OUTPUT-REC\n"
             "           ELSE\n"
             "               MOVE ZERO TO OUTPUT-REC\n"
@@ -233,7 +233,7 @@ FT_TEST(test_transpiler_codegen_formats_perform_until)
     if (test_expect_cstring_equal(procedure_text,
             "       PROCEDURE DIVISION.\n"
             "       MAIN.\n"
-            "           PERFORM UNTIL NOT EOF-FLAG = 'Y'\n"
+            "           PERFORM UNTIL NOT EOF-FLAG == 'Y'\n"
             "               MOVE BUFFER TO OUTPUT-REC\n"
             "           END-PERFORM\n",
             "procedure division should format PERFORM UNTIL loops") != FT_SUCCESS)

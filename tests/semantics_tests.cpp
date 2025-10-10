@@ -76,6 +76,102 @@ static t_ast_node *semantics_create_picture_node(const char *text)
     return (node);
 }
 
+static t_ast_node *semantics_create_comparison_operator_node(t_lexer_token_kind kind,
+    const char *lexeme)
+{
+    t_ast_node *node;
+    t_lexer_token token;
+
+    node = ast_node_create(AST_NODE_COMPARISON_OPERATOR);
+    if (!node)
+        return (NULL);
+    token.kind = kind;
+    token.lexeme = lexeme;
+    token.length = lexeme ? ft_strlen(lexeme) : 0;
+    token.line = 1;
+    token.column = 1;
+    if (ast_node_set_token(node, &token) != FT_SUCCESS)
+    {
+        ast_node_destroy(node);
+        return (NULL);
+    }
+    return (node);
+}
+
+static t_ast_node *semantics_create_arithmetic_operator_node(t_lexer_token_kind kind,
+    const char *lexeme)
+{
+    t_ast_node *node;
+    t_lexer_token token;
+
+    node = ast_node_create(AST_NODE_ARITHMETIC_OPERATOR);
+    if (!node)
+        return (NULL);
+    token.kind = kind;
+    token.lexeme = lexeme;
+    token.length = lexeme ? ft_strlen(lexeme) : 0;
+    token.line = 1;
+    token.column = 1;
+    if (ast_node_set_token(node, &token) != FT_SUCCESS)
+    {
+        ast_node_destroy(node);
+        return (NULL);
+    }
+    return (node);
+}
+
+static t_ast_node *semantics_create_arithmetic_expression_node(const char *left_name,
+    const char *right_name)
+{
+    t_ast_node *expression;
+    t_ast_node *left_operand;
+    t_ast_node *operator_node;
+    t_ast_node *right_operand;
+
+    if (!left_name || !right_name)
+        return (NULL);
+    expression = ast_node_create(AST_NODE_ARITHMETIC_EXPRESSION);
+    if (!expression)
+        return (NULL);
+    left_operand = semantics_create_identifier_node(left_name);
+    if (!left_operand)
+    {
+        ast_node_destroy(expression);
+        return (NULL);
+    }
+    if (ast_node_add_child(expression, left_operand) != FT_SUCCESS)
+    {
+        ast_node_destroy(left_operand);
+        ast_node_destroy(expression);
+        return (NULL);
+    }
+    operator_node = semantics_create_arithmetic_operator_node(LEXER_TOKEN_PLUS, "+");
+    if (!operator_node)
+    {
+        ast_node_destroy(expression);
+        return (NULL);
+    }
+    if (ast_node_add_child(expression, operator_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(operator_node);
+        ast_node_destroy(expression);
+        return (NULL);
+    }
+    right_operand = semantics_create_identifier_node(right_name);
+    if (!right_operand)
+    {
+        ast_node_destroy(expression);
+        return (NULL);
+    }
+    if (ast_node_add_child(expression, right_operand) != FT_SUCCESS)
+    {
+        ast_node_destroy(right_operand);
+        ast_node_destroy(expression);
+        return (NULL);
+    }
+    return (expression);
+}
+
 static t_ast_node *semantics_build_program_with_storage_level(const char *storage_name,
     const char *picture_text, const char *level_text)
 {
@@ -323,14 +419,142 @@ static int semantics_add_copybook_include(t_ast_node *program, const char *copyb
     return (FT_SUCCESS);
 }
 
-static int semantics_attach_procedure_with_move(t_ast_node *program, const char *source_name, const char *target_name,
-    int use_literal_source)
+static int semantics_attach_procedure_with_assignment_like_node(t_ast_node *program,
+    t_ast_node *source_node, const char *target_name, t_ast_node_kind statement_kind)
 {
     t_ast_node *procedure_division;
     t_ast_node *sequence;
-    t_ast_node *move_statement;
-    t_ast_node *source_node;
+    t_ast_node *statement;
     t_ast_node *target_node;
+
+    if (!program)
+        return (FT_FAILURE);
+    if (!source_node)
+        return (FT_FAILURE);
+    procedure_division = ast_node_create(AST_NODE_PROCEDURE_DIVISION);
+    if (!procedure_division)
+    {
+        ast_node_destroy(source_node);
+        return (FT_FAILURE);
+    }
+    if (ast_node_add_child(program, procedure_division) != FT_SUCCESS)
+    {
+        ast_node_destroy(procedure_division);
+        ast_node_destroy(source_node);
+        return (FT_FAILURE);
+    }
+    sequence = ast_node_create(AST_NODE_STATEMENT_SEQUENCE);
+    if (!sequence)
+    {
+        ast_node_destroy(source_node);
+        return (FT_FAILURE);
+    }
+    if (ast_node_add_child(procedure_division, sequence) != FT_SUCCESS)
+    {
+        ast_node_destroy(sequence);
+        ast_node_destroy(source_node);
+        return (FT_FAILURE);
+    }
+    statement = ast_node_create(statement_kind);
+    if (!statement)
+    {
+        ast_node_destroy(source_node);
+        return (FT_FAILURE);
+    }
+    if (ast_node_add_child(statement, source_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(source_node);
+        ast_node_destroy(statement);
+        return (FT_FAILURE);
+    }
+    target_node = semantics_create_identifier_node(target_name);
+    if (!target_node)
+    {
+        ast_node_destroy(statement);
+        return (FT_FAILURE);
+    }
+    if (ast_node_add_child(statement, target_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(target_node);
+        ast_node_destroy(statement);
+        return (FT_FAILURE);
+    }
+    if (ast_node_add_child(sequence, statement) != FT_SUCCESS)
+    {
+        ast_node_destroy(statement);
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+static int semantics_attach_procedure_with_move_node(t_ast_node *program, t_ast_node *source_node,
+    const char *target_name)
+{
+    return (semantics_attach_procedure_with_assignment_like_node(program, source_node,
+            target_name, AST_NODE_MOVE_STATEMENT));
+}
+
+static int semantics_attach_procedure_with_assignment_node(t_ast_node *program,
+    t_ast_node *source_node, const char *target_name)
+{
+    return (semantics_attach_procedure_with_assignment_like_node(program, source_node,
+            target_name, AST_NODE_ASSIGNMENT_STATEMENT));
+}
+
+static int semantics_attach_procedure_with_move(t_ast_node *program, const char *source_name, const char *target_name,
+    int use_literal_source)
+{
+    t_ast_node *source_node;
+
+    if (!program)
+        return (FT_FAILURE);
+    if (use_literal_source)
+        source_node = semantics_create_literal_node("'value'", LEXER_TOKEN_STRING_LITERAL);
+    else
+        source_node = semantics_create_identifier_node(source_name);
+    if (!source_node)
+        return (FT_FAILURE);
+    if (semantics_attach_procedure_with_move_node(program, source_node, target_name) != FT_SUCCESS)
+    {
+        ast_node_destroy(source_node);
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+static int semantics_attach_procedure_with_assignment(t_ast_node *program, const char *source_name,
+    const char *target_name, int use_literal_source)
+{
+    t_ast_node *source_node;
+
+    if (!program)
+        return (FT_FAILURE);
+    if (use_literal_source)
+        source_node = semantics_create_literal_node("'value'", LEXER_TOKEN_STRING_LITERAL);
+    else
+        source_node = semantics_create_identifier_node(source_name);
+    if (!source_node)
+        return (FT_FAILURE);
+    if (semantics_attach_procedure_with_assignment_node(program, source_node, target_name) != FT_SUCCESS)
+    {
+        ast_node_destroy(source_node);
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+static int semantics_attach_procedure_with_if_comparison(t_ast_node *program,
+    const char *left_name, t_lexer_token_kind operator_kind, const char *operator_lexeme,
+    const char *right_name)
+{
+    t_ast_node *procedure_division;
+    t_ast_node *sequence;
+    t_ast_node *if_statement;
+    t_ast_node *condition;
+    t_ast_node *left_operand;
+    t_ast_node *operator_node;
+    t_ast_node *right_operand;
+    t_ast_node *then_sequence;
 
     if (!program)
         return (FT_FAILURE);
@@ -350,43 +574,77 @@ static int semantics_attach_procedure_with_move(t_ast_node *program, const char 
         ast_node_destroy(sequence);
         return (FT_FAILURE);
     }
-    move_statement = ast_node_create(AST_NODE_MOVE_STATEMENT);
-    if (!move_statement)
+    if_statement = ast_node_create(AST_NODE_IF_STATEMENT);
+    if (!if_statement)
         return (FT_FAILURE);
-    if (use_literal_source)
+    condition = ast_node_create(AST_NODE_CONDITION);
+    if (!condition)
     {
-        source_node = semantics_create_literal_node("'value'", LEXER_TOKEN_STRING_LITERAL);
-    }
-    else
-    {
-        source_node = semantics_create_identifier_node(source_name);
-    }
-    if (!source_node)
-    {
-        ast_node_destroy(move_statement);
+        ast_node_destroy(if_statement);
         return (FT_FAILURE);
     }
-    if (ast_node_add_child(move_statement, source_node) != FT_SUCCESS)
+    left_operand = semantics_create_identifier_node(left_name);
+    if (!left_operand)
     {
-        ast_node_destroy(source_node);
-        ast_node_destroy(move_statement);
+        ast_node_destroy(condition);
+        ast_node_destroy(if_statement);
         return (FT_FAILURE);
     }
-    target_node = semantics_create_identifier_node(target_name);
-    if (!target_node)
+    if (ast_node_add_child(condition, left_operand) != FT_SUCCESS)
     {
-        ast_node_destroy(move_statement);
+        ast_node_destroy(left_operand);
+        ast_node_destroy(condition);
+        ast_node_destroy(if_statement);
         return (FT_FAILURE);
     }
-    if (ast_node_add_child(move_statement, target_node) != FT_SUCCESS)
+    operator_node = semantics_create_comparison_operator_node(operator_kind, operator_lexeme);
+    if (!operator_node)
     {
-        ast_node_destroy(target_node);
-        ast_node_destroy(move_statement);
+        ast_node_destroy(condition);
+        ast_node_destroy(if_statement);
         return (FT_FAILURE);
     }
-    if (ast_node_add_child(sequence, move_statement) != FT_SUCCESS)
+    if (ast_node_add_child(condition, operator_node) != FT_SUCCESS)
     {
-        ast_node_destroy(move_statement);
+        ast_node_destroy(operator_node);
+        ast_node_destroy(condition);
+        ast_node_destroy(if_statement);
+        return (FT_FAILURE);
+    }
+    right_operand = semantics_create_identifier_node(right_name);
+    if (!right_operand)
+    {
+        ast_node_destroy(condition);
+        ast_node_destroy(if_statement);
+        return (FT_FAILURE);
+    }
+    if (ast_node_add_child(condition, right_operand) != FT_SUCCESS)
+    {
+        ast_node_destroy(right_operand);
+        ast_node_destroy(condition);
+        ast_node_destroy(if_statement);
+        return (FT_FAILURE);
+    }
+    if (ast_node_add_child(if_statement, condition) != FT_SUCCESS)
+    {
+        ast_node_destroy(if_statement);
+        return (FT_FAILURE);
+    }
+    then_sequence = ast_node_create(AST_NODE_STATEMENT_SEQUENCE);
+    if (!then_sequence)
+    {
+        ast_node_destroy(if_statement);
+        return (FT_FAILURE);
+    }
+    if (ast_node_add_child(if_statement, then_sequence) != FT_SUCCESS)
+    {
+        ast_node_destroy(then_sequence);
+        ast_node_destroy(if_statement);
+        return (FT_FAILURE);
+    }
+    if (ast_node_add_child(sequence, if_statement) != FT_SUCCESS)
+    {
+        ast_node_destroy(if_statement);
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -709,6 +967,38 @@ FT_TEST(test_semantics_rejects_move_into_read_only_item)
     return (status);
 }
 
+FT_TEST(test_semantics_rejects_assignment_into_read_only_item)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage_level("CONST-TARGET", "PIC X(5)", "78");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_assignment(program, "IGNORED", "CONST-TARGET", 1) != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) != FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 1
+            && context.last_error_code == TRANSPILE_ERROR_SEMANTIC_IMMUTABLE_TARGET)
+            status = FT_SUCCESS;
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
 FT_TEST(test_semantics_allows_move_from_read_only_item)
 {
     t_transpiler_context context;
@@ -882,6 +1172,48 @@ FT_TEST(test_semantics_rejects_truncating_identifier_move)
     return (status);
 }
 
+FT_TEST(test_semantics_rejects_truncating_identifier_assignment)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("SHORT-TARGET", "PIC X(4)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "LONG-SOURCE", "PIC X(8)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_assignment(program, "LONG-SOURCE", "SHORT-TARGET", 0) != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) != FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 1)
+        {
+            if (context.diagnostics.count >= 1
+                && context.diagnostics.items[0].code == TRANSPILE_ERROR_SEMANTIC_STRING_TRUNCATION
+                && context.diagnostics.items[0].severity == TRANSPILE_SEVERITY_ERROR)
+                status = FT_SUCCESS;
+        }
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
 FT_TEST(test_semantics_rejects_truncating_literal_move)
 {
     t_transpiler_context context;
@@ -918,6 +1250,490 @@ FT_TEST(test_semantics_rejects_truncating_literal_move)
     return (status);
 }
 
+FT_TEST(test_semantics_accepts_numeric_move_addition)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    t_ast_node *expression;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("SUM-TARGET", "PIC 9(6)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "LEFT-TERM", "PIC 9(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "RIGHT-TERM", "PIC 9(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    expression = semantics_create_arithmetic_expression_node("LEFT-TERM", "RIGHT-TERM");
+    if (!expression)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move_node(program, expression, "SUM-TARGET") != FT_SUCCESS)
+    {
+        ast_node_destroy(expression);
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) == FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 0)
+            status = FT_SUCCESS;
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_accepts_numeric_assignment_addition)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    t_ast_node *expression;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("SUM-TARGET", "PIC 9(6)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "LEFT-TERM", "PIC 9(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "RIGHT-TERM", "PIC 9(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    expression = semantics_create_arithmetic_expression_node("LEFT-TERM", "RIGHT-TERM");
+    if (!expression)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_assignment_node(program, expression, "SUM-TARGET") != FT_SUCCESS)
+    {
+        ast_node_destroy(expression);
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) == FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 0)
+            status = FT_SUCCESS;
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_accepts_floating_move_addition)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    t_ast_node *expression;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("FLOAT-TARGET", "PIC 9V9(6)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "LEFT-FLOAT", "PIC 9V9(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "RIGHT-FLOAT", "PIC 9V9(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    expression = semantics_create_arithmetic_expression_node("LEFT-FLOAT", "RIGHT-FLOAT");
+    if (!expression)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move_node(program, expression, "FLOAT-TARGET") != FT_SUCCESS)
+    {
+        ast_node_destroy(expression);
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) == FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 0)
+            status = FT_SUCCESS;
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_accepts_mixed_floating_move_addition)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    t_ast_node *expression;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("FLOAT-SUM", "PIC 9V9(6)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "FLOAT-TERM", "PIC 9V9(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "NUMERIC-TERM", "PIC 9(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    expression = semantics_create_arithmetic_expression_node("FLOAT-TERM", "NUMERIC-TERM");
+    if (!expression)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move_node(program, expression, "FLOAT-SUM") != FT_SUCCESS)
+    {
+        ast_node_destroy(expression);
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) == FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 0)
+            status = FT_SUCCESS;
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_rejects_alphanumeric_move_addition)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    t_ast_node *expression;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("NUMERIC-TARGET", "PIC 9(4)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "ALPHA-TERM", "PIC X(5)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "NUMERIC-TERM", "PIC 9(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    expression = semantics_create_arithmetic_expression_node("ALPHA-TERM", "NUMERIC-TERM");
+    if (!expression)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move_node(program, expression, "NUMERIC-TARGET") != FT_SUCCESS)
+    {
+        ast_node_destroy(expression);
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) != FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 1)
+        {
+            if (context.diagnostics.count >= 1
+                && context.diagnostics.items[0].code == TRANSPILE_ERROR_SEMANTIC_INVALID_EXPRESSION
+                && context.diagnostics.items[0].severity == TRANSPILE_SEVERITY_ERROR)
+                status = FT_SUCCESS;
+        }
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_rejects_alphanumeric_floating_addition)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    t_ast_node *expression;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("FLOAT-TARGET", "PIC 9V9(4)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "ALPHA-TERM", "PIC X(5)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "FLOAT-TERM", "PIC 9V9(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    expression = semantics_create_arithmetic_expression_node("ALPHA-TERM", "FLOAT-TERM");
+    if (!expression)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move_node(program, expression, "FLOAT-TARGET") != FT_SUCCESS)
+    {
+        ast_node_destroy(expression);
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) != FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 1)
+        {
+            if (context.diagnostics.count >= 1
+                && context.diagnostics.items[0].code == TRANSPILE_ERROR_SEMANTIC_INVALID_EXPRESSION
+                && context.diagnostics.items[0].severity == TRANSPILE_SEVERITY_ERROR)
+                status = FT_SUCCESS;
+        }
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_accepts_numeric_condition_equality)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("LEFT-NUMERIC", "PIC 9(4)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "RIGHT-NUMERIC", "PIC 9(6)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_if_comparison(program, "LEFT-NUMERIC",
+            LEXER_TOKEN_EQUALS, "==", "RIGHT-NUMERIC") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) == FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 0)
+            status = FT_SUCCESS;
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_rejects_mixed_condition_equality)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("NUMERIC-FIELD", "PIC 9(4)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "ALPHA-FIELD", "PIC X(5)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_if_comparison(program, "NUMERIC-FIELD",
+            LEXER_TOKEN_EQUALS, "==", "ALPHA-FIELD") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) != FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 1)
+        {
+            if (context.diagnostics.count >= 1
+                && context.diagnostics.items[0].code == TRANSPILE_ERROR_SEMANTIC_TYPE_MISMATCH
+                && context.diagnostics.items[0].severity == TRANSPILE_SEVERITY_ERROR)
+                status = FT_SUCCESS;
+        }
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_accepts_numeric_condition_less_than)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("LEFT-NUMERIC", "PIC 9(4)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "RIGHT-NUMERIC", "PIC 9(6)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_if_comparison(program, "LEFT-NUMERIC",
+            LEXER_TOKEN_LESS_THAN, "<", "RIGHT-NUMERIC") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) == FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 0)
+            status = FT_SUCCESS;
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_rejects_alphanumeric_condition_less_than)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("LEFT-ALPHA", "PIC X(10)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "RIGHT-ALPHA", "PIC X(5)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_if_comparison(program, "LEFT-ALPHA",
+            LEXER_TOKEN_LESS_THAN, "<", "RIGHT-ALPHA") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) != FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 1)
+        {
+            if (context.diagnostics.count >= 1
+                && context.diagnostics.items[0].code == TRANSPILE_ERROR_SEMANTIC_INVALID_CONDITION
+                && context.diagnostics.items[0].severity == TRANSPILE_SEVERITY_ERROR)
+                status = FT_SUCCESS;
+        }
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
 const t_test_case *get_semantics_tests(size_t *count)
 {
     static const t_test_case tests[] = {
@@ -925,11 +1741,20 @@ const t_test_case *get_semantics_tests(size_t *count)
         {"semantics_rejects_undeclared_identifier", test_semantics_rejects_undeclared_identifier},
         {"semantics_detects_duplicate_data_item", test_semantics_detects_duplicate_data_item},
         {"semantics_rejects_move_into_read_only_item", test_semantics_rejects_move_into_read_only_item},
+        {"semantics_rejects_assignment_into_read_only_item", test_semantics_rejects_assignment_into_read_only_item},
         {"semantics_allows_move_from_read_only_item", test_semantics_allows_move_from_read_only_item},
         {"semantics_records_alphanumeric_length_in_context", test_semantics_records_alphanumeric_length_in_context},
         {"semantics_rejects_type_mismatch_move", test_semantics_rejects_type_mismatch_move},
         {"semantics_rejects_truncating_identifier_move", test_semantics_rejects_truncating_identifier_move},
+        {"semantics_rejects_truncating_identifier_assignment", test_semantics_rejects_truncating_identifier_assignment},
         {"semantics_rejects_truncating_literal_move", test_semantics_rejects_truncating_literal_move},
+        {"semantics_accepts_numeric_move_addition", test_semantics_accepts_numeric_move_addition},
+        {"semantics_accepts_numeric_assignment_addition", test_semantics_accepts_numeric_assignment_addition},
+        {"semantics_rejects_alphanumeric_move_addition", test_semantics_rejects_alphanumeric_move_addition},
+        {"semantics_accepts_numeric_condition_equality", test_semantics_accepts_numeric_condition_equality},
+        {"semantics_rejects_mixed_condition_equality", test_semantics_rejects_mixed_condition_equality},
+        {"semantics_accepts_numeric_condition_less_than", test_semantics_accepts_numeric_condition_less_than},
+        {"semantics_rejects_alphanumeric_condition_less_than", test_semantics_rejects_alphanumeric_condition_less_than},
         {"semantics_registers_copybook_items", test_semantics_registers_copybook_items},
         {"semantics_reports_unknown_copybook", test_semantics_reports_unknown_copybook},
         {"semantics_detects_copybook_duplicate_data_item", test_semantics_detects_copybook_duplicate_data_item}

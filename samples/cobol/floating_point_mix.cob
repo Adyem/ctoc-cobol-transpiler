@@ -21,7 +21,7 @@ MAIN.
        IF CURRENT-READING > SEASONAL-AVERAGE
            MOVE 'Y' TO TRENDING-UP
        END-IF.
-       IF TRENDING-UP = 'Y'
+       IF TRENDING-UP == 'Y'
            DISPLAY "TREND UP"
        ELSE
            DISPLAY "TREND FLAT"

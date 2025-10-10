@@ -29,7 +29,7 @@ int transpiler_standard_library_generate_powerof(char **out_text)
         "           BY REFERENCE LNK-STATUS.\n"
         "       MAIN.\n"
         "           MOVE 0 TO LNK-STATUS.\n"
-        "           IF LNK-BASE = 0 AND LNK-EXPONENT <= 0\n"
+        "           IF LNK-BASE == 0 AND LNK-EXPONENT <= 0\n"
         "               MOVE 1 TO LNK-STATUS\n"
         "               MOVE 0 TO LNK-RESULT\n"
         "               GOBACK\n"

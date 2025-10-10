@@ -1,0 +1,4 @@
+build_logs/
+automated_tests/
+objs/
+objs_tests/

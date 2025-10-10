@@ -71,6 +71,13 @@ int c = a + 1;
 if (c > 10) { display("big"); }
 ```
 
+**Implementation status (2025‑10‑07).** The lexer already emits the dedicated
+`LEXER_TOKEN_ASSIGN` for lone `=` lexemes, and the parser now recognizes
+identifier `=` expression statements. Semantic analysis funnels those
+assignments through the established MOVE validation so type compatibility,
+read-only protection, and string-length safety mirror the existing MOVE
+behavior.
+
 ### 3.3 Built‑ins
 
 * `display(expr)` → `DISPLAY ...` (strings or identifiers)
@@ -154,7 +161,7 @@ WORKING-STORAGE SECTION.
 PROCEDURE DIVISION.
     OPEN INPUT INPUT
          OUTPUT OUTPUT
-    PERFORM UNTIL EOF-FLAG = 'Y'
+    PERFORM UNTIL EOF-FLAG == 'Y'
         READ INPUT INTO LINE
             AT END MOVE 'Y' TO EOF-FLAG
             NOT AT END
@@ -352,7 +359,7 @@ WRITE <FILE>-REC
 
 ```
 MOVE 'N' TO <FILE>-EOF-FLAG
-PERFORM UNTIL <FILE>-EOF-FLAG = 'Y'
+PERFORM UNTIL <FILE>-EOF-FLAG == 'Y'
     READ <FILE> INTO <DEST>
         AT END MOVE 'Y' TO <FILE>-EOF-FLAG
         NOT AT END
@@ -414,7 +421,7 @@ WORKING-STORAGE SECTION.
 PROCEDURE DIVISION.
     OPEN INPUT INPUT
          OUTPUT OUTPUT
-    PERFORM UNTIL INPUT-EOF-FLAG = 'Y'
+    PERFORM UNTIL INPUT-EOF-FLAG == 'Y'
         READ INPUT INTO BUF
             AT END MOVE 'Y' TO INPUT-EOF-FLAG
             NOT AT END
@@ -502,7 +509,7 @@ open(file, mode): emit OPEN <MODE> FILE
 while(read(f, dst)) { body }:
   flag := gensym(f+"-EOF-FLAG")
   emit MOVE 'N' TO flag
-  emit PERFORM UNTIL flag = 'Y'
+  emit PERFORM UNTIL flag == 'Y'
   emit   READ f INTO dst
   emit     AT END MOVE 'Y' TO flag
   emit     NOT AT END { body }

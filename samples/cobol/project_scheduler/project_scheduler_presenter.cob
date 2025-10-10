@@ -24,7 +24,7 @@ MAIN.
            "!" DELIMITED BY SIZE
            INTO SUMMARY-BUFFER
        END-STRING.
-       IF DETAIL = "Assemble Budget"
+       IF DETAIL == "Assemble Budget"
            STRING SUMMARY-BUFFER DELIMITED BY SIZE
                " READY" DELIMITED BY SIZE
                INTO SUMMARY-BUFFER

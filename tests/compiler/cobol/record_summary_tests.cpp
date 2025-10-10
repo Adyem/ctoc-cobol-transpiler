@@ -15,7 +15,7 @@ FT_TEST(test_cobol_transpiled_record_summary_fixture_contains_expected_sections)
     if (test_cobol_fixture_contains(path, "READ INPUT-FILE") != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_cobol_fixture_contains(path,
-            "IF RECORD-STATUS = \"A\"") != FT_SUCCESS)
+            "IF RECORD-STATUS == \"A\"") != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_cobol_fixture_contains(path,
             "ADD RECORD-AMOUNT TO TOTAL-AMOUNT") != FT_SUCCESS)
@@ -51,12 +51,12 @@ FT_TEST(test_cobol_transpiled_record_summary_matches_expected_text)
         "       PROCEDURE DIVISION.\n"
         "MAIN.\n"
         "           OPEN INPUT INPUT-FILE.\n"
-        "           PERFORM UNTIL EOF-FLAG = 'Y'\n"
+        "           PERFORM UNTIL EOF-FLAG == 'Y'\n"
         "               READ INPUT-FILE\n"
         "                   AT END\n"
         "                       MOVE 'Y' TO EOF-FLAG\n"
         "                   NOT AT END\n"
-        "                       IF RECORD-STATUS = \"A\"\n"
+        "                       IF RECORD-STATUS == \"A\"\n"
         "                           ADD 1 TO ACCEPTED-COUNT\n"
         "                           ADD RECORD-AMOUNT TO TOTAL-AMOUNT\n"
         "                       END-IF\n"
