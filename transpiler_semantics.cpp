@@ -755,8 +755,20 @@ static int transpiler_semantics_classify_arithmetic_expression(const t_ast_node 
         return (status);
     }
     operator_kind = operator_node->token.kind;
-    operator_text = operator_node->token.lexeme ? operator_node->token.lexeme : "+";
-    if (operator_kind == LEXER_TOKEN_PLUS)
+    if (operator_node->token.lexeme)
+        operator_text = operator_node->token.lexeme;
+    else if (operator_kind == LEXER_TOKEN_KEYWORD_MOD)
+        operator_text = "MOD";
+    else if (operator_kind == LEXER_TOKEN_MINUS)
+        operator_text = "-";
+    else if (operator_kind == LEXER_TOKEN_STAR)
+        operator_text = "*";
+    else if (operator_kind == LEXER_TOKEN_SLASH)
+        operator_text = "/";
+    else
+        operator_text = "+";
+    if (operator_kind == LEXER_TOKEN_PLUS
+        || operator_kind == LEXER_TOKEN_MINUS)
     {
         if (left_kind != TRANSPILE_SEMANTIC_DATA_UNKNOWN
             && !transpiler_semantics_is_numeric_kind(left_kind))
@@ -795,6 +807,87 @@ static int transpiler_semantics_classify_arithmetic_expression(const t_ast_node 
                 else
                     *out_kind = TRANSPILE_SEMANTIC_DATA_UNKNOWN;
             }
+            if (out_length)
+            {
+                if (left_length > right_length)
+                    *out_length = left_length;
+                else
+                    *out_length = right_length;
+            }
+        }
+        return (status);
+    }
+    if (operator_kind == LEXER_TOKEN_KEYWORD_MOD)
+    {
+        if (left_kind != TRANSPILE_SEMANTIC_DATA_UNKNOWN
+            && left_kind != TRANSPILE_SEMANTIC_DATA_NUMERIC)
+        {
+            pf_snprintf(message, sizeof(message),
+                "arithmetic operator '%s' requires integral operands but %s is %s",
+                operator_text, left_role,
+                transpiler_semantics_kind_to_string(left_kind));
+            if (transpiler_semantics_emit_invalid_expression(context, message) != FT_SUCCESS)
+                status = FT_FAILURE;
+            else
+                status = FT_FAILURE;
+        }
+        if (right_kind != TRANSPILE_SEMANTIC_DATA_UNKNOWN
+            && right_kind != TRANSPILE_SEMANTIC_DATA_NUMERIC)
+        {
+            pf_snprintf(message, sizeof(message),
+                "arithmetic operator '%s' requires integral operands but %s is %s",
+                operator_text, right_role,
+                transpiler_semantics_kind_to_string(right_kind));
+            if (transpiler_semantics_emit_invalid_expression(context, message) != FT_SUCCESS)
+                status = FT_FAILURE;
+            else
+                status = FT_FAILURE;
+        }
+        if (status == FT_SUCCESS)
+        {
+            if (out_kind)
+                *out_kind = TRANSPILE_SEMANTIC_DATA_NUMERIC;
+            if (out_length)
+            {
+                if (left_length > right_length)
+                    *out_length = left_length;
+                else
+                    *out_length = right_length;
+            }
+        }
+        return (status);
+    }
+    if (operator_kind == LEXER_TOKEN_STAR
+        || operator_kind == LEXER_TOKEN_SLASH)
+    {
+        if (left_kind != TRANSPILE_SEMANTIC_DATA_UNKNOWN
+            && !transpiler_semantics_is_numeric_kind(left_kind))
+        {
+            pf_snprintf(message, sizeof(message),
+                "arithmetic operator '%s' requires numeric or floating operands but %s is %s",
+                operator_text, left_role,
+                transpiler_semantics_kind_to_string(left_kind));
+            if (transpiler_semantics_emit_invalid_expression(context, message) != FT_SUCCESS)
+                status = FT_FAILURE;
+            else
+                status = FT_FAILURE;
+        }
+        if (right_kind != TRANSPILE_SEMANTIC_DATA_UNKNOWN
+            && !transpiler_semantics_is_numeric_kind(right_kind))
+        {
+            pf_snprintf(message, sizeof(message),
+                "arithmetic operator '%s' requires numeric or floating operands but %s is %s",
+                operator_text, right_role,
+                transpiler_semantics_kind_to_string(right_kind));
+            if (transpiler_semantics_emit_invalid_expression(context, message) != FT_SUCCESS)
+                status = FT_FAILURE;
+            else
+                status = FT_FAILURE;
+        }
+        if (status == FT_SUCCESS)
+        {
+            if (out_kind)
+                *out_kind = TRANSPILE_SEMANTIC_DATA_FLOATING;
             if (out_length)
             {
                 if (left_length > right_length)

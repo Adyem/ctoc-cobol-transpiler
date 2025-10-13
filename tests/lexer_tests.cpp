@@ -24,6 +24,12 @@ FT_TEST(test_lexer_keyword_lookup_identifies_keywords)
         pf_printf("Assertion failed: lexer should classify WORKING-STORAGE keyword\n");
         return (FT_FAILURE);
     }
+    kind = lexer_token_lookup_keyword("mod", ft_strlen("mod"));
+    if (kind != LEXER_TOKEN_KEYWORD_MOD)
+    {
+        pf_printf("Assertion failed: lexer should classify MOD keyword\n");
+        return (FT_FAILURE);
+    }
     return (FT_SUCCESS);
 }
 
@@ -97,6 +103,75 @@ FT_TEST(test_lexer_distinguishes_assignment_and_equality)
     if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_expect_token(&token, LEXER_TOKEN_END_OF_FILE, NULL, 1, 5) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_lexer_tokenizes_minus_operator)
+{
+    const char *source;
+    t_lexer lexer;
+    t_lexer_token token;
+
+    source = "- 5";
+    lexer_init(&lexer, source);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_MINUS, "-", 1, 1) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_NUMERIC_LITERAL, "5", 1, 3) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_END_OF_FILE, NULL, 1, 4) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_lexer_tokenizes_star_operator)
+{
+    const char *source;
+    t_lexer lexer;
+    t_lexer_token token;
+
+    source = "* 5";
+    lexer_init(&lexer, source);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_STAR, "*", 1, 1) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_NUMERIC_LITERAL, "5", 1, 3) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_END_OF_FILE, NULL, 1, 4) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_lexer_tokenizes_slash_operator)
+{
+    const char *source;
+    t_lexer lexer;
+    t_lexer_token token;
+
+    source = "/ 5";
+    lexer_init(&lexer, source);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_SLASH, "/", 1, 1) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_NUMERIC_LITERAL, "5", 1, 3) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_token(&token, LEXER_TOKEN_END_OF_FILE, NULL, 1, 4) != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
@@ -201,6 +276,9 @@ const t_test_case *get_lexer_tests(size_t *count)
         {"lexer_trivia_detects_whitespace", test_lexer_trivia_detects_whitespace},
         {"lexer_trivia_detects_comments", test_lexer_trivia_detects_comments},
         {"lexer_distinguishes_assignment_and_equality", test_lexer_distinguishes_assignment_and_equality},
+        {"lexer_tokenizes_minus_operator", test_lexer_tokenizes_minus_operator},
+        {"lexer_tokenizes_star_operator", test_lexer_tokenizes_star_operator},
+        {"lexer_tokenizes_slash_operator", test_lexer_tokenizes_slash_operator},
         {"lexer_tokenizes_sample_program", test_lexer_tokenizes_sample_program},
         {"lexer_reports_unterminated_string", test_lexer_reports_unterminated_string}
     };

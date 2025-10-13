@@ -97,12 +97,18 @@ TEST_SRC    = tests/test_main.cpp \
               tests/parser_tests.cpp \
              tests/parser_positive_program_tests.cpp \
              tests/parser_positive_control_flow_tests.cpp \
-             tests/parser_positive_literal_tests.cpp \
+             tests/parser_positive_literal_character_tests.cpp \
+             tests/parser_positive_literal_assignment_tests.cpp \
+             tests/parser_positive_literal_arithmetic_tests.cpp \
              tests/parser_negative_statement_tests.cpp \
              tests/parser_negative_structure_tests.cpp \
              tests/parser_negative_data_tests.cpp \
-              tests/semantics_tests.cpp \
-              tests/runtime_int_tests.cpp \
+             tests/semantics_tests.cpp \
+             tests/semantics_assignment_tests.cpp \
+             tests/semantics_arithmetic_tests.cpp \
+             tests/semantics_condition_tests.cpp \
+             tests/semantics_test_support.cpp \
+             tests/runtime_int_tests.cpp \
               tests/runtime_char_tests.cpp \
               tests/runtime_string_tests.cpp \
               tests/standard_library_tests.cpp \

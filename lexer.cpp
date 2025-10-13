@@ -259,6 +259,12 @@ static int lexer_collect_punctuation(t_lexer *lexer, t_lexer_token *token, size_
         kind = LEXER_TOKEN_RIGHT_PAREN;
     else if (value == '+')
         kind = LEXER_TOKEN_PLUS;
+    else if (value == '-')
+        kind = LEXER_TOKEN_MINUS;
+    else if (value == '*')
+        kind = LEXER_TOKEN_STAR;
+    else if (value == '/')
+        kind = LEXER_TOKEN_SLASH;
     lexer_build_token(lexer, token, kind, start_offset, start_line, start_column);
     if (kind == LEXER_TOKEN_UNKNOWN)
         return (FT_FAILURE);
@@ -350,7 +356,8 @@ int lexer_next_token(t_lexer *lexer, t_lexer_token *token)
         return (FT_SUCCESS);
     }
     if (value == '.' || value == ',' || value == ':' || value == ';'
-        || value == '(' || value == ')' || value == '+')
+        || value == '(' || value == ')' || value == '+' || value == '-'
+        || value == '*' || value == '/')
         return (lexer_collect_punctuation(lexer, token, start_offset, start_line, start_column));
     return (lexer_collect_unknown(lexer, token, start_offset, start_line, start_column));
 }
