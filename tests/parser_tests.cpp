@@ -4,6 +4,10 @@ int test_parser_parses_minimal_program(void);
 int test_parser_parses_control_flow_statements(void);
 int test_parser_accepts_boolean_character_literals(void);
 int test_parser_accepts_assignment_statement(void);
+int test_parser_accepts_modulo_expression(void);
+int test_parser_accepts_multiplication_expression(void);
+int test_parser_accepts_division_expression(void);
+int test_parser_accepts_subtraction_expression(void);
 int test_parser_rejects_unknown_statement(void);
 int test_parser_rejects_paragraph_without_terminator(void);
 int test_parser_rejects_incomplete_if_statement(void);
@@ -31,6 +35,10 @@ const t_test_case *get_parser_tests(size_t *count)
         {"parser_parses_control_flow_statements", test_parser_parses_control_flow_statements},
         {"parser_accepts_boolean_character_literals", test_parser_accepts_boolean_character_literals},
         {"parser_accepts_assignment_statement", test_parser_accepts_assignment_statement},
+        {"parser_accepts_modulo_expression", test_parser_accepts_modulo_expression},
+        {"parser_accepts_multiplication_expression", test_parser_accepts_multiplication_expression},
+        {"parser_accepts_division_expression", test_parser_accepts_division_expression},
+        {"parser_accepts_subtraction_expression", test_parser_accepts_subtraction_expression},
         {"parser_rejects_unknown_statement", test_parser_rejects_unknown_statement},
         {"parser_rejects_paragraph_without_terminator", test_parser_rejects_paragraph_without_terminator},
         {"parser_rejects_incomplete_if_statement", test_parser_rejects_incomplete_if_statement},

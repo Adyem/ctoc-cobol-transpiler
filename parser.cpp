@@ -417,7 +417,12 @@ static int parser_parse_value_node(t_parser *parser, t_ast_node **out_node)
         return (FT_FAILURE);
     if (parser_parse_primary_value(parser, &result) != FT_SUCCESS)
         return (FT_FAILURE);
-    while (parser->has_current && parser->current.kind == LEXER_TOKEN_PLUS)
+    while (parser->has_current
+        && (parser->current.kind == LEXER_TOKEN_PLUS
+            || parser->current.kind == LEXER_TOKEN_MINUS
+            || parser->current.kind == LEXER_TOKEN_STAR
+            || parser->current.kind == LEXER_TOKEN_SLASH
+            || parser->current.kind == LEXER_TOKEN_KEYWORD_MOD))
     {
         t_ast_node *operator_node;
         t_ast_node *expression;
