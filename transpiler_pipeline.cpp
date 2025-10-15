@@ -1,8 +1,7 @@
 #include <cstdlib>
 
 #include "libft/CMA/CMA.hpp"
-#include "transpiler_pipeline.hpp"
-#include "transpiler_logging.hpp"
+#include "cblc_transpiler.hpp"
 
 static int transpiler_pipeline_reserve(t_transpiler_pipeline *pipeline, size_t desired_capacity)
 {

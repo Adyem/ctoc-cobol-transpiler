@@ -1,5 +1,3 @@
-#include "transpiler_semantics.hpp"
-
 #include "libft/Libft/libft.hpp"
 
 #include "semantics_test_support.hpp"

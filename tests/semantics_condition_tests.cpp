@@ -1,5 +1,3 @@
-#include "transpiler_semantics.hpp"
-
 #include "semantics_test_support.hpp"
 
 #include "semantics_test_groups.hpp"

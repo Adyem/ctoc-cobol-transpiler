@@ -1,6 +1,3 @@
-#include "parser.hpp"
-#include "transpiler_cobol_reverse.hpp"
-
 #include "libft/CMA/CMA.hpp"
 #include "libft/Libft/libft.hpp"
 #include "test_suites.hpp"

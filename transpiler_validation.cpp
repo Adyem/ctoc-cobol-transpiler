@@ -1,9 +1,4 @@
-#include "transpiler_validation.hpp"
-
-#include "parser.hpp"
-#include "transpiler_cblc.hpp"
-
-#include "ast.hpp"
+#include "cblc_transpiler.hpp"
 
 int transpiler_validate_generated_cblc(const char *text)
 {

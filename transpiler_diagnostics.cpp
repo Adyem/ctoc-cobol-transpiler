@@ -1,7 +1,7 @@
 #include <cstdlib>
 
 #include "libft/CMA/CMA.hpp"
-#include "transpiler_diagnostics.hpp"
+#include "cblc_transpiler.hpp"
 
 static int transpiler_diagnostics_reserve(t_transpiler_diagnostic_list *list, size_t desired_capacity)
 {

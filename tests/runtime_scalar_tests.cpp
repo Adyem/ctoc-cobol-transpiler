@@ -7,14 +7,7 @@
 
 #include "libft/Libft/libft.hpp"
 #include "libft/Printf/printf.hpp"
-#include "ast.hpp"
-#include "lexer.hpp"
-#include "lexer_token.hpp"
-#include "runtime_file.hpp"
-#include "runtime_scalar.hpp"
-#include "runtime_string.hpp"
-#include "transpiler_context.hpp"
-#include "transpiler_pipeline.hpp"
+#include "cblc_transpiler.hpp"
 
 typedef struct s_test_case
 {
