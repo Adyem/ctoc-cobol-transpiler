@@ -1,0 +1,14 @@
+char greeting[32];
+
+function void initialize_greeting() {
+    greeting = "HELLO FROM CBL-C";
+}
+
+function void display_greeting() {
+    display(greeting);
+}
+
+function void main() {
+    initialize_greeting();
+    display_greeting();
+}
