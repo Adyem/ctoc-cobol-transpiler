@@ -2,3 +2,4 @@ build_logs/
 automated_tests/
 objs/
 objs_tests/
+samples/example_project/build/
