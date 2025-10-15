@@ -37,5 +37,6 @@ const t_test_case *get_logging_tests(size_t *count);
 const t_test_case *get_cobol_reverse_tests(size_t *count);
 const t_test_case *get_ci_tests(size_t *count);
 const t_test_case *get_cblc_formatter_tests(size_t *count);
+const t_test_case *get_validation_tests(size_t *count);
 
 #endif
