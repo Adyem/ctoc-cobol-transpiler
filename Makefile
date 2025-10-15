@@ -90,6 +90,10 @@ OBJS        = $(SRC:%.cpp=$(OBJ_DIR)/%.o)
 
 OBJS_NO_MAIN = $(filter-out $(OBJ_DIR)/main.o,$(OBJS))
 
+.SILENT:
+
+TOTAL_OBJS          := $(words $(OBJS))
+
 TEST_SRC    = tests/test_main.cpp \
               tests/test_support.cpp \
               tests/ast_tests.cpp \
@@ -158,17 +162,19 @@ TEST_SRC    = tests/test_main.cpp \
 
 TEST_OBJS   = $(TEST_SRC:%.cpp=$(OBJ_DIR_TEST)/%.o)
 
+TOTAL_TEST_OBJS     := $(words $(TEST_OBJS))
+
 all: ensure_libft dirs $(TARGET)
 
 tests: ensure_libft dirs $(TEST_NAME)
 
 dirs:
-	-$(MKDIR) $(OBJ_DIR)
-	-$(MKDIR) $(OBJ_DIR_DEBUG)
-	-$(MKDIR) $(OBJ_DIR_TEST)
+	@-$(MKDIR) $(OBJ_DIR)
+	@-$(MKDIR) $(OBJ_DIR_DEBUG)
+	@-$(MKDIR) $(OBJ_DIR_TEST)
 
 $(BUILD_LOG_DIR):
-	-$(MKDIR) $(BUILD_LOG_DIR)
+	@-$(MKDIR) $(BUILD_LOG_DIR)
 
 install_cobc:
 	@if ! command -v cobc >/dev/null 2>&1; then \
@@ -187,16 +193,35 @@ debug:
 	$(MAKE) all DEBUG=1
 
 $(TARGET): $(LIBFT) $(OBJS)
-	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
+	@printf '\033[1;36m[CTOC BUILD] Linking %s\033[0m\n' "$@"
+	@$(CC) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
 
 $(TEST_NAME): $(LIBFT) $(TEST_OBJS) $(OBJS_NO_MAIN)
-	$(CC) $(CFLAGS) $(TEST_OBJS) $(OBJS_NO_MAIN) -o $@ $(LDFLAGS)
+	@printf '\033[1;36m[CTOC BUILD] Linking %s\033[0m\n' "$@"
+	@$(CC) $(CFLAGS) $(TEST_OBJS) $(OBJS_NO_MAIN) -o $@ $(LDFLAGS)
 
+
+LIBFT_BUILD_GOAL := $(if $(DEBUG),debug,all)
 
 $(LIBFT): ensure_libft | $(BUILD_LOG_DIR)
-	@printf 'Building libft (log: %s)\n' "$(LIBFT_BUILD_LOG)"
-	@$(MAKE) -C $(LIBFT_DIR) $(if $(DEBUG), debug) > $(LIBFT_BUILD_LOG) 2>&1 || \
-		{ status=$$?; printf 'libft build failed. Showing log:\n'; cat $(LIBFT_BUILD_LOG); exit $$status; }
+	@need_build=0; \
+	if $(MAKE) -C $(LIBFT_DIR) -q $(LIBFT_BUILD_GOAL); then \
+	:; \
+	else \
+	status=$$?; \
+	if [ $$status -eq 1 ]; then \
+	need_build=1; \
+	else \
+	exit $$status; \
+	fi; \
+	fi; \
+	if [ $$need_build -eq 1 ] || [ ! -f $@ ]; then \
+	printf '\033[1;36m[LIBFT BUILD] Updating %s (log: %s)\033[0m\n' "$@" "$(LIBFT_BUILD_LOG)"; \
+	$(MAKE) -C $(LIBFT_DIR) $(LIBFT_BUILD_GOAL) > $(LIBFT_BUILD_LOG) 2>&1 || \
+	{ status=$$?; printf 'libft build failed. Showing log:\n'; cat $(LIBFT_BUILD_LOG); exit $$status; }; \
+	else \
+	printf '\033[1;36m[LIBFT CHECK] %s is up to date\033[0m\n' "$@"; \
+	fi
 
 initialize:
 	git submodule update --init --recursive
@@ -208,12 +233,20 @@ ensure_libft:
 	fi
 
 $(OBJ_DIR)/%.o: %.cpp
-	-$(MKDIR) $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
+	@-$(MKDIR) $(dir $@)
+	@$(CC) $(CFLAGS) -c $< -o $@
+	@if [ $(TOTAL_OBJS) -gt 0 ]; then \
+		built=$$(find $(OBJ_DIR) -type f -name '*.o' | wc -l); \
+		printf '\033[1;36m[CTOC PROGRESS] %s (%d/%d)\033[0m\n' "$<" $$built $(TOTAL_OBJS); \
+	fi
 
 $(OBJ_DIR_TEST)/%.o: %.cpp
-	-$(MKDIR) $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
+	@-$(MKDIR) $(dir $@)
+	@$(CC) $(CFLAGS) -c $< -o $@
+	@if [ $(TOTAL_TEST_OBJS) -gt 0 ]; then \
+		built=$$(find $(OBJ_DIR_TEST) -type f -name '*.o' | wc -l); \
+		printf '\033[1;36m[CTOC TEST PROGRESS] %s (%d/%d)\033[0m\n' "$<" $$built $(TOTAL_TEST_OBJS); \
+	fi
 
 clean:
 	-$(RM) $(OBJ_DIR)/*.o $(OBJ_DIR_DEBUG)/*.o
