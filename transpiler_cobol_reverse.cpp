@@ -1,11 +1,9 @@
-#include "transpiler_cobol_reverse.hpp"
-
 #include <cstddef>
 
 #include "libft/CMA/CMA.hpp"
 #include "libft/Libft/libft.hpp"
 #include "libft/Printf/printf.hpp"
-#include "transpiler_logging.hpp"
+#include "cblc_transpiler.hpp"
 
 typedef struct s_cblc_builder
 {

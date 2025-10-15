@@ -1,4 +1,4 @@
-#include "transpiler_cobol_types.hpp"
+#include "cblc_transpiler.hpp"
 
 #include "libft/CMA/CMA.hpp"
 

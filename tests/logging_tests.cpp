@@ -1,5 +1,3 @@
-#include "transpiler_logging.hpp"
-
 #include "test_suites.hpp"
 
 FT_TEST(test_logging_info_requires_verbose)

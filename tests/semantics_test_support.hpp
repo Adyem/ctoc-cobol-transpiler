@@ -1,7 +1,7 @@
 #ifndef SEMANTICS_TEST_SUPPORT_HPP
 #define SEMANTICS_TEST_SUPPORT_HPP
 
-#include "transpiler_semantics.hpp"
+#include "cblc_transpiler.hpp"
 
 #include "libft/Libft/libft.hpp"
 

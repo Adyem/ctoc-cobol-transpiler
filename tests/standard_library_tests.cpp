@@ -1,5 +1,3 @@
-#include "transpiler_standard_library.hpp"
-
 #include "compiler/compiler_test_support.hpp"
 #include "libft/CMA/CMA.hpp"
 #include "test_suites.hpp"

@@ -1,5 +1,3 @@
-#include "transpiler_cobol_types.hpp"
-
 #include "libft/CMA/CMA.hpp"
 #include "test_suites.hpp"
 

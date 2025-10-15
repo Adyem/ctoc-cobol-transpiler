@@ -1,5 +1,3 @@
-#include "transpiler_context.hpp"
-
 #include "test_suites.hpp"
 
 FT_TEST(test_transpiler_context_registers_void_function)

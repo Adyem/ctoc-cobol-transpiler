@@ -1,5 +1,4 @@
-#include "runtime_scalar.hpp"
-#include "runtime_string.hpp"
+#include "cblc_transpiler.hpp"
 
 #include "test_suites.hpp"
 

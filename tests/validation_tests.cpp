@@ -1,5 +1,3 @@
-#include "transpiler_validation.hpp"
-
 #include "test_suites.hpp"
 
 FT_TEST(test_transpiler_validation_accepts_valid_cblc)

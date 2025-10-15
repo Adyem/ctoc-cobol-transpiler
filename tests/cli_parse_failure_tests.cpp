@@ -1,7 +1,5 @@
 #include <cstddef>
 
-#include "transpiler_cli.hpp"
-
 #include "test_suites.hpp"
 #include "cli_test_registry.hpp"
 

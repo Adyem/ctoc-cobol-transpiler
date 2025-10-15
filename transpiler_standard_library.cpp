@@ -1,4 +1,4 @@
-#include "transpiler_standard_library.hpp"
+#include "cblc_transpiler.hpp"
 
 static const t_transpiler_standard_library_entry g_transpiler_standard_library_entries[] = {
     {"std::abs", "CBLC-ABS", transpiler_standard_library_generate_abs},

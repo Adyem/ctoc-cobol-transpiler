@@ -1,7 +1,6 @@
-#include "transpiler_logging.hpp"
+#include "cblc_transpiler.hpp"
 
 #include "libft/Printf/printf.hpp"
-#include "transpiler_diagnostics.hpp"
 
 static int transpiler_logging_should_store(const t_transpiler_context *context, t_transpiler_severity severity)
 {

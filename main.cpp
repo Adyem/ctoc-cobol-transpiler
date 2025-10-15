@@ -2,16 +2,7 @@
 #include <filesystem>
 #include <system_error>
 
-#include "cblc_formatter.hpp"
-#include "parser.hpp"
-#include "runtime_file.hpp"
-#include "transpiler_cli.hpp"
-#include "transpiler_cblc.hpp"
-#include "transpiler_cobol_reverse.hpp"
-#include "transpiler_logging.hpp"
-#include "transpiler_pipeline.hpp"
-#include "transpiler_semantics.hpp"
-#include "transpiler_validation.hpp"
+#include "cblc_transpiler.hpp"
 #include "libft/CMA/CMA.hpp"
 #include "libft/Libft/libft.hpp"
 #include "libft/Printf/printf.hpp"

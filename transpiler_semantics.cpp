@@ -1,11 +1,11 @@
 #include <cstddef>
 
-#include "transpiler_semantics.hpp"
+#include "cblc_transpiler.hpp"
 
 #include "libft/CMA/CMA.hpp"
 #include "libft/Libft/libft.hpp"
 #include "libft/Printf/printf.hpp"
-#include "transpiler_logging.hpp"
+#include "cblc_transpiler.hpp"
 
 typedef enum e_transpiler_semantic_data_kind
 {
