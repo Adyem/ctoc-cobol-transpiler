@@ -19,3 +19,4 @@ samples/cblc/project_scheduler/project_scheduler_loader.cblc
 samples/cblc/project_scheduler/project_scheduler_metrics.cblc
 samples/cblc/project_scheduler/project_scheduler_presenter.cblc
 samples/cblc/project_scheduler/project_scheduler_main.cblc
+samples/cblc/example_project/hello_make_demo.cblc

@@ -663,6 +663,27 @@ function void main() {
 }
 ```
 
+### `samples/cblc/example_project/hello_make_demo.cblc`
+- **Purpose:** Provides a minimal end-to-end example that feeds into the standalone sample makefile, ensuring the quick start flow has a self-contained entrypoint.
+- **Constructs:** Global character buffer, helper functions that write to and display the buffer, and a `main` routine that orchestrates the calls.
+
+```cblc
+char greeting[32];
+
+function void initialize_greeting() {
+    greeting = "HELLO FROM CBL-C";
+}
+
+function void display_greeting() {
+    display(greeting);
+}
+
+function void main() {
+    initialize_greeting();
+    display_greeting();
+}
+```
+
 ## Maintenance Checklist
 
 1. Add a new `.cblc` file under `samples/cblc` when introducing language features that need sample coverage.
