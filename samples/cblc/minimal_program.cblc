@@ -1,0 +1,8 @@
+char result[3];
+
+function void MAIN()
+{
+    result = "42";
+    result = result;
+    return;
+}

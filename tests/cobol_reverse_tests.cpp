@@ -5,7 +5,10 @@
 #include "libft/Libft/libft.hpp"
 #include "test_suites.hpp"
 
-static int cobol_reverse_run_fixture(const char *cobol_path, const char *expected_path, const char *label)
+typedef int (*t_cobol_reverse_context_setup)(t_transpiler_context *context);
+
+static int cobol_reverse_run_fixture(const char *cobol_path, const char *expected_path,
+    const char *label, t_cobol_reverse_context_setup setup)
 {
     t_parser parser;
     t_ast_node *program;
@@ -70,6 +73,18 @@ static int cobol_reverse_run_fixture(const char *cobol_path, const char *expecte
     context_initialized = 1;
     transpiler_context_set_languages(&context, TRANSPILE_LANGUAGE_COBOL,
         TRANSPILE_LANGUAGE_CBL_C);
+    if (setup)
+    {
+        if (test_expect_success(setup(&context), label) != FT_SUCCESS)
+        {
+            if (context_initialized)
+                transpiler_context_dispose(&context);
+            ast_node_destroy(program);
+            if (output)
+                cma_free(output);
+            return (FT_FAILURE);
+        }
+    }
     if (test_expect_success(transpiler_cobol_program_to_cblc(&context, program, &output),
             label) != FT_SUCCESS)
     {
@@ -118,6 +133,39 @@ static int cobol_reverse_run_fixture(const char *cobol_path, const char *expecte
     return (FT_SUCCESS);
 }
 
+static int cobol_reverse_register_customer_status_copybook(t_transpiler_context *context)
+{
+    t_transpiler_copybook_item items[5];
+
+    if (!context)
+        return (FT_FAILURE);
+    ft_bzero(items, sizeof(items));
+    ft_strlcpy(items[0].name, "CUSTOMER-FLAG", sizeof(items[0].name));
+    items[0].kind = TRANSPILE_DATA_ITEM_ALPHANUMERIC;
+    items[0].declared_length = 1;
+    items[0].is_read_only = 0;
+    ft_strlcpy(items[1].name, "CUSTOMER-CODE", sizeof(items[1].name));
+    items[1].kind = TRANSPILE_DATA_ITEM_ALPHANUMERIC;
+    items[1].declared_length = 1;
+    items[1].is_read_only = 0;
+    ft_strlcpy(items[2].name, "CUSTOMER-NAME", sizeof(items[2].name));
+    items[2].kind = TRANSPILE_DATA_ITEM_ALPHANUMERIC;
+    items[2].declared_length = 32;
+    items[2].is_read_only = 0;
+    ft_strlcpy(items[3].name, "CUSTOMER-RATING", sizeof(items[3].name));
+    items[3].kind = TRANSPILE_DATA_ITEM_NUMERIC;
+    items[3].declared_length = 4;
+    items[3].is_read_only = 0;
+    ft_strlcpy(items[4].name, "CUSTOMER-BALANCE", sizeof(items[4].name));
+    items[4].kind = TRANSPILE_DATA_ITEM_FLOATING;
+    items[4].declared_length = 0;
+    items[4].is_read_only = 1;
+    if (transpiler_context_register_copybook(context, "CUSTOMER-STATUS", items,
+            sizeof(items) / sizeof(items[0])) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_cobol_reverse_fixtures)
 {
     /*
@@ -128,13 +176,26 @@ FT_TEST(test_cobol_reverse_fixtures)
     ** additional control flow constructs.
     */
     if (cobol_reverse_run_fixture("samples/cobol/reverse_constructs.cob",
-            "samples/cblc/reverse_constructs.cblc", "reverse_constructs") != FT_SUCCESS)
+            "samples/cblc/reverse_constructs.cblc", "reverse_constructs", NULL) != FT_SUCCESS)
         return (FT_FAILURE);
     if (cobol_reverse_run_fixture("samples/cobol/reverse_normalization.cob",
-            "samples/cblc/reverse_normalization.cblc", "reverse_normalization") != FT_SUCCESS)
+            "samples/cblc/reverse_normalization.cblc", "reverse_normalization", NULL) != FT_SUCCESS)
         return (FT_FAILURE);
     if (cobol_reverse_run_fixture("samples/cobol/reverse_control_flow.cob",
-            "samples/cblc/reverse_control_flow.cblc", "reverse_control_flow") != FT_SUCCESS)
+            "samples/cblc/reverse_control_flow.cblc", "reverse_control_flow", NULL) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_reverse_run_fixture("samples/cobol/reverse_numeric_scalars.cob",
+            "samples/cblc/reverse_numeric_scalars.cblc", "reverse_numeric_scalars", NULL) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_reverse_run_fixture("samples/cobol/reverse_group_items.cob",
+            "samples/cblc/reverse_group_items.cblc", "reverse_group_items", NULL) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_reverse_run_fixture("samples/cobol/reverse_value_defaults.cob",
+            "samples/cblc/reverse_value_defaults.cblc", "reverse_value_defaults", NULL) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_reverse_run_fixture("samples/cobol/reverse_copybook.cob",
+            "samples/cblc/reverse_copybook.cblc", "reverse_copybook",
+            cobol_reverse_register_customer_status_copybook) != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }

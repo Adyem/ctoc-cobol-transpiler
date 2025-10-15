@@ -7,6 +7,10 @@ COBOL paragraphs, and every sample includes a `function void main()` entrypoint 
 
 ## Sample Coverage
 
+### `samples/cblc/minimal_program.cblc`
+- **Purpose:** Mirrors the COBOL minimal program so the reverse pipeline has a trivially round-trippable example.
+- **Constructs:** A single global buffer, `function void MAIN()` entrypoint, literal assignment, and explicit `return;` statement.
+
 ### `samples/cblc/copy_file.cblc`
 - **Purpose:** Demonstrates the baseline file copy loop used throughout the design doc and ensures the runtime string buffer path
   is represented in fixtures.
@@ -189,10 +193,14 @@ function void main() {
 ### `samples/cblc/reverse_constructs.cblc`
 - **Purpose:** Serves as the golden CBL-C output for the reverse emitter integration test that exercises COBOL control flow and
   file I/O recovery.
-- **Constructs:** Uppercase identifier normalization, `open`/`close` pairs, negated `while` loops, nested `if`/`else` blocks,
-  `read` statements that capture buffers, and `write` calls forwarding the recovered record.
+- **Constructs:** Boolean and buffer declarations recovered from WORKING-STORAGE, uppercase identifier normalization,
+  `open`/`close` pairs, negated `while` loops, nested `if`/`else` blocks, `read` statements that capture buffers, and `write`
+  calls forwarding the recovered record.
 
 ```cblc
+bool EOF_FLAG = false;
+char OUTPUT_RECORD[1];
+
 function void MAIN() {
     open(INPUT_FILE, "r");
     while (!(EOF_FLAG == true)) {
@@ -211,10 +219,15 @@ function void MAIN() {
 ### `samples/cblc/reverse_normalization.cblc`
 - **Purpose:** Captures the expected normalized output when COBOL paragraphs include lowercase identifiers, leading-zero
   numerics, and inconsistent spacing.
-- **Constructs:** Multiple `function` blocks separated by a single blank line, uppercase identifier emission with collapsed
-  underscores, canonical numeric literals, and normalized string literal quoting.
+- **Constructs:** Multiple `function` blocks separated by a single blank line, recovered integer/boolean/buffer declarations
+  from WORKING-STORAGE, uppercase identifier emission with collapsed underscores, canonical numeric literals, and normalized
+  string literal quoting.
 
 ```cblc
+int RUNNING_TOTAL_VALUE = 5;
+bool STATUS_FLAG = false;
+char SCRATCH_NOTE[12] = "raw value";
+
 function void ENTRY_PARAGRAPH() {
     SCRATCH_NOTE = "mixED Case value";
     RUNNING_TOTAL_VALUE = 0;
@@ -232,11 +245,17 @@ function void NORMALIZE_VALUES() {
 ### `samples/cblc/reverse_control_flow.cblc`
 - **Purpose:** Locks down the recovered CBL-C for nested conditionals and loops so the reverse emitter preserves complex
   control-flow structure.
-- **Constructs:** `if` statements with negated conditions, `while` loops sourced from `PERFORM UNTIL` and `PERFORM VARYING`,
-  literal sentinel assignments that mirror COBOL `MOVE` updates, numeric output routed through `display`, and trailing
-  `return ;` statements for each recovered function.
+- **Constructs:** Flag and counter declarations reconstructed from WORKING-STORAGE, `if` statements with negated conditions,
+  `while` loops sourced from `PERFORM UNTIL` and `PERFORM VARYING`, literal sentinel assignments that mirror COBOL `MOVE`
+  updates, numeric output routed through `display`, and trailing `return ;` statements for each recovered function.
 
 ```cblc
+bool CONTROL_FLAG = false;
+int PROGRESS_METER = 0;
+int PROGRESS_LIMIT = 10;
+int PROGRESS_INDEX = 0;
+int OUTPUT_VALUE = 0;
+
 function void MAIN() {
     if (!(CONTROL_FLAG == true)) {
         while (!(PROGRESS_METER > PROGRESS_LIMIT)) {
@@ -256,6 +275,77 @@ function void MAIN() {
 
 function void NEXT_PARAGRAPH() {
     CONTROL_FLAG = true;
+    return ;
+}
+```
+
+### `samples/cblc/reverse_numeric_scalars.cblc`
+- **Purpose:** Demonstrates how the reverse emitter now lifts decimal `PIC S9V9(n)` declarations into floating-point CBL-C
+  variables while preserving wider precision as `double` and promotes single-character status indicators to booleans.
+- **Constructs:** Mixed numeric declarations including recovered `float`/`double` scalars, integer counters, suffix-based
+  boolean detection (`STATUS-IND`), literal `MOVE` statements converted into assignments, and canonical paragraph emission with
+  trailing `return ;`.
+
+```cblc
+float FLOAT_APPROX = 0;
+double DOUBLE_APPROX = 0;
+int BINARY_COUNT = 0;
+int PACKED_TOTAL = 0;
+bool STATUS_IND = false;
+
+function void MAIN() {
+    FLOAT_APPROX = 1;
+    DOUBLE_APPROX = 100;
+    BINARY_COUNT = 10;
+    PACKED_TOTAL = 42;
+    STATUS_IND = true;
+    return ;
+}
+```
+
+### `samples/cblc/reverse_group_items.cblc`
+- **Purpose:** Locks down recovery of COBOL level 01 group items by asserting that the reverse emitter produces a `record`
+  declaration, mirrors the group variable, and still surfaces each subordinate field as an addressable scalar for existing
+  procedure logic.
+- **Constructs:** A generated `record` with alphanumeric and numeric members, the mirrored group variable, standalone scalars
+  (including a retained VALUE clause initializer), and assignments that populate the recovered fields inside `function void
+  MAIN()`.
+
+### `samples/cblc/reverse_value_defaults.cblc`
+- **Purpose:** Highlights how VALUE clauses on supported WORKING-STORAGE scalars become direct initializers in the generated
+  CBL-C so default state matches the COBOL source.
+- **Constructs:** Boolean flag initialization recovered from a single-character literal, integer and floating-point defaults,
+  alphanumeric buffer expansion with a string initializer, and the empty `function void MAIN()` stub emitted for passive
+  storage declarations.
+
+```cblc
+bool START_FLAG = true;
+int CUSTOMER_COUNT = 12;
+float DISCOUNT_RATE = 1.25;
+char STATUS_MESSAGE[12] = "READY";
+
+function void MAIN() {
+    return ;
+}
+```
+
+### `samples/cblc/reverse_copybook.cblc`
+- **Purpose:** Demonstrates how the reverse emitter expands registered `COPY` books and keeps single-character codes as scalars
+  while preserving buffer-style identifiers as arrays.
+- **Constructs:** Leading comment for the originating `COPY` directive, boolean and character scalars, fixed-length buffers,
+  numeric and floating-point fields, and an empty `function void MAIN()` body that mirrors the COBOL stub.
+
+```cblc
+/* COPY CUSTOMER-STATUS */
+bool CUSTOMER_FLAG;
+char CUSTOMER_CODE;
+char CUSTOMER_NAME[32];
+int CUSTOMER_RATING;
+const double CUSTOMER_BALANCE;
+char STATE_CODE = "A";
+char BUFFER_NAME[8];
+
+function void MAIN() {
     return ;
 }
 ```
@@ -663,30 +753,23 @@ function void main() {
 }
 ```
 
-### `samples/cblc/example_project/hello_make_demo.cblc`
+### `samples/example_project/hello_make_demo.cblc`
 - **Purpose:** Provides a minimal end-to-end example that feeds into the standalone sample makefile, ensuring the quick start flow has a self-contained entrypoint.
-- **Constructs:** Global character buffer, helper functions that write to and display the buffer, and a `main` routine that orchestrates the calls.
+- **Constructs:** Global character buffer, a `main` routine that assigns a literal, emits a `display` call, and terminates with an explicit `return;`.
 
 ```cblc
 char greeting[32];
 
-function void initialize_greeting() {
-    greeting = "HELLO FROM CBL-C";
-}
-
-function void display_greeting() {
-    display(greeting);
-}
-
 function void main() {
-    initialize_greeting();
-    display_greeting();
+    greeting = "HELLO FROM CBL-C";
+    display(greeting);
+    return;
 }
 ```
 
 ## Maintenance Checklist
 
-1. Add a new `.cblc` file under `samples/cblc` when introducing language features that need sample coverage.
+1. Add a new `.cblc` file under `samples/cblc` when introducing language features that need sample coverage. (The hello make demo lives alongside its makefile in `samples/example_project`.)
 2. Append the file path to `samples/cblc/manifest.txt` so tooling and tests can locate the new example.
 3. Update this document with a short description and construct summary so downstream contributors understand what the sample is
    intended to cover.

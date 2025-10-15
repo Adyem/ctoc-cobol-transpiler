@@ -11,7 +11,7 @@ COBC ?= cobc
 BUILD_DIR := build
 SETUP_SENTINEL := $(BUILD_DIR)/.environment_ready
 PROGRAM_NAME := hello_make_demo
-CBLC_SRC := $(REPO_ROOT)/samples/cblc/example_project/$(PROGRAM_NAME).cblc
+CBLC_SRC := $(abspath $(PROGRAM_NAME).cblc)
 COB_OUTPUT := $(BUILD_DIR)/$(PROGRAM_NAME).cob
 EXECUTABLE := $(BUILD_DIR)/$(PROGRAM_NAME)$(EXE_EXT)
 

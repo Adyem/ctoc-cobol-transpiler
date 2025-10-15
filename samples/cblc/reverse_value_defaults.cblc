@@ -1,0 +1,8 @@
+bool START_FLAG = true;
+int CUSTOMER_COUNT = 12;
+float DISCOUNT_RATE = 1.25;
+char STATUS_MESSAGE[12] = "READY";
+
+function void MAIN() {
+    return ;
+}

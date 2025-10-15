@@ -17,12 +17,12 @@
        PROCEDURE DIVISION.
 MAIN.
            OPEN INPUT INPUT-FILE.
-           PERFORM UNTIL EOF-FLAG == 'Y'
+           PERFORM UNTIL EOF-FLAG = 'Y'
                READ INPUT-FILE
                    AT END
                        MOVE 'Y' TO EOF-FLAG
                    NOT AT END
-                       IF RECORD-STATUS == "A"
+                       IF RECORD-STATUS = "A"
                            ADD 1 TO ACCEPTED-COUNT
                            ADD RECORD-AMOUNT TO TOTAL-AMOUNT
                        END-IF

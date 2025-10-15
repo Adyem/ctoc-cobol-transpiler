@@ -11,7 +11,7 @@ FT_TEST(test_cobol_transpiled_reverse_control_flow_fixture_contains_expected_sec
     path = "samples/cobol/reverse_control_flow.cob";
     if (test_cobol_fixture_contains(path, "PROGRAM-ID. REVERSE-CONTROL-FLOW.") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_cobol_fixture_contains(path, "IF NOT CONTROL-FLAG == 'Y'") != FT_SUCCESS)
+    if (test_cobol_fixture_contains(path, "IF NOT CONTROL-FLAG = 'Y'") != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_cobol_fixture_contains(path, "PERFORM UNTIL PROGRESS-METER > PROGRESS-LIMIT") != FT_SUCCESS)
         return (FT_FAILURE);
@@ -51,7 +51,7 @@ FT_TEST(test_cobol_transpiled_reverse_control_flow_matches_expected_text)
         "       01 OUTPUT-VALUE PIC 9(4) VALUE 0000.\n"
         "       PROCEDURE DIVISION.\n"
         "MAIN.\n"
-        "       IF NOT CONTROL-FLAG == 'Y'\n"
+        "       IF NOT CONTROL-FLAG = 'Y'\n"
         "           PERFORM UNTIL PROGRESS-METER > PROGRESS-LIMIT\n"
         "               MOVE 11 TO PROGRESS-METER\n"
         "           END-PERFORM\n"

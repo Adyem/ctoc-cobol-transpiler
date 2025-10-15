@@ -19,7 +19,7 @@ MAIN.
        IF NATIONAL-TOTAL > 5250000000
            MOVE 'Y' TO EXCEEDED-LIMIT
        END-IF.
-       IF EXCEEDED-LIMIT == 'Y'
+       IF EXCEEDED-LIMIT = 'Y'
            DISPLAY "LIMIT EXCEEDED"
        ELSE
            DISPLAY "LIMIT OK"

@@ -1,5 +1,7 @@
 #include "transpiler_cobol_reverse.hpp"
 
+#include <cstddef>
+
 #include "libft/CMA/CMA.hpp"
 #include "libft/Libft/libft.hpp"
 #include "libft/Printf/printf.hpp"
@@ -11,6 +13,34 @@ typedef struct s_cblc_builder
     size_t length;
     size_t capacity;
 }   t_cblc_builder;
+
+static const char *g_cobol_reverse_flag_suffixes[] = {
+    "FLAG",
+    "SWITCH",
+    "IND",
+    "INDICATOR",
+    "BOOL",
+    "BOOLEAN",
+    NULL
+};
+
+static const char *g_cobol_reverse_character_array_markers[] = {
+    "BUFFER",
+    "RECORD",
+    "FIELD",
+    "AREA",
+    "TABLE",
+    "TEXT",
+    "LINE",
+    "NAME",
+    "KEY",
+    "VALUE",
+    NULL
+};
+
+static int cobol_reverse_identifier_token_is_flag(const t_lexer_token *token);
+static int cobol_reverse_identifier_token_matches_any_marker(const t_lexer_token *token,
+    const char **markers);
 
 static void cblc_builder_init(t_cblc_builder *builder)
 {
@@ -87,6 +117,45 @@ static int cblc_builder_append_char(t_cblc_builder *builder, char value)
     builder->length += 1;
     builder->data[builder->length] = '\0';
     return (FT_SUCCESS);
+}
+
+static int cblc_builder_append_unsigned(t_cblc_builder *builder, unsigned long long value)
+{
+    char digits[32];
+    size_t index;
+    size_t left;
+    size_t right;
+
+    if (!builder)
+        return (FT_FAILURE);
+    index = 0;
+    while (value > 0 && index < sizeof(digits))
+    {
+        digits[index] = static_cast<char>('0' + (value % 10));
+        value /= 10;
+        index += 1;
+    }
+    if (index == 0)
+    {
+        digits[index] = '0';
+        index += 1;
+    }
+    left = 0;
+    if (index > 0)
+    {
+        right = index - 1;
+        while (left < right)
+        {
+            char temp;
+
+            temp = digits[left];
+            digits[left] = digits[right];
+            digits[right] = temp;
+            left += 1;
+            right -= 1;
+        }
+    }
+    return (cblc_builder_append_span(builder, digits, index));
 }
 
 static int cblc_builder_append_newline(t_cblc_builder *builder)
@@ -297,7 +366,8 @@ static const char *cobol_reverse_boolean_from_string_literal(const t_lexer_token
     return (NULL);
 }
 
-static int cobol_reverse_append_string_literal(t_cblc_builder *builder, const t_lexer_token *token)
+static int cobol_reverse_append_string_literal(t_cblc_builder *builder,
+    const t_lexer_token *token, int allow_boolean_coercion)
 {
     size_t index;
     const char *boolean_text;
@@ -306,9 +376,12 @@ static int cobol_reverse_append_string_literal(t_cblc_builder *builder, const t_
         return (FT_FAILURE);
     if (!token)
         return (FT_FAILURE);
-    boolean_text = cobol_reverse_boolean_from_string_literal(token);
-    if (boolean_text)
-        return (cblc_builder_append_string(builder, boolean_text));
+    if (allow_boolean_coercion)
+    {
+        boolean_text = cobol_reverse_boolean_from_string_literal(token);
+        if (boolean_text)
+            return (cblc_builder_append_string(builder, boolean_text));
+    }
     if (token->length < 2)
         return (FT_FAILURE);
     if (cblc_builder_append_char(builder, '"') != FT_SUCCESS)
@@ -391,7 +464,7 @@ static int cobol_reverse_append_value(t_cblc_builder *builder, const t_ast_node 
     if (node->kind == AST_NODE_LITERAL)
     {
         if (node->token.kind == LEXER_TOKEN_STRING_LITERAL)
-            return (cobol_reverse_append_string_literal(builder, &node->token));
+            return (cobol_reverse_append_string_literal(builder, &node->token, 1));
         if (node->token.kind == LEXER_TOKEN_NUMERIC_LITERAL)
             return (cobol_reverse_append_numeric_literal(builder, &node->token));
         if (node->token.kind == LEXER_TOKEN_KEYWORD_TRUE)
@@ -400,6 +473,651 @@ static int cobol_reverse_append_value(t_cblc_builder *builder, const t_ast_node 
             return (cblc_builder_append_string(builder, "false"));
     }
     return (FT_FAILURE);
+}
+
+typedef enum e_cobol_reverse_picture_kind
+{
+    COBOL_REVERSE_PICTURE_UNKNOWN = 0,
+    COBOL_REVERSE_PICTURE_ALPHANUMERIC,
+    COBOL_REVERSE_PICTURE_NUMERIC
+}   t_cobol_reverse_picture_kind;
+
+typedef enum e_cobol_reverse_usage_kind
+{
+    COBOL_REVERSE_USAGE_UNKNOWN = 0,
+    COBOL_REVERSE_USAGE_DISPLAY,
+    COBOL_REVERSE_USAGE_COMP,
+    COBOL_REVERSE_USAGE_COMP_1,
+    COBOL_REVERSE_USAGE_COMP_2,
+    COBOL_REVERSE_USAGE_COMP_3,
+    COBOL_REVERSE_USAGE_COMP_5
+}   t_cobol_reverse_usage_kind;
+
+typedef struct s_cobol_reverse_picture
+{
+    t_cobol_reverse_picture_kind kind;
+    size_t length;
+    size_t fractional_length;
+    int is_signed;
+    t_cobol_reverse_usage_kind usage;
+}   t_cobol_reverse_picture;
+
+typedef struct s_cobol_reverse_data_item_info
+{
+    const t_ast_node *level_node;
+    const t_ast_node *name_node;
+    const t_ast_node *picture_node;
+    const t_ast_node *value_node;
+}   t_cobol_reverse_data_item_info;
+
+typedef struct s_cobol_reverse_scalar_metadata
+{
+    const char *type_text;
+    int is_array;
+    size_t array_length;
+    int is_boolean_type;
+}   t_cobol_reverse_scalar_metadata;
+
+static void cobol_reverse_skip_spaces(const char *text, size_t length, size_t *index)
+{
+    if (!text)
+        return ;
+    if (!index)
+        return ;
+    if (*index >= length)
+        return ;
+    while (*index < length
+        && ft_isspace(static_cast<unsigned char>(text[*index])))
+        *index += 1;
+}
+
+static int cobol_reverse_parse_repeat(const char *text, size_t length, size_t *index, size_t *out_repeat)
+{
+    unsigned long long value;
+
+    if (!text || !index || !out_repeat)
+        return (FT_FAILURE);
+    if (*index >= length)
+        return (FT_FAILURE);
+    cobol_reverse_skip_spaces(text, length, index);
+    if (*index >= length)
+        return (FT_FAILURE);
+    if (!ft_isdigit(static_cast<unsigned char>(text[*index])))
+        return (FT_FAILURE);
+    value = 0;
+    while (*index < length && ft_isdigit(static_cast<unsigned char>(text[*index])))
+    {
+        value = (value * 10) + static_cast<unsigned long long>(text[*index] - '0');
+        if (value > SIZE_MAX)
+            return (FT_FAILURE);
+        *index += 1;
+    }
+    cobol_reverse_skip_spaces(text, length, index);
+    if (*index >= length)
+        return (FT_FAILURE);
+    if (text[*index] != ')')
+        return (FT_FAILURE);
+    *index += 1;
+    if (value == 0)
+        return (FT_FAILURE);
+    *out_repeat = static_cast<size_t>(value);
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_parse_usage_keyword(const char *text,
+    t_cobol_reverse_picture *out_picture)
+{
+    if (!text || !out_picture)
+        return (FT_FAILURE);
+    if (ft_strcmp(text, "USAGE") == 0)
+        return (FT_SUCCESS);
+    if (ft_strcmp(text, "DISPLAY") == 0)
+    {
+        out_picture->usage = COBOL_REVERSE_USAGE_DISPLAY;
+        return (FT_SUCCESS);
+    }
+    if (ft_strcmp(text, "COMP-1") == 0
+        || ft_strcmp(text, "COMPUTATIONAL-1") == 0)
+    {
+        out_picture->usage = COBOL_REVERSE_USAGE_COMP_1;
+        return (FT_SUCCESS);
+    }
+    if (ft_strcmp(text, "COMP-2") == 0
+        || ft_strcmp(text, "COMPUTATIONAL-2") == 0)
+    {
+        out_picture->usage = COBOL_REVERSE_USAGE_COMP_2;
+        return (FT_SUCCESS);
+    }
+    if (ft_strcmp(text, "COMP-3") == 0
+        || ft_strcmp(text, "COMPUTATIONAL-3") == 0)
+    {
+        out_picture->usage = COBOL_REVERSE_USAGE_COMP_3;
+        return (FT_SUCCESS);
+    }
+    if (ft_strcmp(text, "COMP-5") == 0
+        || ft_strcmp(text, "COMPUTATIONAL-5") == 0
+        || ft_strcmp(text, "BINARY") == 0)
+    {
+        out_picture->usage = COBOL_REVERSE_USAGE_COMP_5;
+        return (FT_SUCCESS);
+    }
+    if (ft_strcmp(text, "COMP") == 0
+        || ft_strcmp(text, "COMPUTATIONAL") == 0)
+    {
+        out_picture->usage = COBOL_REVERSE_USAGE_COMP;
+        return (FT_SUCCESS);
+    }
+    if (ft_strcmp(text, "SIGN") == 0)
+        return (FT_SUCCESS);
+    if (ft_strcmp(text, "IS") == 0)
+        return (FT_SUCCESS);
+    if (ft_strcmp(text, "LEADING") == 0)
+        return (FT_SUCCESS);
+    if (ft_strcmp(text, "TRAILING") == 0)
+        return (FT_SUCCESS);
+    if (ft_strcmp(text, "SEPARATE") == 0)
+        return (FT_SUCCESS);
+    return (FT_FAILURE);
+}
+
+static int cobol_reverse_parse_picture(const t_ast_node *picture, t_cobol_reverse_picture *out_picture)
+{
+    const char *text;
+    size_t length;
+    size_t index;
+    char normalized;
+    char last_symbol;
+    int last_symbol_fractional;
+    int decimal_section;
+
+    if (!picture || !out_picture)
+        return (FT_FAILURE);
+    ft_bzero(out_picture, sizeof(*out_picture));
+    out_picture->kind = COBOL_REVERSE_PICTURE_UNKNOWN;
+    out_picture->length = 0;
+    out_picture->fractional_length = 0;
+    out_picture->is_signed = 0;
+    out_picture->usage = COBOL_REVERSE_USAGE_UNKNOWN;
+    text = picture->token.lexeme;
+    length = picture->token.length;
+    if (!text)
+        return (FT_FAILURE);
+    index = 0;
+    cobol_reverse_skip_spaces(text, length, &index);
+    if (index < length && (text[index] == 's' || text[index] == 'S'))
+    {
+        out_picture->is_signed = 1;
+        index += 1;
+    }
+    cobol_reverse_skip_spaces(text, length, &index);
+    last_symbol = 0;
+    last_symbol_fractional = 0;
+    decimal_section = 0;
+    while (index < length)
+    {
+        char value;
+
+        value = text[index];
+        if (ft_isspace(static_cast<unsigned char>(value)))
+        {
+            index += 1;
+            continue ;
+        }
+        if (value == '(')
+        {
+            size_t repeat;
+
+            if (last_symbol == 0)
+                return (FT_FAILURE);
+            index += 1;
+            if (cobol_reverse_parse_repeat(text, length, &index, &repeat) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (repeat == 0)
+                return (FT_FAILURE);
+            repeat -= 1;
+            if (last_symbol_fractional)
+            {
+                if (out_picture->fractional_length > SIZE_MAX - repeat)
+                    return (FT_FAILURE);
+                out_picture->fractional_length += repeat;
+            }
+            else if (last_symbol == 'X')
+            {
+                if (out_picture->length > SIZE_MAX - repeat)
+                    return (FT_FAILURE);
+                out_picture->length += repeat;
+            }
+            else
+            {
+                if (out_picture->length > SIZE_MAX - repeat)
+                    return (FT_FAILURE);
+                out_picture->length += repeat;
+            }
+            continue ;
+        }
+        normalized = value;
+        if (normalized >= 'a' && normalized <= 'z')
+            normalized = static_cast<char>(normalized - ('a' - 'A'));
+        if (normalized == 'V' || normalized == '.')
+        {
+            if (out_picture->kind == COBOL_REVERSE_PICTURE_UNKNOWN)
+                out_picture->kind = COBOL_REVERSE_PICTURE_NUMERIC;
+            else if (out_picture->kind != COBOL_REVERSE_PICTURE_NUMERIC)
+                return (FT_FAILURE);
+            decimal_section = 1;
+            last_symbol = 'V';
+            last_symbol_fractional = 0;
+            index += 1;
+            continue ;
+        }
+        if (normalized == 'X' || normalized == 'A')
+        {
+            if (out_picture->kind == COBOL_REVERSE_PICTURE_UNKNOWN)
+                out_picture->kind = COBOL_REVERSE_PICTURE_ALPHANUMERIC;
+            else if (out_picture->kind != COBOL_REVERSE_PICTURE_ALPHANUMERIC)
+                return (FT_FAILURE);
+            if (out_picture->length == SIZE_MAX)
+                return (FT_FAILURE);
+            out_picture->length += 1;
+            last_symbol = 'X';
+            last_symbol_fractional = 0;
+            index += 1;
+            continue ;
+        }
+        if (normalized == '9')
+        {
+            if (out_picture->kind == COBOL_REVERSE_PICTURE_UNKNOWN)
+                out_picture->kind = COBOL_REVERSE_PICTURE_NUMERIC;
+            else if (out_picture->kind != COBOL_REVERSE_PICTURE_NUMERIC)
+                return (FT_FAILURE);
+            if (decimal_section)
+            {
+                if (out_picture->fractional_length == SIZE_MAX)
+                    return (FT_FAILURE);
+                out_picture->fractional_length += 1;
+                last_symbol_fractional = 1;
+            }
+            else
+            {
+                if (out_picture->length == SIZE_MAX)
+                    return (FT_FAILURE);
+                out_picture->length += 1;
+                last_symbol_fractional = 0;
+            }
+            last_symbol = '9';
+            index += 1;
+            continue ;
+        }
+        if ((normalized >= 'A' && normalized <= 'Z')
+            || (normalized == '-' && last_symbol != 0))
+        {
+            size_t word_start;
+            size_t word_end;
+            size_t word_length;
+            char *keyword;
+            size_t keyword_index;
+
+            word_start = index;
+            word_end = index;
+            while (word_end < length)
+            {
+                char symbol;
+
+                symbol = text[word_end];
+                if ((symbol >= 'A' && symbol <= 'Z')
+                    || (symbol >= 'a' && symbol <= 'z')
+                    || (symbol >= '0' && symbol <= '9')
+                    || symbol == '-')
+                {
+                    word_end += 1;
+                    continue ;
+                }
+                break ;
+            }
+            if (word_end <= word_start)
+                return (FT_FAILURE);
+            word_length = word_end - word_start;
+            keyword = static_cast<char *>(cma_calloc(word_length + 1, sizeof(char)));
+            if (!keyword)
+                return (FT_FAILURE);
+            keyword_index = 0;
+            while (keyword_index < word_length)
+            {
+                char symbol;
+
+                symbol = text[word_start + keyword_index];
+                if (symbol >= 'a' && symbol <= 'z')
+                    symbol = static_cast<char>(symbol - ('a' - 'A'));
+                keyword[keyword_index] = symbol;
+                keyword_index += 1;
+            }
+            keyword[word_length] = '\0';
+            if (cobol_reverse_parse_usage_keyword(keyword, out_picture) != FT_SUCCESS)
+            {
+                cma_free(keyword);
+                return (FT_FAILURE);
+            }
+            cma_free(keyword);
+            index = word_end;
+            last_symbol = 0;
+            last_symbol_fractional = 0;
+            continue ;
+        }
+        return (FT_FAILURE);
+    }
+    if (out_picture->kind == COBOL_REVERSE_PICTURE_UNKNOWN)
+        return (FT_FAILURE);
+    if (out_picture->kind == COBOL_REVERSE_PICTURE_ALPHANUMERIC
+        && out_picture->length == 0)
+        out_picture->length = 1;
+    if (out_picture->kind == COBOL_REVERSE_PICTURE_NUMERIC
+        && out_picture->length == 0 && out_picture->fractional_length == 0)
+        return (FT_FAILURE);
+    if (out_picture->usage == COBOL_REVERSE_USAGE_UNKNOWN)
+        out_picture->usage = COBOL_REVERSE_USAGE_DISPLAY;
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_collect_data_item_info(const t_ast_node *item,
+    t_cobol_reverse_data_item_info *out_info)
+{
+    size_t index;
+
+    if (!item || !out_info)
+        return (FT_FAILURE);
+    ft_bzero(out_info, sizeof(*out_info));
+    index = 0;
+    while (index < ast_node_child_count(item))
+    {
+        const t_ast_node *child;
+
+        child = ast_node_get_child(item, index);
+        if (child)
+        {
+            if (child->kind == AST_NODE_LITERAL && !out_info->level_node)
+                out_info->level_node = child;
+            else if (child->kind == AST_NODE_IDENTIFIER && !out_info->name_node)
+                out_info->name_node = child;
+            else if (child->kind == AST_NODE_PICTURE_CLAUSE && !out_info->picture_node)
+                out_info->picture_node = child;
+            else if (child->kind == AST_NODE_VALUE_CLAUSE && !out_info->value_node)
+                out_info->value_node = child;
+        }
+        index += 1;
+    }
+    if (!out_info->level_node || !out_info->name_node)
+        return (FT_FAILURE);
+    if (!out_info->level_node->token.lexeme || !out_info->name_node->token.lexeme)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_get_data_item_level(const t_cobol_reverse_data_item_info *info,
+    long *out_level)
+{
+    long level;
+
+    if (!info || !out_level)
+        return (FT_FAILURE);
+    if (!info->level_node || !info->level_node->token.lexeme)
+        return (FT_FAILURE);
+    level = ft_atol(info->level_node->token.lexeme);
+    *out_level = level;
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_infer_scalar_metadata(t_transpiler_context *context,
+    const t_ast_node *name_node, const t_cobol_reverse_picture *picture,
+    const char *error_message, t_cobol_reverse_scalar_metadata *out_metadata)
+{
+    const char *type_text;
+    int is_array;
+    size_t array_length;
+    int is_boolean_type;
+
+    if (!name_node || !picture || !out_metadata)
+        return (FT_FAILURE);
+    ft_bzero(out_metadata, sizeof(*out_metadata));
+    type_text = NULL;
+    is_array = 0;
+    array_length = 0;
+    is_boolean_type = 0;
+    if (picture->kind == COBOL_REVERSE_PICTURE_NUMERIC)
+    {
+        size_t integer_digits;
+        size_t fractional_digits;
+        size_t total_digits;
+
+        integer_digits = picture->length;
+        fractional_digits = picture->fractional_length;
+        total_digits = integer_digits + fractional_digits;
+        if (picture->usage == COBOL_REVERSE_USAGE_COMP_1)
+            type_text = "float";
+        else if (picture->usage == COBOL_REVERSE_USAGE_COMP_2)
+            type_text = "double";
+        else if (fractional_digits > 0)
+        {
+            if (total_digits <= 9)
+                type_text = "float";
+            else
+                type_text = "double";
+        }
+        else
+        {
+            if (integer_digits <= 9)
+                type_text = "int";
+            else
+                type_text = "long long";
+        }
+    }
+    else if (picture->kind == COBOL_REVERSE_PICTURE_ALPHANUMERIC)
+    {
+        int treat_as_flag;
+        int treat_as_buffer;
+
+        treat_as_flag = 0;
+        treat_as_buffer = 0;
+        if (picture->length <= 1)
+        {
+            treat_as_flag = cobol_reverse_identifier_token_is_flag(&name_node->token);
+            treat_as_buffer = cobol_reverse_identifier_token_matches_any_marker(&name_node->token,
+                    g_cobol_reverse_character_array_markers);
+            if (treat_as_flag)
+                type_text = "bool";
+            else
+            {
+                type_text = "char";
+                if (treat_as_buffer)
+                {
+                    is_array = 1;
+                    array_length = picture->length;
+                    if (array_length == 0)
+                        array_length = 1;
+                }
+            }
+        }
+        else
+        {
+            type_text = "char";
+            is_array = 1;
+            array_length = picture->length;
+            if (array_length == 0)
+                array_length = 1;
+        }
+    }
+    if (!type_text)
+    {
+        if (context && error_message)
+            cobol_reverse_emit_error(context, error_message);
+        return (FT_FAILURE);
+    }
+    if (ft_strcmp(type_text, "bool") == 0)
+        is_boolean_type = 1;
+    out_metadata->type_text = type_text;
+    out_metadata->is_array = is_array;
+    out_metadata->array_length = array_length;
+    out_metadata->is_boolean_type = is_boolean_type;
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_identifier_has_suffix(const t_lexer_token *token, const char *suffix)
+{
+    t_cblc_builder builder;
+    size_t suffix_length;
+    size_t index;
+    size_t suffix_index;
+
+    if (!token || !suffix)
+        return (0);
+    suffix_length = ft_strlen(suffix);
+    if (suffix_length == 0)
+        return (0);
+    cblc_builder_init(&builder);
+    if (cobol_reverse_append_identifier(&builder, token) != FT_SUCCESS)
+    {
+        cblc_builder_dispose(&builder);
+        return (0);
+    }
+    if (builder.length < suffix_length)
+    {
+        cblc_builder_dispose(&builder);
+        return (0);
+    }
+    index = builder.length;
+    suffix_index = suffix_length;
+    while (suffix_index > 0)
+    {
+        char identifier_char;
+        char suffix_char;
+
+        identifier_char = builder.data[index - 1];
+        suffix_char = suffix[suffix_index - 1];
+        if (suffix_char >= 'a' && suffix_char <= 'z')
+            suffix_char = static_cast<char>(suffix_char - ('a' - 'A'));
+        if (suffix_char >= 'A' && suffix_char <= 'Z')
+        {
+            if (identifier_char != suffix_char)
+            {
+                cblc_builder_dispose(&builder);
+                return (0);
+            }
+        }
+        else
+        {
+            if (identifier_char != suffix_char)
+            {
+                cblc_builder_dispose(&builder);
+                return (0);
+            }
+        }
+        index -= 1;
+        suffix_index -= 1;
+    }
+    if (index > 0)
+    {
+        char preceding;
+
+        preceding = builder.data[index - 1];
+        if ((preceding >= 'A' && preceding <= 'Z')
+            || (preceding >= '0' && preceding <= '9'))
+        {
+            cblc_builder_dispose(&builder);
+            return (0);
+        }
+    }
+    cblc_builder_dispose(&builder);
+    return (1);
+}
+
+static int cobol_reverse_identifier_token_matches_any_marker(const t_lexer_token *token,
+    const char **markers)
+{
+    t_cblc_builder builder;
+    size_t marker_index;
+    int result;
+
+    if (!token || !markers)
+        return (0);
+    cblc_builder_init(&builder);
+    if (cobol_reverse_append_identifier(&builder, token) != FT_SUCCESS)
+    {
+        cblc_builder_dispose(&builder);
+        return (0);
+    }
+    if (!builder.data)
+    {
+        cblc_builder_dispose(&builder);
+        return (0);
+    }
+    result = 0;
+    marker_index = 0;
+    while (markers[marker_index])
+    {
+        size_t marker_length;
+        size_t haystack_index;
+
+        marker_length = ft_strlen(markers[marker_index]);
+        if (marker_length == 0)
+        {
+            marker_index += 1;
+            continue ;
+        }
+        haystack_index = 0;
+        while (haystack_index + marker_length <= builder.length)
+        {
+            if (ft_strncmp(builder.data + haystack_index, markers[marker_index], marker_length) == 0)
+            {
+                result = 1;
+                break ;
+            }
+            haystack_index += 1;
+        }
+        if (result)
+            break ;
+        marker_index += 1;
+    }
+    cblc_builder_dispose(&builder);
+    return (result);
+}
+
+static int cobol_reverse_identifier_text_matches_any_marker(const char *text, const char **markers)
+{
+    t_lexer_token token;
+
+    if (!text)
+        return (0);
+    ft_bzero(&token, sizeof(token));
+    token.lexeme = text;
+    token.length = ft_strlen(text);
+    return (cobol_reverse_identifier_token_matches_any_marker(&token, markers));
+}
+
+static int cobol_reverse_identifier_token_is_flag(const t_lexer_token *token)
+{
+    size_t index;
+
+    if (!token)
+        return (0);
+    index = 0;
+    while (g_cobol_reverse_flag_suffixes[index])
+    {
+        if (cobol_reverse_identifier_has_suffix(token, g_cobol_reverse_flag_suffixes[index]))
+            return (1);
+        index += 1;
+    }
+    return (0);
+}
+
+static int cobol_reverse_identifier_text_is_flag(const char *text)
+{
+    t_lexer_token token;
+
+    if (!text)
+        return (0);
+    ft_bzero(&token, sizeof(token));
+    token.lexeme = text;
+    token.length = ft_strlen(text);
+    return (cobol_reverse_identifier_token_is_flag(&token));
 }
 
 static int cobol_reverse_append_operator(t_cblc_builder *builder, const t_ast_node *node)
@@ -961,6 +1679,576 @@ static int cobol_reverse_emit_paragraph(t_transpiler_context *context, t_cblc_bu
     return (FT_SUCCESS);
 }
 
+static int cobol_reverse_emit_data_item(t_transpiler_context *context, t_cblc_builder *builder,
+    const t_ast_node *item)
+{
+    t_cobol_reverse_data_item_info info;
+    long level_value;
+    t_cobol_reverse_picture picture;
+    t_cobol_reverse_scalar_metadata metadata;
+    const t_ast_node *value_literal;
+
+    if (!builder)
+        return (FT_FAILURE);
+    if (!item)
+        return (FT_FAILURE);
+    if (cobol_reverse_collect_data_item_info(item, &info) != FT_SUCCESS)
+    {
+        if (context)
+            cobol_reverse_emit_error(context, "WORKING-STORAGE item missing level or name");
+        return (FT_FAILURE);
+    }
+    if (cobol_reverse_get_data_item_level(&info, &level_value) != FT_SUCCESS)
+    {
+        if (context)
+            cobol_reverse_emit_error(context, "Invalid WORKING-STORAGE metadata");
+        return (FT_FAILURE);
+    }
+    if (level_value == 66 || level_value == 88)
+    {
+        if (context)
+            cobol_reverse_emit_error(context, "Unsupported WORKING-STORAGE level in reverse translation");
+        return (FT_FAILURE);
+    }
+    if (level_value != 77 && (level_value < 1 || level_value > 49))
+    {
+        if (context)
+            cobol_reverse_emit_error(context, "Unsupported WORKING-STORAGE level in reverse translation");
+        return (FT_FAILURE);
+    }
+    if (!info.picture_node)
+    {
+        if (context)
+            cobol_reverse_emit_error(context, "PIC clause required for reverse data item recovery");
+        return (FT_FAILURE);
+    }
+    if (cobol_reverse_parse_picture(info.picture_node, &picture) != FT_SUCCESS)
+    {
+        if (context)
+            cobol_reverse_emit_error(context, "Unsupported PIC clause in WORKING-STORAGE section");
+        return (FT_FAILURE);
+    }
+    if (cobol_reverse_infer_scalar_metadata(context, info.name_node, &picture,
+            "Unsupported WORKING-STORAGE item", &metadata) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_string(builder, metadata.type_text) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_string(builder, " ") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_reverse_append_identifier(builder, &info.name_node->token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (metadata.is_array)
+    {
+        if (cblc_builder_append_char(builder, '[') != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_builder_append_unsigned(builder,
+                static_cast<unsigned long long>(metadata.array_length)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_builder_append_char(builder, ']') != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    value_literal = NULL;
+    if (info.value_node && ast_node_child_count(info.value_node) > 0)
+        value_literal = ast_node_get_child(info.value_node, 0);
+    if (value_literal)
+    {
+        const t_lexer_token *value_token;
+
+        value_token = &value_literal->token;
+        if (cblc_builder_append_string(builder, " = ") != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (value_literal->kind != AST_NODE_LITERAL)
+        {
+            if (context)
+                cobol_reverse_emit_error(context,
+                    "Unsupported VALUE clause literal in WORKING-STORAGE section");
+            return (FT_FAILURE);
+        }
+        if (value_token->kind == LEXER_TOKEN_STRING_LITERAL)
+        {
+            if (metadata.is_boolean_type)
+            {
+                const char *boolean_text;
+
+                boolean_text = cobol_reverse_boolean_from_string_literal(value_token);
+                if (!boolean_text)
+                {
+                    if (context)
+                        cobol_reverse_emit_error(context,
+                            "Unsupported VALUE clause literal in WORKING-STORAGE section");
+                    return (FT_FAILURE);
+                }
+                if (cblc_builder_append_string(builder, boolean_text) != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            else
+            {
+                if (cobol_reverse_append_string_literal(builder, value_token, 0) != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+        }
+        else if (value_token->kind == LEXER_TOKEN_NUMERIC_LITERAL)
+        {
+            if (cobol_reverse_append_numeric_literal(builder, value_token) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        else if (value_token->kind == LEXER_TOKEN_KEYWORD_TRUE)
+        {
+            if (!metadata.is_boolean_type)
+            {
+                if (context)
+                    cobol_reverse_emit_error(context,
+                        "Unsupported VALUE clause literal in WORKING-STORAGE section");
+                return (FT_FAILURE);
+            }
+            if (cblc_builder_append_string(builder, "true") != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        else if (value_token->kind == LEXER_TOKEN_KEYWORD_FALSE)
+        {
+            if (!metadata.is_boolean_type)
+            {
+                if (context)
+                    cobol_reverse_emit_error(context,
+                        "Unsupported VALUE clause literal in WORKING-STORAGE section");
+                return (FT_FAILURE);
+            }
+            if (cblc_builder_append_string(builder, "false") != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        else
+        {
+            if (context)
+                cobol_reverse_emit_error(context,
+                    "Unsupported VALUE clause literal in WORKING-STORAGE section");
+            return (FT_FAILURE);
+        }
+    }
+    if (cblc_builder_append_string(builder, ";") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_newline(builder) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_emit_group_item(t_transpiler_context *context, t_cblc_builder *builder,
+    const t_ast_node *section, size_t item_index)
+{
+    t_cobol_reverse_data_item_info group_info;
+    long group_level;
+    size_t child_index;
+    size_t section_count;
+    size_t field_count;
+
+    if (!builder || !section)
+        return (FT_FAILURE);
+    if (cobol_reverse_collect_data_item_info(ast_node_get_child(section, item_index),
+            &group_info) != FT_SUCCESS)
+    {
+        if (context)
+            cobol_reverse_emit_error(context, "Group item missing identifier");
+        return (FT_FAILURE);
+    }
+    if (cobol_reverse_get_data_item_level(&group_info, &group_level) != FT_SUCCESS)
+    {
+        if (context)
+            cobol_reverse_emit_error(context, "Group item missing level metadata");
+        return (FT_FAILURE);
+    }
+    if (group_info.picture_node)
+    {
+        if (context)
+            cobol_reverse_emit_error(context, "Group items with PIC clauses are not supported in reverse translation");
+        return (FT_FAILURE);
+    }
+    if (group_info.value_node && ast_node_child_count(group_info.value_node) > 0)
+    {
+        if (context)
+            cobol_reverse_emit_error(context, "Group items with VALUE clauses are not supported in reverse translation");
+        return (FT_FAILURE);
+    }
+    if (cblc_builder_append_string(builder, "record ") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_reverse_append_identifier(builder, &group_info.name_node->token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_string(builder, " {\n") != FT_SUCCESS)
+        return (FT_FAILURE);
+    section_count = ast_node_child_count(section);
+    child_index = item_index + 1;
+    field_count = 0;
+    while (child_index < section_count)
+    {
+        const t_ast_node *child;
+        t_cobol_reverse_data_item_info field_info;
+        long field_level;
+        t_cobol_reverse_picture picture;
+        t_cobol_reverse_scalar_metadata metadata;
+
+        child = ast_node_get_child(section, child_index);
+        if (!child || child->kind != AST_NODE_DATA_ITEM)
+            break;
+        if (cobol_reverse_collect_data_item_info(child, &field_info) != FT_SUCCESS)
+        {
+            if (context)
+                cobol_reverse_emit_error(context,
+                    "Group member missing identifier or level");
+            return (FT_FAILURE);
+        }
+        if (cobol_reverse_get_data_item_level(&field_info, &field_level) != FT_SUCCESS)
+        {
+            if (context)
+                cobol_reverse_emit_error(context,
+                    "Group member missing level metadata");
+            return (FT_FAILURE);
+        }
+        if (field_level <= group_level)
+            break;
+        if (!field_info.picture_node)
+        {
+            if (context)
+                cobol_reverse_emit_error(context,
+                    "Nested group items are not supported in reverse translation");
+            return (FT_FAILURE);
+        }
+        if (field_info.value_node && ast_node_child_count(field_info.value_node) > 0)
+        {
+            if (context)
+                cobol_reverse_emit_error(context,
+                    "VALUE clauses on group members are not supported in reverse translation");
+            return (FT_FAILURE);
+        }
+        if (cobol_reverse_parse_picture(field_info.picture_node, &picture) != FT_SUCCESS)
+        {
+            if (context)
+                cobol_reverse_emit_error(context,
+                    "Unsupported PIC clause in group item");
+            return (FT_FAILURE);
+        }
+        if (cobol_reverse_infer_scalar_metadata(context, field_info.name_node, &picture,
+                "Unsupported group item member", &metadata) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_builder_append_indentation(builder, 1) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_builder_append_string(builder, metadata.type_text) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_builder_append_string(builder, " ") != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cobol_reverse_append_identifier(builder, &field_info.name_node->token) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (metadata.is_array)
+        {
+            if (cblc_builder_append_char(builder, '[') != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (cblc_builder_append_unsigned(builder,
+                    static_cast<unsigned long long>(metadata.array_length)) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (cblc_builder_append_char(builder, ']') != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        if (cblc_builder_append_string(builder, ";") != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_builder_append_newline(builder) != FT_SUCCESS)
+            return (FT_FAILURE);
+        field_count += 1;
+        child_index += 1;
+    }
+    if (field_count == 0)
+    {
+        if (context)
+            cobol_reverse_emit_error(context, "Group item missing subordinate fields");
+        return (FT_FAILURE);
+    }
+    if (cblc_builder_append_string(builder, "};") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_newline(builder) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_newline(builder) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_reverse_append_identifier(builder, &group_info.name_node->token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_string(builder, " ") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_reverse_append_identifier(builder, &group_info.name_node->token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_string(builder, ";") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_newline(builder) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_newline(builder) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_emit_copybook_item(t_transpiler_context *context, t_cblc_builder *builder,
+    const t_transpiler_copybook_item *item)
+{
+    const char *type_text;
+    int is_array;
+    size_t array_length;
+    t_lexer_token name_token;
+    size_t declared_length;
+    int treat_as_flag;
+    int treat_as_buffer;
+
+    if (!builder || !item)
+        return (FT_FAILURE);
+    type_text = NULL;
+    is_array = 0;
+    array_length = 0;
+    declared_length = item->declared_length;
+    treat_as_flag = 0;
+    treat_as_buffer = 0;
+    if (declared_length == 0)
+        declared_length = 1;
+    if (item->kind == TRANSPILE_DATA_ITEM_ALPHANUMERIC)
+    {
+        treat_as_flag = cobol_reverse_identifier_text_is_flag(item->name);
+        treat_as_buffer = cobol_reverse_identifier_text_matches_any_marker(item->name,
+                g_cobol_reverse_character_array_markers);
+        if (declared_length <= 1)
+        {
+            if (treat_as_flag)
+                type_text = "bool";
+            else
+            {
+                type_text = "char";
+                if (treat_as_buffer)
+                {
+                    is_array = 1;
+                    array_length = declared_length;
+                }
+                else
+                    is_array = 0;
+            }
+        }
+        else
+        {
+            type_text = "char";
+            is_array = 1;
+            array_length = declared_length;
+        }
+    }
+    else if (item->kind == TRANSPILE_DATA_ITEM_NUMERIC)
+    {
+        if (declared_length <= 9)
+            type_text = "int";
+        else
+            type_text = "long long";
+    }
+    else if (item->kind == TRANSPILE_DATA_ITEM_FLOATING)
+        type_text = "double";
+    else
+    {
+        if (context)
+            cobol_reverse_emit_error(context, "Unsupported copybook item kind in reverse translation");
+        return (FT_FAILURE);
+    }
+    if (!type_text)
+    {
+        if (context)
+            cobol_reverse_emit_error(context, "Unsupported copybook item in reverse translation");
+        return (FT_FAILURE);
+    }
+    if (item->is_read_only)
+    {
+        if (cblc_builder_append_string(builder, "const ") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (cblc_builder_append_string(builder, type_text) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_string(builder, " ") != FT_SUCCESS)
+        return (FT_FAILURE);
+    ft_bzero(&name_token, sizeof(name_token));
+    name_token.lexeme = item->name;
+    name_token.length = ft_strlen(item->name);
+    if (cobol_reverse_append_identifier(builder, &name_token) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (is_array)
+    {
+        if (array_length == 0)
+            array_length = 1;
+        if (cblc_builder_append_char(builder, '[') != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_builder_append_unsigned(builder,
+                static_cast<unsigned long long>(array_length)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_builder_append_char(builder, ']') != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (cblc_builder_append_string(builder, ";") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_newline(builder) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_emit_copybook_include(t_transpiler_context *context, t_cblc_builder *builder,
+    const t_ast_node *include)
+{
+    const t_ast_node *name_node;
+    const t_transpiler_copybook *copybook;
+    size_t index;
+
+    if (!builder)
+        return (FT_FAILURE);
+    if (!include)
+        return (FT_FAILURE);
+    name_node = ast_node_get_child(include, 0);
+    if (!name_node || name_node->kind != AST_NODE_IDENTIFIER || !name_node->token.lexeme)
+    {
+        if (context)
+            cobol_reverse_emit_error(context, "COPY statement missing identifier");
+        return (FT_FAILURE);
+    }
+    if (!context)
+        return (FT_FAILURE);
+    copybook = transpiler_context_find_copybook(context, name_node->token.lexeme);
+    if (!copybook)
+    {
+        if (context)
+            cobol_reverse_emit_error(context, "COPY statement refers to unknown copybook");
+        return (FT_FAILURE);
+    }
+    if (cblc_builder_append_string(builder, "/* COPY ") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_span(builder, name_node->token.lexeme,
+            name_node->token.length) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_string(builder, " */") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_newline(builder) != FT_SUCCESS)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < copybook->item_count)
+    {
+        if (cobol_reverse_emit_copybook_item(context, builder, &copybook->items[index]) != FT_SUCCESS)
+            return (FT_FAILURE);
+        index += 1;
+    }
+    if (copybook->item_count == 0)
+    {
+        if (cblc_builder_append_string(builder, "/* copybook had no registered items */\n") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_emit_working_storage_section(t_transpiler_context *context,
+    t_cblc_builder *builder, const t_ast_node *section, int *out_emitted)
+{
+    size_t index;
+    size_t count;
+    int emitted;
+
+    if (!builder)
+        return (FT_FAILURE);
+    if (!section)
+        return (FT_FAILURE);
+    emitted = 0;
+    count = ast_node_child_count(section);
+    index = 0;
+    while (index < count)
+    {
+        const t_ast_node *child;
+
+        child = ast_node_get_child(section, index);
+        if (child && child->kind == AST_NODE_DATA_ITEM)
+        {
+            t_cobol_reverse_data_item_info info;
+            long level_value;
+
+            if (cobol_reverse_collect_data_item_info(child, &info) != FT_SUCCESS)
+            {
+                if (context)
+                    cobol_reverse_emit_error(context, "WORKING-STORAGE item missing metadata");
+                return (FT_FAILURE);
+            }
+            if (cobol_reverse_get_data_item_level(&info, &level_value) != FT_SUCCESS)
+            {
+                if (context)
+                    cobol_reverse_emit_error(context, "WORKING-STORAGE item missing level");
+                return (FT_FAILURE);
+            }
+            if (!info.picture_node)
+            {
+                if (level_value == 66 || level_value == 77 || level_value == 88)
+                {
+                    if (context)
+                        cobol_reverse_emit_error(context,
+                            "Unsupported WORKING-STORAGE level in reverse translation");
+                    return (FT_FAILURE);
+                }
+                if (level_value < 1 || level_value > 49)
+                {
+                    if (context)
+                        cobol_reverse_emit_error(context,
+                            "Unsupported WORKING-STORAGE level in reverse translation");
+                    return (FT_FAILURE);
+                }
+                if (cobol_reverse_emit_group_item(context, builder, section, index) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                emitted = 1;
+                index += 1;
+                continue;
+            }
+            if (cobol_reverse_emit_data_item(context, builder, child) != FT_SUCCESS)
+                return (FT_FAILURE);
+            emitted = 1;
+        }
+        else if (child && child->kind == AST_NODE_COPYBOOK_INCLUDE)
+        {
+            if (cobol_reverse_emit_copybook_include(context, builder, child) != FT_SUCCESS)
+                return (FT_FAILURE);
+            emitted = 1;
+        }
+        else if (child)
+        {
+            if (context)
+                cobol_reverse_emit_error(context, "Unsupported entry in WORKING-STORAGE section");
+            return (FT_FAILURE);
+        }
+        index += 1;
+    }
+    if (out_emitted)
+        *out_emitted = emitted;
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_emit_data_division(t_transpiler_context *context, t_cblc_builder *builder,
+    const t_ast_node *division, int *out_emitted)
+{
+    size_t index;
+    int emitted_any;
+
+    if (!builder)
+        return (FT_FAILURE);
+    if (!division)
+        return (FT_FAILURE);
+    emitted_any = 0;
+    index = 0;
+    while (index < ast_node_child_count(division))
+    {
+        const t_ast_node *child;
+
+        child = ast_node_get_child(division, index);
+        if (child && child->kind == AST_NODE_WORKING_STORAGE_SECTION)
+        {
+            int section_emitted;
+
+            section_emitted = 0;
+            if (cobol_reverse_emit_working_storage_section(context, builder, child,
+                    &section_emitted) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (section_emitted)
+                emitted_any = 1;
+        }
+        index += 1;
+    }
+    if (out_emitted)
+        *out_emitted = emitted_any;
+    return (FT_SUCCESS);
+}
+
 static const t_ast_node *cobol_reverse_find_procedure_division(const t_ast_node *program)
 {
     size_t index;
@@ -980,10 +2268,30 @@ static const t_ast_node *cobol_reverse_find_procedure_division(const t_ast_node 
     return (NULL);
 }
 
+static const t_ast_node *cobol_reverse_find_data_division(const t_ast_node *program)
+{
+    size_t index;
+
+    if (!program)
+        return (NULL);
+    index = 0;
+    while (index < ast_node_child_count(program))
+    {
+        const t_ast_node *candidate;
+
+        candidate = ast_node_get_child(program, index);
+        if (candidate && candidate->kind == AST_NODE_DATA_DIVISION)
+            return (candidate);
+        index += 1;
+    }
+    return (NULL);
+}
+
 int transpiler_cobol_program_to_cblc(t_transpiler_context *context, const t_ast_node *program,
     char **out_text)
 {
     const t_ast_node *procedure_division;
+    const t_ast_node *data_division;
     size_t index;
     t_cblc_builder builder;
 
@@ -995,6 +2303,17 @@ int transpiler_cobol_program_to_cblc(t_transpiler_context *context, const t_ast_
     {
         cblc_builder_dispose(&builder);
         return (FT_FAILURE);
+    }
+    data_division = cobol_reverse_find_data_division(program);
+    if (data_division)
+    {
+        if (cobol_reverse_emit_data_division(context, &builder, data_division, NULL) != FT_SUCCESS)
+        {
+            cblc_builder_dispose(&builder);
+            if (context && !transpiler_context_has_errors(context))
+                cobol_reverse_emit_error(context, "Failed to recover WORKING-STORAGE declarations");
+            return (FT_FAILURE);
+        }
     }
     procedure_division = cobol_reverse_find_procedure_division(program);
     if (!procedure_division)

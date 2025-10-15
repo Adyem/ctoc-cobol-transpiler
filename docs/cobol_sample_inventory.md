@@ -1,10 +1,19 @@
 # COBOL Sample Inventory
 
-This catalog enumerates the COBOL fixtures that drive validation of the reverse pipeline. Every program lives in
-`samples/cobol` and is registered in `samples/cobol/manifest.txt` so automated checks can keep the documentation and
-filesystem synchronized.
+This catalog enumerates the COBOL fixtures that drive validation of the reverse pipeline. Most programs live in
+`samples/cobol` and are registered in `samples/cobol/manifest.txt` so automated checks can keep the documentation and
+filesystem synchronized. The quick-start example pairs its COBOL artifact with the accompanying makefile in
+`samples/example_project` so the entire demo fits inside a single directory.
 
 ## Sample Coverage
+
+### `samples/cobol/minimal_program.cob`
+- **Purpose:** Supplies a compact program that exercises the parser and reverse emitter without relying on file I/O constructs.
+- **Constructs:** Minimal division headers, a single WORKING-STORAGE scalar, sequential `MOVE` statements, and a `STOP RUN` terminator.
+
+### `samples/example_project/hello_make_demo.cob`
+- **Purpose:** Serves as the COBOL counterpart to the example project greeting demo so both directions of the pipeline share a reference implementation.
+- **Constructs:** WORKING-STORAGE scalar buffer, literal `MOVE`, `DISPLAY`, and `STOP RUN` terminator.
 
 ### `samples/cobol/copy_file.cob`
 - **Purpose:** Establishes a baseline file copy loop for the COBOL input corpus that mirrors the canonical CBL-C example.
@@ -30,21 +39,46 @@ filesystem synchronized.
 ### `samples/cobol/reverse_constructs.cob`
 - **Purpose:** Drives the COBOL→CBL-C reverse emitter against the constructs it currently recovers so we can enforce the output
   shape with golden fixtures.
-- **Constructs:** `PERFORM UNTIL` loops, `READ ... INTO` file operations, guarded `IF`/`ELSE` blocks, `WRITE ... FROM` output,
-  and `MOVE` statements updating sentinel flags.
+- **Constructs:** Level-01 flag and record buffers, `PERFORM UNTIL` loops, `READ ... INTO` file operations, guarded `IF`/`ELSE`
+  blocks, `WRITE ... FROM` output, and `MOVE` statements updating sentinel flags.
 
 ### `samples/cobol/reverse_normalization.cob`
 - **Purpose:** Exercises identifier, literal, and layout normalization paths so the reverse emitter can produce idiomatic CBL-C
   even from loosely formatted COBOL.
-- **Constructs:** Hyphenated identifiers, lowercase working-storage names, string literals with mixed casing, numeric literals
-  that include leading zeros, multiple procedure paragraphs, and STOP statements.
+- **Constructs:** Hyphenated identifiers, lowercase working-storage names that normalize into flag/numeric/buffer declarations,
+  string literals with mixed casing, numeric literals that include leading zeros, multiple procedure paragraphs, and STOP
+  statements.
 
 ### `samples/cobol/reverse_control_flow.cob`
 - **Purpose:** Expands the reverse fixtures with combined conditional branches and looping constructs so complex control flow
   sequencing stays stable under round-trip testing.
-- **Constructs:** `IF NOT` conditionals, `PERFORM UNTIL` loops that update sentinel values through `MOVE`, `PERFORM VARYING`
-  counters, sequential `MOVE` assignments, numeric `DISPLAY` output, and STOP statements spread across multiple procedure
-  paragraphs.
+- **Constructs:** Level-01 flag and counter storage, `IF NOT` conditionals, `PERFORM UNTIL` loops that update sentinel values
+  through `MOVE`, `PERFORM VARYING` counters, sequential `MOVE` assignments, numeric `DISPLAY` output, and STOP statements
+  spread across multiple procedure paragraphs.
+
+### `samples/cobol/reverse_numeric_scalars.cob`
+- **Purpose:** Introduces decimal WORKING-STORAGE items and additional boolean suffixes so the reverse emitter can recover
+  floating-point variables and broaden flag detection beyond `-FLAG`.
+- **Constructs:** Level-01 `PIC S9V9(4)` and `PIC S9(12)V9(6)` fields, display-mode numeric counters, status bytes ending in
+  `-IND`, literal `MOVE` statements, and `STOP RUN` termination.
+
+### `samples/cobol/reverse_group_items.cob`
+- **Purpose:** Validates that a level-01 group without a PIC clause survives reverse translation by materializing a record
+  declaration and mirrored scalars in the generated CBL-C.
+- **Constructs:** A group containing alphanumeric and decimal children, a separate status byte with a VALUE default, literal
+  `MOVE` statements targeting the group members, and a closing `STOP RUN.` paragraph.
+
+### `samples/cobol/reverse_value_defaults.cob`
+- **Purpose:** Exercises VALUE clauses on supported scalars so the reverse emitter can recover default-initialized booleans,
+  numerics, and text buffers directly into CBL-C.
+- **Constructs:** Level-01 flag, integer, and decimal items with VALUE defaults, an alphanumeric buffer populated through a
+  literal VALUE clause, and a bare `STOP RUN` procedure that leaves the recovered storage untouched.
+
+### `samples/cobol/reverse_copybook.cob`
+- **Purpose:** Extends the reverse fixtures with a `COPY` directive and character heuristics so shared working-storage and
+  single-byte codes translate into the right CBL-C surface area.
+- **Constructs:** Simple `COPY` include resolved through the registered copybook table, a single-character code that remains a
+  scalar, buffer identifiers that keep their array form, and a minimal `STOP RUN` procedure body.
 
 ### `samples/cobol/return_numeric.cob`
 - **Purpose:** Demonstrates value-returning helpers expressed as separate COBOL subprograms that accept arguments by reference

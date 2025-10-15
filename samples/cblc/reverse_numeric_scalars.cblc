@@ -1,0 +1,14 @@
+float FLOAT_APPROX = 0;
+double DOUBLE_APPROX = 0;
+int BINARY_COUNT = 0;
+int PACKED_TOTAL = 0;
+bool STATUS_IND = false;
+
+function void MAIN() {
+    FLOAT_APPROX = 1;
+    DOUBLE_APPROX = 100;
+    BINARY_COUNT = 10;
+    PACKED_TOTAL = 42;
+    STATUS_IND = true;
+    return ;
+}

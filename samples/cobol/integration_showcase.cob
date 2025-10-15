@@ -51,12 +51,12 @@
        OPEN INPUT TRANSACTIONS.
        OPEN OUTPUT ACCEPTED-LOG.
        OPEN OUTPUT REJECTED-LOG.
-       PERFORM UNTIL EOF-FLAG == 'Y'
+       PERFORM UNTIL EOF-FLAG = 'Y'
            READ TRANSACTIONS
                AT END
                    MOVE 'Y' TO EOF-FLAG
                NOT AT END
-                   IF TRANSACTION-STATUS == "A"
+                   IF TRANSACTION-STATUS = "A"
                        ADD 1 TO ACCEPTED-COUNT
                        ADD TRANSACTION-AMOUNT TO TOTAL-AMOUNT
                        MOVE ACCEPTED-MARKER TO ACCEPTED-RECORD

@@ -9,7 +9,10 @@ through those boundaries.
 
 Each listing shows the file name on the first line so you can drop the snippet
 into `samples/cblc/` (or your own project hierarchy) and experiment with the
-call flow.  Both examples assume the files are compiled together, for instance:
+call flow. The examples below highlight the argument passing semantics while
+the CLI exposes the reverse (COBOL → CBL-C) pipeline. The forward command will
+report a diagnostic until the code generator is wired in, but the intended
+invocation will eventually resemble:
 
 ```
 ctoc_cobol_transpiler --direction cblc-to-cobol \

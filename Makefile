@@ -224,12 +224,16 @@ $(LIBFT): ensure_libft | $(BUILD_LOG_DIR)
 	fi
 
 initialize:
-	git submodule update --init --recursive
+	git submodule update --init --recursive --force
 
 ensure_libft:
 	@if [ ! -f $(SUBMODULE_SENTINEL) ]; then \
-		printf 'The libft submodule is not initialized. Please run "make initialize" before building.\n'; \
-		exit 1; \
+		printf '\033[1;36m[LIBFT SETUP] Initializing git submodule\033[0m\n'; \
+		$(MAKE) initialize; \
+		if [ ! -f $(SUBMODULE_SENTINEL) ]; then \
+			printf 'Failed to initialize libft submodule. Please check git submodule configuration.\n'; \
+			exit 1; \
+		fi; \
 	fi
 
 $(OBJ_DIR)/%.o: %.cpp

@@ -622,6 +622,41 @@ void transpiler_context_set_warnings_as_errors(t_transpiler_context *context, in
     context->warnings_as_errors = warnings_as_errors;
 }
 
+void transpiler_context_reset_unit_state(t_transpiler_context *context)
+{
+    size_t index;
+
+    if (!context)
+        return ;
+    context->function_count = 0;
+    context->file_count = 0;
+    index = 0;
+    while (index < context->module_count)
+    {
+        transpiler_context_module_clear(&context->modules[index]);
+        index += 1;
+    }
+    context->module_count = 0;
+    context->module_order_count = 0;
+    ft_bzero(&context->entrypoint, sizeof(context->entrypoint));
+    context->data_item_count = 0;
+    index = 0;
+    while (index < context->copybook_count)
+    {
+        if (context->copybooks[index].items)
+        {
+            cma_free(context->copybooks[index].items);
+            context->copybooks[index].items = NULL;
+        }
+        context->copybooks[index].item_count = 0;
+        context->copybooks[index].name[0] = '\0';
+        index += 1;
+    }
+    context->copybook_count = 0;
+    context->source_map_count = 0;
+    context->last_error_code = FT_SUCCESS;
+}
+
 void transpiler_context_record_error(t_transpiler_context *context, int error_code)
 {
     if (!context)

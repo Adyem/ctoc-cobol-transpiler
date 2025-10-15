@@ -8,9 +8,9 @@
        PROCEDURE DIVISION.
 MAIN.
        OPEN INPUT INPUT-FILE.
-       PERFORM UNTIL EOF-FLAG == 'Y'
+       PERFORM UNTIL EOF-FLAG = 'Y'
            READ INPUT-FILE INTO OUTPUT-RECORD
-           IF EOF-FLAG == 'N'
+           IF EOF-FLAG = 'N'
                WRITE OUTPUT-FILE FROM OUTPUT-RECORD.
            ELSE
                MOVE 'Y' TO EOF-FLAG.

@@ -24,7 +24,7 @@ int transpiler_standard_library_generate_ceil(char **out_text)
         "       MAIN.\n"
         "           MOVE 0 TO LNK-STATUS.\n"
         "           COMPUTE LNK-RESULT = FUNCTION INTEGER-PART(LNK-OPERAND).\n"
-        "           IF LNK-OPERAND NOT == LNK-RESULT\n"
+        "           IF LNK-OPERAND NOT = LNK-RESULT\n"
         "               MOVE 1 TO LNK-STATUS\n"
         "               IF LNK-OPERAND > 0\n"
         "                   COMPUTE LNK-RESULT = LNK-RESULT + 1\n"

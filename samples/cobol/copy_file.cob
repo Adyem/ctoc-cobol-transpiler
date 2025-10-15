@@ -17,7 +17,7 @@
 MAIN.
            OPEN INPUT INPUT-FILE.
            OPEN OUTPUT OUTPUT-FILE.
-           PERFORM UNTIL EOF-FLAG == 'Y'
+           PERFORM UNTIL EOF-FLAG = 'Y'
                READ INPUT-FILE
                    AT END
                        MOVE 'Y' TO EOF-FLAG
