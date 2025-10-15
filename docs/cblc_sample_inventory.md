@@ -663,7 +663,7 @@ function void main() {
 }
 ```
 
-### `samples/cblc/example_project/hello_make_demo.cblc`
+### `samples/example_project/hello_make_demo.cblc`
 - **Purpose:** Provides a minimal end-to-end example that feeds into the standalone sample makefile, ensuring the quick start flow has a self-contained entrypoint.
 - **Constructs:** Global character buffer, helper functions that write to and display the buffer, and a `main` routine that orchestrates the calls.
 

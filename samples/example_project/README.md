@@ -8,8 +8,7 @@ COBOL and compiles the result with `cobc`.
 
 - `Makefile` — orchestrates the build by compiling the transpiler if it
   has not been created yet, running the transpiler, and invoking `cobc`.
-- `../cblc/example_project/hello_make_demo.cblc` — CBL-C entrypoint that
-  displays a greeting.
+- `hello_make_demo.cblc` — CBL-C entrypoint that displays a greeting.
 
 ## Usage
 
@@ -22,8 +21,12 @@ COBOL and compiles the result with `cobc`.
    The makefile automatically appends `.exe` when running on Windows so
    both the transpiler binary and the sample executable resolve
    correctly.
-2. Execute `make run` to launch the resulting binary.
-3. Use `make clean` to remove all generated artifacts.
+2. Inspect the generated `hello_make_demo.cob` and
+   `hello_make_demo{.exe}` artifacts that now live alongside the source
+   so you can review the transpiled output directly.
+3. Execute `make run` to launch the resulting binary.
+4. Use `make distclean` to remove the generated artifacts and cached
+   setup files if you want to reset the directory.
 
 > **Note:** Installing GnuCOBOL requires package manager access. If the
 > automatic installation fails, install it manually and rerun `make`.

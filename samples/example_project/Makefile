@@ -8,24 +8,24 @@ endif
 TRANSPILER := $(REPO_ROOT)/ctoc_cobol_transpiler$(EXE_EXT)
 COBC ?= cobc
 
-BUILD_DIR := build
-SETUP_SENTINEL := $(BUILD_DIR)/.environment_ready
+SETUP_DIR := .setup
+SETUP_SENTINEL := $(SETUP_DIR)/environment_ready
 PROGRAM_NAME := hello_make_demo
-CBLC_SRC := $(REPO_ROOT)/samples/cblc/example_project/$(PROGRAM_NAME).cblc
-COB_OUTPUT := $(BUILD_DIR)/$(PROGRAM_NAME).cob
-EXECUTABLE := $(BUILD_DIR)/$(PROGRAM_NAME)$(EXE_EXT)
+CBLC_SRC := $(PROGRAM_NAME).cblc
+COB_OUTPUT := $(PROGRAM_NAME).cob
+EXECUTABLE := $(PROGRAM_NAME)$(EXE_EXT)
 
-.PHONY: all clean run compiler ensure_environment ensure_cobc
+.PHONY: all run compiler ensure_environment ensure_cobc distclean
 
 all: ensure_environment $(EXECUTABLE)
 
 run: ensure_environment $(EXECUTABLE)
-	$(EXECUTABLE)
+	./$(EXECUTABLE)
 
 $(EXECUTABLE): $(COB_OUTPUT) | ensure_cobc
 	$(COBC) -x -o $@ $<
 
-$(COB_OUTPUT): $(CBLC_SRC) compiler | ensure_environment $(BUILD_DIR)
+$(COB_OUTPUT): $(CBLC_SRC) compiler | ensure_environment
 	$(TRANSPILER) --direction cblc-to-cobol \
 		--input $(CBLC_SRC) \
 		--output $@ \
@@ -35,17 +35,17 @@ $(COB_OUTPUT): $(CBLC_SRC) compiler | ensure_environment $(BUILD_DIR)
 		exit 1; \
 	fi
 
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
-
 compiler: ensure_environment $(TRANSPILER)
 
 ensure_environment: $(SETUP_SENTINEL)
 
-$(SETUP_SENTINEL): | $(BUILD_DIR)
+$(SETUP_SENTINEL): | $(SETUP_DIR)
 	$(MAKE) -C $(REPO_ROOT) initialize
 	$(MAKE) -C $(REPO_ROOT) install_cobc
 	touch $(SETUP_SENTINEL)
+
+$(SETUP_DIR):
+	mkdir -p $(SETUP_DIR)
 
 ensure_cobc:
 	@if ! command -v $(COBC) >/dev/null 2>&1; then \
@@ -60,5 +60,6 @@ ensure_cobc:
 $(TRANSPILER): $(SETUP_SENTINEL)
 	$(MAKE) -C $(REPO_ROOT) all
 
-clean:
-	rm -rf $(BUILD_DIR)
+distclean:
+	rm -f $(EXECUTABLE) $(COB_OUTPUT)
+	rm -rf $(SETUP_DIR)
