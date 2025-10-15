@@ -1,3 +1,9 @@
+bool CONTROL_FLAG = false;
+int PROGRESS_METER = 0;
+int PROGRESS_LIMIT = 10;
+int PROGRESS_INDEX = 0;
+int OUTPUT_VALUE = 0;
+
 function void MAIN() {
     if (!(CONTROL_FLAG == true)) {
         while (!(PROGRESS_METER > PROGRESS_LIMIT)) {

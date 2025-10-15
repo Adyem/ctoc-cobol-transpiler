@@ -1,0 +1,20 @@
+record CUSTOMER_DETAIL {
+    char CUSTOMER_ID[8];
+    char CUSTOMER_NAME[24];
+    float CUSTOMER_BALANCE;
+};
+
+CUSTOMER_DETAIL CUSTOMER_DETAIL;
+
+char CUSTOMER_ID[8];
+char CUSTOMER_NAME[24];
+float CUSTOMER_BALANCE;
+char CUSTOMER_STATUS = "N";
+
+function void MAIN() {
+    CUSTOMER_ID = "00001234";
+    CUSTOMER_NAME = "ALPHA";
+    CUSTOMER_BALANCE = 12345;
+    CUSTOMER_STATUS = true;
+    return ;
+}

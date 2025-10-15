@@ -51,7 +51,7 @@ FT_TEST(test_cobol_transpiled_copy_file_matches_expected_text)
         "MAIN.\n"
         "           OPEN INPUT INPUT-FILE.\n"
         "           OPEN OUTPUT OUTPUT-FILE.\n"
-        "           PERFORM UNTIL EOF-FLAG == 'Y'\n"
+        "           PERFORM UNTIL EOF-FLAG = 'Y'\n"
         "               READ INPUT-FILE\n"
         "                   AT END\n"
         "                       MOVE 'Y' TO EOF-FLAG\n"

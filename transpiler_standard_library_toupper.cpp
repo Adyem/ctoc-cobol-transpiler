@@ -33,7 +33,7 @@ int transpiler_standard_library_generate_toupper(char **out_text)
         "           END-IF.\n"
         "           MOVE 0 TO IDX.\n"
         "           PERFORM VARYING IDX FROM 1 BY 1 UNTIL IDX > TARGET-LIMIT\n"
-        "               IF LNK-TARGET(IDX:1) == LOW-VALUE\n"
+        "               IF LNK-TARGET(IDX:1) = LOW-VALUE\n"
         "                   EXIT PERFORM\n"
         "               END-IF\n"
         "               MOVE LNK-TARGET(IDX:1) TO CURRENT-CHAR\n"

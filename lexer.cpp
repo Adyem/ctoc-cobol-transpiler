@@ -204,6 +204,13 @@ static int lexer_collect_numeric_literal(t_lexer *lexer, t_lexer_token *token, s
         return (FT_FAILURE);
     while (!lexer_is_at_end(lexer) && lexer_is_digit(lexer_peek(lexer)))
         lexer_advance(lexer);
+    if (!lexer_is_at_end(lexer) && lexer_peek(lexer) == '.'
+        && lexer_is_digit(lexer_peek_next(lexer)))
+    {
+        lexer_advance(lexer);
+        while (!lexer_is_at_end(lexer) && lexer_is_digit(lexer_peek(lexer)))
+            lexer_advance(lexer);
+    }
     lexer_build_token(lexer, token, LEXER_TOKEN_NUMERIC_LITERAL, start_offset, start_line, start_column);
     return (FT_SUCCESS);
 }

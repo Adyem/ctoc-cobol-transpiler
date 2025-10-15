@@ -1,3 +1,6 @@
+bool EOF_FLAG = false;
+char OUTPUT_RECORD[1];
+
 function void MAIN() {
     open(INPUT_FILE, "r");
     while (!(EOF_FLAG == true)) {

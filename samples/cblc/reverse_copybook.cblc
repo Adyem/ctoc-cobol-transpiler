@@ -1,0 +1,12 @@
+/* COPY CUSTOMER-STATUS */
+bool CUSTOMER_FLAG;
+char CUSTOMER_CODE;
+char CUSTOMER_NAME[32];
+int CUSTOMER_RATING;
+const double CUSTOMER_BALANCE;
+char STATE_CODE = "A";
+char BUFFER_NAME[8];
+
+function void MAIN() {
+    return ;
+}

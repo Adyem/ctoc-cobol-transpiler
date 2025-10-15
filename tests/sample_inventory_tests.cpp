@@ -37,7 +37,7 @@ static int sample_manifest_extract_line(const char *buffer, size_t *offset, char
 
 static int validate_manifest_entries(const char *manifest_path)
 {
-    char manifest_buffer[1024];
+    char manifest_buffer[4096];
     char sample_buffer[4096];
     char line[256];
     size_t offset;
@@ -64,7 +64,7 @@ static int validate_inventory_mentions(const char *manifest_path, const char *in
 {
     char line[256];
     size_t offset;
-    char manifest_buffer[1024];
+    char manifest_buffer[4096];
     char inventory_buffer[32768];
     size_t inventory_length;
 
@@ -126,7 +126,7 @@ static int sample_manifest_extract_basename(const char *line, char *basename, si
 
 static int sample_manifest_collect_basenames(const char *manifest_path, char names[][64], size_t capacity, size_t *count)
 {
-    char manifest_buffer[1024];
+    char manifest_buffer[4096];
     char line[256];
     size_t offset;
 
@@ -359,7 +359,7 @@ static int sample_validate_unique_functions(const char *sample_path, const char 
 
 static int validate_cblc_sample_functions_unique(const char *manifest_path)
 {
-    char manifest_buffer[1024];
+    char manifest_buffer[4096];
     char sample_buffer[4096];
     char line[256];
     size_t offset;

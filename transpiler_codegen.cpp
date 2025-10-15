@@ -206,7 +206,7 @@ static int transpiler_codegen_buffer_end_line(t_transpiler_codegen_buffer *buffe
 static const char *transpiler_codegen_condition_operator_text(t_transpiler_cobol_comparison_operator op)
 {
     if (op == TRANSPILE_COBOL_COMPARISON_EQUALS)
-        return ("==");
+        return ("=");
     if (op == TRANSPILE_COBOL_COMPARISON_NOT_EQUALS)
         return ("<>");
     if (op == TRANSPILE_COBOL_COMPARISON_LESS_THAN)

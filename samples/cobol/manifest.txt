@@ -5,6 +5,10 @@ samples/cobol/record_summary.cob
 samples/cobol/reverse_constructs.cob
 samples/cobol/reverse_normalization.cob
 samples/cobol/reverse_control_flow.cob
+samples/cobol/reverse_numeric_scalars.cob
+samples/cobol/reverse_copybook.cob
+samples/cobol/reverse_group_items.cob
+samples/cobol/reverse_value_defaults.cob
 samples/cobol/numeric_precision.cob
 samples/cobol/integration_showcase.cob
 samples/cobol/return_numeric.cob
@@ -19,3 +23,5 @@ samples/cobol/project_scheduler/project_scheduler_loader.cob
 samples/cobol/project_scheduler/project_scheduler_metrics.cob
 samples/cobol/project_scheduler/project_scheduler_presenter.cob
 samples/cobol/project_scheduler/project_scheduler_main.cob
+samples/cobol/minimal_program.cob
+samples/example_project/hello_make_demo.cob

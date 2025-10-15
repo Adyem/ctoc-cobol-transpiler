@@ -206,6 +206,7 @@ void transpiler_context_set_output_directory(t_transpiler_context *context, cons
 void transpiler_context_set_format_mode(t_transpiler_context *context, t_transpiler_format_mode mode);
 void transpiler_context_set_diagnostic_level(t_transpiler_context *context, t_transpiler_diagnostic_level level);
 void transpiler_context_set_warnings_as_errors(t_transpiler_context *context, int warnings_as_errors);
+void transpiler_context_reset_unit_state(t_transpiler_context *context);
 void transpiler_context_record_error(t_transpiler_context *context, int error_code);
 int transpiler_context_has_errors(const t_transpiler_context *context);
 int transpiler_context_register_module(t_transpiler_context *context, const char *name, const char *path);

@@ -19,17 +19,20 @@ Refer to `docs/onboarding_checklist.md` for a full environment audit before comm
    make all
    make test
    ```
-2. Transpile a sample program while collecting verbose diagnostics:
+2. Transpile a sample COBOL program while collecting verbose diagnostics:
    ```
-   mkdir -p build
-   ./ctoc_cobol_transpiler --direction cblc-to-cobol \
-       --input samples/cblc/filter_prefix.cblc \
-       --output build/filter_prefix.cob \
+   ./ctoc_cobol_transpiler --direction cobol-to-cblc \
+       --input samples/cobol/minimal_program.cob \
+       --output build/minimal_program.cblc \
        --diagnostics verbose
    ```
-3. Inspect `build/filter_prefix.cob` and run it with `cobc` if you want to confirm the generated output.
+   Missing output directories are created on demand, so you can stream results to a brand-new staging area without pre-creating folders.
+3. Inspect `build/minimal_program.cblc` (or pipe it through `cblc_formatter`) if you want consistent indentation:
+   ```
+   cat build/minimal_program.cblc
+   ```
 
-The `docs/cli_usage_examples.md` file contains additional flag combinations, and `docs/cblc_multi_file_arguments.md` demonstrates how to compile several CBL-C translation units together.
+The `docs/cli_usage_examples.md` file contains additional flag combinations. The forward CBL-C to COBOL pipeline will return once the code generator is wired into the CLI; until then, `--direction cblc-to-cobol` reports a diagnostic instead of writing output.
 
 ## New Language and Diagnostics Features
 
