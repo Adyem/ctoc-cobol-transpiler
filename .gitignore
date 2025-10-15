@@ -2,3 +2,7 @@ build_logs/
 automated_tests/
 objs/
 objs_tests/
+samples/example_project/.setup/
+samples/example_project/hello_make_demo
+samples/example_project/hello_make_demo.exe
+samples/example_project/hello_make_demo.cob

@@ -1,13 +1,26 @@
-#include "runtime_scalar.hpp"
 #include "transpiler_cli.hpp"
 #include "transpiler_logging.hpp"
 #include "transpiler_pipeline.hpp"
+#include "transpiler_stub_cblc.hpp"
 
-static int runtime_demo_stage(t_transpiler_context *context, void *user_data)
+static int transpiler_stage_cblc_to_cobol(t_transpiler_context *context, void *user_data)
 {
-    (void)context;
+    size_t index;
+
     (void)user_data;
-    runtime_demo();
+    if (!context)
+        return (FT_FAILURE);
+    if (context->source_count != context->target_count)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < context->source_count)
+    {
+        if (!context->source_paths || !context->target_paths)
+            return (FT_FAILURE);
+        if (transpiler_stub_cblc_to_cobol(context->source_paths[index], context->target_paths[index]) != FT_SUCCESS)
+            return (FT_FAILURE);
+        index += 1;
+    }
     return (FT_SUCCESS);
 }
 
@@ -48,12 +61,16 @@ int main(int argc, const char **argv)
         transpiler_cli_options_dispose(&options);
         return (1);
     }
-    if (transpiler_pipeline_add_stage(&pipeline, "runtime-scalar-demo", runtime_demo_stage, NULL) != FT_SUCCESS)
+    if (context.source_language == TRANSPILE_LANGUAGE_CBL_C
+        && context.target_language == TRANSPILE_LANGUAGE_COBOL)
     {
-        transpiler_context_dispose(&context);
-        transpiler_pipeline_dispose(&pipeline);
-        transpiler_cli_options_dispose(&options);
-        return (1);
+        if (transpiler_pipeline_add_stage(&pipeline, "cblc-to-cobol", transpiler_stage_cblc_to_cobol, NULL) != FT_SUCCESS)
+        {
+            transpiler_context_dispose(&context);
+            transpiler_pipeline_dispose(&pipeline);
+            transpiler_cli_options_dispose(&options);
+            return (1);
+        }
     }
     status = transpiler_pipeline_execute(&pipeline, &context);
     transpiler_logging_flush(&context);
