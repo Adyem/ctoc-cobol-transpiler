@@ -8,12 +8,11 @@ endif
 TRANSPILER := $(REPO_ROOT)/ctoc_cobol_transpiler$(EXE_EXT)
 COBC ?= cobc
 
-BUILD_DIR := build
-SETUP_SENTINEL := $(BUILD_DIR)/.environment_ready
+SETUP_SENTINEL := .environment_ready
 PROGRAM_NAME := hello_make_demo
 CBLC_SRC := $(abspath $(PROGRAM_NAME).cblc)
-COB_OUTPUT := $(BUILD_DIR)/$(PROGRAM_NAME).cob
-EXECUTABLE := $(BUILD_DIR)/$(PROGRAM_NAME)$(EXE_EXT)
+COB_OUTPUT := $(PROGRAM_NAME).cob
+EXECUTABLE := $(PROGRAM_NAME)$(EXE_EXT)
 
 .PHONY: all clean run transpile compile compiler ensure_environment ensure_cobc
 
@@ -29,24 +28,21 @@ run: $(EXECUTABLE)
 $(EXECUTABLE): $(COB_OUTPUT) | ensure_cobc
 	$(COBC) -x -o $@ $<
 
-$(COB_OUTPUT): $(CBLC_SRC) $(TRANSPILER) | $(BUILD_DIR)
+$(COB_OUTPUT): $(CBLC_SRC) $(TRANSPILER)
 	$(TRANSPILER) --direction cblc-to-cobol \
-	        --input $(CBLC_SRC) \
-	        --output $@ \
-	        --diagnostics silent
+		--input $(CBLC_SRC) \
+		--output $@ \
+		--diagnostics silent
 	@if [ ! -f $@ ]; then \
 		printf 'The transpiler did not emit %s. Check the command output above for diagnostics.\n' "$@"; \
 		exit 1; \
 	fi
 
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
-
 compiler: $(TRANSPILER)
 
 ensure_environment: $(SETUP_SENTINEL)
 
-$(SETUP_SENTINEL): | $(BUILD_DIR)
+$(SETUP_SENTINEL):
 	$(MAKE) -C $(REPO_ROOT) initialize
 	$(MAKE) -C $(REPO_ROOT) install_cobc
 	touch $(SETUP_SENTINEL)
@@ -65,4 +61,4 @@ $(TRANSPILER): | $(SETUP_SENTINEL)
 	$(MAKE) -C $(REPO_ROOT) all
 
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -f $(COB_OUTPUT) $(EXECUTABLE) $(SETUP_SENTINEL)
