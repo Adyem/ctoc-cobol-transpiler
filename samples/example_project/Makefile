@@ -15,21 +15,25 @@ CBLC_SRC := $(abspath $(PROGRAM_NAME).cblc)
 COB_OUTPUT := $(BUILD_DIR)/$(PROGRAM_NAME).cob
 EXECUTABLE := $(BUILD_DIR)/$(PROGRAM_NAME)$(EXE_EXT)
 
-.PHONY: all clean run compiler ensure_environment ensure_cobc
+.PHONY: all clean run transpile compile compiler ensure_environment ensure_cobc
 
-all: ensure_environment $(EXECUTABLE)
+all: transpile $(EXECUTABLE)
 
-run: ensure_environment $(EXECUTABLE)
+transpile: $(COB_OUTPUT)
+
+compile: $(EXECUTABLE)
+
+run: $(EXECUTABLE)
 	$(EXECUTABLE)
 
 $(EXECUTABLE): $(COB_OUTPUT) | ensure_cobc
 	$(COBC) -x -o $@ $<
 
-$(COB_OUTPUT): $(CBLC_SRC) compiler | ensure_environment $(BUILD_DIR)
+$(COB_OUTPUT): $(CBLC_SRC) $(TRANSPILER) | $(BUILD_DIR)
 	$(TRANSPILER) --direction cblc-to-cobol \
-		--input $(CBLC_SRC) \
-		--output $@ \
-		--diagnostics silent
+	        --input $(CBLC_SRC) \
+	        --output $@ \
+	        --diagnostics silent
 	@if [ ! -f $@ ]; then \
 		printf 'The transpiler did not emit %s. Check the command output above for diagnostics.\n' "$@"; \
 		exit 1; \
@@ -38,7 +42,7 @@ $(COB_OUTPUT): $(CBLC_SRC) compiler | ensure_environment $(BUILD_DIR)
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-compiler: ensure_environment $(TRANSPILER)
+compiler: $(TRANSPILER)
 
 ensure_environment: $(SETUP_SENTINEL)
 
@@ -57,7 +61,7 @@ ensure_cobc:
 		fi; \
 	fi
 
-$(TRANSPILER): $(SETUP_SENTINEL)
+$(TRANSPILER): | $(SETUP_SENTINEL)
 	$(MAKE) -C $(REPO_ROOT) all
 
 clean:

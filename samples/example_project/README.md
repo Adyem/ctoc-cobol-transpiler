@@ -14,7 +14,10 @@ COBOL and compiles the result with `cobc`.
 
 ## Usage
 
-1. Run `make` inside this directory. The makefile will:
+1. Run `make transpile` to regenerate the COBOL source without invoking
+   the COBOL compiler. This is handy when you only want to inspect the
+   transpiler output.
+2. Run `make` (or `make compile`) inside this directory. The makefile will:
    - initialize the `libft` submodule if it has not been checked out,
    - attempt to install GnuCOBOL via the root `make install_cobc` target
      when `cobc` is missing,
@@ -24,8 +27,8 @@ COBOL and compiles the result with `cobc`.
    The makefile automatically appends `.exe` when running on Windows so
    both the transpiler binary and the sample executable resolve
    correctly.
-2. Execute `make run` to launch the resulting binary.
-3. Use `make clean` to remove all generated artifacts.
+3. Execute `make run` to launch the resulting binary.
+4. Use `make clean` to remove all generated artifacts.
 
 > **Note:** Installing GnuCOBOL requires package manager access. If the
 > automatic installation fails, install it manually and rerun `make`.

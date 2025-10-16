@@ -560,6 +560,8 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
         goto cleanup;
     if (cobol_text_builder_append_line(&builder, line) != FT_SUCCESS)
         goto cleanup;
+    if (cobol_text_builder_append_line(&builder, "       ENVIRONMENT DIVISION.") != FT_SUCCESS)
+        goto cleanup;
     if (cobol_text_builder_append_line(&builder, "       DATA DIVISION.") != FT_SUCCESS)
         goto cleanup;
     if (cobol_text_builder_append_line(&builder, "       WORKING-STORAGE SECTION.") != FT_SUCCESS)
