@@ -395,6 +395,7 @@ typedef enum e_lexer_token_kind
     LEXER_TOKEN_KEYWORD_PERFORM,
     LEXER_TOKEN_KEYWORD_UNTIL,
     LEXER_TOKEN_KEYWORD_MOVE,
+    LEXER_TOKEN_KEYWORD_COMPUTE,
     LEXER_TOKEN_KEYWORD_COPY,
     LEXER_TOKEN_KEYWORD_OPEN,
     LEXER_TOKEN_KEYWORD_CLOSE,
@@ -468,6 +469,7 @@ typedef enum e_ast_node_kind
     AST_NODE_PARAGRAPH,
     AST_NODE_MOVE_STATEMENT,
     AST_NODE_ASSIGNMENT_STATEMENT,
+    AST_NODE_COMPUTE_STATEMENT,
     AST_NODE_IF_STATEMENT,
     AST_NODE_PERFORM_UNTIL_STATEMENT,
     AST_NODE_PERFORM_VARYING_STATEMENT,
@@ -568,23 +570,34 @@ int transpiler_validate_generated_cobol(const char *text);
 // ==================================
 // COBOL and CBLC transformation APIs
 // ==================================
+typedef enum e_cblc_data_kind
+{
+    CBLC_DATA_KIND_CHAR = 0,
+    CBLC_DATA_KIND_INT
+}   t_cblc_data_kind;
+
+#define TRANSPILE_STATEMENT_TEXT_MAX 256
+
 typedef struct s_cblc_data_item
 {
-    char name[TRANSPILE_IDENTIFIER_MAX];
+    char source_name[TRANSPILE_IDENTIFIER_MAX];
+    char cobol_name[TRANSPILE_IDENTIFIER_MAX];
     size_t length;
+    t_cblc_data_kind kind;
 }   t_cblc_data_item;
 
 typedef enum e_cblc_statement_type
 {
     CBLC_STATEMENT_ASSIGNMENT,
-    CBLC_STATEMENT_DISPLAY
+    CBLC_STATEMENT_DISPLAY,
+    CBLC_STATEMENT_COMPUTE
 }   t_cblc_statement_type;
 
 typedef struct s_cblc_statement
 {
     t_cblc_statement_type type;
     char target[TRANSPILE_IDENTIFIER_MAX];
-    char source[TRANSPILE_IDENTIFIER_MAX];
+    char source[TRANSPILE_STATEMENT_TEXT_MAX];
     int is_literal;
 }   t_cblc_statement;
 

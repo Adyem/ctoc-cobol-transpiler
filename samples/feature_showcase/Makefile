@@ -9,7 +9,7 @@ TRANSPILER := $(REPO_ROOT)/ctoc_cobol_transpiler$(EXE_EXT)
 COBC ?= cobc
 
 SETUP_SENTINEL := .environment_ready
-PROGRAM_NAME := hello_make_demo
+PROGRAM_NAME := message_showcase
 CBLC_SRC := $(abspath $(PROGRAM_NAME).cblc)
 COB_OUTPUT := $(PROGRAM_NAME).cob
 EXECUTABLE := $(PROGRAM_NAME)$(EXE_EXT)

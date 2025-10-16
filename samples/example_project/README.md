@@ -9,7 +9,7 @@ COBOL and compiles the result with `cobc`.
 - `Makefile` — orchestrates the build by compiling the transpiler if it
   has not been created yet, running the transpiler, and invoking `cobc`.
 - `hello_make_demo.cblc` — CBL-C entrypoint that loads a greeting and displays it before returning.
-- `build/hello_make_demo.cob` — COBOL emitted by the transpiler during the
+- `hello_make_demo.cob` — COBOL emitted by the transpiler during the
   build. The file is regenerated every time you run the sample so the
   checked-out sources remain clean.
 
@@ -24,7 +24,7 @@ COBOL and compiles the result with `cobc`.
      when `cobc` is missing,
    - build the transpiler if required, and
    - transpile the sample before compiling it with `cobc`, writing the
-     generated program to `build/hello_make_demo.cob`.
+     generated program to `hello_make_demo.cob`.
    The makefile automatically appends `.exe` when running on Windows so
    both the transpiler binary and the sample executable resolve
    correctly.
