@@ -155,6 +155,10 @@ TEST_SRC    = tests/test_main.cpp \
               tests/compiler/cobol/reverse_control_flow_tests.cpp \
               tests/compiler/cobol/reverse_normalization_tests.cpp \
               tests/compiler/cobol/reverse_cli_tests.cpp \
+              tests/compiler/cobol/round_trip_pipeline_helpers.cpp \
+              tests/compiler/cobol/round_trip_pipeline_cblc_to_cobol_tests.cpp \
+              tests/compiler/cobol/round_trip_pipeline_cobol_round_trip_tests.cpp \
+              tests/compiler/cobol/round_trip_pipeline_tests.cpp \
               tests/compiler/cobol/tests.cpp \
               tests/compiler/tests.cpp \
               tests/logging_tests.cpp \
