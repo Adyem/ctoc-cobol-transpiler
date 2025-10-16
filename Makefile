@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+
 ifeq ($(OS),Windows_NT)
     EXE_EXT := .exe
 else
@@ -220,13 +222,18 @@ $(LIBFT): ensure_libft | $(BUILD_LOG_DIR)
 	exit $$status; \
 	fi; \
 	fi; \
-	if [ $$need_build -eq 1 ] || [ ! -f $@ ]; then \
-	printf '\033[1;36m[LIBFT BUILD] Updating %s (log: %s)\033[0m\n' "$@" "$(LIBFT_BUILD_LOG)"; \
-	$(MAKE) -C $(LIBFT_DIR) $(LIBFT_BUILD_GOAL) > $(LIBFT_BUILD_LOG) 2>&1 || \
-	{ status=$$?; printf 'libft build failed. Showing log:\n'; cat $(LIBFT_BUILD_LOG); exit $$status; }; \
-	else \
-	printf '\033[1;36m[LIBFT CHECK] %s is up to date\033[0m\n' "$@"; \
-	fi
+        if [ $$need_build -eq 1 ] || [ ! -f $@ ]; then \
+        printf '\033[1;36m[LIBFT BUILD] Updating %s (log: %s)\033[0m\n' "$@" "$(LIBFT_BUILD_LOG)"; \
+        { $(MAKE) -C $(LIBFT_DIR) $(LIBFT_BUILD_GOAL); } 2>&1 | tee $(LIBFT_BUILD_LOG); \
+        status=$${PIPESTATUS[0]}; \
+        if [ $$status -ne 0 ]; then \
+        printf 'libft build failed. Showing log:\n'; \
+        cat $(LIBFT_BUILD_LOG); \
+        exit $$status; \
+        fi; \
+        else \
+        printf '\033[1;36m[LIBFT CHECK] %s is up to date\033[0m\n' "$@"; \
+        fi
 
 initialize:
 	git submodule update --init --recursive --force
