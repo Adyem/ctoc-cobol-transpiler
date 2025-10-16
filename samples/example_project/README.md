@@ -9,8 +9,9 @@ COBOL and compiles the result with `cobc`.
 - `Makefile` — orchestrates the build by compiling the transpiler if it
   has not been created yet, running the transpiler, and invoking `cobc`.
 - `hello_make_demo.cblc` — CBL-C entrypoint that loads a greeting and displays it before returning.
-- `hello_make_demo.cob` — reference COBOL emitted by the transpiler so
-  you can compare the generated artifact with the checked-in version.
+- `build/hello_make_demo.cob` — COBOL emitted by the transpiler during the
+  build. The file is regenerated every time you run the sample so the
+  checked-out sources remain clean.
 
 ## Usage
 

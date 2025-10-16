@@ -49,6 +49,27 @@ FT_TEST(test_transpiler_validation_accepts_valid_cobol)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_transpiler_validation_accepts_working_storage_program)
+{
+    const char *source;
+
+    source = "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. DEMO.\n"
+        "       ENVIRONMENT DIVISION.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 GREETING PIC X(32).\n"
+        "       PROCEDURE DIVISION.\n"
+        "MAIN.\n"
+        "           MOVE \"HELLO FROM CBL-C\" TO GREETING\n"
+        "           DISPLAY GREETING\n"
+        "           STOP RUN.\n";
+    if (test_expect_success(transpiler_validate_generated_cobol(source),
+            "validator should accept COBOL with working-storage items") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_transpiler_validation_rejects_invalid_cobol)
 {
     const char *source;
@@ -68,6 +89,7 @@ const t_test_case *get_validation_tests(size_t *count)
         {"transpiler_validation_accepts_valid_cblc", test_transpiler_validation_accepts_valid_cblc},
         {"transpiler_validation_rejects_cblc_without_return", test_transpiler_validation_rejects_cblc_without_return},
         {"transpiler_validation_accepts_valid_cobol", test_transpiler_validation_accepts_valid_cobol},
+        {"transpiler_validation_accepts_working_storage_program", test_transpiler_validation_accepts_working_storage_program},
         {"transpiler_validation_rejects_invalid_cobol", test_transpiler_validation_rejects_invalid_cobol}
     };
 
