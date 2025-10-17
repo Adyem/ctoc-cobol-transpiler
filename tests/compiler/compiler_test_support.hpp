@@ -15,6 +15,7 @@ void test_cleanup_example_artifacts_with_log(const char *source_path, const char
 int test_run_command_capture_status(const char *command, int *exit_status);
 int test_cobol_fixture_contains(const char *path, const char *snippet);
 int test_expect_file_equals(const char *path, const char *expected);
+int test_expect_transcript_equal(const char *actual, const char *expected);
 int test_expect_compiler_output_allowed(const char *path);
 
 #endif

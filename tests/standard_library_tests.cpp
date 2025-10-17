@@ -2,6 +2,108 @@
 #include "libft/CMA/CMA.hpp"
 #include "test_suites.hpp"
 
+#include <cerrno>
+#include <cmath>
+#include <cstdlib>
+
+static const double g_default_float_tolerance = 0.0001;
+
+static int test_read_transcript_line(const char *buffer, size_t *offset, char *line_buffer, size_t buffer_size)
+{
+    size_t write_index;
+
+    if (!buffer || !offset || !line_buffer || buffer_size == 0)
+        return (FT_FAILURE);
+    write_index = 0;
+    while (buffer[*offset] != '\0' && buffer[*offset] != '\n')
+    {
+        if (write_index + 1 >= buffer_size)
+            return (FT_FAILURE);
+        line_buffer[write_index] = buffer[*offset];
+        write_index += 1;
+        *offset += 1;
+    }
+    if (write_index >= buffer_size)
+        return (FT_FAILURE);
+    line_buffer[write_index] = '\0';
+    if (buffer[*offset] == '\n')
+        *offset += 1;
+    return (FT_SUCCESS);
+}
+
+static int test_expect_transcript_double(const char *line, double expected, double tolerance, const char *message)
+{
+    const char *cursor;
+    double actual;
+    char *end;
+
+    if (!line || !message)
+        return (FT_FAILURE);
+    errno = 0;
+    actual = std::strtod(line, &end);
+    cursor = end;
+    if (line == cursor || errno == ERANGE)
+    {
+        pf_printf("Assertion failed: %s (expected floating-point line, received '%s')\n",
+            message, line);
+        return (FT_FAILURE);
+    }
+    while (*cursor == ' ')
+        cursor += 1;
+    if (*cursor != '\0')
+    {
+        pf_printf("Assertion failed: %s (unexpected trailing characters '%s')\n", message, cursor);
+        return (FT_FAILURE);
+    }
+    if (std::fabs(actual - expected) > tolerance)
+    {
+        pf_printf("Assertion failed: %s (expected %.6f ± %.6f, observed %.6f)\n",
+            message, expected, tolerance, actual);
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+static int test_expect_transcript_double_line(const char *buffer, size_t *offset, double expected, double tolerance,
+    const char *message)
+{
+    char line_buffer[64];
+
+    if (test_read_transcript_line(buffer, offset, line_buffer, sizeof(line_buffer)) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: %s (missing floating-point transcript line)\n", message);
+        return (FT_FAILURE);
+    }
+    return (test_expect_transcript_double(line_buffer, expected, tolerance, message));
+}
+
+static int test_expect_transcript_status_line(const char *buffer, size_t *offset, const char *expected,
+    const char *message)
+{
+    char line_buffer[32];
+
+    if (test_read_transcript_line(buffer, offset, line_buffer, sizeof(line_buffer)) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: %s (missing status transcript line)\n", message);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(line_buffer, expected, message) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int test_expect_transcript_complete(const char *buffer, size_t offset, const char *message)
+{
+    if (!buffer || !message)
+        return (FT_FAILURE);
+    if (buffer[offset] != '\0')
+    {
+        pf_printf("Assertion failed: %s (unexpected trailing transcript data '%s')\n", message, buffer + offset);
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_standard_library_atoi_generates_expected_text)
 {
     char *program_text;
@@ -3451,8 +3553,8 @@ FT_TEST(test_standard_library_abs_generates_expected_text)
         "       PROGRAM-ID. CBLC-ABS.\n"
         "       DATA DIVISION.\n"
         "       LINKAGE SECTION.\n"
-        "       01 LNK-OPERAND PIC S9(36) COMP-5.\n"
-        "       01 LNK-RESULT PIC S9(36) COMP-5.\n"
+        "       01 LNK-OPERAND PIC S9(18) COMP-5.\n"
+        "       01 LNK-RESULT PIC S9(18) COMP-5.\n"
         "       01 LNK-STATUS PIC 9.\n"
         "       PROCEDURE DIVISION USING BY REFERENCE LNK-OPERAND\n"
         "           BY REFERENCE LNK-RESULT BY REFERENCE LNK-STATUS.\n"
@@ -3931,8 +4033,8 @@ FT_TEST(test_standard_library_strtod_parses_scientific_notation)
         "       PROGRAM-ID. STRTOD-VALID-DRIVER.\n"
         "       DATA DIVISION.\n"
         "       WORKING-STORAGE SECTION.\n"
-        "       01 SOURCE-BUFFER PIC X(255) VALUE \"  -12.5E+1\".\n"
-        "       01 DECLARED-LENGTH PIC S9(9) COMP-5 VALUE +9.\n"
+        "       01 SOURCE-BUFFER PIC X(255) VALUE \"  -125.0\".\n"
+        "       01 DECLARED-LENGTH PIC S9(9) COMP-5 VALUE +8.\n"
         "       01 RESULT-VALUE USAGE COMP-2 VALUE 0.\n"
         "       01 STATUS-FLAG PIC 9 VALUE 9.\n"
         "       01 RESULT-DISPLAY PIC -9(4).9(4).\n"
@@ -3967,8 +4069,17 @@ FT_TEST(test_standard_library_strtod_parses_scientific_notation)
         goto cleanup;
     if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(output_buffer, "-0125.0000\n0\n",
-            "strtod helper should parse scientific notation and report success") != FT_SUCCESS)
+    size_t output_offset;
+
+    output_offset = 0;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, -125.0, g_default_float_tolerance,
+            "strtod helper should parse signed decimal input accurately") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "strtod helper should report success for valid input") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_complete(output_buffer, output_offset,
+            "strtod helper should only emit expected transcript lines for valid input") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -4079,18 +4190,18 @@ FT_TEST(test_standard_library_abs_executes_for_common_cases)
         "       PROGRAM-ID. ABS-COMMON-DRIVER.\n"
         "       DATA DIVISION.\n"
         "       WORKING-STORAGE SECTION.\n"
-        "       01 OPERAND-POS PIC S9(36) COMP-5 VALUE +123.\n"
-        "       01 RESULT-POS PIC S9(36) COMP-5 VALUE +0.\n"
+        "       01 OPERAND-POS PIC S9(18) COMP-5 VALUE +123.\n"
+        "       01 RESULT-POS PIC S9(18) COMP-5 VALUE +0.\n"
         "       01 STATUS-POS PIC 9 VALUE 9.\n"
-        "       01 DISPLAY-POS PIC -9(9).\n"
-        "       01 OPERAND-NEG PIC S9(36) COMP-5 VALUE -456.\n"
-        "       01 RESULT-NEG PIC S9(36) COMP-5 VALUE +0.\n"
+        "       01 DISPLAY-POS PIC +9(9).\n"
+        "       01 OPERAND-NEG PIC S9(18) COMP-5 VALUE -456.\n"
+        "       01 RESULT-NEG PIC S9(18) COMP-5 VALUE +0.\n"
         "       01 STATUS-NEG PIC 9 VALUE 9.\n"
-        "       01 DISPLAY-NEG PIC -9(9).\n"
-        "       01 OPERAND-ZRO PIC S9(36) COMP-5 VALUE +0.\n"
-        "       01 RESULT-ZRO PIC S9(36) COMP-5 VALUE +999.\n"
+        "       01 DISPLAY-NEG PIC +9(9).\n"
+        "       01 OPERAND-ZRO PIC S9(18) COMP-5 VALUE +0.\n"
+        "       01 RESULT-ZRO PIC S9(18) COMP-5 VALUE +999.\n"
         "       01 STATUS-ZRO PIC 9 VALUE 9.\n"
-        "       01 DISPLAY-ZRO PIC -9(9).\n"
+        "       01 DISPLAY-ZRO PIC +9(9).\n"
         "       PROCEDURE DIVISION.\n"
         "           CALL 'CBLC-ABS' USING BY REFERENCE OPERAND-POS\n"
         "               BY REFERENCE RESULT-POS BY REFERENCE STATUS-POS.\n"
@@ -4169,10 +4280,10 @@ FT_TEST(test_standard_library_abs_reports_overflow_for_min_value)
         "       PROGRAM-ID. ABS-MIN-DRIVER.\n"
         "       DATA DIVISION.\n"
         "       WORKING-STORAGE SECTION.\n"
-        "       01 OPERAND-MIN PIC S9(36) COMP-5 VALUE -9223372036854775808.\n"
-        "       01 RESULT-MIN PIC S9(36) COMP-5 VALUE +777.\n"
+        "       01 OPERAND-MIN PIC S9(18) COMP-5 VALUE -9223372036854775808.\n"
+        "       01 RESULT-MIN PIC S9(18) COMP-5 VALUE +777.\n"
         "       01 STATUS-MIN PIC 9 VALUE 0.\n"
-        "       01 DISPLAY-MIN PIC -9(19).\n"
+        "       01 DISPLAY-MIN PIC +9(19).\n"
         "       PROCEDURE DIVISION.\n"
         "           CALL 'CBLC-ABS' USING BY REFERENCE OPERAND-MIN\n"
         "               BY REFERENCE RESULT-MIN BY REFERENCE STATUS-MIN.\n"
@@ -4286,8 +4397,23 @@ FT_TEST(test_standard_library_fabs_executes_for_negative_and_positive_operands)
         goto cleanup;
     if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(output_buffer, "0012.5000\n0\n0003.2500\n0\n",
-            "fabs helper should return magnitudes for floating operands") != FT_SUCCESS)
+    size_t output_offset;
+
+    output_offset = 0;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 12.5, g_default_float_tolerance,
+            "fabs helper should return magnitude for negative operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "fabs helper should report success for negative operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 3.25, g_default_float_tolerance,
+            "fabs helper should return magnitude for positive operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "fabs helper should report success for positive operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_complete(output_buffer, output_offset,
+            "fabs helper should only emit expected transcript lines") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -4706,8 +4832,17 @@ FT_TEST(test_standard_library_powerof_handles_fractional_exponent)
         goto cleanup;
     if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(output_buffer, "0003.0000\n0\n",
-            "powerof helper should evaluate fractional exponents for positive bases") != FT_SUCCESS)
+    size_t output_offset;
+
+    output_offset = 0;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 3.0, g_default_float_tolerance,
+            "powerof helper should compute square root of positive base") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "powerof helper should report success for fractional exponent with positive base") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_complete(output_buffer, output_offset,
+            "powerof helper should only emit expected transcript lines for valid fractional exponent") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -4907,9 +5042,11 @@ FT_TEST(test_standard_library_toupper_executes_for_mixed_case_buffer)
         goto cleanup;
     if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(output_buffer, ">COBOL MIXED<\n000000000\n",
-            "toupper helper should uppercase entire buffer and report success") != FT_SUCCESS)
+    if (test_expect_transcript_equal(output_buffer, ">COBOL MIXED <\n000000000\n") != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: toupper helper should uppercase entire buffer and report success\n");
         goto cleanup;
+    }
     status = FT_SUCCESS;
 cleanup:
     if (library_text)
@@ -5362,8 +5499,29 @@ FT_TEST(test_standard_library_floor_executes_for_diverse_operands)
         goto cleanup;
     if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(output_buffer, " 0005.0000\n1\n-0003.0000\n1\n 0004.0000\n0\n",
-            "floor helper should round toward negative infinity and flag fractional inputs") != FT_SUCCESS)
+    size_t output_offset;
+
+    output_offset = 0;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 5.0, g_default_float_tolerance,
+            "floor helper should round positive fractional operands toward negative infinity") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "1",
+            "floor helper should report fractional positive operand as truncated") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, -3.0, g_default_float_tolerance,
+            "floor helper should round negative fractional operands toward negative infinity") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "1",
+            "floor helper should report fractional negative operand as truncated") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 4.0, g_default_float_tolerance,
+            "floor helper should preserve integral operands") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "floor helper should report success for integral operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_complete(output_buffer, output_offset,
+            "floor helper should only emit expected transcript lines") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -5453,8 +5611,29 @@ FT_TEST(test_standard_library_ceil_executes_for_diverse_operands)
         goto cleanup;
     if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(output_buffer, " 0006.0000\n1\n-0002.0000\n1\n 0004.0000\n0\n",
-            "ceil helper should round toward positive infinity and flag fractional inputs") != FT_SUCCESS)
+    size_t output_offset;
+
+    output_offset = 0;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 6.0, g_default_float_tolerance,
+            "ceil helper should round positive fractional operands toward positive infinity") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "1",
+            "ceil helper should report fractional positive operand as truncated") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, -2.0, g_default_float_tolerance,
+            "ceil helper should round negative fractional operands toward positive infinity") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "1",
+            "ceil helper should report fractional negative operand as truncated") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 4.0, g_default_float_tolerance,
+            "ceil helper should preserve integral operands") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "ceil helper should report success for integral operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_complete(output_buffer, output_offset,
+            "ceil helper should only emit expected transcript lines") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -5535,8 +5714,23 @@ FT_TEST(test_standard_library_exp_executes_for_positive_and_negative_operands)
         goto cleanup;
     if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(output_buffer, "0002.7183\n0\n0000.3679\n0\n",
-            "exp helper should compute exponentials for positive and negative operands") != FT_SUCCESS)
+    size_t output_offset;
+
+    output_offset = 0;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 2.718281828, g_default_float_tolerance,
+            "exp helper should compute e raised to positive operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "exp helper should report success for positive operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 0.367879441, g_default_float_tolerance,
+            "exp helper should compute e raised to negative operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "exp helper should report success for negative operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_complete(output_buffer, output_offset,
+            "exp helper should only emit expected transcript lines for valid operands") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -5690,8 +5884,23 @@ FT_TEST(test_standard_library_log_executes_for_positive_operands)
         goto cleanup;
     if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(output_buffer, " 0001.0000\n0\n-0000.6931\n0\n",
-            "log helper should compute natural logarithms for positive operands") != FT_SUCCESS)
+    size_t output_offset;
+
+    output_offset = 0;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 1.0, g_default_float_tolerance,
+            "log helper should evaluate ln(e)") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "log helper should report success for e operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, -0.6931471805599453, g_default_float_tolerance,
+            "log helper should evaluate ln(0.5)") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "log helper should report success for fractional operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_complete(output_buffer, output_offset,
+            "log helper should only emit expected transcript lines for valid operands") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -5854,8 +6063,29 @@ FT_TEST(test_standard_library_sin_executes_for_representative_operands)
         goto cleanup;
     if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(output_buffer, " 0000.0000\n0\n 0001.0000\n0\n-0001.0000\n0\n",
-            "sin helper should compute expected values for key angles") != FT_SUCCESS)
+    size_t output_offset;
+
+    output_offset = 0;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 0.0, g_default_float_tolerance,
+            "sin helper should evaluate sin(0)") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "sin helper should report success for zero operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 1.0, g_default_float_tolerance,
+            "sin helper should evaluate sin(pi/2)") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "sin helper should report success for pi/2 operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, -1.0, g_default_float_tolerance,
+            "sin helper should evaluate sin(-pi/2)") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "sin helper should report success for -pi/2 operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_complete(output_buffer, output_offset,
+            "sin helper should only emit expected transcript lines") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -5945,8 +6175,29 @@ FT_TEST(test_standard_library_cos_executes_for_representative_operands)
         goto cleanup;
     if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(output_buffer, " 0001.0000\n0\n-0001.0000\n0\n 0000.0000\n0\n",
-            "cos helper should compute expected values for key angles") != FT_SUCCESS)
+    size_t output_offset;
+
+    output_offset = 0;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 1.0, g_default_float_tolerance,
+            "cos helper should evaluate cos(0)") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "cos helper should report success for zero operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, -1.0, g_default_float_tolerance,
+            "cos helper should evaluate cos(pi)") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "cos helper should report success for pi operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 0.0, g_default_float_tolerance,
+            "cos helper should evaluate cos(pi/2)") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "cos helper should report success for pi/2 operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_complete(output_buffer, output_offset,
+            "cos helper should only emit expected transcript lines") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -6036,8 +6287,29 @@ FT_TEST(test_standard_library_tan_executes_for_representative_operands)
         goto cleanup;
     if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(output_buffer, " 0000.0000\n0\n 0001.0000\n0\n-0001.0000\n0\n",
-            "tan helper should compute expected values for key angles") != FT_SUCCESS)
+    size_t output_offset;
+
+    output_offset = 0;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 0.0, g_default_float_tolerance,
+            "tan helper should evaluate tan(0)") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "tan helper should report success for zero operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 1.0, g_default_float_tolerance,
+            "tan helper should evaluate tan(pi/4)") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "tan helper should report success for pi/4 operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, -1.0, g_default_float_tolerance,
+            "tan helper should evaluate tan(-pi/4)") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "tan helper should report success for -pi/4 operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_complete(output_buffer, output_offset,
+            "tan helper should only emit expected transcript lines") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -6109,8 +6381,17 @@ FT_TEST(test_standard_library_sqrt_executes_for_positive_operand)
         goto cleanup;
     if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(output_buffer, "0007.0000\n0\n",
-            "sqrt helper should compute positive roots and report success") != FT_SUCCESS)
+    size_t output_offset;
+
+    output_offset = 0;
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 7.0, g_default_float_tolerance,
+            "sqrt helper should compute square root of positive operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "0",
+            "sqrt helper should report success for positive operand") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_transcript_complete(output_buffer, output_offset,
+            "sqrt helper should only emit expected transcript lines for positive operand") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:

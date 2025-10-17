@@ -229,6 +229,49 @@ static int cblc_translation_unit_ensure_statement_capacity(t_cblc_translation_un
     return (FT_SUCCESS);
 }
 
+static int cblc_parse_char_literal(const char **cursor, char *out_value)
+{
+    char value;
+
+    if (!cursor || !*cursor || !out_value)
+        return (FT_FAILURE);
+    if (**cursor != '\'')
+        return (FT_FAILURE);
+    *cursor += 1;
+    if (**cursor == '\0')
+        return (FT_FAILURE);
+    if (**cursor == '\\')
+    {
+        *cursor += 1;
+        if (**cursor == 'n')
+            value = '\n';
+        else if (**cursor == 'r')
+            value = '\r';
+        else if (**cursor == 't')
+            value = '\t';
+        else if (**cursor == '\\')
+            value = '\\';
+        else if (**cursor == '\'')
+            value = '\'';
+        else if (**cursor == '"')
+            value = '"';
+        else
+            return (FT_FAILURE);
+    }
+    else
+    {
+        value = **cursor;
+    }
+    if (**cursor == '\0')
+        return (FT_FAILURE);
+    *cursor += 1;
+    if (**cursor != '\'')
+        return (FT_FAILURE);
+    *cursor += 1;
+    *out_value = value;
+    return (FT_SUCCESS);
+}
+
 static int cblc_parse_char_declaration(const char **cursor, t_cblc_translation_unit *unit)
 {
     char identifier[TRANSPILE_IDENTIFIER_MAX];
@@ -242,17 +285,19 @@ static int cblc_parse_char_declaration(const char **cursor, t_cblc_translation_u
     if (cblc_parse_identifier(cursor, identifier, sizeof(identifier)) != FT_SUCCESS)
         return (FT_FAILURE);
     cblc_skip_whitespace(cursor);
-    if (**cursor != '[')
-        return (FT_FAILURE);
-    *cursor += 1;
-    cblc_skip_whitespace(cursor);
-    if (cblc_parse_numeric_literal(cursor, &length) != FT_SUCCESS)
-        return (FT_FAILURE);
-    cblc_skip_whitespace(cursor);
-    if (**cursor != ']')
-        return (FT_FAILURE);
-    *cursor += 1;
-    cblc_skip_whitespace(cursor);
+    length = 1;
+    if (**cursor == '[')
+    {
+        *cursor += 1;
+        cblc_skip_whitespace(cursor);
+        if (cblc_parse_numeric_literal(cursor, &length) != FT_SUCCESS)
+            return (FT_FAILURE);
+        cblc_skip_whitespace(cursor);
+        if (**cursor != ']')
+            return (FT_FAILURE);
+        *cursor += 1;
+        cblc_skip_whitespace(cursor);
+    }
     if (**cursor != ';')
         return (FT_FAILURE);
     *cursor += 1;
@@ -501,6 +546,29 @@ static int cblc_parse_assignment(const char **cursor, t_cblc_translation_unit *u
             cobol_source[0] = '\"';
             cobol_source[1] = '\0';
             ft_strlcat(cobol_source, literal_buffer, sizeof(cobol_source));
+            ft_strlcat(cobol_source, "\"", sizeof(cobol_source));
+            cblc_skip_whitespace(cursor);
+            if (**cursor != ';')
+                return (FT_FAILURE);
+            *cursor += 1;
+            return (cblc_append_statement(unit, CBLC_STATEMENT_ASSIGNMENT,
+                    target_item->cobol_name, cobol_source, 1));
+        }
+        if (**cursor == '\'')
+        {
+            char literal_value;
+            char literal_text[4];
+
+            if (cblc_parse_char_literal(cursor, &literal_value) != FT_SUCCESS)
+                return (FT_FAILURE);
+            literal_text[0] = literal_value;
+            literal_text[1] = '\0';
+            cobol_source[0] = '\"';
+            cobol_source[1] = '\0';
+            if (literal_value == '"')
+                ft_strlcat(cobol_source, "\"\"", sizeof(cobol_source));
+            else
+                ft_strlcat(cobol_source, literal_text, sizeof(cobol_source));
             ft_strlcat(cobol_source, "\"", sizeof(cobol_source));
             cblc_skip_whitespace(cursor);
             if (**cursor != ';')
