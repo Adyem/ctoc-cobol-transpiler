@@ -153,6 +153,7 @@ TEST_SRC    = tests/test_main.cpp \
               tests/compiler/cobol/return_character_tests.cpp \
               tests/compiler/cobol/record_writer_tests.cpp \
               tests/compiler/cobol/integration_showcase_tests.cpp \
+              tests/compiler/cobol/message_showcase_tests.cpp \
               tests/compiler/cobol/record_summary_tests.cpp \
               tests/compiler/cobol/reverse_control_flow_tests.cpp \
               tests/compiler/cobol/reverse_normalization_tests.cpp \

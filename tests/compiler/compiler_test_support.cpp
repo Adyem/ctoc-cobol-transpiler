@@ -7,6 +7,52 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+static int test_trim_transcript_lines(const char *source, char *buffer, size_t buffer_size)
+{
+    size_t read_index;
+    size_t write_index;
+
+    if (!source || !buffer || buffer_size == 0)
+        return (FT_FAILURE);
+    read_index = 0;
+    write_index = 0;
+    while (source[read_index] != '\0')
+    {
+        size_t line_start;
+        size_t line_end;
+        size_t trim_end;
+
+        line_start = read_index;
+        line_end = read_index;
+        while (source[line_end] != '\0' && source[line_end] != '\n')
+            line_end += 1;
+        trim_end = line_end;
+        while (trim_end > line_start && source[trim_end - 1] == ' ')
+            trim_end -= 1;
+        while (line_start < trim_end)
+        {
+            if (write_index + 1 >= buffer_size)
+                return (FT_FAILURE);
+            buffer[write_index] = source[line_start];
+            write_index += 1;
+            line_start += 1;
+        }
+        if (source[line_end] == '\n')
+        {
+            if (write_index + 1 >= buffer_size)
+                return (FT_FAILURE);
+            buffer[write_index] = '\n';
+            write_index += 1;
+            line_end += 1;
+        }
+        read_index = line_end;
+    }
+    if (write_index >= buffer_size)
+        return (FT_FAILURE);
+    buffer[write_index] = '\0';
+    return (FT_SUCCESS);
+}
+
 void test_cleanup_example_artifacts(const char *source_path, const char *binary_path, const char *output_path)
 {
     test_remove_file(output_path);
@@ -175,6 +221,25 @@ int test_expect_file_equals(const char *path, const char *expected)
     if (ft_strncmp(buffer, expected, ft_strlen(expected) + 1) != 0)
     {
         pf_printf("Assertion failed: file %s did not match expected content\n", path);
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+int test_expect_transcript_equal(const char *actual, const char *expected)
+{
+    char normalized[4096];
+
+    if (!actual || !expected)
+        return (FT_FAILURE);
+    if (test_trim_transcript_lines(actual, normalized, sizeof(normalized)) != FT_SUCCESS)
+    {
+        pf_printf("Assertion failed: unable to normalize transcript before comparison\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(normalized, expected, ft_strlen(expected) + 1) != 0)
+    {
+        pf_printf("Assertion failed: transcript did not match expected text\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);

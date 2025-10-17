@@ -6,6 +6,8 @@ int test_cblc_copy_file_translates_to_cobol_and_executes(void);
 int test_cblc_filter_prefix_translates_to_cobol_and_executes(void);
 int test_cblc_reverse_control_flow_translates_to_cobol_and_executes(void);
 int test_cblc_integration_showcase_translates_to_cobol_and_executes(void);
+int test_cblc_message_showcase_translates_to_cobol_and_executes(void);
+int test_message_showcase_sample_make_pipeline(void);
 int test_cblc_multi_module_translates_to_cobol_and_executes(void);
 int test_cblc_numeric_precision_translates_to_cobol_and_executes(void);
 int test_cblc_floating_point_mix_translates_to_cobol_and_executes(void);
@@ -40,6 +42,9 @@ const t_test_case *get_compiler_cobol_round_trip_pipeline_tests(size_t *count)
             test_cblc_reverse_control_flow_translates_to_cobol_and_executes},
         {"cblc_integration_showcase_translates_to_cobol_and_executes",
             test_cblc_integration_showcase_translates_to_cobol_and_executes},
+        {"cblc_message_showcase_translates_to_cobol_and_executes",
+            test_cblc_message_showcase_translates_to_cobol_and_executes},
+        {"message_showcase_sample_make_pipeline", test_message_showcase_sample_make_pipeline},
         {"cblc_multi_module_translates_to_cobol_and_executes",
             test_cblc_multi_module_translates_to_cobol_and_executes},
         {"cblc_numeric_precision_translates_to_cobol_and_executes",
