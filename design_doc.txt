@@ -218,14 +218,19 @@ Default numeric size policy (configurable):
 
 | CBL‑C     | COBOL                                                      |
 | --------- | ---------------------------------------------------------- |
-| `int`     | `PIC 9(10) SIGN IS LEADING SEPARATE` (or unsigned `9(10)`) |
+| `int`     | `PIC 9(10) SIGN IS LEADING SEPARATE USAGE COMP-5` (or unsigned `9(10)` with `USAGE COMP-5`) |
 | `char[n]` | `PIC X(n)`                                                 |
 | `bool`    | `PIC X VALUE 'N'` (size 1, `'Y'`/`'N'` operators supported) |
 
 Helper routines in `transpiler_cobol_types` encapsulate these policies. Elementary descriptors carry
-length, scale, and signedness so they can render `PIC` clauses (including optional `V9` precision and
-`SIGN IS LEADING SEPARATE`). Group helpers emit `01` headers and stitch nested `05` entries, letting
+length, scale, signedness, and usage so they can render `PIC` clauses (including optional `V9` precision,
+`SIGN IS LEADING SEPARATE`, and binary `USAGE COMP-5`). Group helpers emit `01` headers and stitch nested `05` entries, letting
 file section records and working-storage layouts share consistent formatting surfaces.
+
+Custom helpers complement the built-in `int`/`char` presets so callers can size data items explicitly. Use
+`transpiler_cobol_describe_numeric(digits, is_signed, usage, ...)` for arbitrary integer lengths (display or `COMP-5`), and
+`transpiler_cobol_describe_fixed_point(integral, fractional, is_signed, usage, ...)` when integral/fractional precision must be
+configured independently.
 
 ### 4.6 Control Flow
 

@@ -630,11 +630,18 @@ typedef enum e_transpiler_cobol_elementary_kind
     TRANSPILE_COBOL_ELEMENTARY_NUMERIC_UNSIGNED
 }   t_transpiler_cobol_elementary_kind;
 
+typedef enum e_transpiler_cobol_usage
+{
+    TRANSPILE_COBOL_USAGE_DISPLAY = 0,
+    TRANSPILE_COBOL_USAGE_COMP_5
+}   t_transpiler_cobol_usage;
+
 typedef struct s_transpiler_cobol_elementary
 {
     t_transpiler_cobol_elementary_kind kind;
     size_t length;
     size_t scale;
+    t_transpiler_cobol_usage usage;
 }   t_transpiler_cobol_elementary;
 
 typedef struct s_transpiler_cobol_group_field
@@ -659,6 +666,10 @@ int transpiler_cobol_describe_c_float(t_transpiler_cobol_elementary *out);
 int transpiler_cobol_describe_c_double(t_transpiler_cobol_elementary *out);
 int transpiler_cobol_describe_c_char_array(size_t length, t_transpiler_cobol_elementary *out);
 int transpiler_cobol_describe_c_bool(t_transpiler_cobol_elementary *out);
+int transpiler_cobol_describe_numeric(size_t digits, int is_signed, t_transpiler_cobol_usage usage,
+    t_transpiler_cobol_elementary *out);
+int transpiler_cobol_describe_fixed_point(size_t integral_digits, size_t fractional_digits, int is_signed,
+    t_transpiler_cobol_usage usage, t_transpiler_cobol_elementary *out);
 int transpiler_cobol_format_elementary(const char *name, size_t level,
     const t_transpiler_cobol_elementary *element, size_t indentation, char **out);
 int transpiler_cobol_format_group(const t_transpiler_cobol_group *group,

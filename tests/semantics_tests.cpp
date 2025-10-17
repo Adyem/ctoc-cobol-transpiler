@@ -2,7 +2,7 @@
 
 const t_test_case *get_semantics_tests(size_t *count)
 {
-    static t_test_case tests[40];
+    static t_test_case tests[80];
     static size_t total_count = 0;
     static int initialized = 0;
     size_t offset;
