@@ -573,7 +573,8 @@ int transpiler_validate_generated_cobol(const char *text);
 typedef enum e_cblc_data_kind
 {
     CBLC_DATA_KIND_CHAR = 0,
-    CBLC_DATA_KIND_INT
+    CBLC_DATA_KIND_INT,
+    CBLC_DATA_KIND_STRING
 }   t_cblc_data_kind;
 
 #define TRANSPILE_STATEMENT_TEXT_MAX 256
@@ -815,14 +816,23 @@ int cblc_formatter_format(const char *input, t_transpiler_format_mode mode, char
 // ===================================
 // Standard library generation helpers
 // ===================================
+typedef enum e_transpiler_standard_library_buffer_kind
+{
+    TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE = 0,
+    TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR,
+    TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING
+}   t_transpiler_standard_library_buffer_kind;
+
 typedef struct s_transpiler_standard_library_entry
 {
     const char *qualified_name;
+    t_transpiler_standard_library_buffer_kind buffer_kind;
     const char *program_name;
     int (*generator)(char **out_text);
 }   t_transpiler_standard_library_entry;
 
 int transpiler_standard_library_generate_strlen(char **out_text);
+int transpiler_standard_library_generate_strlen_string(char **out_text);
 int transpiler_standard_library_generate_strnlen(char **out_text);
 int transpiler_standard_library_generate_strcmp(char **out_text);
 int transpiler_standard_library_generate_strcpy(char **out_text);
@@ -851,6 +861,8 @@ int transpiler_standard_library_generate_isalpha(char **out_text);
 
 const t_transpiler_standard_library_entry *transpiler_standard_library_get_entries(size_t *count);
 const t_transpiler_standard_library_entry *transpiler_standard_library_lookup(const char *qualified_name);
+const t_transpiler_standard_library_entry *transpiler_standard_library_lookup_with_buffer_kind(
+    const char *qualified_name, t_transpiler_standard_library_buffer_kind buffer_kind);
 
 // ============================
 // Command line and diagnostics
