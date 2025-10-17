@@ -31,6 +31,22 @@ FT_TEST(test_runtime_char_from_string_rejects_empty_input)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_runtime_char_from_string_rejects_multi_character_input)
+{
+    t_runtime_char character;
+
+    runtime_char_set(&character, 'Q');
+    if (runtime_char_from_string(&character, "YZ") != FT_FAILURE)
+    {
+        pf_printf("Assertion failed: runtime_char_from_string should reject multi-character text\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_char_equal(character.value, 'Q',
+            "runtime_char_from_string should preserve previous value") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_runtime_char_to_string_and_compare)
 {
     t_runtime_char left;
@@ -60,6 +76,7 @@ const t_test_case *get_runtime_char_tests(size_t *count)
     static const t_test_case tests[] = {
         {"runtime_char_transforms", test_runtime_char_transforms},
         {"runtime_char_from_string_rejects_empty_input", test_runtime_char_from_string_rejects_empty_input},
+        {"runtime_char_from_string_rejects_multi_character_input", test_runtime_char_from_string_rejects_multi_character_input},
         {"runtime_char_to_string_and_compare", test_runtime_char_to_string_and_compare}
     };
 
