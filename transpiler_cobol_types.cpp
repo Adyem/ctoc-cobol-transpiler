@@ -276,6 +276,11 @@ static int transpiler_cobol_elementary_append_picture(t_transpiler_cobol_buffer 
             if (transpiler_cobol_buffer_append_string(buffer, " SIGN IS LEADING SEPARATE") != FT_SUCCESS)
                 return (FT_FAILURE);
         }
+        if (element->usage == TRANSPILE_COBOL_USAGE_COMP_5)
+        {
+            if (transpiler_cobol_buffer_append_string(buffer, " USAGE COMP-5") != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
         return (FT_SUCCESS);
     }
     return (FT_FAILURE);
@@ -307,6 +312,7 @@ int transpiler_cobol_describe_c_int(size_t digits, int is_signed, t_transpiler_c
         : TRANSPILE_COBOL_ELEMENTARY_NUMERIC_UNSIGNED;
     out->length = digits;
     out->scale = 0;
+    out->usage = TRANSPILE_COBOL_USAGE_COMP_5;
     return (FT_SUCCESS);
 }
 
@@ -327,6 +333,7 @@ int transpiler_cobol_describe_c_float(t_transpiler_cobol_elementary *out)
     out->kind = TRANSPILE_COBOL_ELEMENTARY_NUMERIC_SIGNED;
     out->length = 9;
     out->scale = 9;
+    out->usage = TRANSPILE_COBOL_USAGE_DISPLAY;
     return (FT_SUCCESS);
 }
 
@@ -337,6 +344,7 @@ int transpiler_cobol_describe_c_double(t_transpiler_cobol_elementary *out)
     out->kind = TRANSPILE_COBOL_ELEMENTARY_NUMERIC_SIGNED;
     out->length = 18;
     out->scale = 18;
+    out->usage = TRANSPILE_COBOL_USAGE_DISPLAY;
     return (FT_SUCCESS);
 }
 
@@ -349,6 +357,7 @@ int transpiler_cobol_describe_c_char_array(size_t length, t_transpiler_cobol_ele
     out->kind = TRANSPILE_COBOL_ELEMENTARY_ALPHANUMERIC;
     out->length = length;
     out->scale = 0;
+    out->usage = TRANSPILE_COBOL_USAGE_DISPLAY;
     return (FT_SUCCESS);
 }
 
@@ -359,6 +368,41 @@ int transpiler_cobol_describe_c_bool(t_transpiler_cobol_elementary *out)
     out->kind = TRANSPILE_COBOL_ELEMENTARY_BOOLEAN;
     out->length = 1;
     out->scale = 0;
+    out->usage = TRANSPILE_COBOL_USAGE_DISPLAY;
+    return (FT_SUCCESS);
+}
+
+int transpiler_cobol_describe_numeric(size_t digits, int is_signed, t_transpiler_cobol_usage usage,
+    t_transpiler_cobol_elementary *out)
+{
+    if (!out)
+        return (FT_FAILURE);
+    if (usage != TRANSPILE_COBOL_USAGE_DISPLAY && usage != TRANSPILE_COBOL_USAGE_COMP_5)
+        return (FT_FAILURE);
+    if (digits == 0)
+        digits = 1;
+    out->kind = is_signed ? TRANSPILE_COBOL_ELEMENTARY_NUMERIC_SIGNED
+        : TRANSPILE_COBOL_ELEMENTARY_NUMERIC_UNSIGNED;
+    out->length = digits;
+    out->scale = 0;
+    out->usage = usage;
+    return (FT_SUCCESS);
+}
+
+int transpiler_cobol_describe_fixed_point(size_t integral_digits, size_t fractional_digits, int is_signed,
+    t_transpiler_cobol_usage usage, t_transpiler_cobol_elementary *out)
+{
+    if (!out)
+        return (FT_FAILURE);
+    if (usage != TRANSPILE_COBOL_USAGE_DISPLAY && usage != TRANSPILE_COBOL_USAGE_COMP_5)
+        return (FT_FAILURE);
+    if (integral_digits == 0 && fractional_digits == 0)
+        integral_digits = 1;
+    out->kind = is_signed ? TRANSPILE_COBOL_ELEMENTARY_NUMERIC_SIGNED
+        : TRANSPILE_COBOL_ELEMENTARY_NUMERIC_UNSIGNED;
+    out->length = integral_digits;
+    out->scale = fractional_digits;
+    out->usage = usage;
     return (FT_SUCCESS);
 }
 

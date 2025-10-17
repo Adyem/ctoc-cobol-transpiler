@@ -402,6 +402,21 @@ static int transpiler_semantics_is_numeric_kind(t_transpiler_semantic_data_kind 
     return (0);
 }
 
+static int transpiler_semantics_numeric_kinds_match(
+    t_transpiler_semantic_data_kind left,
+    t_transpiler_semantic_data_kind right)
+{
+    if (left == TRANSPILE_SEMANTIC_DATA_UNKNOWN
+        || right == TRANSPILE_SEMANTIC_DATA_UNKNOWN)
+        return (1);
+    if (!transpiler_semantics_is_numeric_kind(left)
+        || !transpiler_semantics_is_numeric_kind(right))
+        return (left == right);
+    if (left == right)
+        return (1);
+    return (0);
+}
+
 static int transpiler_semantics_kinds_compatible(t_transpiler_semantic_data_kind left,
     t_transpiler_semantic_data_kind right)
 {
@@ -794,6 +809,19 @@ static int transpiler_semantics_classify_arithmetic_expression(const t_ast_node 
             else
                 status = FT_FAILURE;
         }
+        if (status == FT_SUCCESS
+            && !transpiler_semantics_numeric_kinds_match(left_kind, right_kind))
+        {
+            pf_snprintf(message, sizeof(message),
+                "arithmetic operator '%s' requires operands of the same type but %s is %s and %s is %s",
+                operator_text, left_role,
+                transpiler_semantics_kind_to_string(left_kind), right_role,
+                transpiler_semantics_kind_to_string(right_kind));
+            if (transpiler_semantics_emit_invalid_expression(context, message) != FT_SUCCESS)
+                status = FT_FAILURE;
+            else
+                status = FT_FAILURE;
+        }
         if (status == FT_SUCCESS)
         {
             if (out_kind)
@@ -878,6 +906,19 @@ static int transpiler_semantics_classify_arithmetic_expression(const t_ast_node 
             pf_snprintf(message, sizeof(message),
                 "arithmetic operator '%s' requires numeric or floating operands but %s is %s",
                 operator_text, right_role,
+                transpiler_semantics_kind_to_string(right_kind));
+            if (transpiler_semantics_emit_invalid_expression(context, message) != FT_SUCCESS)
+                status = FT_FAILURE;
+            else
+                status = FT_FAILURE;
+        }
+        if (status == FT_SUCCESS
+            && !transpiler_semantics_numeric_kinds_match(left_kind, right_kind))
+        {
+            pf_snprintf(message, sizeof(message),
+                "arithmetic operator '%s' requires operands of the same type but %s is %s and %s is %s",
+                operator_text, left_role,
+                transpiler_semantics_kind_to_string(left_kind), right_role,
                 transpiler_semantics_kind_to_string(right_kind));
             if (transpiler_semantics_emit_invalid_expression(context, message) != FT_SUCCESS)
                 status = FT_FAILURE;
@@ -1130,6 +1171,19 @@ static int transpiler_semantics_validate_condition(const t_ast_node *condition,
                     pf_snprintf(message, sizeof(message),
                         "condition operator '%s' requires numeric or floating operands but right operand '%s' is %s",
                         operator_text, right_name, transpiler_semantics_kind_to_string(right_kind));
+                    if (transpiler_semantics_emit_invalid_condition(context, message) != FT_SUCCESS)
+                        status = FT_FAILURE;
+                    else
+                        status = FT_FAILURE;
+                }
+                if (status == FT_SUCCESS
+                    && !transpiler_semantics_numeric_kinds_match(left_kind, right_kind))
+                {
+                    pf_snprintf(message, sizeof(message),
+                        "condition operator '%s' requires operands of the same type but '%s' is %s and '%s' is %s",
+                        operator_text, left_name,
+                        transpiler_semantics_kind_to_string(left_kind), right_name,
+                        transpiler_semantics_kind_to_string(right_kind));
                     if (transpiler_semantics_emit_invalid_condition(context, message) != FT_SUCCESS)
                         status = FT_FAILURE;
                     else
