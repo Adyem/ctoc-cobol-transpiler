@@ -12,7 +12,7 @@ TEST_NAME   = automated_tests$(EXE_EXT)
 PYTHON      ?= python3
 LINT_SCRIPT  = scripts/lint_sources.py
 
-SRC         = main.cpp runtime_scalar.cpp runtime_string.cpp runtime_record.cpp runtime_file.cpp lexer.cpp lexer_token.cpp ast.cpp parser.cpp transpiler_diagnostics.cpp transpiler_context.cpp transpiler_pipeline.cpp transpiler_cblc.cpp transpiler_cli.cpp cblc_formatter.cpp transpiler_logging.cpp transpiler_validation.cpp transpiler_semantics.cpp transpiler_codegen.cpp transpiler_cobol_types.cpp transpiler_cobol_procedure.cpp transpiler_cobol_reverse.cpp transpiler_standard_library.cpp transpiler_standard_library_strlen.cpp transpiler_standard_library_strlen_string.cpp transpiler_standard_library_strnlen.cpp transpiler_standard_library_strcmp.cpp transpiler_standard_library_strcpy.cpp transpiler_standard_library_strncpy.cpp transpiler_standard_library_memcmp.cpp transpiler_standard_library_strcat.cpp transpiler_standard_library_strtod.cpp transpiler_standard_library_abs.cpp transpiler_standard_library_fabs.cpp transpiler_standard_library_floor.cpp transpiler_standard_library_ceil.cpp transpiler_standard_library_exp.cpp transpiler_standard_library_log.cpp transpiler_standard_library_sin.cpp transpiler_standard_library_cos.cpp transpiler_standard_library_tan.cpp transpiler_standard_library_atoi.cpp transpiler_standard_library_atol.cpp transpiler_standard_library_atoll.cpp transpiler_standard_library_powerof.cpp transpiler_standard_library_sqrt.cpp transpiler_standard_library_toupper.cpp transpiler_standard_library_tolower.cpp transpiler_standard_library_isdigit.cpp transpiler_standard_library_isalpha.cpp
+SRC         = main.cpp runtime_scalar.cpp runtime_string.cpp runtime_record.cpp runtime_file.cpp lexer.cpp lexer_token.cpp ast.cpp parser.cpp transpiler_diagnostics.cpp transpiler_context.cpp transpiler_pipeline.cpp transpiler_cblc.cpp transpiler_cli.cpp cblc_formatter.cpp transpiler_logging.cpp transpiler_validation.cpp transpiler_semantics.cpp transpiler_codegen.cpp transpiler_cobol_types.cpp transpiler_cobol_procedure.cpp transpiler_cobol_reverse.cpp transpiler_standard_library.cpp transpiler_standard_library_state.cpp transpiler_standard_library_strlen.cpp transpiler_standard_library_strlen_string.cpp transpiler_standard_library_strnlen.cpp transpiler_standard_library_strnlen_string.cpp transpiler_standard_library_strcmp.cpp transpiler_standard_library_strcmp_string.cpp transpiler_standard_library_strcpy.cpp transpiler_standard_library_strcpy_string.cpp transpiler_standard_library_strncpy.cpp transpiler_standard_library_strncpy_string.cpp transpiler_standard_library_memcmp.cpp transpiler_standard_library_memcmp_string.cpp transpiler_standard_library_strcat.cpp transpiler_standard_library_strcat_string.cpp transpiler_standard_library_strtod.cpp transpiler_standard_library_strtod_string.cpp transpiler_standard_library_abs.cpp transpiler_standard_library_fabs.cpp transpiler_standard_library_floor.cpp transpiler_standard_library_ceil.cpp transpiler_standard_library_exp.cpp transpiler_standard_library_log.cpp transpiler_standard_library_sin.cpp transpiler_standard_library_cos.cpp transpiler_standard_library_tan.cpp transpiler_standard_library_atoi.cpp transpiler_standard_library_atoi_string.cpp transpiler_standard_library_atol.cpp transpiler_standard_library_atol_string.cpp transpiler_standard_library_atoll.cpp transpiler_standard_library_atoll_string.cpp transpiler_standard_library_powerof.cpp transpiler_standard_library_sqrt.cpp transpiler_standard_library_toupper.cpp transpiler_standard_library_toupper_string.cpp transpiler_standard_library_tolower.cpp transpiler_standard_library_tolower_string.cpp transpiler_standard_library_isdigit.cpp transpiler_standard_library_isalpha.cpp
 
 CC          = g++
 
@@ -116,8 +116,35 @@ TEST_SRC    = tests/test_main.cpp \
              tests/semantics_test_support.cpp \
              tests/runtime_int_tests.cpp \
               tests/runtime_char_tests.cpp \
-              tests/runtime_string_tests.cpp \
-              tests/standard_library_tests.cpp \
+             tests/runtime_string_tests.cpp \
+             tests/standard_library_tests.cpp \
+             tests/standard_library/standard_library_registry_tests.cpp \
+             tests/standard_library/standard_library_abs_tests.cpp \
+             tests/standard_library/standard_library_atoi_tests.cpp \
+             tests/standard_library/standard_library_atol_tests.cpp \
+             tests/standard_library/standard_library_atoll_tests.cpp \
+             tests/standard_library/standard_library_ceil_tests.cpp \
+             tests/standard_library/standard_library_cos_tests.cpp \
+             tests/standard_library/standard_library_exp_tests.cpp \
+             tests/standard_library/standard_library_fabs_tests.cpp \
+             tests/standard_library/standard_library_floor_tests.cpp \
+             tests/standard_library/standard_library_isalpha_tests.cpp \
+             tests/standard_library/standard_library_isdigit_tests.cpp \
+             tests/standard_library/standard_library_log_tests.cpp \
+             tests/standard_library/standard_library_memcmp_tests.cpp \
+             tests/standard_library/standard_library_powerof_tests.cpp \
+             tests/standard_library/standard_library_sin_tests.cpp \
+             tests/standard_library/standard_library_sqrt_tests.cpp \
+             tests/standard_library/standard_library_strcat_tests.cpp \
+             tests/standard_library/standard_library_strcmp_tests.cpp \
+             tests/standard_library/standard_library_strcpy_tests.cpp \
+             tests/standard_library/standard_library_strlen_tests.cpp \
+             tests/standard_library/standard_library_strncpy_tests.cpp \
+             tests/standard_library/standard_library_strnlen_tests.cpp \
+             tests/standard_library/standard_library_strtod_tests.cpp \
+             tests/standard_library/standard_library_tan_tests.cpp \
+             tests/standard_library/standard_library_tolower_tests.cpp \
+             tests/standard_library/standard_library_toupper_tests.cpp \
               tests/runtime_audit_tests.cpp \
               tests/runtime_record_tests.cpp \
               tests/runtime_file_tests.cpp \
