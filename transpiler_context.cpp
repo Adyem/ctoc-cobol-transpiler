@@ -655,6 +655,7 @@ void transpiler_context_reset_unit_state(t_transpiler_context *context)
     context->copybook_count = 0;
     context->source_map_count = 0;
     context->last_error_code = FT_SUCCESS;
+    transpiler_standard_library_reset_usage();
 }
 
 void transpiler_context_record_error(t_transpiler_context *context, int error_code)
