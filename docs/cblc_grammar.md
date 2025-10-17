@@ -51,7 +51,7 @@ file_fixed_record_spec ::= 'fixed' '(' INTEGER_LITERAL ')'
 ```
 record_declaration  ::= 'record' identifier '{' { record_field } '}' ';'
 record_field        ::= scalar_type identifier array_suffix ';'
-scalar_type         ::= 'int' | 'char' | 'bool'
+scalar_type         ::= 'int' | 'char' | 'bool' | 'string'
 array_suffix        ::= '[' INTEGER_LITERAL ']' | ε
 ```
 
@@ -119,6 +119,7 @@ unary_expression            ::= unary_operator unary_expression | primary_expres
 unary_operator              ::= '!' | '-'
 primary_expression          ::= literal
                               | identifier
+                              | identifier '.' 'len'
                               | call_expression
                               | '(' expression ')'
 call_expression             ::= identifier '(' argument_list ')'

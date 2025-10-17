@@ -62,6 +62,11 @@ following helpers:
   scans at most the caller-provided length, exits early on NUL bytes, trims
   trailing spaces, and writes the resulting character count into the return
   slot.
+- `CBLC-STRLEN-STRING` accepts a by-reference group containing a `PIC 9(4)
+  COMP` length field alongside an alphanumeric buffer (up to 255 characters)
+  plus a trailing numeric slot for the result. The helper simply moves the
+  caller-maintained length field into the return slot so string objects retain
+  their internal length metadata when passed across module boundaries.
 - `CBLC-STRNLEN` accepts the same parameters as `CBLC-STRLEN` plus an explicit
   request limit passed by value. It caps the scan to the minimum of the declared
   length, requested length, and 255-character ceiling, exits early on NUL bytes,

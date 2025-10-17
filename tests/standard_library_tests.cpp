@@ -1139,6 +1139,45 @@ FT_TEST(test_standard_library_strlen_generates_expected_text)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_standard_library_strlen_string_generates_expected_text)
+{
+    char *program_text;
+    const char *expected_text;
+    int status;
+
+    program_text = NULL;
+    expected_text =
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. CBLC-STRLEN-STRING.\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       LINKAGE SECTION.\n"
+        "       01 LNK-SOURCE.\n"
+        "          05 LNK-SOURCE-LEN PIC 9(4) COMP.\n"
+        "          05 LNK-SOURCE-BUF PIC X(255).\n"
+        "       01 LNK-RESULT PIC 9(9).\n"
+        "       PROCEDURE DIVISION USING BY REFERENCE LNK-SOURCE\n"
+        "           BY REFERENCE LNK-RESULT.\n"
+        "       MAIN.\n"
+        "           MOVE LNK-SOURCE-LEN TO LNK-RESULT.\n"
+        "           GOBACK.\n"
+        "       END PROGRAM CBLC-STRLEN-STRING.\n";
+    if (test_expect_success(transpiler_standard_library_generate_strlen_string(&program_text),
+            "string strlen generator should succeed") != FT_SUCCESS)
+    {
+        if (program_text)
+            cma_free(program_text);
+        return (FT_FAILURE);
+    }
+    status = test_expect_cstring_equal(program_text, expected_text,
+        "string strlen generator should emit expected COBOL subprogram");
+    if (program_text)
+        cma_free(program_text);
+    if (status != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_standard_library_lookup_enforces_std_prefix)
 {
     const t_transpiler_standard_library_entry *entry;
@@ -1284,6 +1323,19 @@ FT_TEST(test_standard_library_lookup_enforces_std_prefix)
     if (ft_strncmp(entry->program_name, "CBLC-STRLEN", ft_strlen("CBLC-STRLEN") + 1) != 0)
     {
         pf_printf("Assertion failed: std::strlen should map to CBLC-STRLEN program\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup_with_buffer_kind("std::strlen",
+        TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING);
+    if (!entry)
+    {
+        pf_printf("Assertion failed: std::strlen overload for string should resolve to catalog entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-STRLEN-STRING",
+            ft_strlen("CBLC-STRLEN-STRING") + 1) != 0)
+    {
+        pf_printf("Assertion failed: std::strlen overload for string should map to CBLC-STRLEN-STRING program\n");
         return (FT_FAILURE);
     }
     entry = transpiler_standard_library_lookup("std::strnlen");
@@ -1570,9 +1622,10 @@ FT_TEST(test_standard_library_catalog_lists_all_entries)
         pf_printf("Assertion failed: catalog should return entry table\n");
         return (FT_FAILURE);
     }
-    if (count != 26)
+    if (count != 27)
     {
-        pf_printf("Assertion failed: catalog should report twenty-six standard library entries but returned %u\n", static_cast<unsigned int>(count));
+        pf_printf("Assertion failed: catalog should report twenty-seven standard library entries but returned %u\n",
+            static_cast<unsigned int>(count));
         return (FT_FAILURE);
     }
     if (ft_strncmp(entries[0].qualified_name, "std::abs", ft_strlen("std::abs") + 1) != 0)
@@ -1640,69 +1693,84 @@ FT_TEST(test_standard_library_catalog_lists_all_entries)
         pf_printf("Assertion failed: thirteenth catalog entry should be std::strlen\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[13].qualified_name, "std::strnlen", ft_strlen("std::strnlen") + 1) != 0)
+    if (entries[12].buffer_kind != TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR)
     {
-        pf_printf("Assertion failed: fourteenth catalog entry should be std::strnlen\n");
+        pf_printf("Assertion failed: thirteenth catalog entry should target char buffers\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[14].qualified_name, "std::strcmp", ft_strlen("std::strcmp") + 1) != 0)
+    if (ft_strncmp(entries[13].qualified_name, "std::strlen", ft_strlen("std::strlen") + 1) != 0)
     {
-        pf_printf("Assertion failed: fifteenth catalog entry should be std::strcmp\n");
+        pf_printf("Assertion failed: fourteenth catalog entry should be std::strlen overload\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[15].qualified_name, "std::strcpy", ft_strlen("std::strcpy") + 1) != 0)
+    if (entries[13].buffer_kind != TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING)
     {
-        pf_printf("Assertion failed: sixteenth catalog entry should be std::strcpy\n");
+        pf_printf("Assertion failed: fourteenth catalog entry should target string buffers\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[16].qualified_name, "std::strncpy", ft_strlen("std::strncpy") + 1) != 0)
+    if (ft_strncmp(entries[14].qualified_name, "std::strnlen", ft_strlen("std::strnlen") + 1) != 0)
     {
-        pf_printf("Assertion failed: seventeenth catalog entry should be std::strncpy\n");
+        pf_printf("Assertion failed: fifteenth catalog entry should be std::strnlen\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[17].qualified_name, "std::memcmp", ft_strlen("std::memcmp") + 1) != 0)
+    if (ft_strncmp(entries[15].qualified_name, "std::strcmp", ft_strlen("std::strcmp") + 1) != 0)
     {
-        pf_printf("Assertion failed: eighteenth catalog entry should be std::memcmp\n");
+        pf_printf("Assertion failed: sixteenth catalog entry should be std::strcmp\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[18].qualified_name, "std::strcat", ft_strlen("std::strcat") + 1) != 0)
+    if (ft_strncmp(entries[16].qualified_name, "std::strcpy", ft_strlen("std::strcpy") + 1) != 0)
     {
-        pf_printf("Assertion failed: nineteenth catalog entry should be std::strcat\n");
+        pf_printf("Assertion failed: seventeenth catalog entry should be std::strcpy\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[19].qualified_name, "std::strtod", ft_strlen("std::strtod") + 1) != 0)
+    if (ft_strncmp(entries[17].qualified_name, "std::strncpy", ft_strlen("std::strncpy") + 1) != 0)
     {
-        pf_printf("Assertion failed: twentieth catalog entry should be std::strtod\n");
+        pf_printf("Assertion failed: eighteenth catalog entry should be std::strncpy\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[20].qualified_name, "std::pow", ft_strlen("std::pow") + 1) != 0)
+    if (ft_strncmp(entries[18].qualified_name, "std::memcmp", ft_strlen("std::memcmp") + 1) != 0)
     {
-        pf_printf("Assertion failed: twenty-first catalog entry should be std::pow\n");
+        pf_printf("Assertion failed: nineteenth catalog entry should be std::memcmp\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[21].qualified_name, "std::sqrt", ft_strlen("std::sqrt") + 1) != 0)
+    if (ft_strncmp(entries[19].qualified_name, "std::strcat", ft_strlen("std::strcat") + 1) != 0)
     {
-        pf_printf("Assertion failed: twenty-second catalog entry should be std::sqrt\n");
+        pf_printf("Assertion failed: twentieth catalog entry should be std::strcat\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[22].qualified_name, "std::toupper", ft_strlen("std::toupper") + 1) != 0)
+    if (ft_strncmp(entries[20].qualified_name, "std::strtod", ft_strlen("std::strtod") + 1) != 0)
     {
-        pf_printf("Assertion failed: twenty-third catalog entry should be std::toupper\n");
+        pf_printf("Assertion failed: twenty-first catalog entry should be std::strtod\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[23].qualified_name, "std::tolower", ft_strlen("std::tolower") + 1) != 0)
+    if (ft_strncmp(entries[21].qualified_name, "std::pow", ft_strlen("std::pow") + 1) != 0)
     {
-        pf_printf("Assertion failed: twenty-fourth catalog entry should be std::tolower\n");
+        pf_printf("Assertion failed: twenty-second catalog entry should be std::pow\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[24].qualified_name, "std::isdigit", ft_strlen("std::isdigit") + 1) != 0)
+    if (ft_strncmp(entries[22].qualified_name, "std::sqrt", ft_strlen("std::sqrt") + 1) != 0)
     {
-        pf_printf("Assertion failed: twenty-fifth catalog entry should be std::isdigit\n");
+        pf_printf("Assertion failed: twenty-third catalog entry should be std::sqrt\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(entries[25].qualified_name, "std::isalpha", ft_strlen("std::isalpha") + 1) != 0)
+    if (ft_strncmp(entries[23].qualified_name, "std::toupper", ft_strlen("std::toupper") + 1) != 0)
     {
-        pf_printf("Assertion failed: twenty-sixth catalog entry should be std::isalpha\n");
+        pf_printf("Assertion failed: twenty-fourth catalog entry should be std::toupper\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entries[24].qualified_name, "std::tolower", ft_strlen("std::tolower") + 1) != 0)
+    {
+        pf_printf("Assertion failed: twenty-fifth catalog entry should be std::tolower\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entries[25].qualified_name, "std::isdigit", ft_strlen("std::isdigit") + 1) != 0)
+    {
+        pf_printf("Assertion failed: twenty-sixth catalog entry should be std::isdigit\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entries[26].qualified_name, "std::isalpha", ft_strlen("std::isalpha") + 1) != 0)
+    {
+        pf_printf("Assertion failed: twenty-seventh catalog entry should be std::isalpha\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -6486,6 +6554,7 @@ const t_test_case *get_standard_library_tests(size_t *count)
         {"standard_library_catalog_lists_all_entries", test_standard_library_catalog_lists_all_entries},
         {"standard_library_generators_validate_out_parameter", test_standard_library_generators_validate_out_parameter},
         {"standard_library_strlen_generates_expected_text", test_standard_library_strlen_generates_expected_text},
+        {"standard_library_strlen_string_generates_expected_text", test_standard_library_strlen_string_generates_expected_text},
         {"standard_library_strlen_executes", test_standard_library_strlen_executes},
         {"standard_library_strlen_handles_all_spaces", test_standard_library_strlen_handles_all_spaces},
         {"standard_library_strnlen_generates_expected_text", test_standard_library_strnlen_generates_expected_text},
