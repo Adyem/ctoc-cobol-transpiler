@@ -134,14 +134,14 @@ void runtime_char_set(t_runtime_char *destination, char value)
 
 int runtime_char_from_string(t_runtime_char *destination, const char *text)
 {
-    int length;
+    size_t length;
 
     if (runtime_check_destination_char(destination) != FT_SUCCESS)
         return (FT_FAILURE);
     if (!text)
         return (FT_FAILURE);
     length = ft_strlen(text);
-    if (length <= 0)
+    if (length != 1)
         return (FT_FAILURE);
     destination->value = text[0];
     return (FT_SUCCESS);
