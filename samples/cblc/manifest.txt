@@ -11,6 +11,7 @@ samples/cblc/reverse_group_items.cblc
 samples/cblc/reverse_value_defaults.cblc
 samples/cblc/numeric_precision.cblc
 samples/cblc/integration_showcase.cblc
+samples/cblc/abs_magnitude_report.cblc
 samples/cblc/return_numeric.cblc
 samples/cblc/return_boolean.cblc
 samples/cblc/return_character.cblc

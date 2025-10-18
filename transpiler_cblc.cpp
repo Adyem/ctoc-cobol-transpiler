@@ -537,6 +537,17 @@ static int cblc_parse_numeric_expression(const char **cursor, t_cblc_translation
                 expect_operand = 0;
                 continue ;
             }
+            if (**cursor == '+' || **cursor == '-')
+            {
+                char operator_buffer[2];
+
+                operator_buffer[0] = **cursor;
+                operator_buffer[1] = '\0';
+                if (cblc_expression_append(buffer, buffer_size, operator_buffer) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                *cursor += 1;
+                continue ;
+            }
         if ((**cursor >= 'a' && **cursor <= 'z') || (**cursor >= 'A' && **cursor <= 'Z')
             || **cursor == '_')
         {

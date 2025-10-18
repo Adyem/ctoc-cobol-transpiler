@@ -65,19 +65,19 @@ FT_TEST(test_semantics_accepts_floating_move_multiplication)
     status = FT_FAILURE;
     if (transpiler_context_init(&context) != FT_SUCCESS)
         return (FT_FAILURE);
-    program = semantics_build_program_with_storage("PRODUCT-TARGET", "PIC 9V9(6)");
+    program = semantics_build_program_with_storage("PRODUCT-TARGET", "PIC 9(4)V9(6)");
     if (!program)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    if (semantics_add_data_item(program, "LEFT-TERM", "PIC 9(4)") != FT_SUCCESS)
+    if (semantics_add_data_item(program, "LEFT-TERM", "PIC 9V9(3)") != FT_SUCCESS)
     {
         semantics_destroy_program(program);
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    if (semantics_add_data_item(program, "RIGHT-TERM", "PIC 9(4)") != FT_SUCCESS)
+    if (semantics_add_data_item(program, "RIGHT-TERM", "PIC 9V9(3)") != FT_SUCCESS)
     {
         semantics_destroy_program(program);
         transpiler_context_dispose(&context);
@@ -210,6 +210,298 @@ FT_TEST(test_semantics_accepts_numeric_move_subtraction)
     {
         if (transpiler_context_has_errors(&context) == 0)
             status = FT_SUCCESS;
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_accepts_numeric_move_unary_plus)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    t_ast_node *expression;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("TARGET", "PIC 9(4)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "OPERAND", "PIC 9(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    expression = semantics_create_unary_expression_node("OPERAND",
+        LEXER_TOKEN_PLUS, "+");
+    if (!expression)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move_node(program, expression,
+            "TARGET") != FT_SUCCESS)
+    {
+        ast_node_destroy(expression);
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) == FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 0)
+            status = FT_SUCCESS;
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_accepts_numeric_move_unary_minus)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    t_ast_node *expression;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("TARGET", "PIC 9(4)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "OPERAND", "PIC 9(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    expression = semantics_create_unary_expression_node("OPERAND",
+        LEXER_TOKEN_MINUS, "-");
+    if (!expression)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move_node(program, expression,
+            "TARGET") != FT_SUCCESS)
+    {
+        ast_node_destroy(expression);
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) == FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 0)
+            status = FT_SUCCESS;
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_accepts_numeric_move_abs)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    t_ast_node *expression;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("TARGET", "PIC 9(4)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "OPERAND", "PIC 9(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    expression = semantics_create_unary_expression_node("OPERAND",
+        LEXER_TOKEN_KEYWORD_ABS, "ABS");
+    if (!expression)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move_node(program, expression,
+            "TARGET") != FT_SUCCESS)
+    {
+        ast_node_destroy(expression);
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) == FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 0)
+            status = FT_SUCCESS;
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_accepts_floating_move_abs)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    t_ast_node *expression;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("TARGET", "PIC 9V9(3)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "OPERAND", "PIC 9V9(3)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    expression = semantics_create_unary_expression_node("OPERAND",
+        LEXER_TOKEN_KEYWORD_ABS, "ABS");
+    if (!expression)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move_node(program, expression,
+            "TARGET") != FT_SUCCESS)
+    {
+        ast_node_destroy(expression);
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) == FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 0)
+            status = FT_SUCCESS;
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_rejects_unary_plus_on_alphanumeric)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    t_ast_node *expression;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("TARGET", "PIC X(4)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "SOURCE", "PIC X(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    expression = semantics_create_unary_expression_node("SOURCE",
+        LEXER_TOKEN_PLUS, "+");
+    if (!expression)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move_node(program, expression,
+            "TARGET") != FT_SUCCESS)
+    {
+        ast_node_destroy(expression);
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) != FT_SUCCESS)
+        status = FT_SUCCESS;
+    else if (transpiler_context_has_errors(&context) != 0)
+        status = FT_SUCCESS;
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_rejects_abs_on_alphanumeric)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    t_ast_node *expression;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("TARGET", "PIC X(4)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "SOURCE", "PIC X(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    expression = semantics_create_unary_expression_node("SOURCE",
+        LEXER_TOKEN_KEYWORD_ABS, "ABS");
+    if (!expression)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move_node(program, expression,
+            "TARGET") != FT_SUCCESS)
+    {
+        ast_node_destroy(expression);
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) != FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 1)
+        {
+            if (context.diagnostics.count >= 1
+                && context.diagnostics.items[0].code == TRANSPILE_ERROR_SEMANTIC_INVALID_EXPRESSION
+                && context.diagnostics.items[0].severity == TRANSPILE_SEVERITY_ERROR)
+                status = FT_SUCCESS;
+        }
     }
     semantics_destroy_program(program);
     transpiler_context_dispose(&context);
@@ -581,7 +873,7 @@ FT_TEST(test_semantics_accepts_floating_assignment_multiplication)
     status = FT_FAILURE;
     if (transpiler_context_init(&context) != FT_SUCCESS)
         return (FT_FAILURE);
-    program = semantics_build_program_with_storage("PRODUCT-TARGET", "PIC 9V9(6)");
+    program = semantics_build_program_with_storage("PRODUCT-TARGET", "PIC 9(4)V9(6)");
     if (!program)
     {
         transpiler_context_dispose(&context);
@@ -856,7 +1148,7 @@ FT_TEST(test_semantics_accepts_floating_move_addition)
     status = FT_FAILURE;
     if (transpiler_context_init(&context) != FT_SUCCESS)
         return (FT_FAILURE);
-    program = semantics_build_program_with_storage("FLOAT-TARGET", "PIC 9V9(6)");
+    program = semantics_build_program_with_storage("FLOAT-TARGET", "PIC 9V9(4)");
     if (!program)
     {
         transpiler_context_dispose(&context);
@@ -908,7 +1200,7 @@ FT_TEST(test_semantics_accepts_floating_move_subtraction)
     status = FT_FAILURE;
     if (transpiler_context_init(&context) != FT_SUCCESS)
         return (FT_FAILURE);
-    program = semantics_build_program_with_storage("FLOAT-DIFFERENCE", "PIC 9V9(6)");
+    program = semantics_build_program_with_storage("FLOAT-DIFFERENCE", "PIC 9V9(4)");
     if (!program)
     {
         transpiler_context_dispose(&context);
@@ -962,7 +1254,7 @@ FT_TEST(test_semantics_rejects_mixed_floating_move_addition)
     status = FT_FAILURE;
     if (transpiler_context_init(&context) != FT_SUCCESS)
         return (FT_FAILURE);
-    program = semantics_build_program_with_storage("FLOAT-SUM", "PIC 9V9(6)");
+    program = semantics_build_program_with_storage("FLOAT-SUM", "PIC 9V9(4)");
     if (!program)
     {
         transpiler_context_dispose(&context);
@@ -1019,7 +1311,7 @@ FT_TEST(test_semantics_rejects_mixed_floating_move_subtraction)
     status = FT_FAILURE;
     if (transpiler_context_init(&context) != FT_SUCCESS)
         return (FT_FAILURE);
-    program = semantics_build_program_with_storage("FLOAT-DIFFERENCE", "PIC 9V9(6)");
+    program = semantics_build_program_with_storage("FLOAT-DIFFERENCE", "PIC 9V9(4)");
     if (!program)
     {
         transpiler_context_dispose(&context);
@@ -1537,6 +1829,10 @@ const t_test_case *get_semantics_arithmetic_tests(size_t *count)
         {"semantics_accepts_floating_move_multiplication", test_semantics_accepts_floating_move_multiplication},
         {"semantics_accepts_numeric_move_modulo", test_semantics_accepts_numeric_move_modulo},
         {"semantics_accepts_numeric_move_subtraction", test_semantics_accepts_numeric_move_subtraction},
+        {"semantics_accepts_numeric_move_unary_plus", test_semantics_accepts_numeric_move_unary_plus},
+        {"semantics_accepts_numeric_move_unary_minus", test_semantics_accepts_numeric_move_unary_minus},
+        {"semantics_accepts_numeric_move_abs", test_semantics_accepts_numeric_move_abs},
+        {"semantics_accepts_floating_move_abs", test_semantics_accepts_floating_move_abs},
         {"semantics_rejects_mixed_numeric_floating_addition", test_semantics_rejects_mixed_numeric_floating_addition},
         {"semantics_rejects_mixed_numeric_floating_multiplication", test_semantics_rejects_mixed_numeric_floating_multiplication},
         {"semantics_reports_mixed_numeric_floating_addition_message", test_semantics_reports_mixed_numeric_floating_addition_message},
@@ -1555,6 +1851,8 @@ const t_test_case *get_semantics_arithmetic_tests(size_t *count)
         {"semantics_rejects_alphanumeric_move_subtraction", test_semantics_rejects_alphanumeric_move_subtraction},
         {"semantics_rejects_alphanumeric_move_multiplication", test_semantics_rejects_alphanumeric_move_multiplication},
         {"semantics_rejects_alphanumeric_move_division", test_semantics_rejects_alphanumeric_move_division},
+        {"semantics_rejects_unary_plus_on_alphanumeric", test_semantics_rejects_unary_plus_on_alphanumeric},
+        {"semantics_rejects_abs_on_alphanumeric", test_semantics_rejects_abs_on_alphanumeric},
         {"semantics_rejects_alphanumeric_floating_addition", test_semantics_rejects_alphanumeric_floating_addition},
         {"semantics_rejects_alphanumeric_floating_subtraction", test_semantics_rejects_alphanumeric_floating_subtraction},
         {"semantics_rejects_alphanumeric_floating_multiplication", test_semantics_rejects_alphanumeric_floating_multiplication},

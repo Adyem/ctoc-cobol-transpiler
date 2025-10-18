@@ -410,6 +410,65 @@ static int parser_parse_primary_value(t_parser *parser, t_ast_node **out_node)
     return (parser_set_error(parser));
 }
 
+static int parser_parse_unary_value(t_parser *parser, t_ast_node **out_node)
+{
+    t_lexer_token operator_token;
+    t_ast_node *operand;
+    t_ast_node *operator_node;
+    t_ast_node *expression;
+
+    if (!parser)
+        return (FT_FAILURE);
+    if (!out_node)
+        return (FT_FAILURE);
+    if (!parser->has_current)
+        return (parser_set_error(parser));
+    if (parser->current.kind != LEXER_TOKEN_PLUS
+        && parser->current.kind != LEXER_TOKEN_MINUS
+        && parser->current.kind != LEXER_TOKEN_KEYWORD_ABS)
+        return (parser_parse_primary_value(parser, out_node));
+    operator_token = parser->current;
+    if (parser_advance(parser) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (parser_parse_unary_value(parser, &operand) != FT_SUCCESS)
+        return (FT_FAILURE);
+    expression = parser_create_node(parser, AST_NODE_UNARY_EXPRESSION);
+    if (!expression)
+    {
+        ast_node_destroy(operand);
+        return (FT_FAILURE);
+    }
+    operator_node = parser_create_node(parser, AST_NODE_ARITHMETIC_OPERATOR);
+    if (!operator_node)
+    {
+        ast_node_destroy(operand);
+        ast_node_destroy(expression);
+        return (FT_FAILURE);
+    }
+    if (ast_node_set_token(operator_node, &operator_token) != FT_SUCCESS)
+    {
+        ast_node_destroy(operator_node);
+        ast_node_destroy(operand);
+        ast_node_destroy(expression);
+        return (parser_set_error(parser));
+    }
+    if (ast_node_add_child(expression, operator_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(operator_node);
+        ast_node_destroy(operand);
+        ast_node_destroy(expression);
+        return (FT_FAILURE);
+    }
+    if (ast_node_add_child(expression, operand) != FT_SUCCESS)
+    {
+        ast_node_destroy(operand);
+        ast_node_destroy(expression);
+        return (FT_FAILURE);
+    }
+    *out_node = expression;
+    return (parser_set_success(parser));
+}
+
 static int parser_parse_value_node(t_parser *parser, t_ast_node **out_node)
 {
     t_ast_node *result;
@@ -418,7 +477,7 @@ static int parser_parse_value_node(t_parser *parser, t_ast_node **out_node)
         return (FT_FAILURE);
     if (!out_node)
         return (FT_FAILURE);
-    if (parser_parse_primary_value(parser, &result) != FT_SUCCESS)
+    if (parser_parse_unary_value(parser, &result) != FT_SUCCESS)
         return (FT_FAILURE);
     while (parser->has_current
         && (parser->current.kind == LEXER_TOKEN_PLUS
@@ -439,7 +498,7 @@ static int parser_parse_value_node(t_parser *parser, t_ast_node **out_node)
             ast_node_destroy(result);
             return (FT_FAILURE);
         }
-        if (parser_parse_primary_value(parser, &right) != FT_SUCCESS)
+        if (parser_parse_unary_value(parser, &right) != FT_SUCCESS)
         {
             ast_node_destroy(result);
             return (FT_FAILURE);

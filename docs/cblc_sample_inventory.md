@@ -472,6 +472,41 @@ function void analyze_precision() {
 }
 ```
 
+### `samples/cblc/abs_magnitude_report.cblc`
+- **Purpose:** Demonstrates using the `ABS` unary operator to normalize both integral and floating-point deltas before reporting inventory metrics.
+- **Constructs:** Global integer and double storage, arithmetic subtraction, unary `ABS` applications, string and numeric `display` statements, and a helper invoked from `main`.
+
+```cblc
+int inbound_units;
+int outbound_units;
+int net_position;
+int net_magnitude;
+
+double revenue_delta;
+double revenue_magnitude;
+
+function void analyze_inventory() {
+    inbound_units = 145;
+    outbound_units = 172;
+    net_position = inbound_units - outbound_units;
+    net_magnitude = ABS net_position;
+
+    revenue_delta = -12.375;
+    revenue_magnitude = ABS revenue_delta;
+
+    display("NET POSITION:");
+    display(net_position);
+    display("NET MAGNITUDE:");
+    display(net_magnitude);
+    display("REVENUE MAGNITUDE:");
+    display(revenue_magnitude);
+}
+
+function void main() {
+    analyze_inventory();
+}
+```
+
 ### `samples/cblc/multi_module_main.cblc`
 - **Purpose:** Demonstrates splitting a program across multiple translation units where the entrypoint resides in one file and helper routines live alongside it.
 - **Constructs:** Global integers shared within a unit, helper functions invoked from `main`, cross-file calls to external routines, arithmetic updates, and console output of computed values.
