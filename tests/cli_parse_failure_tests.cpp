@@ -71,7 +71,7 @@ FT_TEST(test_cli_rejects_unknown_direction)
 
     argc = sizeof(argv) / sizeof(argv[0]);
     return (expect_cli_parse_failure(argv, argc,
-        "Unknown direction 'invalid-direction'. Expected 'cblc-to-cobol' or 'cobol-to-cblc'.\n",
+        "Unknown direction 'invalid-direction'. Expected 'cblc-to-cobol', 'cobol-to-cblc', or 'standard-library'.\n",
         "CLI should reject unknown direction"));
 }
 
@@ -89,7 +89,7 @@ FT_TEST(test_cli_rejects_missing_direction_value)
 
     argc = sizeof(argv) / sizeof(argv[0]);
     return (expect_cli_parse_failure(argv, argc,
-        "Unknown direction '--input'. Expected 'cblc-to-cobol' or 'cobol-to-cblc'.\n",
+        "Unknown direction '--input'. Expected 'cblc-to-cobol', 'cobol-to-cblc', or 'standard-library'.\n",
         "CLI should reject missing direction value"));
 }
 
@@ -186,6 +186,27 @@ FT_TEST(test_cli_rejects_invalid_format)
         "CLI should reject unknown format"));
 }
 
+FT_TEST(test_cli_rejects_invalid_layout)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cobol-to-cblc",
+        "--layout",
+        "sideways",
+        "--input",
+        "legacy.cob",
+        "--output",
+        "modern.cblc"
+    };
+    size_t argc;
+
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Unknown layout 'sideways'. Expected 'normalize' or 'preserve'.\n",
+        "CLI should reject unknown layout"));
+}
+
 FT_TEST(test_cli_rejects_invalid_diagnostics)
 {
     const char *argv[] = {
@@ -205,6 +226,26 @@ FT_TEST(test_cli_rejects_invalid_diagnostics)
     return (expect_cli_parse_failure(argv, argc,
         "Unknown diagnostics level 'extreme'. Expected 'silent', 'normal', or 'verbose'.\n",
         "CLI should reject unknown diagnostics"));
+}
+
+FT_TEST(test_cli_rejects_missing_layout_value)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cobol-to-cblc",
+        "--input",
+        "legacy.cob",
+        "--output",
+        "modern.cblc",
+        "--layout"
+    };
+    size_t argc;
+
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Missing value for --layout option.\n",
+        "CLI should report missing layout value"));
 }
 
 FT_TEST(test_cli_rejects_missing_input_value)
@@ -312,11 +353,13 @@ const t_test_case *get_cli_parse_failure_tests(size_t *count)
         {"cli_requires_output_path", test_cli_requires_output_path},
         {"cli_rejects_unknown_option", test_cli_rejects_unknown_option},
         {"cli_rejects_invalid_format", test_cli_rejects_invalid_format},
+        {"cli_rejects_invalid_layout", test_cli_rejects_invalid_layout},
         {"cli_rejects_invalid_diagnostics", test_cli_rejects_invalid_diagnostics},
         {"cli_rejects_missing_input_value", test_cli_rejects_missing_input_value},
         {"cli_rejects_missing_output_value", test_cli_rejects_missing_output_value},
         {"cli_rejects_missing_output_directory_value", test_cli_rejects_missing_output_directory_value},
         {"cli_rejects_missing_format_value", test_cli_rejects_missing_format_value},
+        {"cli_rejects_missing_layout_value", test_cli_rejects_missing_layout_value},
         {"cli_rejects_missing_diagnostics_value", test_cli_rejects_missing_diagnostics_value}
     };
 

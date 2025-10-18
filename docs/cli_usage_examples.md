@@ -1,16 +1,16 @@
 # CLI Usage Examples
 
-The `ctoc_cobol_transpiler` binary provides a single entry point for converting between CBL-C and COBOL source files. This guide collects ready-to-run invocations that illustrate the required flags, optional formatting controls, and diagnostics knobs exercised by the command-line interface.
+The `ctoc_cobol_transpiler` binary provides a single entry point for converting between CBL-C and COBOL source files and for generating the bundled standard library programs. This guide collects ready-to-run invocations that illustrate the required flags, optional formatting controls, diagnostics knobs, and library build workflows exercised by the command-line interface.
 
 ## Required options
 
-Every run must specify the transformation direction alongside at least one input and output path:
+Translation runs must specify the transformation direction alongside at least one input and output path:
 
 ```
 ctoc_cobol_transpiler --direction cobol-to-cblc --input samples/cobol/copy_file.cob --output build/copy_file.cblc
 ```
 
-* `--direction` accepts `cblc-to-cobol` or `cobol-to-cblc` and determines which frontend/parser and backend/emitter pair the pipeline assembles. The reverse path now lifts level 01/77 scalars (`PIC X(n)`, `PIC 9(n)`, and decimal patterns such as `PIC S9V9(n)`/`USAGE COMP-2`) into CBL-C declarations alongside the paragraph bodies reconstructed from `MOVE`, `IF`, `PERFORM`, file I/O, and `STOP` statements while distinguishing flag suffixes from single-character buffers, expanding registered `COPY` includes into concrete declarations, and preserving VALUE clause defaults on those recovered scalars. Level 01 group items without PIC clauses emit `record` definitions with mirrored group variables and subordinate fields so structured data survives the round-trip.
+* `--direction` accepts `cblc-to-cobol`, `cobol-to-cblc`, or `standard-library` and determines which pipeline the tool assembles. The conversion directions select the appropriate frontend/parser and backend/emitter pair. The reverse path now lifts level 01/77 scalars (`PIC X(n)`, `PIC 9(n)`, and decimal patterns such as `PIC S9V9(n)`/`USAGE COMP-2`) into CBL-C declarations alongside the paragraph bodies reconstructed from `MOVE`, `IF`, `PERFORM`, file I/O, and `STOP` statements while distinguishing flag suffixes from single-character buffers, expanding registered `COPY` includes into concrete declarations, and preserving VALUE clause defaults on those recovered scalars. Level 01 group items without PIC clauses emit `record` definitions with mirrored group variables and subordinate fields so structured data survives the round-trip.
 * `--input` points at the source file that the pipeline reads. Repeat the flag to queue additional translation units.
 * `--output` names the artifact written by the code generator. Provide one `--output` per input so the files can be emitted side by side.
 
@@ -24,14 +24,25 @@ ctoc_cobol_transpiler --direction cobol-to-cblc \
 
 The tool rejects mismatched counts to ensure every generated COBOL file has a designated destination.
 
+## Building the standard library
+
+Use the `standard-library` direction to emit every cataloged helper as an individual COBOL program. The generator writes each routine to the current directory unless `--output-dir` redirects the artifacts:
+
+```
+ctoc_cobol_transpiler --direction standard-library --output-dir build/std
+```
+
+This mode ignores `--input` and `--output` flags, iterates across the registry returned by `transpiler_standard_library_get_entries`, and produces `<PROGRAM-ID>.cob` files for distribution alongside translated projects.
+
 ## Optional layout and destination controls
 
 ```
-ctoc_cobol_transpiler --direction cobol-to-cblc --input samples/cobol/copy_file.cob --output build/copy_file.cblc --output-dir dist --format pretty
+ctoc_cobol_transpiler --direction cobol-to-cblc --input samples/cobol/copy_file.cob --output build/copy_file.cblc --output-dir dist --format pretty --layout normalize
 ```
 
 * `--output-dir` overrides the directory that hosts generated files. When omitted, the tool writes next to the provided `--output` path.
-* `--format` accepts `default`, `minimal`, or `pretty` to toggle whitespace and alignment policies. `pretty` now feeds generated CBL-C through the canonical formatter so braces, indentation, and operator spacing remain consistent across runs.
+* `--format` accepts `default`, `minimal`, or `pretty` to toggle whitespace and alignment policies for COBOL emission. `pretty` feeds generated COBOL through the canonical formatter so braces, indentation, and operator spacing remain consistent across runs.
+* `--layout` accepts `normalize` or `preserve` to control the regenerated CBL-C layout when translating from COBOL. `normalize` routes output through the formatter, while `preserve` copies the recovered structure verbatim so existing spacing can be reviewed without modification.
 
 ## Diagnostics and help
 

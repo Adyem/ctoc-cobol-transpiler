@@ -1,0 +1,53 @@
+CBL-C FEATURE SHOWCASE
+STAGE 1
+Load shared buffers
+STAGE 2
+Copy headline into detail
+CBL-C FEATURE SHOWCASE
+STAGE 3
+Reset headline
+SHOWCASE COMPLETE
+STAGE 4
+Perform numeric calculations
+Combined total (base + processed)
++000000042
+Difference (base - processed)
++000000012
+Double total (combined * 2)
++000000084
+Average batch (combined / 2)
++000000021
+RUN COMPLETE
+
+SHOWCASE MODULES
+Activating banner helpers
+STAGE 1
+Initialize counters
+STAGE 2
+Display worker status
+Worker module online
+BANNER TOTAL
++000000002
+
+METRIC STAGE
+Combined total (base + processed)
++000000042
+Difference (base - processed)
++000000012
+Double total (combined * 2)
++000000084
+Average batch (combined / 2)
++000000021
+FINAL METRIC TOTALS
++000000042
++000000012
++000000084
++000000021
+
+IO SHOWCASE
+SUCCESS COUNT
+        2
+FAILURE COUNT
+        1
+TOTAL AMOUNT
+       39

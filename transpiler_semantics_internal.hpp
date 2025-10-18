@@ -56,8 +56,12 @@ int     transpiler_semantics_analyze_usage(const t_transpiler_semantic_scope *sc
 
 int     transpiler_semantics_emit_error(t_transpiler_context *context, int code,
             const char *message);
+int     transpiler_semantics_emit_error_at(t_transpiler_context *context, const t_ast_node *node,
+            int code, const char *message, const char *suggestion);
 int     transpiler_semantics_emit_warning(t_transpiler_context *context, int code,
             const char *message);
+int     transpiler_semantics_emit_warning_at(t_transpiler_context *context, const t_ast_node *node,
+            int code, const char *message, const char *suggestion);
 int     transpiler_semantics_emit_invalid_expression(t_transpiler_context *context,
             const char *message);
 

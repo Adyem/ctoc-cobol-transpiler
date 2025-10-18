@@ -8,7 +8,8 @@ int difference_total;
 int doubled_total;
 int average_batch;
 
-function void main() {
+function void main()
+{
     headline = "CBL-C FEATURE SHOWCASE";
     display(headline);
 
@@ -36,34 +37,20 @@ function void main() {
     detail_line = "Perform numeric calculations";
     display(detail_line);
 
-    detail_line = "Set base count";
-    display(detail_line);
     base_count = 27;
-    display(base_count);
-
-    detail_line = "Set processed count";
-    display(detail_line);
     processed_count = 15;
-    display(processed_count);
-
-    detail_line = "Combined total (base + processed)";
-    display(detail_line);
     combined_total = base_count + processed_count;
-    display(combined_total);
-
-    detail_line = "Difference (base - processed)";
-    display(detail_line);
     difference_total = base_count - processed_count;
-    display(difference_total);
-
-    detail_line = "Double total (combined * 2)";
-    display(detail_line);
     doubled_total = combined_total * 2;
-    display(doubled_total);
-
-    detail_line = "Average batch (combined / 2)";
-    display(detail_line);
     average_batch = combined_total / 2;
+
+    display("Combined total (base + processed)");
+    display(combined_total);
+    display("Difference (base - processed)");
+    display(difference_total);
+    display("Double total (combined * 2)");
+    display(doubled_total);
+    display("Average batch (combined / 2)");
     display(average_batch);
 
     display("RUN COMPLETE");

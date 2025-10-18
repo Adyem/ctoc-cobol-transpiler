@@ -1165,11 +1165,18 @@ FT_TEST(test_semantics_rejects_truncating_identifier_move)
 {
     t_transpiler_context context;
     t_ast_node *program;
+    const char *source_text;
+    size_t target_length;
     int status;
 
     status = FT_FAILURE;
     if (transpiler_context_init(&context) != FT_SUCCESS)
         return (FT_FAILURE);
+    source_text = "MOVE LONG-SOURCE TO SHORT-TARGET.";
+    target_length = ft_strlen("SHORT-TARGET");
+    context.source_path = "test.cob";
+    context.active_source_text = source_text;
+    context.active_source_length = ft_strlen(source_text);
     program = semantics_build_program_with_storage("SHORT-TARGET", "PIC X(4)");
     if (!program)
     {
@@ -1195,7 +1202,24 @@ FT_TEST(test_semantics_rejects_truncating_identifier_move)
             if (context.diagnostics.count >= 1
                 && context.diagnostics.items[0].code == TRANSPILE_ERROR_SEMANTIC_STRING_TRUNCATION
                 && context.diagnostics.items[0].severity == TRANSPILE_SEVERITY_ERROR)
-                status = FT_SUCCESS;
+            {
+                if (test_expect_cstring_equal(context.diagnostics.items[0].snippet,
+                        source_text, "string truncation diagnostic should include source line") == FT_SUCCESS
+                    && test_expect_cstring_equal(context.diagnostics.items[0].suggestion,
+                        "Increase the target length or truncate the source explicitly.",
+                        "string truncation diagnostic should include suggestion") == FT_SUCCESS
+                    && test_expect_cstring_equal(context.diagnostics.items[0].span.path,
+                        context.source_path, "string truncation diagnostic should include path") == FT_SUCCESS)
+                {
+                    if (test_expect_size_t_equal(context.diagnostics.items[0].span.start_line, 1,
+                            "string truncation diagnostic should start on line 1") == FT_SUCCESS
+                        && test_expect_size_t_equal(context.diagnostics.items[0].span.start_column, 1,
+                            "string truncation diagnostic should start at column 1") == FT_SUCCESS
+                        && test_expect_size_t_equal(context.diagnostics.items[0].span.end_column, target_length,
+                            "string truncation diagnostic should span the target name") == FT_SUCCESS)
+                        status = FT_SUCCESS;
+                }
+            }
         }
     }
     semantics_destroy_program(program);

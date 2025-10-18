@@ -60,6 +60,7 @@ FT_TEST(test_cli_usage_lists_supported_flags)
         "--output",
         "--output-dir",
         "--format",
+        "--layout",
         "--diagnostics",
         "--warnings-as-errors",
         "--help"

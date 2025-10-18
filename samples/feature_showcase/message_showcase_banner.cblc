@@ -1,0 +1,33 @@
+char intro_header[32];
+char stage_label[16];
+char stage_detail[48];
+int banner_counter;
+
+function void main()
+{
+    intro_header = "SHOWCASE MODULES";
+    stage_detail = "Activating banner helpers";
+    display(intro_header);
+    display(stage_detail);
+
+    banner_counter = 0;
+
+    stage_label = "STAGE 1";
+    stage_detail = "Initialize counters";
+    display(stage_label);
+    display(stage_detail);
+    banner_counter = banner_counter + 1;
+
+    stage_label = "STAGE 2";
+    stage_detail = "Display worker status";
+    display(stage_label);
+    display(stage_detail);
+    stage_detail = "Worker module online";
+    display(stage_detail);
+    banner_counter = banner_counter + 1;
+
+    stage_label = "BANNER TOTAL";
+    display(stage_label);
+    display(banner_counter);
+    return;
+}

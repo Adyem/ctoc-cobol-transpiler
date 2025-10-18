@@ -174,6 +174,7 @@ int runtime_collation_compare(const char *left, size_t left_length, const char *
 // Context management and helpers
 // ===============================
 #define TRANSPILE_DIAGNOSTIC_MESSAGE_MAX 256
+#define TRANSPILE_DIAGNOSTIC_SNIPPET_MAX 256
 
 typedef enum e_transpiler_severity
 {
@@ -182,11 +183,55 @@ typedef enum e_transpiler_severity
     TRANSPILE_SEVERITY_ERROR
 }   t_transpiler_severity;
 
+typedef enum e_transpiler_language
+{
+    TRANSPILE_LANGUAGE_NONE = 0,
+    TRANSPILE_LANGUAGE_CBL_C,
+    TRANSPILE_LANGUAGE_COBOL
+}   t_transpiler_language;
+
+typedef enum e_transpiler_format_mode
+{
+    TRANSPILE_FORMAT_DEFAULT = 0,
+    TRANSPILE_FORMAT_MINIMAL,
+    TRANSPILE_FORMAT_PRETTY
+}   t_transpiler_format_mode;
+
+typedef enum e_transpiler_layout_mode
+{
+    TRANSPILE_LAYOUT_NORMALIZE = 0,
+    TRANSPILE_LAYOUT_PRESERVE
+}   t_transpiler_layout_mode;
+
+typedef enum e_transpiler_diagnostic_level
+{
+    TRANSPILE_DIAGNOSTIC_SILENT = 0,
+    TRANSPILE_DIAGNOSTIC_NORMAL,
+    TRANSPILE_DIAGNOSTIC_VERBOSE
+}   t_transpiler_diagnostic_level;
+
+#define TRANSPILE_FUNCTION_NAME_MAX 64
+#define TRANSPILE_IDENTIFIER_MAX 64
+#define TRANSPILE_MODULE_NAME_MAX 64
+#define TRANSPILE_FILE_PATH_MAX 260
+
+typedef struct s_transpiler_source_span
+{
+    char path[TRANSPILE_FILE_PATH_MAX];
+    size_t start_line;
+    size_t start_column;
+    size_t end_line;
+    size_t end_column;
+}   t_transpiler_source_span;
+
 typedef struct s_transpiler_diagnostic
 {
     t_transpiler_severity severity;
     int code;
     char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    t_transpiler_source_span span;
+    char snippet[TRANSPILE_DIAGNOSTIC_SNIPPET_MAX];
+    char suggestion[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 }   t_transpiler_diagnostic;
 
 typedef struct s_transpiler_diagnostic_list
@@ -200,6 +245,9 @@ int transpiler_diagnostics_init(t_transpiler_diagnostic_list *list);
 void transpiler_diagnostics_dispose(t_transpiler_diagnostic_list *list);
 int transpiler_diagnostics_push(t_transpiler_diagnostic_list *list, t_transpiler_severity severity, int code,
     const char *message);
+int transpiler_diagnostics_push_with_details(t_transpiler_diagnostic_list *list, t_transpiler_severity severity,
+    int code, const char *message, const t_transpiler_source_span *span, const char *snippet,
+    const char *suggestion);
 
 typedef enum e_transpiler_warning_group
 {
@@ -218,32 +266,6 @@ typedef struct s_transpiler_warning_settings
     int shadow;
     int unused;
 }   t_transpiler_warning_settings;
-
-typedef enum e_transpiler_language
-{
-    TRANSPILE_LANGUAGE_NONE = 0,
-    TRANSPILE_LANGUAGE_CBL_C,
-    TRANSPILE_LANGUAGE_COBOL
-}   t_transpiler_language;
-
-typedef enum e_transpiler_format_mode
-{
-    TRANSPILE_FORMAT_DEFAULT = 0,
-    TRANSPILE_FORMAT_MINIMAL,
-    TRANSPILE_FORMAT_PRETTY
-}   t_transpiler_format_mode;
-
-typedef enum e_transpiler_diagnostic_level
-{
-    TRANSPILE_DIAGNOSTIC_SILENT = 0,
-    TRANSPILE_DIAGNOSTIC_NORMAL,
-    TRANSPILE_DIAGNOSTIC_VERBOSE
-}   t_transpiler_diagnostic_level;
-
-#define TRANSPILE_FUNCTION_NAME_MAX 64
-#define TRANSPILE_IDENTIFIER_MAX 64
-#define TRANSPILE_MODULE_NAME_MAX 64
-#define TRANSPILE_FILE_PATH_MAX 260
 
 typedef enum e_transpiler_function_return_mode
 {
@@ -280,6 +302,8 @@ typedef struct s_transpiler_function_signature
 #define TRANSPILE_ERROR_DATA_ITEM_PARAMETER_TRUNCATION 1013
 #define TRANSPILE_ERROR_FUNCTION_PRIVATE_ACCESS 1014
 #define TRANSPILE_ERROR_COPYBOOK_DUPLICATE 1015
+#define TRANSPILE_ERROR_MODULE_IMPORT_REQUIRED 1016
+#define TRANSPILE_ERROR_FUNCTION_UNRESOLVED 1017
 
 typedef enum e_transpiler_file_role
 {
@@ -355,15 +379,6 @@ typedef struct s_transpiler_copybook
     size_t item_count;
 }   t_transpiler_copybook;
 
-typedef struct s_transpiler_source_span
-{
-    char path[TRANSPILE_FILE_PATH_MAX];
-    size_t start_line;
-    size_t start_column;
-    size_t end_line;
-    size_t end_column;
-}   t_transpiler_source_span;
-
 typedef struct s_transpiler_source_map_entry
 {
     t_transpiler_source_span cblc_span;
@@ -376,6 +391,8 @@ typedef struct s_transpiler_context
     t_transpiler_language target_language;
     const char *source_path;
     const char *target_path;
+    const char *active_source_text;
+    size_t active_source_length;
     const char **source_paths;
     size_t source_count;
     size_t source_capacity;
@@ -383,7 +400,9 @@ typedef struct s_transpiler_context
     size_t target_count;
     size_t target_capacity;
     const char *output_directory;
+    int emit_standard_library;
     t_transpiler_format_mode format_mode;
+    t_transpiler_layout_mode layout_mode;
     t_transpiler_diagnostic_level diagnostic_level;
     int warnings_as_errors;
     t_transpiler_warning_settings warning_settings;
@@ -420,16 +439,23 @@ void transpiler_context_set_languages(t_transpiler_context *context, t_transpile
 int transpiler_context_set_io_paths(t_transpiler_context *context, const char **source_paths, size_t source_count,
     const char **target_paths, size_t target_count);
 void transpiler_context_set_output_directory(t_transpiler_context *context, const char *output_directory);
+void transpiler_context_set_emit_standard_library(t_transpiler_context *context, int emit);
 void transpiler_context_set_format_mode(t_transpiler_context *context, t_transpiler_format_mode mode);
+void transpiler_context_set_layout_mode(t_transpiler_context *context, t_transpiler_layout_mode mode);
 void transpiler_context_set_diagnostic_level(t_transpiler_context *context, t_transpiler_diagnostic_level level);
 void transpiler_context_set_warnings_as_errors(t_transpiler_context *context, int warnings_as_errors);
 void transpiler_context_set_warning_settings(t_transpiler_context *context, const t_transpiler_warning_settings *settings);
 int transpiler_context_warning_group_enabled(const t_transpiler_context *context, t_transpiler_warning_group group);
 void transpiler_context_reset_unit_state(t_transpiler_context *context);
+void transpiler_context_reset_module_registry(t_transpiler_context *context);
 void transpiler_context_record_error(t_transpiler_context *context, int error_code);
 int transpiler_context_has_errors(const t_transpiler_context *context);
+int transpiler_context_get_line_snippet(const t_transpiler_context *context, size_t line, char *buffer,
+    size_t buffer_size);
 int transpiler_context_register_module(t_transpiler_context *context, const char *name, const char *path);
 const t_transpiler_module *transpiler_context_get_modules(const t_transpiler_context *context, size_t *count);
+const t_transpiler_function_signature *transpiler_context_get_functions(const t_transpiler_context *context,
+    size_t *count);
 int transpiler_context_register_module_import(t_transpiler_context *context, const char *module_name,
     const char *import_path);
 int transpiler_context_scan_imports_for_module(t_transpiler_context *context, const char *module_name,
@@ -717,11 +743,17 @@ typedef struct s_cblc_data_item
     t_cblc_data_kind kind;
 }   t_cblc_data_item;
 
+typedef struct s_cblc_import
+{
+    char path[TRANSPILE_FILE_PATH_MAX];
+}   t_cblc_import;
+
 typedef enum e_cblc_statement_type
 {
     CBLC_STATEMENT_ASSIGNMENT,
     CBLC_STATEMENT_DISPLAY,
-    CBLC_STATEMENT_COMPUTE
+    CBLC_STATEMENT_COMPUTE,
+    CBLC_STATEMENT_CALL
 }   t_cblc_statement_type;
 
 typedef struct s_cblc_statement
@@ -730,24 +762,43 @@ typedef struct s_cblc_statement
     char target[TRANSPILE_IDENTIFIER_MAX];
     char source[TRANSPILE_STATEMENT_TEXT_MAX];
     int is_literal;
+    char call_identifier[TRANSPILE_IDENTIFIER_MAX];
+    int call_is_external;
 }   t_cblc_statement;
+
+typedef struct s_cblc_function
+{
+    char source_name[TRANSPILE_IDENTIFIER_MAX];
+    char cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    t_cblc_statement *statements;
+    size_t statement_count;
+    size_t statement_capacity;
+    int saw_return;
+}   t_cblc_function;
 
 typedef struct s_cblc_translation_unit
 {
     t_cblc_data_item *data_items;
     size_t data_count;
     size_t data_capacity;
-    t_cblc_statement *statements;
-    size_t statement_count;
-    size_t statement_capacity;
+    t_cblc_import *imports;
+    size_t import_count;
+    size_t import_capacity;
+    t_cblc_function *functions;
+    size_t function_count;
+    size_t function_capacity;
+    size_t entry_function_index;
     char program_name[TRANSPILE_IDENTIFIER_MAX];
-    int saw_return;
 }   t_cblc_translation_unit;
 
 void cblc_translation_unit_init(t_cblc_translation_unit *unit);
 void cblc_translation_unit_dispose(t_cblc_translation_unit *unit);
 int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit);
 int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text);
+int cblc_register_translation_unit_exports(t_transpiler_context *context, const char *module_name,
+    const t_cblc_translation_unit *unit);
+int cblc_resolve_translation_unit_calls(t_transpiler_context *context, const char *module_name,
+    t_cblc_translation_unit *unit);
 
 int transpiler_cobol_program_to_cblc(t_transpiler_context *context, const t_ast_node *program,
     char **out_text);
@@ -942,6 +993,8 @@ int transpiler_codegen_build_procedure_division(const t_transpiler_cobol_procedu
     char **out);
 
 int cblc_formatter_format(const char *input, t_transpiler_format_mode mode, char **output);
+int transpiler_cblc_apply_layout(const char *input, t_transpiler_layout_mode layout_mode,
+    t_transpiler_format_mode format_mode, char **output);
 
 // ===================================
 // Standard library generation helpers
@@ -1032,10 +1085,12 @@ typedef struct s_transpiler_cli_options
     t_transpiler_language source_language;
     t_transpiler_language target_language;
     t_transpiler_format_mode format_mode;
+    t_transpiler_layout_mode layout_mode;
     t_transpiler_diagnostic_level diagnostic_level;
     int warnings_as_errors;
     t_transpiler_warning_settings warning_settings;
     int show_help;
+    int emit_standard_library;
 }   t_transpiler_cli_options;
 
 int transpiler_cli_options_init(t_transpiler_cli_options *options);
@@ -1045,6 +1100,8 @@ int transpiler_cli_apply(const t_transpiler_cli_options *options, t_transpiler_c
 void transpiler_cli_print_usage(void);
 
 int transpiler_logging_emit(t_transpiler_context *context, t_transpiler_severity severity, int code, const char *message);
+int transpiler_logging_emit_with_details(t_transpiler_context *context, t_transpiler_severity severity, int code,
+    const char *message, const t_transpiler_source_span *span, const char *snippet, const char *suggestion);
 void transpiler_logging_stage_start(t_transpiler_context *context, const char *stage_name);
 void transpiler_logging_stage_success(t_transpiler_context *context, const char *stage_name);
 void transpiler_logging_stage_failure(t_transpiler_context *context, const char *stage_name, int error_code);

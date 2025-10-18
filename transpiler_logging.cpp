@@ -1,5 +1,6 @@
 #include "cblc_transpiler.hpp"
 
+#include "libft/Libft/libft.hpp"
 #include "libft/Printf/printf.hpp"
 
 static int transpiler_logging_should_store(const t_transpiler_context *context, t_transpiler_severity severity)
@@ -51,7 +52,87 @@ static t_transpiler_severity transpiler_logging_resolve_severity(const t_transpi
     return (severity);
 }
 
-int transpiler_logging_emit(t_transpiler_context *context, t_transpiler_severity severity, int code, const char *message)
+static void transpiler_logging_print_details(const t_transpiler_diagnostic *diagnostic)
+{
+    size_t index;
+    size_t caret_length;
+    size_t snippet_length;
+    size_t available_length;
+
+    if (!diagnostic)
+        return ;
+    if (diagnostic->span.path[0] != '\0')
+    {
+        if (diagnostic->severity == TRANSPILE_SEVERITY_ERROR)
+            pf_printf_fd(2, " --> %s:%zu:%zu\n", diagnostic->span.path, diagnostic->span.start_line,
+                diagnostic->span.start_column);
+        else
+            pf_printf(" --> %s:%zu:%zu\n", diagnostic->span.path, diagnostic->span.start_line,
+                diagnostic->span.start_column);
+    }
+    if (diagnostic->snippet[0] != '\0')
+    {
+        if (diagnostic->severity == TRANSPILE_SEVERITY_ERROR)
+            pf_printf_fd(2, "      %s\n", diagnostic->snippet);
+        else
+            pf_printf("      %s\n", diagnostic->snippet);
+        if (diagnostic->severity == TRANSPILE_SEVERITY_ERROR)
+            pf_printf_fd(2, "      ");
+        else
+            pf_printf("      ");
+        index = 1;
+        if (diagnostic->span.start_column > 0)
+        {
+            while (index < diagnostic->span.start_column)
+            {
+                if (diagnostic->severity == TRANSPILE_SEVERITY_ERROR)
+                    pf_printf_fd(2, " ");
+                else
+                    pf_printf(" ");
+                index += 1;
+            }
+        }
+        caret_length = 1;
+        if (diagnostic->span.start_column > 0
+            && diagnostic->span.end_column >= diagnostic->span.start_column)
+        {
+            caret_length = diagnostic->span.end_column - diagnostic->span.start_column + 1;
+        }
+        snippet_length = ft_strlen(diagnostic->snippet);
+        if (diagnostic->span.start_column > 0
+            && snippet_length + 1 >= diagnostic->span.start_column)
+        {
+            available_length = snippet_length - (diagnostic->span.start_column - 1);
+            if (available_length > 0 && caret_length > available_length)
+                caret_length = available_length;
+        }
+        if (caret_length == 0)
+            caret_length = 1;
+        index = 0;
+        while (index < caret_length)
+        {
+            if (diagnostic->severity == TRANSPILE_SEVERITY_ERROR)
+                pf_printf_fd(2, "^");
+            else
+                pf_printf("^");
+            index += 1;
+        }
+        if (diagnostic->severity == TRANSPILE_SEVERITY_ERROR)
+            pf_printf_fd(2, "\n");
+        else
+            pf_printf("\n");
+    }
+    if (diagnostic->suggestion[0] != '\0')
+    {
+        if (diagnostic->severity == TRANSPILE_SEVERITY_ERROR)
+            pf_printf_fd(2, "      suggestion: %s\n", diagnostic->suggestion);
+        else
+            pf_printf("      suggestion: %s\n", diagnostic->suggestion);
+    }
+}
+
+int transpiler_logging_emit_with_details(t_transpiler_context *context, t_transpiler_severity severity, int code,
+    const char *message, const t_transpiler_source_span *span, const char *snippet, const char *suggestion)
 {
     t_transpiler_severity effective_severity;
 
@@ -62,7 +143,8 @@ int transpiler_logging_emit(t_transpiler_context *context, t_transpiler_severity
     effective_severity = transpiler_logging_resolve_severity(context, severity);
     if (transpiler_logging_should_store(context, effective_severity) == 0)
         return (FT_SUCCESS);
-    if (transpiler_diagnostics_push(&context->diagnostics, effective_severity, code, message) != FT_SUCCESS)
+    if (transpiler_diagnostics_push_with_details(&context->diagnostics, effective_severity, code, message, span,
+            snippet, suggestion) != FT_SUCCESS)
         return (FT_FAILURE);
     if (effective_severity == TRANSPILE_SEVERITY_ERROR)
     {
@@ -72,6 +154,11 @@ int transpiler_logging_emit(t_transpiler_context *context, t_transpiler_severity
             transpiler_context_record_error(context, FT_FAILURE);
     }
     return (FT_SUCCESS);
+}
+
+int transpiler_logging_emit(t_transpiler_context *context, t_transpiler_severity severity, int code, const char *message)
+{
+    return (transpiler_logging_emit_with_details(context, severity, code, message, NULL, NULL, NULL));
 }
 
 void transpiler_logging_stage_start(t_transpiler_context *context, const char *stage_name)
@@ -122,14 +209,17 @@ void transpiler_logging_flush(const t_transpiler_context *context)
         if (diagnostic->severity == TRANSPILE_SEVERITY_ERROR)
         {
             pf_printf_fd(2, "[%s] (%d) %s\n", label, diagnostic->code, diagnostic->message);
+            transpiler_logging_print_details(diagnostic);
         }
         else if (diagnostic->code != 0)
         {
             pf_printf("[%s] (%d) %s\n", label, diagnostic->code, diagnostic->message);
+            transpiler_logging_print_details(diagnostic);
         }
         else
         {
             pf_printf("[%s] %s\n", label, diagnostic->message);
+            transpiler_logging_print_details(diagnostic);
         }
         index += 1;
     }

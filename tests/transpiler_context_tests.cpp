@@ -804,6 +804,18 @@ FT_TEST(test_transpiler_context_rejects_private_access_across_modules)
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
+    if (test_expect_success(transpiler_context_register_module_import(&context, "beta_mod", "alpha_mod"),
+            "dependent module should record import") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_compute_module_initialization_order(&context),
+            "module ordering should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
     if (test_expect_success(transpiler_context_register_function(&context, "alpha_mod", "helper",
             TRANSPILE_FUNCTION_RETURN_VOID, TRANSPILE_SYMBOL_PRIVATE),
             "private helper registration should succeed") != FT_SUCCESS)
@@ -860,6 +872,18 @@ FT_TEST(test_transpiler_context_allows_public_access_across_modules)
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
+    if (test_expect_success(transpiler_context_register_module_import(&context, "beta_mod", "alpha_mod"),
+            "dependent module should record import") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_compute_module_initialization_order(&context),
+            "module ordering should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
     if (test_expect_success(transpiler_context_register_function(&context, "alpha_mod", "helper",
             TRANSPILE_FUNCTION_RETURN_VOID, TRANSPILE_SYMBOL_PUBLIC),
             "public helper registration should succeed") != FT_SUCCESS)
@@ -888,6 +912,234 @@ FT_TEST(test_transpiler_context_allows_public_access_across_modules)
     }
     transpiler_context_dispose(&context);
     return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_requires_import_for_cross_module_access)
+{
+    t_transpiler_context context;
+    const t_transpiler_function_signature *signature;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_module(&context, "alpha_mod", NULL),
+            "first module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_module(&context, "beta_mod", NULL),
+            "second module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_function(&context, "alpha_mod", "helper",
+            TRANSPILE_FUNCTION_RETURN_VOID, TRANSPILE_SYMBOL_PUBLIC),
+            "public helper registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    signature = transpiler_context_resolve_function_access(&context, "beta_mod", "alpha_mod", "helper");
+    if (signature)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: cross-module access should require imports\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 1,
+            "missing import should emit diagnostic") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(context.diagnostics.items[0].code,
+            TRANSPILE_ERROR_MODULE_IMPORT_REQUIRED,
+            "missing import diagnostic should use dedicated code") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(transpiler_context_has_errors(&context), 1,
+            "missing import should mark context as having errors") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cblc_register_translation_unit_exports_records_entrypoint_and_helpers)
+{
+    t_transpiler_context context;
+    t_cblc_translation_unit unit;
+    const t_transpiler_entrypoint *entrypoint;
+    const t_transpiler_function_signature *signature;
+    const char *source;
+    int status;
+
+    source = "function void helper() {\n"
+        "    return;\n"
+        "}\n\n"
+        "function void main() {\n"
+        "    return;\n"
+        "}\n";
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(transpiler_context_register_module(&context, "alpha_mod", NULL),
+            "module registration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "translation unit should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_register_translation_unit_exports(&context, "alpha_mod", &unit),
+            "export registration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    entrypoint = transpiler_context_get_entrypoint(&context);
+    if (!entrypoint)
+    {
+        pf_printf("Assertion failed: expected entrypoint to be registered\n");
+        goto cleanup;
+    }
+    if (test_expect_cstring_equal(entrypoint->name, "main",
+            "entrypoint should record main function") != FT_SUCCESS)
+        goto cleanup;
+    signature = transpiler_context_find_function(&context, "alpha_mod", "main");
+    if (!signature)
+    {
+        pf_printf("Assertion failed: expected main function to be registered\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(static_cast<int>(signature->visibility), TRANSPILE_SYMBOL_PUBLIC,
+            "entrypoint should be exported as public") != FT_SUCCESS)
+        goto cleanup;
+    signature = transpiler_context_find_function(&context, "alpha_mod", "helper");
+    if (!signature)
+    {
+        pf_printf("Assertion failed: expected helper function to be registered\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(static_cast<int>(signature->visibility), TRANSPILE_SYMBOL_PUBLIC,
+            "helper should be exported as public") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(static_cast<int>(context.function_count), 2,
+            "two functions should be tracked") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_cblc_register_translation_unit_exports_skips_entrypoint_without_main)
+{
+    t_transpiler_context context;
+    t_cblc_translation_unit unit;
+    const t_transpiler_entrypoint *entrypoint;
+    const t_transpiler_function_signature *signature;
+    const char *source;
+    int status;
+
+    source = "function void show_banner() {\n"
+        "    return;\n"
+        "}\n";
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(transpiler_context_register_module(&context, "worker_mod", NULL),
+            "module registration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "translation unit should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_register_translation_unit_exports(&context, "worker_mod", &unit),
+            "export registration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    entrypoint = transpiler_context_get_entrypoint(&context);
+    if (entrypoint)
+    {
+        pf_printf("Assertion failed: modules without main should not register entrypoints\n");
+        goto cleanup;
+    }
+    signature = transpiler_context_find_function(&context, "worker_mod", "show_banner");
+    if (!signature)
+    {
+        pf_printf("Assertion failed: expected worker function to be registered\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(static_cast<int>(signature->visibility), TRANSPILE_SYMBOL_PUBLIC,
+            "worker function should be exported as public") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(static_cast<int>(context.function_count), 1,
+            "one function should be tracked") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_cblc_register_translation_unit_exports_reports_duplicate_entrypoint)
+{
+    t_transpiler_context context;
+    t_cblc_translation_unit first_unit;
+    t_cblc_translation_unit second_unit;
+    const char *first_source;
+    const char *second_source;
+    int status;
+
+    first_source = "function void main() {\n"
+        "    return;\n"
+        "}\n";
+    second_source = "function void main() {\n"
+        "    return;\n"
+        "}\n";
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    cblc_translation_unit_init(&first_unit);
+    cblc_translation_unit_init(&second_unit);
+    if (test_expect_success(transpiler_context_register_module(&context, "main_mod", NULL),
+            "first module registration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(transpiler_context_register_module(&context, "alternate_mod", NULL),
+            "second module registration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_parse_translation_unit(first_source, &first_unit),
+            "first module should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_register_translation_unit_exports(&context, "main_mod", &first_unit),
+            "first module exports should register") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_parse_translation_unit(second_source, &second_unit),
+            "second module should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_register_translation_unit_exports(&context, "alternate_mod", &second_unit) != FT_FAILURE)
+    {
+        pf_printf("Assertion failed: duplicate entrypoint should fail to register\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 1,
+            "duplicate entrypoint should emit diagnostic") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(context.diagnostics.items[0].code, TRANSPILE_ERROR_ENTRYPOINT_DUPLICATE,
+            "duplicate entrypoint should use dedicated error code") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(transpiler_context_has_errors(&context), 1,
+            "duplicate entrypoint should flag context error state") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&first_unit);
+    cblc_translation_unit_dispose(&second_unit);
+    transpiler_context_dispose(&context);
+    return (status);
 }
 
 FT_TEST(test_transpiler_context_scans_imports_and_orders_modules)
@@ -1046,6 +1298,136 @@ FT_TEST(test_transpiler_context_orders_modules_deterministically)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_transpiler_context_resolves_imports_by_file_name)
+{
+    t_transpiler_context context;
+    const t_transpiler_module *modules;
+    const size_t *order;
+    size_t module_count;
+    size_t order_count;
+    size_t worker_index;
+    size_t main_index;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_module(&context, "metrics_main.cblc",
+                "samples/cblc/metrics_main.cblc"),
+            "main module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_module(&context, "metrics_worker.cblc",
+                "samples/cblc/workers/metrics_worker.cblc"),
+            "worker module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_module_import(&context, "metrics_main.cblc",
+                "metrics_worker.cblc"),
+            "import by base file name should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_module_import(&context, "metrics_main.cblc",
+                "samples/cblc/workers/metrics_worker.cblc"),
+            "import by relative path should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_compute_module_initialization_order(&context),
+            "module order computation should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    modules = transpiler_context_get_modules(&context, &module_count);
+    if (!modules)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected to query registered modules\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(module_count), 2,
+            "two modules should be registered") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(modules[0].name, "metrics_worker.cblc", ft_strlen("metrics_worker.cblc") + 1) == 0)
+    {
+        worker_index = 0;
+        main_index = 1;
+    }
+    else
+    {
+        worker_index = 1;
+        main_index = 0;
+    }
+    if (test_expect_cstring_equal(modules[worker_index].name, "metrics_worker.cblc",
+            "worker module should retain its base file name") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(modules[main_index].name, "metrics_main.cblc",
+            "main module should retain its base file name") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(modules[main_index].import_count), 2,
+            "main module should record both imports") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(modules[main_index].imports[0].resolved_index),
+            static_cast<int>(worker_index),
+            "import by base file name should resolve to worker module") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(modules[main_index].imports[1].resolved_index),
+            static_cast<int>(worker_index),
+            "import by relative path should resolve to worker module") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    order = transpiler_context_get_module_initialization_order(&context, &order_count);
+    if (!order)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected module order to be available\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(order_count), 2,
+            "module order should include importer and dependency") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(order[0]), static_cast<int>(worker_index),
+            "worker should initialize before main module") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(order[1]), static_cast<int>(main_index),
+            "main module should initialize after worker") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_transpiler_context_rejects_empty_module_name)
 {
     t_transpiler_context context;
@@ -1192,6 +1574,71 @@ FT_TEST(test_transpiler_context_resolves_imports_by_path)
     }
     if (test_expect_int_equal(static_cast<int>(modules[1].imports[0].resolved_index), 0,
             "path import should resolve to worker module index") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_unit_reset_preserves_registered_modules)
+{
+    t_transpiler_context context;
+    const t_transpiler_module *modules;
+    size_t module_count;
+
+    if (test_expect_success(transpiler_context_init(&context),
+            "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_module(&context, "alpha_mod", NULL),
+            "first module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_register_module(&context, "beta_mod", NULL),
+            "second module registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_reset_unit_state(&context);
+    modules = transpiler_context_get_modules(&context, &module_count);
+    if (!modules)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected module registry to remain accessible\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(module_count), 2,
+            "unit reset should preserve registered modules") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(modules[0].name, "alpha_mod",
+            "first module should remain registered after unit reset") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(modules[1].name, "beta_mod",
+            "second module should remain registered after unit reset") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_reset_module_registry(&context);
+    modules = transpiler_context_get_modules(&context, &module_count);
+    if (!modules)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected module registry pointer to remain valid\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(module_count), 0,
+            "module registry reset should clear registered modules") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);

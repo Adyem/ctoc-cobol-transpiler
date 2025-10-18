@@ -47,7 +47,8 @@ void transpiler_diagnostics_dispose(t_transpiler_diagnostic_list *list)
     list->capacity = 0;
 }
 
-int transpiler_diagnostics_push(t_transpiler_diagnostic_list *list, t_transpiler_severity severity, int code, const char *message)
+int transpiler_diagnostics_push_with_details(t_transpiler_diagnostic_list *list, t_transpiler_severity severity, int code,
+    const char *message, const t_transpiler_source_span *span, const char *snippet, const char *suggestion)
 {
     t_transpiler_diagnostic *destination;
 
@@ -64,6 +65,28 @@ int transpiler_diagnostics_push(t_transpiler_diagnostic_list *list, t_transpiler
     destination->severity = severity;
     destination->code = code;
     ft_strlcpy(destination->message, message, TRANSPILE_DIAGNOSTIC_MESSAGE_MAX);
+    ft_bzero(&destination->span, sizeof(destination->span));
+    if (span)
+    {
+        ft_strlcpy(destination->span.path, span->path, TRANSPILE_FILE_PATH_MAX);
+        destination->span.start_line = span->start_line;
+        destination->span.start_column = span->start_column;
+        destination->span.end_line = span->end_line;
+        destination->span.end_column = span->end_column;
+    }
+    if (snippet)
+        ft_strlcpy(destination->snippet, snippet, TRANSPILE_DIAGNOSTIC_SNIPPET_MAX);
+    else
+        destination->snippet[0] = '\0';
+    if (suggestion)
+        ft_strlcpy(destination->suggestion, suggestion, TRANSPILE_DIAGNOSTIC_MESSAGE_MAX);
+    else
+        destination->suggestion[0] = '\0';
     list->count += 1;
     return (FT_SUCCESS);
+}
+
+int transpiler_diagnostics_push(t_transpiler_diagnostic_list *list, t_transpiler_severity severity, int code, const char *message)
+{
+    return (transpiler_diagnostics_push_with_details(list, severity, code, message, NULL, NULL, NULL));
 }
