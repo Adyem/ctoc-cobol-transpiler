@@ -26,6 +26,7 @@ The CTOC COBOL Transpiler lets you author business logic in a lightweight C-styl
        --diagnostics verbose
    ```
    The CLI creates the `build/` directory automatically when it does not already exist, so you can point `--output` at a fresh staging path.
+   Conversion warnings remain enabled by default, but you can tailor diagnostics per run using `-W` flags. Pass `-Werror` to escalate warnings into build failures, use `-Wconversion` / `-Wno-conversion` to toggle implicit-conversion diagnostics, and reach for `-Woverflow`, `-Wstring-trunc`, `-Wshadow`, or `-Wunused` (each with matching `-Wno-` variants) as additional groups come online.
 3. View the emitted CBL-C (or feed it through `cblc_formatter` for pretty-printing):
    ```
    cat build/minimal_program.cblc
@@ -79,6 +80,7 @@ With the command above you can compile multiple CBL-C translation units in one i
 
 - Consult [`design_doc.txt`](design_doc.txt) for architectural goals and the language surface area.
 - Review [`docs/runtime_api_reference.md`](docs/runtime_api_reference.md) when writing CBL-C that interacts with the provided runtime helpers.
+- Study [`docs/abi_spec.md`](docs/abi_spec.md) for the runtime ABI, calling conventions, and linkage layout shared by generated COBOL and native integrations.
 - Use [`compiler_feature_tracker.md`](compiler_feature_tracker.md) to follow the roadmap and discover which capabilities ship next.
 
 Whether you're modernizing existing COBOL or prototyping new workflows in CBL-C, the transpiler provides repeatable builds, actionable diagnostics, and modular composition patterns so you can stay productive in either language.

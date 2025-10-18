@@ -2,6 +2,134 @@
 
 #include "transpiler_semantics_internal.hpp"
 
+static size_t transpiler_semantics_double_precision_threshold(void)
+{
+    return (18);
+}
+
+static int transpiler_semantics_is_double_precision(size_t length)
+{
+    if (length >= transpiler_semantics_double_precision_threshold())
+        return (1);
+    return (0);
+}
+
+static const char *transpiler_semantics_assignment_name(const t_ast_node *node,
+    const char *fallback)
+{
+    if (!node)
+        return (fallback);
+    if (node->token.lexeme)
+        return (node->token.lexeme);
+    return (fallback);
+}
+
+static void transpiler_semantics_note_conversion_warnings(t_transpiler_context *context,
+    const t_ast_node *source, const t_ast_node *target, const char *source_role,
+    const char *target_role, t_transpiler_semantic_data_kind source_kind,
+    size_t source_length, size_t source_scale, int source_scale_known,
+    t_transpiler_semantic_data_kind target_kind, size_t target_length,
+    size_t target_scale, int target_scale_known)
+{
+    const char *source_name;
+    const char *target_name;
+    int source_is_double;
+    int target_is_double;
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+    (void)source_scale;
+    (void)source_scale_known;
+    (void)target_scale;
+    (void)target_scale_known;
+    if (!context)
+        return ;
+    if (!source_role)
+        source_role = "source";
+    if (!target_role)
+        target_role = "target";
+    source_name = transpiler_semantics_assignment_name(source, "<source>");
+    target_name = transpiler_semantics_assignment_name(target, "<target>");
+    if (source_kind == TRANSPILE_SEMANTIC_DATA_FLOATING
+        && target_kind == TRANSPILE_SEMANTIC_DATA_FLOATING)
+    {
+        source_is_double = transpiler_semantics_is_double_precision(source_length);
+        target_is_double = transpiler_semantics_is_double_precision(target_length);
+        if (!source_is_double && target_is_double)
+        {
+            pf_snprintf(message, sizeof(message),
+                "%s '%s' (float precision) coerces into %s '%s' (double precision)",
+                source_role, source_name, target_role, target_name);
+            (void)transpiler_semantics_emit_warning(context,
+                TRANSPILE_WARNING_SEMANTIC_FLOAT_TO_DOUBLE, message);
+        }
+        else if (source_is_double && !target_is_double)
+        {
+            pf_snprintf(message, sizeof(message),
+                "%s '%s' (double precision) coerces into %s '%s' (float precision)",
+                source_role, source_name, target_role, target_name);
+            (void)transpiler_semantics_emit_warning(context,
+                TRANSPILE_WARNING_SEMANTIC_DOUBLE_TO_FLOAT, message);
+        }
+    }
+    if (source_kind == TRANSPILE_SEMANTIC_DATA_NUMERIC
+        && target_kind == TRANSPILE_SEMANTIC_DATA_FLOATING)
+    {
+        pf_snprintf(message, sizeof(message),
+            "%s '%s' (integral) coerces into %s '%s' (floating precision)",
+            source_role, source_name, target_role, target_name);
+        (void)transpiler_semantics_emit_warning(context,
+            TRANSPILE_WARNING_SEMANTIC_INTEGRAL_TO_FLOATING, message);
+    }
+    if (source_kind == TRANSPILE_SEMANTIC_DATA_NUMERIC
+        && target_kind == TRANSPILE_SEMANTIC_DATA_ALPHANUMERIC)
+    {
+        pf_snprintf(message, sizeof(message),
+            "%s '%s' (integral) coerces into %s '%s' (alphanumeric or boolean storage)",
+            source_role, source_name, target_role, target_name);
+        (void)transpiler_semantics_emit_warning(context,
+            TRANSPILE_WARNING_SEMANTIC_INTEGRAL_TO_ALPHANUMERIC, message);
+    }
+    if (source_kind == TRANSPILE_SEMANTIC_DATA_BOOLEAN
+        && transpiler_semantics_is_numeric_kind(target_kind))
+    {
+        pf_snprintf(message, sizeof(message),
+            "%s '%s' (boolean) coerces into %s '%s' (%s storage)",
+            source_role, source_name, target_role, target_name,
+            transpiler_semantics_kind_to_string(target_kind));
+        (void)transpiler_semantics_emit_warning(context,
+            TRANSPILE_WARNING_SEMANTIC_BOOLEAN_TO_NUMERIC, message);
+    }
+    if (transpiler_semantics_is_numeric_kind(source_kind)
+        && target_kind == TRANSPILE_SEMANTIC_DATA_BOOLEAN)
+    {
+        pf_snprintf(message, sizeof(message),
+            "%s '%s' (%s) coerces into %s '%s' (boolean storage)",
+            source_role, source_name,
+            transpiler_semantics_kind_to_string(source_kind),
+            target_role, target_name);
+        (void)transpiler_semantics_emit_warning(context,
+            TRANSPILE_WARNING_SEMANTIC_NUMERIC_TO_BOOLEAN, message);
+    }
+    if (source_kind == TRANSPILE_SEMANTIC_DATA_BOOLEAN
+        && target_kind == TRANSPILE_SEMANTIC_DATA_ALPHANUMERIC)
+    {
+        pf_snprintf(message, sizeof(message),
+            "%s '%s' (boolean) coerces into %s '%s' (alphanumeric storage)",
+            source_role, source_name, target_role, target_name);
+        (void)transpiler_semantics_emit_warning(context,
+            TRANSPILE_WARNING_SEMANTIC_BOOLEAN_TO_ALPHANUMERIC, message);
+    }
+    if (source_kind == TRANSPILE_SEMANTIC_DATA_ALPHANUMERIC
+        && target_kind == TRANSPILE_SEMANTIC_DATA_BOOLEAN)
+    {
+        pf_snprintf(message, sizeof(message),
+            "%s '%s' (alphanumeric) coerces into %s '%s' (boolean storage)",
+            source_role, source_name, target_role, target_name);
+        (void)transpiler_semantics_emit_warning(context,
+            TRANSPILE_WARNING_SEMANTIC_ALPHANUMERIC_TO_BOOLEAN, message);
+    }
+}
+
 static int transpiler_semantics_classify_move_value(const t_ast_node *value,
     const t_transpiler_semantic_scope *scope, t_transpiler_context *context,
     const char *role, t_transpiler_semantic_data_kind *out_kind, size_t *out_length,
@@ -165,6 +293,13 @@ static int transpiler_semantics_validate_assignment_like_statement(const t_ast_n
                 source_role, &source_kind, &source_length,
                 &source_scale, &source_scale_known) != FT_SUCCESS)
             status = FT_FAILURE;
+    }
+    if (status == FT_SUCCESS)
+    {
+        transpiler_semantics_note_conversion_warnings(context, source, target,
+            source_role, target_role, source_kind, source_length,
+            source_scale, source_scale_known, target_kind, target_length,
+            target_scale, target_scale_known);
     }
     if (target_is_read_only)
     {

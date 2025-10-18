@@ -218,6 +218,68 @@ t_ast_node *semantics_create_arithmetic_expression_node(
         LEXER_TOKEN_PLUS, "+", right_name));
 }
 
+t_ast_node *semantics_create_move_statement(const char *source_name,
+    const char *target_name)
+{
+    t_ast_node *statement;
+    t_ast_node *source_node;
+    t_ast_node *target_node;
+
+    if (!source_name)
+        return (NULL);
+    if (!target_name)
+        return (NULL);
+    statement = ast_node_create(AST_NODE_MOVE_STATEMENT);
+    if (!statement)
+        return (NULL);
+    source_node = semantics_create_identifier_node(source_name);
+    if (!source_node)
+    {
+        ast_node_destroy(statement);
+        return (NULL);
+    }
+    if (ast_node_add_child(statement, source_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(source_node);
+        ast_node_destroy(statement);
+        return (NULL);
+    }
+    target_node = semantics_create_identifier_node(target_name);
+    if (!target_node)
+    {
+        ast_node_destroy(statement);
+        return (NULL);
+    }
+    if (ast_node_add_child(statement, target_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(target_node);
+        ast_node_destroy(statement);
+        return (NULL);
+    }
+    return (statement);
+}
+
+t_ast_node *semantics_create_stop_run_statement(void)
+{
+    t_ast_node *statement;
+    t_lexer_token token;
+
+    statement = ast_node_create(AST_NODE_STOP_STATEMENT);
+    if (!statement)
+        return (NULL);
+    token.kind = LEXER_TOKEN_KEYWORD_STOP;
+    token.lexeme = "STOP";
+    token.length = 4;
+    token.line = 1;
+    token.column = 1;
+    if (ast_node_set_token(statement, &token) != FT_SUCCESS)
+    {
+        ast_node_destroy(statement);
+        return (NULL);
+    }
+    return (statement);
+}
+
 t_ast_node *semantics_build_program_with_storage_level(
     const char *storage_name, const char *picture_text,
     const char *level_text)
@@ -545,6 +607,51 @@ int semantics_attach_procedure_with_assignment(t_ast_node *program,
     if (semantics_attach_procedure_with_assignment_node(program,
             source_node, target_name) != FT_SUCCESS)
         return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+int semantics_attach_procedure_with_statements(t_ast_node *program,
+    t_ast_node **statements, size_t statement_count)
+{
+    t_ast_node *procedure_division;
+    t_ast_node *sequence;
+    size_t index;
+
+    if (!program)
+        return (FT_FAILURE);
+    procedure_division = ast_node_create(AST_NODE_PROCEDURE_DIVISION);
+    if (!procedure_division)
+        return (FT_FAILURE);
+    sequence = ast_node_create(AST_NODE_STATEMENT_SEQUENCE);
+    if (!sequence)
+    {
+        ast_node_destroy(procedure_division);
+        return (FT_FAILURE);
+    }
+    if (ast_node_add_child(procedure_division, sequence) != FT_SUCCESS)
+    {
+        ast_node_destroy(sequence);
+        ast_node_destroy(procedure_division);
+        return (FT_FAILURE);
+    }
+    if (ast_node_add_child(program, procedure_division) != FT_SUCCESS)
+    {
+        ast_node_destroy(procedure_division);
+        return (FT_FAILURE);
+    }
+    index = 0;
+    while (index < statement_count)
+    {
+        if (statements && statements[index])
+        {
+            if (ast_node_add_child(sequence, statements[index]) != FT_SUCCESS)
+            {
+                ast_node_destroy(statements[index]);
+                return (FT_FAILURE);
+            }
+        }
+        index += 1;
+    }
     return (FT_SUCCESS);
 }
 

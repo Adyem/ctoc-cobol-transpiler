@@ -9,6 +9,7 @@ typedef enum e_transpiler_semantic_data_kind
 {
     TRANSPILE_SEMANTIC_DATA_UNKNOWN = 0,
     TRANSPILE_SEMANTIC_DATA_ALPHANUMERIC,
+    TRANSPILE_SEMANTIC_DATA_BOOLEAN,
     TRANSPILE_SEMANTIC_DATA_NUMERIC,
     TRANSPILE_SEMANTIC_DATA_FLOATING
 }   t_transpiler_semantic_data_kind;
@@ -21,6 +22,9 @@ typedef struct s_transpiler_semantic_data_item
     size_t declared_scale;
     int has_declared_scale;
     int is_read_only;
+    size_t read_count;
+    size_t write_count;
+    int has_initial_value;
 }   t_transpiler_semantic_data_item;
 
 typedef struct s_transpiler_semantic_scope
@@ -47,8 +51,12 @@ int     transpiler_semantics_validate_identifier_use(const t_transpiler_semantic
             int is_target, t_transpiler_semantic_data_kind *out_kind,
             size_t *out_length, size_t *out_scale, int *out_scale_known,
             int *out_is_read_only);
+int     transpiler_semantics_analyze_usage(const t_transpiler_semantic_scope *scope,
+            t_transpiler_context *context);
 
 int     transpiler_semantics_emit_error(t_transpiler_context *context, int code,
+            const char *message);
+int     transpiler_semantics_emit_warning(t_transpiler_context *context, int code,
             const char *message);
 int     transpiler_semantics_emit_invalid_expression(t_transpiler_context *context,
             const char *message);

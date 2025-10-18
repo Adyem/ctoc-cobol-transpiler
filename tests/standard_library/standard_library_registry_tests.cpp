@@ -175,6 +175,65 @@ FT_TEST(test_standard_library_lookup_enforces_std_prefix)
         pf_printf("Assertion failed: std::tan should map to CBLC-TAN program\n");
         return (FT_FAILURE);
     }
+    entry = transpiler_standard_library_lookup("std::round");
+    if (!entry)
+    {
+        pf_printf("Assertion failed: std::round should resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-ROUNDED", ft_strlen("CBLC-ROUNDED") + 1) != 0)
+    {
+        pf_printf("Assertion failed: std::round should map to CBLC-ROUNDED program\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup("cblc::banker_round");
+    if (!entry)
+    {
+        pf_printf("Assertion failed: cblc::banker_round should resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-BANKER-ROUND", ft_strlen("CBLC-BANKER-ROUND") + 1) != 0)
+    {
+        pf_printf("Assertion failed: cblc::banker_round should map to CBLC-BANKER-ROUND program\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup("cblc::date_parse_yyyymmdd");
+    if (!entry)
+    {
+        pf_printf("Assertion failed: cblc::date_parse_yyyymmdd should resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-DATE-YYYYMMDD",
+            ft_strlen("CBLC-DATE-YYYYMMDD") + 1) != 0)
+    {
+        pf_printf("Assertion failed: cblc::date_parse_yyyymmdd should map to CBLC-DATE-YYYYMMDD program\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup_with_buffer_kind("cblc::date_parse_yyyymmdd",
+        TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR);
+    if (!entry)
+    {
+        pf_printf("Assertion failed: cblc::date_parse_yyyymmdd char overload should resolve to catalog entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-DATE-YYYYMMDD",
+            ft_strlen("CBLC-DATE-YYYYMMDD") + 1) != 0)
+    {
+        pf_printf("Assertion failed: cblc::date_parse_yyyymmdd char overload should map to CBLC-DATE-YYYYMMDD program\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup("cblc::date_duration_days");
+    if (!entry)
+    {
+        pf_printf("Assertion failed: cblc::date_duration_days should resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-DATE-DURATION",
+            ft_strlen("CBLC-DATE-DURATION") + 1) != 0)
+    {
+        pf_printf("Assertion failed: cblc::date_duration_days should map to CBLC-DATE-DURATION program\n");
+        return (FT_FAILURE);
+    }
     entry = transpiler_standard_library_lookup("std::strlen");
     if (!entry)
     {
@@ -387,6 +446,28 @@ FT_TEST(test_standard_library_lookup_enforces_std_prefix)
     if (ft_strncmp(entry->program_name, "CBLC-SQRT", ft_strlen("CBLC-SQRT") + 1) != 0)
     {
         pf_printf("Assertion failed: std::sqrt should map to CBLC-SQRT program\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup("std::fmin");
+    if (!entry)
+    {
+        pf_printf("Assertion failed: std::fmin should resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-MIN", ft_strlen("CBLC-MIN") + 1) != 0)
+    {
+        pf_printf("Assertion failed: std::fmin should map to CBLC-MIN program\n");
+        return (FT_FAILURE);
+    }
+    entry = transpiler_standard_library_lookup("std::fmax");
+    if (!entry)
+    {
+        pf_printf("Assertion failed: std::fmax should resolve to standard library entry\n");
+        return (FT_FAILURE);
+    }
+    if (ft_strncmp(entry->program_name, "CBLC-MAX", ft_strlen("CBLC-MAX") + 1) != 0)
+    {
+        pf_printf("Assertion failed: std::fmax should map to CBLC-MAX program\n");
         return (FT_FAILURE);
     }
     entry = transpiler_standard_library_lookup("std::toupper");
@@ -615,6 +696,10 @@ FT_TEST(test_standard_library_catalog_lists_all_entries)
         {"std::sin", TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE},
         {"std::cos", TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE},
         {"std::tan", TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE},
+        {"std::round", TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE},
+        {"cblc::banker_round", TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE},
+        {"cblc::date_parse_yyyymmdd", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR},
+        {"cblc::date_duration_days", TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE},
         {"std::strlen", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR},
         {"std::strlen", TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING},
         {"std::strnlen", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR},
@@ -633,6 +718,8 @@ FT_TEST(test_standard_library_catalog_lists_all_entries)
         {"std::strtod", TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING},
         {"std::pow", TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE},
         {"std::sqrt", TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE},
+        {"std::fmin", TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE},
+        {"std::fmax", TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE},
         {"std::toupper", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR},
         {"std::toupper", TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING},
         {"std::tolower", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR},
@@ -797,6 +884,16 @@ FT_TEST(test_standard_library_generators_validate_out_parameter)
     if (transpiler_standard_library_generate_sqrt(NULL) != FT_FAILURE)
     {
         pf_printf("Assertion failed: sqrt generator should reject NULL output pointer\n");
+        return (FT_FAILURE);
+    }
+    if (transpiler_standard_library_generate_min(NULL) != FT_FAILURE)
+    {
+        pf_printf("Assertion failed: min generator should reject NULL output pointer\n");
+        return (FT_FAILURE);
+    }
+    if (transpiler_standard_library_generate_max(NULL) != FT_FAILURE)
+    {
+        pf_printf("Assertion failed: max generator should reject NULL output pointer\n");
         return (FT_FAILURE);
     }
     if (transpiler_standard_library_generate_toupper(NULL) != FT_FAILURE)

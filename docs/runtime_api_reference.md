@@ -46,9 +46,99 @@ alphanumeric data to libft-friendly buffers. The API comprises:
   `runtime_string_concat` to support relational operators and concatenation.
 - `runtime_string_to_int` bridges to `runtime_scalar` when numeric conversions
   are required.
+- `runtime_string_blank` and `runtime_string_copy_checked` provide bounds-
+  checked operations for fixed-width caller buffers, blanking destinations with
+  spaces, copying no more than the provided source length, and reporting the
+  number of characters moved plus any truncation.
 
 All string buffers expand automatically using CMA-backed growth and guarantee a
 null-terminated `data` pointer so they remain compatible with libft routines.
+
+## Memory Helpers (`runtime_memory`)
+
+Generated code frequently moves raw bytes between overlapping buffers when
+reshaping COBOL records. The memory helper module exposes
+`runtime_memory_copy_checked`, which validates source and destination lengths,
+refuses to overrun the destination, and falls back to `memmove` semantics when
+regions overlap. Callers that supply zero lengths are treated as no-ops so the
+helper can guard optional fields without branching in generated code.
+
+## Sorting Helpers (`runtime_sort`)
+
+Many COBOL workflows manipulate indexed record sets. The sorting module pairs a
+`t_runtime_record_key` description with helpers that operate on `t_runtime_record`
+arrays:
+
+- `runtime_record_compare_keys` evaluates two records against one or more key
+  segments, supports ascending or descending order, and pads short records with
+  spaces so variable-length entries remain comparable.
+- `runtime_record_sort` performs a stable insertion sort over caller-supplied
+  record arrays using the provided keys, moving only the lightweight record
+  structures while leaving the underlying buffers in place.
+- `runtime_record_search_all` implements a binary search equivalent to COBOL's
+  `SEARCH ALL`, returning whether a key is present and reporting the insertion
+  point for new records.
+
+These helpers guard null pointers, reject empty key spans, and make it easy for
+generated code to provide deterministic ordering without pulling in additional
+runtime dependencies.
+
+## CSV and Line I/O Helpers (`runtime_csv`)
+
+Text integrations frequently exchange comma-separated values or line-oriented
+records. The CSV module introduces a handful of utilities that build on the
+existing file helpers:
+
+- `runtime_csv_parse_line` splits a line into pre-initialized
+  `t_runtime_string` fields, honoring ANSI CSV quoting rules (including doubled
+  quotes) and optional trailing commas.
+- `runtime_csv_format_line` emits a CSV row from a field array, quoting values
+  that contain commas, spaces, quotes, or newlines while
+  escaping embedded quotes.
+- `runtime_line_read_fixed` and `runtime_line_write_fixed` read and write
+  fixed-length records by blank-padding shorter inputs and returning the exact
+  byte window requested.
+- `runtime_line_read_variable` and `runtime_line_write_variable` consume or
+  produce delimited records (typically newline-terminated), skipping carriage
+  returns and signalling end-of-file through an optional flag.
+
+The helpers reuse `runtime_file` descriptors, making them safe to mix with other
+runtime I/O routines.
+
+## Encoding Helpers (`runtime_encoding`)
+
+COBOL environments often operate on EBCDIC data while the transpiler emits
+ASCII-compatible CBL-C. The encoding module introduces explicit transcoding
+points so generated programs can normalize buffers at the boundaries:
+
+- `runtime_encoding_reset` restores the default CCSID 037 tables, ensuring
+  callsites start from a known mapping before applying overrides.
+- `runtime_encoding_get_active` copies the currently active tables into a
+  caller-provided `t_runtime_encoding_table` so native integrations can inspect
+  or persist the mapping.
+- `runtime_encoding_set_active` copies caller-supplied tables into the runtime,
+  enabling alternate CCSIDs or patched character maps.
+- `runtime_encoding_transcode_to_ascii` and
+  `runtime_encoding_transcode_to_ebcdic` translate buffers using the active
+  tables, validate source/destination lengths, and report how many bytes were
+  written.
+
+The helper enforces explicit destination lengths to guard fixed-width COBOL
+fields and rejects null pointers when a non-zero length is requested.
+
+## Collation Helpers (`runtime_collation`)
+
+String comparisons now flow through a dedicated collation layer. By default the
+module performs locale-independent ASCII comparisons so diagnostics and runtime
+semantics remain deterministic. Advanced hosts can register a custom bridge via
+`runtime_collation_set_bridge`, supplying a callback that receives both operands
+and writes the comparison result. The active bridge can be inspected with
+`runtime_collation_get_bridge` or cleared with `runtime_collation_clear_bridge`
+to fall back to the ASCII behavior.
+
+Generated helpers call `runtime_collation_compare` directly, so any registered
+bridge automatically applies to `runtime_string_compare` and standard library
+subprograms that depend on lexicographic ordering.
 
 ## Standard Library Subprograms
 
@@ -218,6 +308,35 @@ following helpers:
   operand into the result, increments by one for positive values with fractional
   components, and writes status `1` when an adjustment occurs (otherwise `0`).
   Callers reference the helper through `std::ceil`.
+- `CBLC-ROUNDED` applies COBOL `ROUNDED` clause semantics to a caller-supplied
+  floating operand (`USAGE COMP-2`). Callers pass the operand, a trailing result
+  slot, and a numeric status flag by reference. The helper copies the integer
+  portion of the operand, detects fractional components, and applies banker-style
+  rounding (ties to even) before writing the final result. Status `1` indicates
+  the helper adjusted the value, while status `0` reports that the operand was
+  already integral. Callers reference the helper through `std::round`.
+- `CBLC-BANKER-ROUND` rounds a caller-supplied floating operand (`USAGE COMP-2`)
+  to a requested scale. Callers pass the operand, a `PIC S9(4) COMP-5` scale
+  parameter indicating the number of digits to preserve to the right of the
+  decimal point, a trailing result slot, and a numeric status flag. The helper
+  computes a scaling factor, widens the operand to that precision, and applies
+  banker-style rounding (ties to even). When rounding occurs it reports status
+  `1`, status `0` signals that no adjustment was necessary, and status `2`
+  signals either an invalid scale (less than `0` or greater than `18`) or a COBOL
+  size error during scaling. Callers reference the helper through
+  `cblc::banker_round`.
+- `CBLC-DATE-YYYYMMDD` accepts an eight-character `PIC X(8)` buffer by
+  reference and returns the parsed year, month, day, packed (`PIC 9(8) COMP-3`)
+  encoding, and serial (`PIC S9(9) COMP-5`) day count through trailing result
+  slots. The helper validates that every character is numeric, enforces legal
+  month/day ranges with leap-year checks, zeroes all result fields when
+  validation fails, and reports status codes (`0` success, `1` non-digit input,
+  `2` invalid month, `3` invalid day) so callers can branch on specific errors.
+- `CBLC-DATE-DURATION` consumes two serial day counts (`PIC S9(9) COMP-5`) from
+  `CBLC-DATE-YYYYMMDD`, computes the absolute day difference, and writes a
+  signed comparison flag (`-1`, `0`, or `1`) alongside a success status. Equal
+  inputs leave the duration and comparison slots at zero so callers can detect
+  matching dates without extra arithmetic.
 - `CBLC-EXP` widens a caller-supplied floating operand (`USAGE COMP-2`) through
   `FUNCTION EXP` to produce the mathematical exponential. Callers provide the
   operand, a trailing floating result slot, and a numeric status flag by
@@ -293,6 +412,15 @@ following helpers:
   otherwise computing the square root via `FUNCTION SQRT` and writing the
   result with status `0`. Callers reference the helper through `std::sqrt` and
   are expected to widen narrower numeric inputs before invocation.
+- `CBLC-MIN` accepts two floating operands (`USAGE COMP-2`) along with a result
+  slot and numeric status flag. It evaluates `FUNCTION MIN` to select the
+  smaller operand, stores the result, and reports status `0`. Any size error
+  zeroes the result and returns status `1`. Callers reach the helper through
+  `std::fmin` and should widen integral inputs before invocation.
+- `CBLC-MAX` mirrors `CBLC-MIN` but uses `FUNCTION MAX` to return the larger
+  operand. It reports status `0` when the computation succeeds and propagates a
+  status `1` with a zeroed result if COBOL signals a size error. Callers access
+  the helper via `std::fmax`.
 - Callers reference standard library helpers through the `std::` prefix (for
   example, `std::strlen`, `std::strnlen`, `std::strcmp`, `std::strcpy`, `std::strncpy`, `std::strcat`, or `std::sqrt`), which resolves to the COBOL
   subprogram names listed above and prevents collisions with user-defined

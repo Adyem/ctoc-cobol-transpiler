@@ -310,6 +310,11 @@ int transpiler_context_init(t_transpiler_context *context)
     context->format_mode = TRANSPILE_FORMAT_DEFAULT;
     context->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
     context->warnings_as_errors = 0;
+    context->warning_settings.conversion = 1;
+    context->warning_settings.overflow = 1;
+    context->warning_settings.string_truncation = 1;
+    context->warning_settings.shadow = 1;
+    context->warning_settings.unused = 1;
     context->last_error_code = FT_SUCCESS;
     context->functions = NULL;
     context->function_count = 0;
@@ -486,6 +491,11 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->format_mode = TRANSPILE_FORMAT_DEFAULT;
     context->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
     context->warnings_as_errors = 0;
+    context->warning_settings.conversion = 1;
+    context->warning_settings.overflow = 1;
+    context->warning_settings.string_truncation = 1;
+    context->warning_settings.shadow = 1;
+    context->warning_settings.unused = 1;
     context->last_error_code = FT_SUCCESS;
     if (context->functions)
         cma_free(context->functions);
@@ -620,6 +630,58 @@ void transpiler_context_set_warnings_as_errors(t_transpiler_context *context, in
     if (!context)
         return ;
     context->warnings_as_errors = warnings_as_errors;
+}
+
+void transpiler_context_set_warning_settings(t_transpiler_context *context,
+    const t_transpiler_warning_settings *settings)
+{
+    if (!context)
+        return ;
+    if (!settings)
+        return ;
+    context->warning_settings.conversion = settings->conversion;
+    context->warning_settings.overflow = settings->overflow;
+    context->warning_settings.string_truncation = settings->string_truncation;
+    context->warning_settings.shadow = settings->shadow;
+    context->warning_settings.unused = settings->unused;
+}
+
+int transpiler_context_warning_group_enabled(const t_transpiler_context *context,
+    t_transpiler_warning_group group)
+{
+    if (!context)
+        return (0);
+    if (group == TRANSPILE_WARNING_GROUP_CONVERSION)
+    {
+        if (context->warning_settings.conversion)
+            return (1);
+        return (0);
+    }
+    if (group == TRANSPILE_WARNING_GROUP_OVERFLOW)
+    {
+        if (context->warning_settings.overflow)
+            return (1);
+        return (0);
+    }
+    if (group == TRANSPILE_WARNING_GROUP_STRING_TRUNCATION)
+    {
+        if (context->warning_settings.string_truncation)
+            return (1);
+        return (0);
+    }
+    if (group == TRANSPILE_WARNING_GROUP_SHADOW)
+    {
+        if (context->warning_settings.shadow)
+            return (1);
+        return (0);
+    }
+    if (group == TRANSPILE_WARNING_GROUP_UNUSED)
+    {
+        if (context->warning_settings.unused)
+            return (1);
+        return (0);
+    }
+    return (1);
 }
 
 void transpiler_context_reset_unit_state(t_transpiler_context *context)

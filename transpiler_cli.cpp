@@ -52,6 +52,17 @@ static int transpiler_cli_options_reserve_outputs(t_transpiler_cli_options *opti
     return (FT_SUCCESS);
 }
 
+static void transpiler_cli_warning_settings_enable_all(t_transpiler_warning_settings *settings)
+{
+    if (!settings)
+        return ;
+    settings->conversion = 1;
+    settings->overflow = 1;
+    settings->string_truncation = 1;
+    settings->shadow = 1;
+    settings->unused = 1;
+}
+
 static int transpiler_cli_options_append_input(t_transpiler_cli_options *options, const char *path)
 {
     if (!options || !path)
@@ -213,6 +224,75 @@ static int transpiler_cli_parse_diagnostics_value(const char *value, t_transpile
     return (FT_FAILURE);
 }
 
+static int transpiler_cli_parse_warning_option(t_transpiler_cli_options *options, const char *argument)
+{
+    const char *name;
+    size_t length;
+    size_t name_length;
+    int enable;
+
+    if (!options || !argument)
+        return (FT_FAILURE);
+    if (ft_strlen(argument) < 3)
+    {
+        pf_printf("Unknown option '%s'.\n", argument);
+        return (FT_FAILURE);
+    }
+    name = argument + 2;
+    name_length = static_cast<size_t>(ft_strlen(name));
+    if (name_length == 0)
+    {
+        pf_printf("Missing warning group for -W option.\n");
+        return (FT_FAILURE);
+    }
+    length = ft_strlen("error");
+    if (ft_strncmp(name, "error", length + 1) == 0)
+    {
+        options->warnings_as_errors = 1;
+        return (FT_SUCCESS);
+    }
+    enable = 1;
+    length = ft_strlen("no-");
+    if (ft_strncmp(name, "no-", length) == 0 && name_length > length)
+    {
+        enable = 0;
+        name += length;
+        name_length = static_cast<size_t>(ft_strlen(name));
+    }
+    length = ft_strlen("conversion");
+    if (ft_strncmp(name, "conversion", length + 1) == 0)
+    {
+        options->warning_settings.conversion = enable;
+        return (FT_SUCCESS);
+    }
+    length = ft_strlen("overflow");
+    if (ft_strncmp(name, "overflow", length + 1) == 0)
+    {
+        options->warning_settings.overflow = enable;
+        return (FT_SUCCESS);
+    }
+    length = ft_strlen("string-trunc");
+    if (ft_strncmp(name, "string-trunc", length + 1) == 0)
+    {
+        options->warning_settings.string_truncation = enable;
+        return (FT_SUCCESS);
+    }
+    length = ft_strlen("shadow");
+    if (ft_strncmp(name, "shadow", length + 1) == 0)
+    {
+        options->warning_settings.shadow = enable;
+        return (FT_SUCCESS);
+    }
+    length = ft_strlen("unused");
+    if (ft_strncmp(name, "unused", length + 1) == 0)
+    {
+        options->warning_settings.unused = enable;
+        return (FT_SUCCESS);
+    }
+    pf_printf("Unknown warning option '%s'.\n", argument);
+    return (FT_FAILURE);
+}
+
 int transpiler_cli_options_init(t_transpiler_cli_options *options)
 {
     if (!options)
@@ -233,6 +313,7 @@ int transpiler_cli_options_init(t_transpiler_cli_options *options)
     options->format_mode = TRANSPILE_FORMAT_DEFAULT;
     options->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
     options->warnings_as_errors = 0;
+    transpiler_cli_warning_settings_enable_all(&options->warning_settings);
     options->show_help = 0;
     return (FT_SUCCESS);
 }
@@ -257,6 +338,7 @@ void transpiler_cli_options_dispose(t_transpiler_cli_options *options)
     options->format_mode = TRANSPILE_FORMAT_DEFAULT;
     options->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
     options->warnings_as_errors = 0;
+    transpiler_cli_warning_settings_enable_all(&options->warning_settings);
     options->show_help = 0;
 }
 
@@ -355,6 +437,7 @@ static int transpiler_cli_parse_long_option(t_transpiler_cli_options *options, c
 int transpiler_cli_parse(t_transpiler_cli_options *options, int argc, const char **argv)
 {
     int index;
+    const char *argument;
 
     if (!options || !argv)
         return (FT_FAILURE);
@@ -363,8 +446,22 @@ int transpiler_cli_parse(t_transpiler_cli_options *options, int argc, const char
     index = 1;
     while (index < argc)
     {
-        if (transpiler_cli_parse_long_option(options, argv, argc, &index) != FT_SUCCESS)
+        argument = argv[index];
+        if (ft_strncmp(argument, "--", 2) == 0 && ft_strlen(argument) > 2)
+        {
+            if (transpiler_cli_parse_long_option(options, argv, argc, &index) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        else if (ft_strncmp(argument, "-W", 2) == 0 && ft_strlen(argument) > 2)
+        {
+            if (transpiler_cli_parse_warning_option(options, argument) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        else
+        {
+            pf_printf("Unknown option '%s'.\n", argument);
             return (FT_FAILURE);
+        }
         index += 1;
     }
     if (options->show_help)
@@ -393,6 +490,7 @@ int transpiler_cli_apply(const t_transpiler_cli_options *options, t_transpiler_c
     transpiler_context_set_format_mode(context, options->format_mode);
     transpiler_context_set_diagnostic_level(context, options->diagnostic_level);
     transpiler_context_set_warnings_as_errors(context, options->warnings_as_errors);
+    transpiler_context_set_warning_settings(context, &options->warning_settings);
     return (FT_SUCCESS);
 }
 
@@ -406,4 +504,10 @@ void transpiler_cli_print_usage(void)
     pf_printf("                 --format <default|minimal|pretty> to control COBOL layout.\n");
     pf_printf("                 --diagnostics <silent|normal|verbose> to tune logging.\n");
     pf_printf("                 --warnings-as-errors to treat warnings as build errors.\n");
+    pf_printf("                 -Werror to escalate warnings.\n");
+    pf_printf("                 -Wconversion / -Wno-conversion to toggle conversion warnings.\n");
+    pf_printf("                 -Woverflow / -Wno-overflow to toggle overflow warnings.\n");
+    pf_printf("                 -Wstring-trunc / -Wno-string-trunc to toggle truncation warnings.\n");
+    pf_printf("                 -Wshadow / -Wno-shadow to toggle shadowing warnings.\n");
+    pf_printf("                 -Wunused / -Wno-unused to toggle unused-code warnings.\n");
 }

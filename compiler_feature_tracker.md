@@ -67,17 +67,31 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Provide a `CBLC-STRTOD` standard library subprogram that parses caller-supplied alphanumeric operands into floating results, honors declared lengths, and reports invalid input or range errors through a trailing status slot.
 - [x] Provide `CBLC-ABS` and `CBLC-FABS` standard library subprograms that return magnitudes for integral (`PIC S9(36) COMP-5`) and floating (`USAGE COMP-2`) operands, clamp to caller-declared ranges, and report overflow via trailing status slots.
 - [x] Provide `CBLC-FLOOR` and `CBLC-CEIL` standard library subprograms that round floating (`USAGE COMP-2`) operands toward their respective infinities, return the adjusted value through a trailing slot, and report fractional adjustments via a status flag.
+- [x] Provide a `CBLC-ROUNDED` standard library subprogram that applies COBOL `ROUNDED` clause semantics to floating operands, performs banker-style tie handling, returns the nearest integral result through a trailing slot, and reports fractional adjustments via a status flag.
+- [x] Provide a `CBLC-BANKER-ROUND` standard library subprogram that rounds floating operands to a caller-specified scale using banker-style tie handling, enforces valid scales, propagates size errors through a dedicated status code, and returns the adjusted value through a trailing slot.
 - [x] Provide `CBLC-ATOI`, `CBLC-ATOL`, and `CBLC-ATOLL` standard library subprograms that convert caller-supplied alphanumeric buffers into signed numeric results, enforce digit-only input, clamp to declared widths, and report conversion status through a trailing numeric slot.
 - [x] Provide a `CBLC-SQRT` standard library subprogram that widens numeric operands to floating precision, rejects negative inputs, and returns the computed root via a trailing slot alongside a status flag.
+- [x] Provide `CBLC-MIN` and `CBLC-MAX` standard library subprograms that accept floating operands by reference, store the smaller or larger value in trailing result slots, propagate size errors via status flags, and expose the helpers through `std::fmin` and `std::fmax` registry entries.
 - [x] Provide `CBLC-TOUPPER` and `CBLC-TOLOWER` standard library subprograms that convert caller buffers between upper and lower case in place while respecting declared lengths and reporting status via a trailing numeric slot.
 - [x] Provide `CBLC-ISDIGIT` and `CBLC-ISALPHA` standard library subprograms that classify single-character operands without locale dependencies and report boolean results through trailing numeric slots.
+- [x] Dates/times: add `CBLC-DATE-YYYYMMDD` and `CBLC-DATE-DURATION` helpers that validate `YYYYMMDD` buffers, surface packed/serial outputs, and compute durations with signed comparisons.
+- [x] Memory & safety: add bounds-checked string routines and a checked `memcpy` that falls back to `memmove`.
+- [x] EBCDIC/ASCII boundaries: introduce explicit transcoding points with configurable CCSID selection.
+- [x] Collation/locale: provide locale-independent string comparison with an optional locale bridge.
+- [x] Sorting/search: provide keyed record sorting, SEARCH ALL wrappers, and comparator helpers.
+- [x] CSV/line I/O: support parsing and emitting fixed or variable-length records.
 - [x] Provide `CBLC-EXP` and `CBLC-LOG` standard library subprograms that compute exponentials and natural logarithms for floating operands, clamp invalid domains or overflow via trailing status slots, and expose the helpers through `std::exp` and `std::log`.
 - [x] Provide `CBLC-SIN`, `CBLC-COS`, and `CBLC-TAN` standard library subprograms that compute trigonometric results for floating operands (and widened integral inputs), apply COBOL intrinsic functions, and surface status codes for overflow or other domain issues through trailing numeric slots.
 - [x] Visibility rules: surface diagnostics for public/private types, fields, and functions, enforcing access at semantic analysis time.
 - [x] Source maps: retain CBL-C ↔ COBOL span mappings to power diagnostics and debugging outputs.
 - [x] Linter/formatter: produce a canonical, deterministic CBL-C pretty-printer for consistent diffs.
+- [x] Document the runtime ABI, including calling conventions, return-slot rules, record layout, and alignment guidance for native integrations.
 - [x] Multiplication (`*`): covers operands typed as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`); widens both operands before multiplying, reports overflow, and generates COBOL statements that retain sign and scaling.
 - [x] Division (`/`): accepts `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`) operands, widens before division, ensures two's-complement quotient semantics with overflow/zero diagnostics, and preserves COBOL sign/scale.
+- [x] `float` conversion warnings: flag assignments or implicit coercions from `float` and `PIC V9(n)` items into integral (`PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)`/`long`, `PIC 9(36)`/`long long`), `double`/`PIC V9(18)`, boolean, or alphanumeric (`PIC X`, `PIC X(n)`) targets, issuing truncation or precision-loss warnings.
+- [x] `double` conversion warnings: surface diagnostics when `double` or `PIC V9(18)` values flow into integral widths, `float`/`PIC V9(n)`, boolean, or alphanumeric targets, capturing precision or magnitude loss.
+- [x] Integral conversion warnings: report when `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), or `PIC 9(36)` (`long long`) values assign into floating (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`), boolean, or alphanumeric items, highlighting sign/overflow risks.
+- [x] Dead-code detection: flag unreachable statements that follow terminating `STOP RUN` directives or reside in branches proven impossible by constant conditions.
 
 ## Pending Features
 
@@ -120,8 +134,6 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Greater-than comparison (`>`): compares `float`, `double`, `PIC V9(n)`, and `PIC V9(18)` operands (with coerced integrals), respecting COBOL ordering and diagnostics for special values.
 - [x] Greater-or-equal comparison (`>=`): supports `float`, `double`, `PIC V9(n)`, and `PIC V9(18)` operands (with coerced integrals), preserving COBOL ordering semantics and diagnostics.
 - [x] Equality comparison (`==`): aligns `float`, `double`, `PIC V9(n)`, and `PIC V9(18)` operands with integral (`PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)`, `PIC 9(36)`) and alphanumeric (`PIC X`, `PIC X(n)`) participants, normalizes operands by widening or coercion, honors COBOL rounding expectations, and defers string comparisons to libft/standard `strcmp` helpers while surfacing special-value diagnostics.
-- [ ] ROUNDED helper: applies COBOL `ROUNDED` clause semantics to `float`, `double`, `PIC V9(n)`, and `PIC V9(18)` results, coercing integrals when present, and ensures banker-style rounding ties are honored.
-- [ ] Banker-style rounding helper: offers explicit banker-rounding support for `float`, `double`, `PIC V9(n)`, and `PIC V9(18)` results (with coerced integrals), aligning with COBOL precision/scale and propagating overflow/underflow diagnostics.
 
 #### Assignment Semantics
 - [x] `=` assignment operator: parse identifier `=` expression statements in CBL-C, lower them through the existing MOVE infrastructure, and ensure single `=` lexemes never tokenize as comparisons.
@@ -132,41 +144,28 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Decimal scale preservation: when moving between floating and fixed-point items, preserve declared decimal scaling factors and emit diagnostics when scaling adjustments would truncate or overflow.
 
 #### Conversion Warning Coverage
-- [ ] `float` conversion warnings: flag assignments or implicit coercions from `float` and `PIC V9(n)` items into integral (`PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)`/`long`, `PIC 9(36)`/`long long`), `double`/`PIC V9(18)`, boolean, or alphanumeric (`PIC X`, `PIC X(n)`) targets, issuing truncation or precision-loss warnings.
-- [ ] `double` conversion warnings: surface diagnostics when `double` or `PIC V9(18)` values flow into integral widths, `float`/`PIC V9(n)`, boolean, or alphanumeric targets, capturing precision or magnitude loss.
-- [ ] Integral conversion warnings: report when `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), or `PIC 9(36)` (`long long`) values assign into floating (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`), boolean, or alphanumeric items, highlighting sign/overflow risks.
-- [ ] Boolean conversion warnings: emit diagnostics when boolean operands convert to or from numeric (`PIC 9`, `PIC 9(n)`, `PIC 9(18)`, `PIC 9(36)`, `float`, `double`, `PIC V9(n)`, `PIC V9(18)`) or alphanumeric types, ensuring callers handle non-zero truthiness semantics explicitly.
+- [x] Boolean conversion warnings: emit diagnostics when boolean operands convert to or from numeric (`PIC 9`, `PIC 9(n)`, `PIC 9(18)`, `PIC 9(36)`, `float`, `double`, `PIC V9(n)`, `PIC V9(18)`) or alphanumeric types, ensuring callers handle non-zero truthiness semantics explicitly.
+- [x] Warning groups/flags: add `-Wconversion`, `-Woverflow`, `-Wstring-trunc`, `-Wshadow`, `-Wunused`, and `-Werror` controls.
+- [x] Unused/uninitialized analysis: warn on unused variables, unread writes, and definite-assignment gaps.
 
 ### Standard Library Subprogram Catalog
 
-- [ ] Additional numeric helpers: track future candidates such as `cbrt`, `hypot`, `min`/`max`, or `clamp` that should accept the same integral and floating domains defined above, ensuring the standard library surface mirrors common CBL-C idioms once return-slot plumbing lands.
 
 ### Data / Encoding / I/O
 
-- [ ] EBCDIC/ASCII boundaries: introduce explicit transcoding points with configurable CCSID selection.
 - [ ] Indexed/relative files: add SELECT/ORGANIZATION handling, key definitions, READ NEXT traversal, and locking controls.
-- [ ] Collation/locale: provide locale-independent string comparison with an optional locale bridge.
 
 ### Codegen / Backends
 
 - [ ] C backend: emit portable C from the shared IR to simplify native testing.
-- [ ] ABI spec: document calling conventions, return-slot rules, record layout, and alignment.
 - [ ] Deterministic builds: scrub timestamps and paths to guarantee reproducible output.
 - [ ] Parallel compilation: build a translation-unit DAG, cache per-file outputs, and support incremental rebuilds.
 
 ### Runtime / Stdlib
 
-- [ ] Memory & safety: add bounds-checked string routines and a checked `memcpy` that falls back to `memmove`.
-- [ ] Dates/times: expose helpers for `yyyymmdd`, packed decimals, durations, and comparisons.
-- [ ] Sorting/search: provide keyed record sorting, SEARCH ALL wrappers, and comparator helpers.
-- [ ] CSV/line I/O: support parsing and emitting fixed or variable-length records.
 - [ ] Error model: define uniform status enums and propagate them through trailing return slots.
 
 ### Diagnostics & Tooling
-
-- [ ] Unused/uninitialized analysis: warn on unused variables, unread writes, and definite-assignment gaps.
-- [ ] Dead-code detection: flag unreachable code following returns or constant-false branches.
-- [ ] Warning groups/flags: add `-Wconversion`, `-Woverflow`, `-Wstring-trunc`, `-Wshadow`, `-Wunused`, and `-Werror` controls.
 - [ ] Pretty diagnostics: include line snippets, caret ranges, and suggestion text in diagnostics.
 
 ### Reverse Pipeline (COBOL → CBL-C)
