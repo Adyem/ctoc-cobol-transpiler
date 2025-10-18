@@ -122,6 +122,10 @@ filesystem synchronized. The quick-start example pairs its COBOL artifact with t
 - **Purpose:** Provides the entrypoint program that kicks off the presenter helper so the full multi-module workflow can be executed from a single invocation.
 - **Constructs:** Minimal working-storage, `CALL` into the presenter subprogram, and `STOP RUN` termination.
 
+### `samples/cobol/abs_magnitude_report.cob`
+- **Purpose:** Highlights the intrinsic `FUNCTION ABS` usage on signed totals so the forward compiler can validate unary absolute-value expressions on numeric and floating targets.
+- **Constructs:** Signed integer and scaled-decimal working-storage items, `COMPUTE` statements that subtract and apply `FUNCTION ABS`, literal initialization of deltas, and `DISPLAY` calls that report raw and absolute magnitudes.
+
 ### `samples/cobol/numeric_precision.cob`
 - **Purpose:** Anchors the widened numeric arithmetic and comparison behavior expected from the forward compiler across `LONG`, `COMP-1`, and `COMP-2` analogs.
 - **Constructs:** Signed `PIC S9(9)` and `PIC S9(12)` integers, scaled decimal (`S9V9(4)`) fields, `COMPUTE` statements combining addition, subtraction, and multiplication, relational comparisons (`>=`, `>`, `=`, `NOT =`), and diagnostic `DISPLAY` calls for each branch.

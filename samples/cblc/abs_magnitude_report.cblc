@@ -1,0 +1,30 @@
+int inbound_units;
+int outbound_units;
+int net_position;
+int net_magnitude;
+
+double revenue_delta;
+double revenue_magnitude;
+
+function void analyze_inventory()
+{
+    inbound_units = 145;
+    outbound_units = 172;
+    net_position = inbound_units - outbound_units;
+    net_magnitude = ABS net_position;
+
+    revenue_delta = -12.375;
+    revenue_magnitude = ABS revenue_delta;
+
+    display("NET POSITION:");
+    display(net_position);
+    display("NET MAGNITUDE:");
+    display(net_magnitude);
+    display("REVENUE MAGNITUDE:");
+    display(revenue_magnitude);
+}
+
+function void main()
+{
+    analyze_inventory();
+}

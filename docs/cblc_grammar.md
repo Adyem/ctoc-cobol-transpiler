@@ -116,7 +116,7 @@ additive_operator           ::= '+' | '-'
 multiplicative_expression   ::= unary_expression { multiplicative_operator unary_expression }
 multiplicative_operator     ::= '*' | '/' | '%'
 unary_expression            ::= unary_operator unary_expression | primary_expression
-unary_operator              ::= '!' | '-'
+unary_operator              ::= '!' | '+' | '-' | 'ABS'
 primary_expression          ::= literal
                               | identifier
                               | identifier '.' 'len'
@@ -135,6 +135,7 @@ The grammar delegates to the lexer for tokenization of identifiers, integers, st
 
 * `IDENTIFIER` tokens follow the lexer rules documented in `docs/cblc_sample_inventory.md`.
 * `INTEGER_LITERAL` values are base-10 without separators; negative numbers use unary `-`.
+* `ABS` mirrors COBOL's `FUNCTION ABS`, yielding the magnitude of numeric and floating operands.
 * `STRING_LITERAL` supports escape sequences handled by the runtime helpers.
 * `CHAR_LITERAL` wraps a single character or escape sequence in single quotes.
 * Keywords are reserved and cannot be used as identifiers.

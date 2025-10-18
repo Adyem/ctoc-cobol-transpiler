@@ -117,6 +117,46 @@ t_ast_node *semantics_create_arithmetic_operator_node(
     return (node);
 }
 
+t_ast_node *semantics_create_unary_expression_node(const char *operand_name,
+    t_lexer_token_kind operator_kind, const char *operator_lexeme)
+{
+    t_ast_node *expression;
+    t_ast_node *operator_node;
+    t_ast_node *operand;
+
+    if (!operand_name)
+        return (NULL);
+    expression = ast_node_create(AST_NODE_UNARY_EXPRESSION);
+    if (!expression)
+        return (NULL);
+    operator_node = semantics_create_arithmetic_operator_node(operator_kind,
+            operator_lexeme);
+    if (!operator_node)
+    {
+        ast_node_destroy(expression);
+        return (NULL);
+    }
+    if (ast_node_add_child(expression, operator_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(operator_node);
+        ast_node_destroy(expression);
+        return (NULL);
+    }
+    operand = semantics_create_identifier_node(operand_name);
+    if (!operand)
+    {
+        ast_node_destroy(expression);
+        return (NULL);
+    }
+    if (ast_node_add_child(expression, operand) != FT_SUCCESS)
+    {
+        ast_node_destroy(operand);
+        ast_node_destroy(expression);
+        return (NULL);
+    }
+    return (expression);
+}
+
 t_ast_node *semantics_create_arithmetic_expression_node_with_operator(
     const char *left_name, t_lexer_token_kind operator_kind,
     const char *operator_lexeme, const char *right_name)

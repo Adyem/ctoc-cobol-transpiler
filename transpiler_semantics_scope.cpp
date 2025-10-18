@@ -1,0 +1,380 @@
+#include <cstddef>
+
+#include "libft/CMA/CMA.hpp"
+#include "libft/Libft/libft.hpp"
+#include "libft/Printf/printf.hpp"
+
+#include "transpiler_semantics_internal.hpp"
+
+void transpiler_semantics_scope_init(t_transpiler_semantic_scope *scope)
+{
+    if (!scope)
+        return ;
+    scope->items = NULL;
+    scope->item_count = 0;
+    scope->item_capacity = 0;
+}
+
+void transpiler_semantics_scope_dispose(t_transpiler_semantic_scope *scope)
+{
+    if (!scope)
+        return ;
+    if (scope->items)
+        cma_free(scope->items);
+    scope->items = NULL;
+    scope->item_count = 0;
+    scope->item_capacity = 0;
+}
+
+static int transpiler_semantics_scope_reserve(t_transpiler_semantic_scope *scope,
+    size_t desired_capacity)
+{
+    t_transpiler_semantic_data_item *new_items;
+    size_t index;
+
+    if (!scope)
+        return (FT_FAILURE);
+    if (scope->item_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    new_items = static_cast<t_transpiler_semantic_data_item *>(cma_calloc(desired_capacity,
+        sizeof(*new_items)));
+    if (!new_items)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < scope->item_count)
+    {
+        ft_strlcpy(new_items[index].name, scope->items[index].name, TRANSPILE_IDENTIFIER_MAX);
+        new_items[index].kind = scope->items[index].kind;
+        new_items[index].declared_length = scope->items[index].declared_length;
+        new_items[index].declared_scale = scope->items[index].declared_scale;
+        new_items[index].has_declared_scale = scope->items[index].has_declared_scale;
+        new_items[index].is_read_only = scope->items[index].is_read_only;
+        index += 1;
+    }
+    if (scope->items)
+        cma_free(scope->items);
+    scope->items = new_items;
+    scope->item_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
+const t_transpiler_semantic_data_item *transpiler_semantics_scope_lookup(
+    const t_transpiler_semantic_scope *scope, const char *name)
+{
+    size_t index;
+
+    if (!scope)
+        return (NULL);
+    if (!name)
+        return (NULL);
+    index = 0;
+    while (index < scope->item_count)
+    {
+        if (ft_strncmp(scope->items[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+            return (&scope->items[index]);
+        index += 1;
+    }
+    return (NULL);
+}
+
+static int transpiler_semantics_register_data_item(t_transpiler_semantic_scope *scope,
+    t_transpiler_context *context, const char *name,
+    t_transpiler_semantic_data_kind kind, size_t declared_length,
+    size_t declared_scale, int has_declared_scale, int is_read_only)
+{
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    const t_transpiler_semantic_data_item *existing;
+    t_transpiler_semantic_data_item *item;
+
+    if (!scope)
+        return (FT_FAILURE);
+    if (!context)
+        return (FT_FAILURE);
+    if (!name || name[0] == '\0')
+    {
+        pf_snprintf(message, sizeof(message),
+            "data item declaration is missing an identifier");
+        return (transpiler_semantics_emit_error(context,
+            TRANSPILE_ERROR_SEMANTIC_INVALID_MOVE, message));
+    }
+    existing = transpiler_semantics_scope_lookup(scope, name);
+    if (existing)
+    {
+        pf_snprintf(message, sizeof(message),
+            "data item '%s' declared multiple times in WORKING-STORAGE", name);
+        return (transpiler_semantics_emit_error(context,
+            TRANSPILE_ERROR_SEMANTIC_DUPLICATE_DATA_ITEM, message));
+    }
+    if (scope->item_count >= scope->item_capacity)
+    {
+        if (transpiler_semantics_scope_reserve(scope,
+                scope->item_capacity == 0 ? 4 : scope->item_capacity * 2) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    item = &scope->items[scope->item_count];
+    ft_strlcpy(item->name, name, TRANSPILE_IDENTIFIER_MAX);
+    item->kind = kind;
+    item->declared_length = declared_length;
+    item->declared_scale = declared_scale;
+    item->has_declared_scale = has_declared_scale;
+    item->is_read_only = is_read_only;
+    if (transpiler_context_register_data_item(context, name,
+            transpiler_semantics_convert_kind(kind), declared_length, is_read_only) != FT_SUCCESS)
+    {
+        item->name[0] = '\0';
+        item->kind = TRANSPILE_SEMANTIC_DATA_UNKNOWN;
+        item->declared_length = 0;
+        item->is_read_only = 0;
+        return (FT_FAILURE);
+    }
+    scope->item_count += 1;
+    return (FT_SUCCESS);
+}
+
+static int transpiler_semantics_register_copybook(const t_ast_node *node,
+    t_transpiler_semantic_scope *scope, t_transpiler_context *context);
+
+static int transpiler_semantics_collect_data_items(const t_ast_node *section,
+    t_transpiler_semantic_scope *scope, t_transpiler_context *context)
+{
+    size_t index;
+    const t_ast_node *child;
+    int status;
+
+    if (!section)
+        return (FT_SUCCESS);
+    if (!scope)
+        return (FT_FAILURE);
+    if (!context)
+        return (FT_FAILURE);
+    status = FT_SUCCESS;
+    index = 0;
+    while (index < ast_node_child_count(section))
+    {
+        child = ast_node_get_child(section, index);
+        if (child && child->kind == AST_NODE_DATA_ITEM)
+        {
+            const t_ast_node *name_node;
+            const t_ast_node *picture_node;
+            const t_ast_node *level_node;
+            size_t name_index;
+
+            name_node = NULL;
+            picture_node = NULL;
+            level_node = NULL;
+            name_index = 0;
+            while (name_index < ast_node_child_count(child))
+            {
+                const t_ast_node *candidate;
+
+                candidate = ast_node_get_child(child, name_index);
+                if (candidate && candidate->kind == AST_NODE_IDENTIFIER)
+                    name_node = candidate;
+                else if (candidate && candidate->kind == AST_NODE_PICTURE_CLAUSE)
+                    picture_node = candidate;
+                else if (candidate && candidate->kind == AST_NODE_LITERAL)
+                    level_node = candidate;
+                name_index += 1;
+            }
+            if (!name_node)
+            {
+                char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+                pf_snprintf(message, sizeof(message),
+                    "data item declaration is missing an identifier");
+                transpiler_semantics_emit_error(context,
+                    TRANSPILE_ERROR_SEMANTIC_INVALID_MOVE, message);
+                status = FT_FAILURE;
+            }
+            else
+            {
+                t_transpiler_semantic_data_kind kind;
+                size_t declared_length;
+                size_t declared_scale;
+                int has_declared_scale;
+                int is_read_only;
+
+                kind = TRANSPILE_SEMANTIC_DATA_UNKNOWN;
+                declared_length = 0;
+                declared_scale = 0;
+                has_declared_scale = 0;
+                is_read_only = 0;
+                if (picture_node)
+                {
+                    kind = transpiler_semantics_classify_picture(picture_node->token.lexeme);
+                    if (kind == TRANSPILE_SEMANTIC_DATA_ALPHANUMERIC)
+                        declared_length = transpiler_semantics_picture_alphanumeric_length(picture_node->token.lexeme);
+                    else if (kind == TRANSPILE_SEMANTIC_DATA_NUMERIC)
+                        declared_length = transpiler_semantics_picture_numeric_length(picture_node->token.lexeme);
+                    else if (kind == TRANSPILE_SEMANTIC_DATA_FLOATING)
+                    {
+                        declared_length = transpiler_semantics_picture_numeric_length(picture_node->token.lexeme);
+                        declared_scale = transpiler_semantics_picture_decimal_scale(picture_node->token.lexeme);
+                        has_declared_scale = 1;
+                    }
+                }
+                if (level_node && level_node->token.lexeme)
+                {
+                    int level_value;
+
+                    level_value = ft_atoi(level_node->token.lexeme);
+                    if (level_value == 78)
+                        is_read_only = 1;
+                }
+                if (transpiler_semantics_register_data_item(scope, context,
+                        name_node->token.lexeme, kind, declared_length,
+                        declared_scale, has_declared_scale, is_read_only) != FT_SUCCESS)
+                    status = FT_FAILURE;
+            }
+        }
+        else if (child && child->kind == AST_NODE_COPYBOOK_INCLUDE)
+        {
+            if (transpiler_semantics_register_copybook(child, scope, context) != FT_SUCCESS)
+                status = FT_FAILURE;
+        }
+        index += 1;
+    }
+    return (status);
+}
+
+static int transpiler_semantics_register_copybook(const t_ast_node *node,
+    t_transpiler_semantic_scope *scope, t_transpiler_context *context)
+{
+    const t_transpiler_copybook *copybook;
+    const t_ast_node *name_node;
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    size_t index;
+    int status;
+
+    if (!node)
+        return (FT_FAILURE);
+    if (!scope)
+        return (FT_FAILURE);
+    if (!context)
+        return (FT_FAILURE);
+    name_node = ast_node_get_child(node, 0);
+    if (!name_node || name_node->kind != AST_NODE_IDENTIFIER || !name_node->token.lexeme)
+    {
+        pf_snprintf(message, sizeof(message),
+            "COPY directive is missing a copybook identifier");
+        transpiler_semantics_emit_error(context,
+            TRANSPILE_ERROR_SEMANTIC_INVALID_MOVE, message);
+        return (FT_FAILURE);
+    }
+    copybook = transpiler_context_find_copybook(context, name_node->token.lexeme);
+    if (!copybook)
+    {
+        pf_snprintf(message, sizeof(message),
+            "copybook '%s' is not registered in the current compilation context",
+            name_node->token.lexeme);
+        transpiler_semantics_emit_error(context,
+            TRANSPILE_ERROR_SEMANTIC_UNKNOWN_COPYBOOK, message);
+        return (FT_FAILURE);
+    }
+    status = FT_SUCCESS;
+    index = 0;
+    while (index < copybook->item_count)
+    {
+        const t_transpiler_copybook_item *item;
+        t_transpiler_semantic_data_kind kind;
+
+        item = &copybook->items[index];
+        kind = transpiler_semantics_kind_from_context(item->kind);
+        if (transpiler_semantics_register_data_item(scope, context, item->name,
+                kind, item->declared_length, 0, 0, item->is_read_only) != FT_SUCCESS)
+            status = FT_FAILURE;
+        index += 1;
+    }
+    return (status);
+}
+
+int transpiler_semantics_collect_scope(const t_ast_node *program,
+    t_transpiler_semantic_scope *scope, t_transpiler_context *context)
+{
+    size_t index;
+    const t_ast_node *data_division;
+    int status;
+
+    if (!program)
+        return (FT_SUCCESS);
+    if (!scope)
+        return (FT_FAILURE);
+    if (!context)
+        return (FT_FAILURE);
+    data_division = NULL;
+    index = 0;
+    while (index < ast_node_child_count(program))
+    {
+        const t_ast_node *candidate;
+
+        candidate = ast_node_get_child(program, index);
+        if (candidate && candidate->kind == AST_NODE_DATA_DIVISION)
+        {
+            data_division = candidate;
+            break ;
+        }
+        index += 1;
+    }
+    if (!data_division)
+        return (FT_SUCCESS);
+    status = FT_SUCCESS;
+    index = 0;
+    while (index < ast_node_child_count(data_division))
+    {
+        const t_ast_node *child;
+
+        child = ast_node_get_child(data_division, index);
+        if (child && child->kind == AST_NODE_WORKING_STORAGE_SECTION)
+        {
+            if (transpiler_semantics_collect_data_items(child, scope, context) != FT_SUCCESS)
+                status = FT_FAILURE;
+        }
+        index += 1;
+    }
+    return (status);
+}
+
+int transpiler_semantics_validate_identifier_use(const t_transpiler_semantic_scope *scope,
+    t_transpiler_context *context, const t_ast_node *identifier, int is_target,
+    t_transpiler_semantic_data_kind *out_kind, size_t *out_length,
+    size_t *out_scale, int *out_scale_known, int *out_is_read_only)
+{
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    const t_transpiler_semantic_data_item *item;
+
+    if (!identifier)
+        return (FT_FAILURE);
+    if (!context)
+        return (FT_FAILURE);
+    if (!identifier->token.lexeme)
+    {
+        pf_snprintf(message, sizeof(message),
+            "MOVE %s is missing an identifier", is_target ? "target" : "source");
+        transpiler_semantics_emit_error(context,
+            TRANSPILE_ERROR_SEMANTIC_INVALID_MOVE, message);
+        return (FT_FAILURE);
+    }
+    item = transpiler_semantics_scope_lookup(scope, identifier->token.lexeme);
+    if (!item)
+    {
+        pf_snprintf(message, sizeof(message),
+            "identifier '%s' referenced in MOVE is not declared in WORKING-STORAGE",
+            identifier->token.lexeme);
+        transpiler_semantics_emit_error(context,
+            TRANSPILE_ERROR_SEMANTIC_UNDECLARED_IDENTIFIER, message);
+        return (FT_FAILURE);
+    }
+    if (out_kind)
+        *out_kind = item->kind;
+    if (out_length)
+        *out_length = item->declared_length;
+    if (out_scale)
+        *out_scale = item->declared_scale;
+    if (out_scale_known)
+        *out_scale_known = item->has_declared_scale;
+    if (out_is_read_only)
+        *out_is_read_only = item->is_read_only;
+    return (FT_SUCCESS);
+}

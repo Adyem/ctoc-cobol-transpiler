@@ -14,6 +14,8 @@ t_ast_node *semantics_create_comparison_operator_node(
     t_lexer_token_kind kind, const char *lexeme);
 t_ast_node *semantics_create_arithmetic_operator_node(
     t_lexer_token_kind kind, const char *lexeme);
+t_ast_node *semantics_create_unary_expression_node(const char *operand_name,
+    t_lexer_token_kind operator_kind, const char *operator_lexeme);
 t_ast_node *semantics_create_arithmetic_expression_node_with_operator(
     const char *left_name, t_lexer_token_kind operator_kind,
     const char *operator_lexeme, const char *right_name);

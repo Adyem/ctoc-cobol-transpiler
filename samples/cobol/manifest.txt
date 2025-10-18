@@ -9,6 +9,7 @@ samples/cobol/reverse_numeric_scalars.cob
 samples/cobol/reverse_copybook.cob
 samples/cobol/reverse_group_items.cob
 samples/cobol/reverse_value_defaults.cob
+samples/cobol/abs_magnitude_report.cob
 samples/cobol/numeric_precision.cob
 samples/cobol/integration_showcase.cob
 samples/cobol/return_numeric.cob
