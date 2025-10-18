@@ -76,6 +76,8 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Visibility rules: surface diagnostics for public/private types, fields, and functions, enforcing access at semantic analysis time.
 - [x] Source maps: retain CBL-C ↔ COBOL span mappings to power diagnostics and debugging outputs.
 - [x] Linter/formatter: produce a canonical, deterministic CBL-C pretty-printer for consistent diffs.
+- [x] Multiplication (`*`): covers operands typed as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`); widens both operands before multiplying, reports overflow, and generates COBOL statements that retain sign and scaling.
+- [x] Division (`/`): accepts `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`) operands, widens before division, ensures two's-complement quotient semantics with overflow/zero diagnostics, and preserves COBOL sign/scale.
 
 ## Pending Features
 
@@ -91,12 +93,10 @@ are completed; keep completed items grouped separately from the remaining work t
 
 - [x] Addition (`+`): supports operands declared as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (mapped to `long`), and `PIC 9(36)` (mapped to `long long`); promotes mixed-width operands to the widest participating type, performs two's-complement math with overflow diagnostics, and emits COBOL that preserves sign and scale.
 - [x] Subtraction (`-`): handles `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`) operands, widens to the widest type before subtraction, emits two's-complement semantics with overflow checks, and maintains COBOL sign/scale fidelity.
-- [ ] Multiplication (`*`): covers operands typed as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`); widens both operands before multiplying, reports overflow, and generates COBOL statements that retain sign and scaling.
-- [ ] Division (`/`): accepts `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`) operands, widens before division, ensures two's-complement quotient semantics with overflow/zero diagnostics, and preserves COBOL sign/scale.
 - [x] Modulo (`MOD`): supports modulus operations over `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`) operands, promotes to the widest width, enforces two's-complement remainder semantics, and emits COBOL preserving sign expectations.
-- [ ] Unary plus (`+`): accepts `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`) operands, normalizes operand sign via widening to the widest encountered type, and returns the widened representation without altering value.
-- [ ] Unary minus (`-`): negates operands declared as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`), widens prior to negation, diagnoses overflow on minimum values, and preserves COBOL sign handling.
-- [ ] Absolute value (`ABS`): handles `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`) operands, widens before evaluating magnitude, diagnoses overflow on minimum values, and emits COBOL preserving sign/scale.
+- [x] Unary plus (`+`): accepts `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`) operands, normalizes operand sign via widening to the widest encountered type, and returns the widened representation without altering value.
+- [x] Unary minus (`-`): negates operands declared as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`), widens prior to negation, diagnoses overflow on minimum values, and preserves COBOL sign handling.
+- [x] Absolute value (`ABS`): handles `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`) operands, widens before evaluating magnitude, diagnoses overflow on minimum values, and emits COBOL preserving sign/scale.
 - [ ] Equality comparison (`==`): evaluates operands declared as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`), widens operands to the broadest width, mirrors two's-complement equality rules, and allows comparison interop with floating (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`) and alphanumeric (`PIC X`, `PIC X(n)`) items by dispatching to the libft/standard `strcmp` helpers for string-aware semantics.
 - [x] Equality comparison (`==`): compares operands typed as `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`), widens operands, and emits COBOL comparisons matching two's-complement semantics.
 - [ ] Inequality comparison (`<>`): supports mixed operands among `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), and `PIC 9(36)` (`long long`), widens operands, and mirrors COBOL inequality semantics.

@@ -1,7 +1,22 @@
 #include "cblc_transpiler.hpp"
 #include "libft/Printf/printf.hpp"
+#include <climits>
 
 static int runtime_check_destination_int(t_runtime_int *destination)
+{
+    if (!destination)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int runtime_check_destination_long(t_runtime_long *destination)
+{
+    if (!destination)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int runtime_check_destination_long_long(t_runtime_long_long *destination)
 {
     if (!destination)
         return (FT_FAILURE);
@@ -39,6 +54,24 @@ static int runtime_int_overflow(long long value)
     if (value > static_cast<long long>(FT_INT_MAX))
         return (FT_FAILURE);
     if (value < static_cast<long long>(FT_INT_MIN))
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int runtime_long_overflow(long long value)
+{
+    if (value > static_cast<long long>(LONG_MAX))
+        return (FT_FAILURE);
+    if (value < static_cast<long long>(LONG_MIN))
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int runtime_long_long_overflow(long long value)
+{
+    if (value > LLONG_MAX)
+        return (FT_FAILURE);
+    if (value < LLONG_MIN)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
@@ -95,6 +128,247 @@ int runtime_int_divide(t_runtime_int dividend, t_runtime_int divisor, t_runtime_
     if (runtime_int_overflow(quotient) != FT_SUCCESS)
         return (FT_FAILURE);
     result->value = static_cast<int>(quotient);
+    return (FT_SUCCESS);
+}
+
+int runtime_int_unary_plus(t_runtime_int value, t_runtime_int *result)
+{
+    if (runtime_check_destination_int(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    result->value = value.value;
+    return (FT_SUCCESS);
+}
+
+int runtime_int_unary_minus(t_runtime_int value, t_runtime_int *result)
+{
+    long long accumulator;
+
+    if (runtime_check_destination_int(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    accumulator = static_cast<long long>(value.value);
+    accumulator = -accumulator;
+    if (runtime_int_overflow(accumulator) != FT_SUCCESS)
+        return (FT_FAILURE);
+    result->value = static_cast<int>(accumulator);
+    return (FT_SUCCESS);
+}
+
+int runtime_int_absolute(t_runtime_int value, t_runtime_int *result)
+{
+    long long magnitude;
+
+    if (runtime_check_destination_int(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    magnitude = static_cast<long long>(value.value);
+    if (magnitude < 0)
+    {
+        magnitude = -magnitude;
+        if (runtime_int_overflow(magnitude) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    result->value = static_cast<int>(magnitude);
+    return (FT_SUCCESS);
+}
+
+void runtime_long_set(t_runtime_long *destination, long value)
+{
+    if (runtime_check_destination_long(destination) != FT_SUCCESS)
+        return ;
+    destination->value = value;
+}
+
+int runtime_long_add(t_runtime_long left, t_runtime_long right, t_runtime_long *result)
+{
+    long sum;
+
+    if (runtime_check_destination_long(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (__builtin_add_overflow(left.value, right.value, &sum))
+        return (FT_FAILURE);
+    result->value = sum;
+    return (FT_SUCCESS);
+}
+
+int runtime_long_subtract(t_runtime_long left, t_runtime_long right, t_runtime_long *result)
+{
+    long difference;
+
+    if (runtime_check_destination_long(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (__builtin_sub_overflow(left.value, right.value, &difference))
+        return (FT_FAILURE);
+    result->value = difference;
+    return (FT_SUCCESS);
+}
+
+int runtime_long_multiply(t_runtime_long left, t_runtime_long right, t_runtime_long *result)
+{
+    long product;
+
+    if (runtime_check_destination_long(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (__builtin_mul_overflow(left.value, right.value, &product))
+        return (FT_FAILURE);
+    result->value = product;
+    return (FT_SUCCESS);
+}
+
+int runtime_long_divide(t_runtime_long dividend, t_runtime_long divisor, t_runtime_long *result)
+{
+    long quotient;
+
+    if (runtime_check_destination_long(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (divisor.value == 0)
+        return (FT_FAILURE);
+    if (dividend.value == LONG_MIN && divisor.value == -1)
+        return (FT_FAILURE);
+    quotient = dividend.value / divisor.value;
+    result->value = quotient;
+    return (FT_SUCCESS);
+}
+
+int runtime_long_unary_plus(t_runtime_long value, t_runtime_long *result)
+{
+    if (runtime_check_destination_long(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    result->value = value.value;
+    return (FT_SUCCESS);
+}
+
+int runtime_long_unary_minus(t_runtime_long value, t_runtime_long *result)
+{
+    long long magnitude;
+
+    if (runtime_check_destination_long(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (value.value == LONG_MIN)
+        return (FT_FAILURE);
+    magnitude = static_cast<long long>(value.value);
+    magnitude = -magnitude;
+    if (runtime_long_overflow(magnitude) != FT_SUCCESS)
+        return (FT_FAILURE);
+    result->value = static_cast<long>(magnitude);
+    return (FT_SUCCESS);
+}
+
+int runtime_long_absolute(t_runtime_long value, t_runtime_long *result)
+{
+    long long magnitude;
+
+    if (runtime_check_destination_long(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (value.value == LONG_MIN)
+        return (FT_FAILURE);
+    magnitude = static_cast<long long>(value.value);
+    if (magnitude < 0)
+        magnitude = -magnitude;
+    if (runtime_long_overflow(magnitude) != FT_SUCCESS)
+        return (FT_FAILURE);
+    result->value = static_cast<long>(magnitude);
+    return (FT_SUCCESS);
+}
+
+void runtime_long_long_set(t_runtime_long_long *destination, long long value)
+{
+    if (runtime_check_destination_long_long(destination) != FT_SUCCESS)
+        return ;
+    destination->value = value;
+}
+
+int runtime_long_long_add(t_runtime_long_long left, t_runtime_long_long right,
+    t_runtime_long_long *result)
+{
+    long long sum;
+
+    if (runtime_check_destination_long_long(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (__builtin_add_overflow(left.value, right.value, &sum))
+        return (FT_FAILURE);
+    result->value = sum;
+    return (FT_SUCCESS);
+}
+
+int runtime_long_long_subtract(t_runtime_long_long left, t_runtime_long_long right,
+    t_runtime_long_long *result)
+{
+    long long difference;
+
+    if (runtime_check_destination_long_long(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (__builtin_sub_overflow(left.value, right.value, &difference))
+        return (FT_FAILURE);
+    result->value = difference;
+    return (FT_SUCCESS);
+}
+
+int runtime_long_long_multiply(t_runtime_long_long left, t_runtime_long_long right,
+    t_runtime_long_long *result)
+{
+    long long product;
+
+    if (runtime_check_destination_long_long(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (__builtin_mul_overflow(left.value, right.value, &product))
+        return (FT_FAILURE);
+    result->value = product;
+    return (FT_SUCCESS);
+}
+
+int runtime_long_long_divide(t_runtime_long_long dividend, t_runtime_long_long divisor,
+    t_runtime_long_long *result)
+{
+    long long quotient;
+
+    if (runtime_check_destination_long_long(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (divisor.value == 0)
+        return (FT_FAILURE);
+    if (dividend.value == LLONG_MIN && divisor.value == -1)
+        return (FT_FAILURE);
+    quotient = dividend.value / divisor.value;
+    result->value = quotient;
+    return (FT_SUCCESS);
+}
+
+int runtime_long_long_unary_plus(t_runtime_long_long value, t_runtime_long_long *result)
+{
+    if (runtime_check_destination_long_long(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    result->value = value.value;
+    return (FT_SUCCESS);
+}
+
+int runtime_long_long_unary_minus(t_runtime_long_long value, t_runtime_long_long *result)
+{
+    long long magnitude;
+
+    if (runtime_check_destination_long_long(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (value.value == LLONG_MIN)
+        return (FT_FAILURE);
+    magnitude = value.value;
+    magnitude = -magnitude;
+    if (runtime_long_long_overflow(magnitude) != FT_SUCCESS)
+        return (FT_FAILURE);
+    result->value = magnitude;
+    return (FT_SUCCESS);
+}
+
+int runtime_long_long_absolute(t_runtime_long_long value, t_runtime_long_long *result)
+{
+    long long magnitude;
+
+    if (runtime_check_destination_long_long(result) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (value.value == LLONG_MIN)
+        return (FT_FAILURE);
+    magnitude = value.value;
+    if (magnitude < 0)
+        magnitude = -magnitude;
+    if (runtime_long_long_overflow(magnitude) != FT_SUCCESS)
+        return (FT_FAILURE);
+    result->value = magnitude;
     return (FT_SUCCESS);
 }
 
