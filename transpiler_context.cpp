@@ -300,6 +300,8 @@ int transpiler_context_init(t_transpiler_context *context)
     context->target_language = TRANSPILE_LANGUAGE_NONE;
     context->source_path = NULL;
     context->target_path = NULL;
+    context->active_source_text = NULL;
+    context->active_source_length = 0;
     context->source_paths = NULL;
     context->source_count = 0;
     context->source_capacity = 0;
@@ -307,7 +309,9 @@ int transpiler_context_init(t_transpiler_context *context)
     context->target_count = 0;
     context->target_capacity = 0;
     context->output_directory = NULL;
+    context->emit_standard_library = 0;
     context->format_mode = TRANSPILE_FORMAT_DEFAULT;
+    context->layout_mode = TRANSPILE_LAYOUT_NORMALIZE;
     context->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
     context->warnings_as_errors = 0;
     context->warning_settings.conversion = 1;
@@ -487,8 +491,11 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->target_language = TRANSPILE_LANGUAGE_NONE;
     context->source_path = NULL;
     context->target_path = NULL;
+    context->active_source_text = NULL;
+    context->active_source_length = 0;
     context->output_directory = NULL;
     context->format_mode = TRANSPILE_FORMAT_DEFAULT;
+    context->layout_mode = TRANSPILE_LAYOUT_NORMALIZE;
     context->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
     context->warnings_as_errors = 0;
     context->warning_settings.conversion = 1;
@@ -611,11 +618,28 @@ void transpiler_context_set_output_directory(t_transpiler_context *context, cons
     context->output_directory = output_directory;
 }
 
+void transpiler_context_set_emit_standard_library(t_transpiler_context *context, int emit)
+{
+    if (!context)
+        return ;
+    if (emit)
+        context->emit_standard_library = 1;
+    else
+        context->emit_standard_library = 0;
+}
+
 void transpiler_context_set_format_mode(t_transpiler_context *context, t_transpiler_format_mode mode)
 {
     if (!context)
         return ;
     context->format_mode = mode;
+}
+
+void transpiler_context_set_layout_mode(t_transpiler_context *context, t_transpiler_layout_mode mode)
+{
+    if (!context)
+        return ;
+    context->layout_mode = mode;
 }
 
 void transpiler_context_set_diagnostic_level(t_transpiler_context *context, t_transpiler_diagnostic_level level)
@@ -690,15 +714,10 @@ void transpiler_context_reset_unit_state(t_transpiler_context *context)
 
     if (!context)
         return ;
+    context->active_source_text = NULL;
+    context->active_source_length = 0;
     context->function_count = 0;
     context->file_count = 0;
-    index = 0;
-    while (index < context->module_count)
-    {
-        transpiler_context_module_clear(&context->modules[index]);
-        index += 1;
-    }
-    context->module_count = 0;
     context->module_order_count = 0;
     ft_bzero(&context->entrypoint, sizeof(context->entrypoint));
     context->data_item_count = 0;
@@ -718,6 +737,22 @@ void transpiler_context_reset_unit_state(t_transpiler_context *context)
     context->source_map_count = 0;
     context->last_error_code = FT_SUCCESS;
     transpiler_standard_library_reset_usage();
+}
+
+void transpiler_context_reset_module_registry(t_transpiler_context *context)
+{
+    size_t index;
+
+    if (!context)
+        return ;
+    index = 0;
+    while (index < context->module_count)
+    {
+        transpiler_context_module_clear(&context->modules[index]);
+        index += 1;
+    }
+    context->module_count = 0;
+    context->module_order_count = 0;
 }
 
 void transpiler_context_record_error(t_transpiler_context *context, int error_code)
@@ -746,6 +781,45 @@ int transpiler_context_has_errors(const t_transpiler_context *context)
         index += 1;
     }
     return (0);
+}
+
+int transpiler_context_get_line_snippet(const t_transpiler_context *context, size_t line, char *buffer,
+    size_t buffer_size)
+{
+    size_t index;
+    size_t current_line;
+    size_t length;
+
+    if (!buffer || buffer_size == 0)
+        return (FT_FAILURE);
+    buffer[0] = '\0';
+    if (!context)
+        return (FT_FAILURE);
+    if (!context->active_source_text)
+        return (FT_FAILURE);
+    if (line == 0)
+        return (FT_FAILURE);
+    index = 0;
+    current_line = 1;
+    while (index < context->active_source_length && current_line < line)
+    {
+        if (context->active_source_text[index] == '\n')
+            current_line += 1;
+        index += 1;
+    }
+    if (current_line != line)
+        return (FT_FAILURE);
+    length = 0;
+    while (index + length < context->active_source_length
+        && context->active_source_text[index + length] != '\n')
+    {
+        if (length + 1 >= buffer_size)
+            break ;
+        buffer[length] = context->active_source_text[index + length];
+        length += 1;
+    }
+    buffer[length] = '\0';
+    return (FT_SUCCESS);
 }
 
 static int transpiler_context_is_identifier_char(char value)
@@ -805,6 +879,38 @@ static int transpiler_context_find_module_index(const t_transpiler_context *cont
     if (index >= 0)
         return (index);
     return (transpiler_context_find_module_index_by_path(context, identifier));
+}
+
+static int transpiler_context_module_has_import(const t_transpiler_context *context,
+    size_t requester_index, size_t target_index)
+{
+    const t_transpiler_module *requester;
+    size_t import_index;
+
+    if (!context)
+        return (0);
+    if (requester_index >= context->module_count)
+        return (0);
+    if (target_index >= context->module_count)
+        return (0);
+    if (requester_index == target_index)
+        return (1);
+    requester = &context->modules[requester_index];
+    import_index = 0;
+    while (import_index < requester->import_count)
+    {
+        if (requester->imports[import_index].resolved_index == target_index)
+            return (1);
+        if (ft_strncmp(requester->imports[import_index].path,
+                context->modules[target_index].name, TRANSPILE_FILE_PATH_MAX) == 0)
+            return (1);
+        if (context->modules[target_index].path[0] != '\0'
+            && ft_strncmp(requester->imports[import_index].path,
+                context->modules[target_index].path, TRANSPILE_FILE_PATH_MAX) == 0)
+            return (1);
+        import_index += 1;
+    }
+    return (0);
 }
 
 int transpiler_context_register_module(t_transpiler_context *context, const char *name, const char *path)
@@ -868,6 +974,16 @@ const t_transpiler_module *transpiler_context_get_modules(const t_transpiler_con
     if (count)
         *count = context->module_count;
     return (context->modules);
+}
+
+const t_transpiler_function_signature *transpiler_context_get_functions(const t_transpiler_context *context,
+    size_t *count)
+{
+    if (!context)
+        return (NULL);
+    if (count)
+        *count = context->function_count;
+    return (context->functions);
 }
 
 int transpiler_context_register_module_import(t_transpiler_context *context, const char *module_name,
@@ -1226,6 +1342,8 @@ const t_transpiler_function_signature *transpiler_context_resolve_function_acces
     const t_transpiler_function_signature *signature;
     const char *requester_label;
     char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    int requester_index;
+    int target_index;
 
     if (!context)
         return (NULL);
@@ -1239,6 +1357,21 @@ const t_transpiler_function_signature *transpiler_context_resolve_function_acces
         return (signature);
     if (ft_strncmp(requesting_module, module_name, TRANSPILE_MODULE_NAME_MAX) == 0)
         return (signature);
+    requester_index = transpiler_context_find_module_index(context, requesting_module);
+    target_index = transpiler_context_find_module_index(context, module_name);
+    if (requester_index >= 0 && target_index >= 0
+        && !transpiler_context_module_has_import(context,
+            static_cast<size_t>(requester_index), static_cast<size_t>(target_index)))
+    {
+        requester_label = requesting_module;
+        pf_snprintf(message, sizeof(message),
+            "module '%s' must import module '%s' before accessing function '%s'",
+            requester_label, module_name, name);
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_MODULE_IMPORT_REQUIRED, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_MODULE_IMPORT_REQUIRED);
+        return (NULL);
+    }
     if (signature->visibility == TRANSPILE_SYMBOL_PUBLIC)
         return (signature);
     requester_label = requesting_module;

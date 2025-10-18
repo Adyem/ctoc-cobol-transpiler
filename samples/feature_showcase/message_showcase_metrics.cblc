@@ -1,0 +1,33 @@
+int base_count;
+int processed_count;
+int combined_total;
+int difference_total;
+int doubled_total;
+int average_batch;
+
+function void main()
+{
+    display("METRIC STAGE");
+
+    base_count = 27;
+    processed_count = 15;
+    combined_total = base_count + processed_count;
+    difference_total = base_count - processed_count;
+    doubled_total = combined_total * 2;
+    average_batch = combined_total / 2;
+
+    display("Combined total (base + processed)");
+    display(combined_total);
+    display("Difference (base - processed)");
+    display(difference_total);
+    display("Double total (combined * 2)");
+    display(doubled_total);
+    display("Average batch (combined / 2)");
+    display(average_batch);
+    display("FINAL METRIC TOTALS");
+    display(combined_total);
+    display(difference_total);
+    display(doubled_total);
+    display(average_batch);
+    return;
+}

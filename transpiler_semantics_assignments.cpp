@@ -59,16 +59,18 @@ static void transpiler_semantics_note_conversion_warnings(t_transpiler_context *
             pf_snprintf(message, sizeof(message),
                 "%s '%s' (float precision) coerces into %s '%s' (double precision)",
                 source_role, source_name, target_role, target_name);
-            (void)transpiler_semantics_emit_warning(context,
-                TRANSPILE_WARNING_SEMANTIC_FLOAT_TO_DOUBLE, message);
+            (void)transpiler_semantics_emit_warning_at(context, source,
+                TRANSPILE_WARNING_SEMANTIC_FLOAT_TO_DOUBLE, message,
+                "Verify the conversion preserves the intended precision.");
         }
         else if (source_is_double && !target_is_double)
         {
             pf_snprintf(message, sizeof(message),
                 "%s '%s' (double precision) coerces into %s '%s' (float precision)",
                 source_role, source_name, target_role, target_name);
-            (void)transpiler_semantics_emit_warning(context,
-                TRANSPILE_WARNING_SEMANTIC_DOUBLE_TO_FLOAT, message);
+            (void)transpiler_semantics_emit_warning_at(context, target,
+                TRANSPILE_WARNING_SEMANTIC_DOUBLE_TO_FLOAT, message,
+                "Narrowing the result may truncate significant digits.");
         }
     }
     if (source_kind == TRANSPILE_SEMANTIC_DATA_NUMERIC
@@ -77,8 +79,9 @@ static void transpiler_semantics_note_conversion_warnings(t_transpiler_context *
         pf_snprintf(message, sizeof(message),
             "%s '%s' (integral) coerces into %s '%s' (floating precision)",
             source_role, source_name, target_role, target_name);
-        (void)transpiler_semantics_emit_warning(context,
-            TRANSPILE_WARNING_SEMANTIC_INTEGRAL_TO_FLOATING, message);
+        (void)transpiler_semantics_emit_warning_at(context, target,
+            TRANSPILE_WARNING_SEMANTIC_INTEGRAL_TO_FLOATING, message,
+            "Confirm that fractional rounding of the integral value is acceptable.");
     }
     if (source_kind == TRANSPILE_SEMANTIC_DATA_NUMERIC
         && target_kind == TRANSPILE_SEMANTIC_DATA_ALPHANUMERIC)
@@ -86,8 +89,9 @@ static void transpiler_semantics_note_conversion_warnings(t_transpiler_context *
         pf_snprintf(message, sizeof(message),
             "%s '%s' (integral) coerces into %s '%s' (alphanumeric or boolean storage)",
             source_role, source_name, target_role, target_name);
-        (void)transpiler_semantics_emit_warning(context,
-            TRANSPILE_WARNING_SEMANTIC_INTEGRAL_TO_ALPHANUMERIC, message);
+        (void)transpiler_semantics_emit_warning_at(context, target,
+            TRANSPILE_WARNING_SEMANTIC_INTEGRAL_TO_ALPHANUMERIC, message,
+            "Consider formatting the numeric value explicitly before storing it.");
     }
     if (source_kind == TRANSPILE_SEMANTIC_DATA_BOOLEAN
         && transpiler_semantics_is_numeric_kind(target_kind))
@@ -96,8 +100,9 @@ static void transpiler_semantics_note_conversion_warnings(t_transpiler_context *
             "%s '%s' (boolean) coerces into %s '%s' (%s storage)",
             source_role, source_name, target_role, target_name,
             transpiler_semantics_kind_to_string(target_kind));
-        (void)transpiler_semantics_emit_warning(context,
-            TRANSPILE_WARNING_SEMANTIC_BOOLEAN_TO_NUMERIC, message);
+        (void)transpiler_semantics_emit_warning_at(context, target,
+            TRANSPILE_WARNING_SEMANTIC_BOOLEAN_TO_NUMERIC, message,
+            "Map boolean values to explicit numeric codes if required.");
     }
     if (transpiler_semantics_is_numeric_kind(source_kind)
         && target_kind == TRANSPILE_SEMANTIC_DATA_BOOLEAN)
@@ -107,8 +112,9 @@ static void transpiler_semantics_note_conversion_warnings(t_transpiler_context *
             source_role, source_name,
             transpiler_semantics_kind_to_string(source_kind),
             target_role, target_name);
-        (void)transpiler_semantics_emit_warning(context,
-            TRANSPILE_WARNING_SEMANTIC_NUMERIC_TO_BOOLEAN, message);
+        (void)transpiler_semantics_emit_warning_at(context, target,
+            TRANSPILE_WARNING_SEMANTIC_NUMERIC_TO_BOOLEAN, message,
+            "Ensure non-zero values map to the expected boolean meaning.");
     }
     if (source_kind == TRANSPILE_SEMANTIC_DATA_BOOLEAN
         && target_kind == TRANSPILE_SEMANTIC_DATA_ALPHANUMERIC)
@@ -116,8 +122,9 @@ static void transpiler_semantics_note_conversion_warnings(t_transpiler_context *
         pf_snprintf(message, sizeof(message),
             "%s '%s' (boolean) coerces into %s '%s' (alphanumeric storage)",
             source_role, source_name, target_role, target_name);
-        (void)transpiler_semantics_emit_warning(context,
-            TRANSPILE_WARNING_SEMANTIC_BOOLEAN_TO_ALPHANUMERIC, message);
+        (void)transpiler_semantics_emit_warning_at(context, target,
+            TRANSPILE_WARNING_SEMANTIC_BOOLEAN_TO_ALPHANUMERIC, message,
+            "Normalize boolean values before storing them as text.");
     }
     if (source_kind == TRANSPILE_SEMANTIC_DATA_ALPHANUMERIC
         && target_kind == TRANSPILE_SEMANTIC_DATA_BOOLEAN)
@@ -125,8 +132,9 @@ static void transpiler_semantics_note_conversion_warnings(t_transpiler_context *
         pf_snprintf(message, sizeof(message),
             "%s '%s' (alphanumeric) coerces into %s '%s' (boolean storage)",
             source_role, source_name, target_role, target_name);
-        (void)transpiler_semantics_emit_warning(context,
-            TRANSPILE_WARNING_SEMANTIC_ALPHANUMERIC_TO_BOOLEAN, message);
+        (void)transpiler_semantics_emit_warning_at(context, target,
+            TRANSPILE_WARNING_SEMANTIC_ALPHANUMERIC_TO_BOOLEAN, message,
+            "Validate textual values before interpreting them as booleans.");
     }
 }
 
@@ -360,19 +368,38 @@ static int transpiler_semantics_validate_assignment_like_statement(const t_ast_n
             pf_snprintf(message, sizeof(message),
                 "%s has more fractional digits (%zu) than %s (%zu)",
                 source_role, source_scale, target_role, target_scale);
-            transpiler_semantics_emit_error(context,
-                TRANSPILE_ERROR_SEMANTIC_DECIMAL_SCALE_MISMATCH, message);
+            if (target)
+            {
+                transpiler_semantics_emit_error_at(context, target,
+                    TRANSPILE_ERROR_SEMANTIC_DECIMAL_SCALE_MISMATCH, message,
+                    "Adjust the target scale to accommodate the source value.");
+            }
+            else
+            {
+                transpiler_semantics_emit_error(context,
+                    TRANSPILE_ERROR_SEMANTIC_DECIMAL_SCALE_MISMATCH, message);
+            }
             status = FT_FAILURE;
         }
         if (status == FT_SUCCESS && source_length > target_length)
         {
             char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+            const char *suggestion;
 
             pf_snprintf(message, sizeof(message),
                 "%s has more digits (%zu) than %s (%zu)",
                 source_role, source_length, target_role, target_length);
-            transpiler_semantics_emit_error(context,
-                TRANSPILE_ERROR_SEMANTIC_NUMERIC_OVERFLOW, message);
+            suggestion = "Increase the target precision or adjust the source expression.";
+            if (target)
+            {
+                transpiler_semantics_emit_error_at(context, target,
+                    TRANSPILE_ERROR_SEMANTIC_NUMERIC_OVERFLOW, message, suggestion);
+            }
+            else
+            {
+                transpiler_semantics_emit_error(context,
+                    TRANSPILE_ERROR_SEMANTIC_NUMERIC_OVERFLOW, message);
+            }
             status = FT_FAILURE;
         }
     }
@@ -398,6 +425,7 @@ static int transpiler_semantics_validate_assignment_like_statement(const t_ast_n
             char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
             const char *target_name;
             const char *source_name;
+            const char *suggestion;
 
             target_name = (target && target->token.lexeme) ? target->token.lexeme : "<target>";
             if (source && source->token.lexeme)
@@ -408,8 +436,17 @@ static int transpiler_semantics_validate_assignment_like_statement(const t_ast_n
                 "%s '%s' (%zu characters) truncates into %s '%s' (%zu characters)",
                 source_role, source_name, required_length, target_role,
                 target_name, target_length);
-            transpiler_semantics_emit_error(context,
-                TRANSPILE_ERROR_SEMANTIC_STRING_TRUNCATION, message);
+            suggestion = "Increase the target length or truncate the source explicitly.";
+            if (target)
+            {
+                transpiler_semantics_emit_error_at(context, target,
+                    TRANSPILE_ERROR_SEMANTIC_STRING_TRUNCATION, message, suggestion);
+            }
+            else
+            {
+                transpiler_semantics_emit_error(context,
+                    TRANSPILE_ERROR_SEMANTIC_STRING_TRUNCATION, message);
+            }
             status = FT_FAILURE;
         }
     }

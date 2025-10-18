@@ -145,12 +145,14 @@ FT_TEST(test_cli_optional_configuration)
         "--format",
         "pretty",
         "--diagnostics",
-        "verbose"
+        "verbose",
+        "--layout",
+        "preserve"
     };
     t_transpiler_cli_options options;
     t_transpiler_context context;
 
-    if (test_expect_success(transpiler_cli_parse(&options, 13, argv),
+    if (test_expect_success(transpiler_cli_parse(&options, 15, argv),
             "transpiler_cli_parse should accept configuration flags") != FT_SUCCESS)
         return (FT_FAILURE);
     if (transpiler_context_init(&context) != FT_SUCCESS)
@@ -213,6 +215,13 @@ FT_TEST(test_cli_optional_configuration)
         transpiler_cli_options_dispose(&options);
         return (FT_FAILURE);
     }
+    if (test_expect_int_equal(options.layout_mode, TRANSPILE_LAYOUT_PRESERVE,
+            "layout mode should map to enum") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
     if (test_expect_int_equal(static_cast<int>(context.source_count), 1,
             "context should record one source path") != FT_SUCCESS)
     {
@@ -257,6 +266,69 @@ FT_TEST(test_cli_optional_configuration)
     }
     if (test_expect_int_equal(context.diagnostic_level, TRANSPILE_DIAGNOSTIC_VERBOSE,
             "context should store diagnostic level") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(context.layout_mode, TRANSPILE_LAYOUT_PRESERVE,
+            "context should store layout mode") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    transpiler_cli_options_dispose(&options);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cli_standard_library_direction)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "standard-library",
+        "--output-dir",
+        "library"
+    };
+    t_transpiler_cli_options options;
+    t_transpiler_context context;
+
+    if (test_expect_success(transpiler_cli_parse(&options, 5, argv),
+            "transpiler_cli_parse should accept standard-library direction") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_int_equal(options.emit_standard_library, 1,
+            "standard-library direction should enable library emission") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(options.input_count), 0,
+            "standard-library direction should not record inputs") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(options.output_directory, "library",
+            "output directory should be recorded for library builds") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (transpiler_cli_apply(&options, &context) != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(context.emit_standard_library, 1,
+            "context should record standard-library emission request") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         transpiler_cli_options_dispose(&options);

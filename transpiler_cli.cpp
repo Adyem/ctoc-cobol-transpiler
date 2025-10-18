@@ -112,6 +112,7 @@ static int transpiler_cli_parse_direction_value(const char *value, t_transpiler_
     {
         options->source_language = TRANSPILE_LANGUAGE_CBL_C;
         options->target_language = TRANSPILE_LANGUAGE_COBOL;
+        options->emit_standard_library = 0;
         return (FT_SUCCESS);
     }
     length = ft_strlen("cobol-to-cblc");
@@ -119,9 +120,18 @@ static int transpiler_cli_parse_direction_value(const char *value, t_transpiler_
     {
         options->source_language = TRANSPILE_LANGUAGE_COBOL;
         options->target_language = TRANSPILE_LANGUAGE_CBL_C;
+        options->emit_standard_library = 0;
         return (FT_SUCCESS);
     }
-    pf_printf("Unknown direction '%s'. Expected 'cblc-to-cobol' or 'cobol-to-cblc'.\n", value);
+    length = ft_strlen("standard-library");
+    if (ft_strncmp(value, "standard-library", length + 1) == 0)
+    {
+        options->emit_standard_library = 1;
+        options->source_language = TRANSPILE_LANGUAGE_NONE;
+        options->target_language = TRANSPILE_LANGUAGE_NONE;
+        return (FT_SUCCESS);
+    }
+    pf_printf("Unknown direction '%s'. Expected 'cblc-to-cobol', 'cobol-to-cblc', or 'standard-library'.\n", value);
     return (FT_FAILURE);
 }
 
@@ -131,6 +141,8 @@ static int transpiler_cli_apply_direction_from_env(t_transpiler_cli_options *opt
 
     if (!options)
         return (FT_FAILURE);
+    if (options->emit_standard_library)
+        return (FT_SUCCESS);
     if (options->source_language != TRANSPILE_LANGUAGE_NONE)
         return (FT_SUCCESS);
     value = std::getenv("CTOC_DEFAULT_DIRECTION");
@@ -147,6 +159,8 @@ static int transpiler_cli_require_paths(const t_transpiler_cli_options *options)
     if (!options)
         return (FT_FAILURE);
     if (options->show_help)
+        return (FT_SUCCESS);
+    if (options->emit_standard_library)
         return (FT_SUCCESS);
     if (options->input_count == 0)
     {
@@ -193,6 +207,28 @@ static int transpiler_cli_parse_format_value(const char *value, t_transpiler_cli
         return (FT_SUCCESS);
     }
     pf_printf("Unknown format '%s'. Expected 'default', 'minimal', or 'pretty'.\n", value);
+    return (FT_FAILURE);
+}
+
+static int transpiler_cli_parse_layout_value(const char *value, t_transpiler_cli_options *options)
+{
+    size_t length;
+
+    if (!value || !options)
+        return (FT_FAILURE);
+    length = ft_strlen("normalize");
+    if (ft_strncmp(value, "normalize", length + 1) == 0)
+    {
+        options->layout_mode = TRANSPILE_LAYOUT_NORMALIZE;
+        return (FT_SUCCESS);
+    }
+    length = ft_strlen("preserve");
+    if (ft_strncmp(value, "preserve", length + 1) == 0)
+    {
+        options->layout_mode = TRANSPILE_LAYOUT_PRESERVE;
+        return (FT_SUCCESS);
+    }
+    pf_printf("Unknown layout '%s'. Expected 'normalize' or 'preserve'.\n", value);
     return (FT_FAILURE);
 }
 
@@ -311,10 +347,12 @@ int transpiler_cli_options_init(t_transpiler_cli_options *options)
     options->source_language = TRANSPILE_LANGUAGE_NONE;
     options->target_language = TRANSPILE_LANGUAGE_NONE;
     options->format_mode = TRANSPILE_FORMAT_DEFAULT;
+    options->layout_mode = TRANSPILE_LAYOUT_NORMALIZE;
     options->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
     options->warnings_as_errors = 0;
     transpiler_cli_warning_settings_enable_all(&options->warning_settings);
     options->show_help = 0;
+    options->emit_standard_library = 0;
     return (FT_SUCCESS);
 }
 
@@ -336,10 +374,12 @@ void transpiler_cli_options_dispose(t_transpiler_cli_options *options)
     options->source_language = TRANSPILE_LANGUAGE_NONE;
     options->target_language = TRANSPILE_LANGUAGE_NONE;
     options->format_mode = TRANSPILE_FORMAT_DEFAULT;
+    options->layout_mode = TRANSPILE_LAYOUT_NORMALIZE;
     options->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
     options->warnings_as_errors = 0;
     transpiler_cli_warning_settings_enable_all(&options->warning_settings);
     options->show_help = 0;
+    options->emit_standard_library = 0;
 }
 
 static int transpiler_cli_parse_long_option(t_transpiler_cli_options *options, const char **argv, int argc, int *index)
@@ -415,6 +455,16 @@ static int transpiler_cli_parse_long_option(t_transpiler_cli_options *options, c
         }
         return (transpiler_cli_parse_format_value(argv[*index], options));
     }
+    if (ft_strncmp(argument, "--layout", 9) == 0 && ft_strlen(argument) == 8)
+    {
+        *index += 1;
+        if (*index >= argc)
+        {
+            pf_printf("Missing value for --layout option.\n");
+            return (FT_FAILURE);
+        }
+        return (transpiler_cli_parse_layout_value(argv[*index], options));
+    }
     if (ft_strncmp(argument, "--diagnostics", 14) == 0 && ft_strlen(argument) == 13)
     {
         *index += 1;
@@ -468,7 +518,9 @@ int transpiler_cli_parse(t_transpiler_cli_options *options, int argc, const char
         return (FT_SUCCESS);
     if (transpiler_cli_apply_direction_from_env(options) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (options->source_language == TRANSPILE_LANGUAGE_NONE || options->target_language == TRANSPILE_LANGUAGE_NONE)
+    if (!options->emit_standard_library
+        && (options->source_language == TRANSPILE_LANGUAGE_NONE
+            || options->target_language == TRANSPILE_LANGUAGE_NONE))
     {
         pf_printf("Unable to determine translation direction.\n");
         return (FT_FAILURE);
@@ -487,7 +539,9 @@ int transpiler_cli_apply(const t_transpiler_cli_options *options, t_transpiler_c
             options->output_paths, options->output_count) != FT_SUCCESS)
         return (FT_FAILURE);
     transpiler_context_set_output_directory(context, options->output_directory);
+    transpiler_context_set_emit_standard_library(context, options->emit_standard_library);
     transpiler_context_set_format_mode(context, options->format_mode);
+    transpiler_context_set_layout_mode(context, options->layout_mode);
     transpiler_context_set_diagnostic_level(context, options->diagnostic_level);
     transpiler_context_set_warnings_as_errors(context, options->warnings_as_errors);
     transpiler_context_set_warning_settings(context, &options->warning_settings);
@@ -498,10 +552,12 @@ void transpiler_cli_print_usage(void)
 {
     pf_printf("Usage: ctoc_cobol_transpiler --direction <dir> --input <path> [--input <path> ...]\n");
     pf_printf("       --output <path> [--output <path> ...]\n");
-    pf_printf("       Direction: cblc-to-cobol | cobol-to-cblc\n");
+    pf_printf("       Direction: cblc-to-cobol | cobol-to-cblc | standard-library\n");
     pf_printf("       Environment: CTOC_DEFAULT_DIRECTION can supply the direction.\n");
+    pf_printf("       Standard-library builds emit all cataloged programs to the selected directory.\n");
     pf_printf("       Optional: --output-dir <directory> to override emission path base.\n");
     pf_printf("                 --format <default|minimal|pretty> to control COBOL layout.\n");
+    pf_printf("                 --layout <normalize|preserve> to control regenerated CBL-C layout.\n");
     pf_printf("                 --diagnostics <silent|normal|verbose> to tune logging.\n");
     pf_printf("                 --warnings-as-errors to treat warnings as build errors.\n");
     pf_printf("                 -Werror to escalate warnings.\n");

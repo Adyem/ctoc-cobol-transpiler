@@ -482,6 +482,8 @@ FT_TEST(test_cobol_numeric_precision_matches_golden)
 FT_TEST(test_cblc_multi_module_main_matches_golden)
 {
     static const char expected[] =
+        "import \"multi_module_worker.cblc\";\n"
+        "\n"
         "int accumulator;\n"
         "\n"
         "function void add_once() {\n"

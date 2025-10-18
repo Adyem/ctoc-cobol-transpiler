@@ -8,35 +8,62 @@ endif
 TRANSPILER := $(REPO_ROOT)/ctoc_cobol_transpiler$(EXE_EXT)
 COBC ?= cobc
 
+CBLC_PROGRAMS := message_showcase message_showcase_banner message_showcase_metrics
+COBOL_PROGRAMS := message_showcase_io
+CBLC_SOURCES := $(addsuffix .cblc,$(CBLC_PROGRAMS))
+GENERATED_COB := $(addsuffix .cob,$(CBLC_PROGRAMS))
+STATIC_COB := $(addsuffix .cob,$(COBOL_PROGRAMS))
+ALL_PROGRAMS := $(CBLC_PROGRAMS) $(COBOL_PROGRAMS)
+EXECUTABLES := $(addsuffix $(EXE_EXT),$(ALL_PROGRAMS))
+STD_DIR := stdlib
+STD_SENTINEL := $(STD_DIR)/.standard_library_built
+IO_INPUT := showcase_transactions.dat
+IO_OUTPUT := showcase_success.txt showcase_failure.txt
+IO_SENTINEL := .io_seeded
+
 SETUP_SENTINEL := .environment_ready
-PROGRAM_NAME := message_showcase
-CBLC_SRC := $(abspath $(PROGRAM_NAME).cblc)
-COB_OUTPUT := $(PROGRAM_NAME).cob
-EXECUTABLE := $(PROGRAM_NAME)$(EXE_EXT)
 
-.PHONY: all clean run transpile compile compiler ensure_environment ensure_cobc
+.PHONY: all clean run transpile compile compiler ensure_environment ensure_cobc stdlib io-fixtures
 
-all: transpile $(EXECUTABLE)
+all: stdlib transpile compile
 
-transpile: $(COB_OUTPUT)
+transpile: $(GENERATED_COB)
 
-compile: $(EXECUTABLE)
+stdlib: $(STD_SENTINEL)
 
-run: $(EXECUTABLE)
-	./$(EXECUTABLE)
+compile: $(EXECUTABLES)
 
-$(EXECUTABLE): $(COB_OUTPUT) | ensure_cobc
-	$(COBC) -x -o $@ $<
+run: io-fixtures $(EXECUTABLES)
+	./message_showcase$(EXE_EXT)
+	./message_showcase_banner$(EXE_EXT)
+	./message_showcase_metrics$(EXE_EXT)
+	./message_showcase_io$(EXE_EXT)
 
-$(COB_OUTPUT): $(CBLC_SRC) $(TRANSPILER)
+%$(EXE_EXT): %.cob | ensure_cobc
+	$(COBC) -x -free -o $@ $<
+
+%.cob: %.cblc $(TRANSPILER)
 	$(TRANSPILER) --direction cblc-to-cobol \
-		--input $(CBLC_SRC) \
-		--output $@ \
+		--input $(abspath $<) \
+		--output $(abspath $@) \
 		--diagnostics silent
 	@if [ ! -f $@ ]; then \
 		printf 'The transpiler did not emit %s. Check the command output above for diagnostics.\n' "$@"; \
 		exit 1; \
 	fi
+
+$(STD_SENTINEL): $(TRANSPILER)
+	mkdir -p $(STD_DIR)
+	CTOC_SKIP_STANDARD_LIBRARY_VALIDATION=1 $(TRANSPILER) --direction standard-library \
+		--output-dir $(abspath $(STD_DIR)) \
+		--diagnostics silent
+	touch $@
+
+io-fixtures: $(IO_SENTINEL)
+
+$(IO_SENTINEL):
+	printf 'A 00027\nR 00015\nA 00012\n' > $(IO_INPUT)
+	touch $(IO_SENTINEL)
 
 compiler: $(TRANSPILER)
 
@@ -61,4 +88,5 @@ $(TRANSPILER): | $(SETUP_SENTINEL)
 	$(MAKE) -C $(REPO_ROOT) all
 
 clean:
-	rm -f $(COB_OUTPUT) $(EXECUTABLE) $(SETUP_SENTINEL)
+	rm -f $(GENERATED_COB) $(EXECUTABLES) $(SETUP_SENTINEL) $(STD_SENTINEL) $(IO_SENTINEL) $(IO_INPUT) $(IO_OUTPUT)
+	rm -rf $(STD_DIR)

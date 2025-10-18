@@ -80,12 +80,59 @@ FT_TEST(test_cblc_formatter_passthrough_minimal_mode)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_transpiler_cblc_apply_layout_normalize)
+{
+    const char *input;
+    const char *expected;
+    char *output;
+
+    input = "function void sample(){return;}";
+    expected = "function void sample()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    if (test_expect_success(transpiler_cblc_apply_layout(input, TRANSPILE_LAYOUT_NORMALIZE,
+                TRANSPILE_FORMAT_PRETTY, &output),
+            "normalize layout should format output") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_cstring_equal(output, expected,
+            "normalize layout should produce formatted text") != FT_SUCCESS)
+    {
+        cma_free(output);
+        return (FT_FAILURE);
+    }
+    cma_free(output);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_cblc_apply_layout_preserve)
+{
+    const char *input;
+    char *output;
+
+    input = "function void sample(){return;}";
+    if (test_expect_success(transpiler_cblc_apply_layout(input, TRANSPILE_LAYOUT_PRESERVE,
+                TRANSPILE_FORMAT_PRETTY, &output),
+            "preserve layout should copy input") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_cstring_equal(output, input,
+            "preserve layout should keep original spacing") != FT_SUCCESS)
+    {
+        cma_free(output);
+        return (FT_FAILURE);
+    }
+    cma_free(output);
+    return (FT_SUCCESS);
+}
+
 const t_test_case *get_cblc_formatter_tests(size_t *count)
 {
     static t_test_case tests[] = {
         {"test_cblc_formatter_formats_function_body", test_cblc_formatter_formats_function_body},
         {"test_cblc_formatter_preserves_strings_and_comments", test_cblc_formatter_preserves_strings_and_comments},
-        {"test_cblc_formatter_passthrough_minimal_mode", test_cblc_formatter_passthrough_minimal_mode}
+        {"test_cblc_formatter_passthrough_minimal_mode", test_cblc_formatter_passthrough_minimal_mode},
+        {"test_transpiler_cblc_apply_layout_normalize", test_transpiler_cblc_apply_layout_normalize},
+        {"test_transpiler_cblc_apply_layout_preserve", test_transpiler_cblc_apply_layout_preserve}
     };
     if (count)
         *count = sizeof(tests) / sizeof(tests[0]);

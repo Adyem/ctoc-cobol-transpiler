@@ -512,6 +512,8 @@ function void main() {
 - **Constructs:** Global integers shared within a unit, helper functions invoked from `main`, cross-file calls to external routines, arithmetic updates, and console output of computed values.
 
 ```cblc
+import "multi_module_worker.cblc";
+
 int accumulator;
 
 function void add_once() {

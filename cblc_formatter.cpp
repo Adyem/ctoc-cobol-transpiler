@@ -726,3 +726,15 @@ int cblc_formatter_format(const char *input, t_transpiler_format_mode mode, char
         return (cblc_formatter_format_passthrough(input, output));
     return (cblc_formatter_format_pretty(input, output));
 }
+
+int transpiler_cblc_apply_layout(const char *input, t_transpiler_layout_mode layout_mode,
+    t_transpiler_format_mode format_mode, char **output)
+{
+    if (!output)
+        return (FT_FAILURE);
+    if (!input)
+        return (FT_FAILURE);
+    if (layout_mode == TRANSPILE_LAYOUT_PRESERVE)
+        return (cblc_formatter_format_passthrough(input, output));
+    return (cblc_formatter_format(input, format_mode, output));
+}

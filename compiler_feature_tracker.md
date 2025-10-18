@@ -166,12 +166,12 @@ are completed; keep completed items grouped separately from the remaining work t
 - [ ] Error model: define uniform status enums and propagate them through trailing return slots.
 
 ### Diagnostics & Tooling
-- [ ] Pretty diagnostics: include line snippets, caret ranges, and suggestion text in diagnostics.
+- [x] Pretty diagnostics: include line snippets, caret ranges, and suggestion text in diagnostics.
 
 ### Reverse Pipeline (COBOL → CBL-C)
 
 - [ ] Comment preservation: carry comments as trivia and re-emit them near original anchors.
-- [ ] Layout fidelity knobs: provide "normalize" and "preserve" modes for regenerated source.
+- [x] Layout fidelity knobs: provide "normalize" and "preserve" modes for regenerated source.
 - [ ] Copybook reconstruction: prefer re-emitting COPY directives instead of fully expanded fields when possible.
 - [ ] Recover long, long long, and floating-point picture clauses into canonical CBL-C type annotations.
 - [ ] Reconstruct string length metadata so regenerated CBL-C declarations reflect original caller sizes.

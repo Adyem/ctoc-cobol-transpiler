@@ -161,11 +161,12 @@ static int pipeline_resolve_output_path(const t_transpiler_context *context, con
     return (FT_SUCCESS);
 }
 
-static int pipeline_format_cblc(const char *input, t_transpiler_format_mode mode, char **out_text)
+static int pipeline_apply_cblc_layout(const char *input, t_transpiler_layout_mode layout_mode,
+    t_transpiler_format_mode format_mode, char **out_text)
 {
     if (!input || !out_text)
         return (FT_FAILURE);
-    return (cblc_formatter_format(input, mode, out_text));
+    return (transpiler_cblc_apply_layout(input, layout_mode, format_mode, out_text));
 }
 
 static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const char *input_path, const char *output_path)
@@ -192,6 +193,10 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
             (void)pipeline_emit_error(context, message);
         goto cleanup;
     }
+    context->source_path = input_path;
+    context->target_path = output_path;
+    context->active_source_text = source_text;
+    context->active_source_length = ft_strlen(source_text);
     parser_init(&parser, source_text);
     if (parser_parse_program(&parser, &program) != FT_SUCCESS)
     {
@@ -214,7 +219,8 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
             (void)pipeline_emit_error(context, message);
         goto cleanup;
     }
-    if (pipeline_format_cblc(cblc_text, context->format_mode, &formatted_text) != FT_SUCCESS)
+    if (pipeline_apply_cblc_layout(cblc_text, context->layout_mode, context->format_mode,
+            &formatted_text) != FT_SUCCESS)
     {
         if (pf_snprintf(message, sizeof(message), "Failed to format generated CBL-C for '%s'", input_path) >= 0)
             (void)pipeline_emit_error(context, message);
@@ -240,6 +246,11 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
     }
     status = FT_SUCCESS;
 cleanup:
+    if (context)
+    {
+        context->active_source_text = NULL;
+        context->active_source_length = 0;
+    }
     if (program)
         ast_node_destroy(program);
     if (formatted_text)
@@ -249,6 +260,76 @@ cleanup:
     if (source_text)
         cma_free(source_text);
     return (status);
+}
+
+static int pipeline_stage_emit_standard_library(t_transpiler_context *context, void *user_data)
+{
+    const t_transpiler_standard_library_entry *entries;
+    size_t entry_count;
+    size_t index;
+
+    (void)user_data;
+    if (!context)
+        return (FT_FAILURE);
+    entries = transpiler_standard_library_get_entries(&entry_count);
+    index = 0;
+    while (index < entry_count)
+    {
+        char filename[TRANSPILE_FILE_PATH_MAX];
+        char resolved_path[TRANSPILE_FILE_PATH_MAX];
+        char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+        char *program_text;
+        int status;
+
+        if (pf_snprintf(filename, sizeof(filename), "%s.cob", entries[index].program_name) < 0)
+            return (FT_FAILURE);
+        program_text = NULL;
+        status = entries[index].generator(&program_text);
+        if (status != FT_SUCCESS || !program_text)
+        {
+            if (pf_snprintf(message, sizeof(message),
+                    "Unable to generate standard library program '%s'", entries[index].program_name) >= 0)
+                (void)pipeline_emit_error(context, message);
+            if (program_text)
+                cma_free(program_text);
+            return (FT_FAILURE);
+        }
+        const char *skip_validation_env;
+
+        skip_validation_env = std::getenv("CTOC_SKIP_STANDARD_LIBRARY_VALIDATION");
+        if ((!skip_validation_env || skip_validation_env[0] == '\0'
+                || skip_validation_env[0] == '0')
+            && transpiler_validate_generated_cobol(program_text) != FT_SUCCESS)
+        {
+            if (pf_snprintf(message, sizeof(message),
+                    "Generated standard library program '%s' failed validation",
+                    entries[index].program_name) >= 0)
+                (void)pipeline_emit_error(context, message);
+            cma_free(program_text);
+            return (FT_FAILURE);
+        }
+        if (pipeline_resolve_output_path(context, filename, resolved_path, sizeof(resolved_path)) != FT_SUCCESS)
+        {
+            if (pf_snprintf(message, sizeof(message),
+                    "Unable to resolve output path for standard library program '%s'",
+                    entries[index].program_name) >= 0)
+                (void)pipeline_emit_error(context, message);
+            cma_free(program_text);
+            return (FT_FAILURE);
+        }
+        if (pipeline_write_file(resolved_path, program_text) != FT_SUCCESS)
+        {
+            if (pf_snprintf(message, sizeof(message),
+                    "Unable to write standard library program '%s' to '%s'",
+                    entries[index].program_name, resolved_path) >= 0)
+                (void)pipeline_emit_error(context, message);
+            cma_free(program_text);
+            return (FT_FAILURE);
+        }
+        cma_free(program_text);
+        index += 1;
+    }
+    return (FT_SUCCESS);
 }
 
 static int pipeline_stage_cobol_to_cblc(t_transpiler_context *context, void *user_data)
@@ -268,87 +349,241 @@ static int pipeline_stage_cobol_to_cblc(t_transpiler_context *context, void *use
     return (FT_SUCCESS);
 }
 
+static void pipeline_extract_module_name(const char *path, char *buffer, size_t buffer_size)
+{
+    const char *cursor;
+
+    if (!buffer || buffer_size == 0)
+        return ;
+    buffer[0] = '\0';
+    if (!path)
+        return ;
+    cursor = path;
+    while (*cursor != '\0')
+    {
+        if (*cursor == '/' || *cursor == '\\')
+            path = cursor + 1;
+        cursor += 1;
+    }
+    if (!*path)
+        return ;
+    ft_strlcpy(buffer, path, buffer_size);
+}
+
+static void pipeline_choose_module_name(const char *path, const t_cblc_translation_unit *unit,
+    char *buffer, size_t buffer_size)
+{
+    if (!buffer || buffer_size == 0)
+        return ;
+    pipeline_extract_module_name(path, buffer, buffer_size);
+    if (buffer[0] == '\0' && unit && unit->program_name[0] != '\0')
+        ft_strlcpy(buffer, unit->program_name, buffer_size);
+    if (buffer[0] == '\0')
+        ft_strlcpy(buffer, "MODULE", buffer_size);
+}
+
 static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *user_data)
 {
+    t_cblc_translation_unit *units;
+    char **sources;
+    size_t *module_indices;
+    char (*module_names)[TRANSPILE_MODULE_NAME_MAX];
+    const size_t *order;
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    size_t order_count;
+    size_t file_count;
     size_t index;
+    int status;
 
     (void)user_data;
     if (!context)
         return (FT_FAILURE);
-    index = 0;
-    while (index < context->source_count)
+    file_count = context->source_count;
+    if (file_count == 0)
+        return (FT_SUCCESS);
+    transpiler_context_reset_module_registry(context);
+    transpiler_context_reset_unit_state(context);
+    units = static_cast<t_cblc_translation_unit *>(cma_calloc(file_count,
+        sizeof(t_cblc_translation_unit)));
+    sources = static_cast<char **>(cma_calloc(file_count, sizeof(char *)));
+    module_indices = static_cast<size_t *>(cma_calloc(file_count, sizeof(size_t)));
+    module_names = NULL;
+    module_names = static_cast<char (*)[TRANSPILE_MODULE_NAME_MAX]>(cma_calloc(file_count,
+        sizeof(*module_names)));
+    if (!units || !sources || !module_indices || !module_names)
     {
-        char resolved_path[TRANSPILE_FILE_PATH_MAX];
-        char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
-        char *source_text;
-        char *cobol_text;
-        t_cblc_translation_unit unit;
+        (void)pipeline_emit_error(context, "Unable to allocate module tracking for CBL-C inputs");
+        status = FT_FAILURE;
+        goto cleanup;
+    }
+    index = 0;
+    while (index < file_count)
+    {
+        t_cblc_translation_unit *unit;
+        char module_name[TRANSPILE_MODULE_NAME_MAX];
+        size_t import_index;
 
-        source_text = NULL;
-        cobol_text = NULL;
-        cblc_translation_unit_init(&unit);
-        if (pipeline_read_file(context->source_paths[index], &source_text) != FT_SUCCESS)
+        module_indices[index] = static_cast<size_t>(-1);
+        unit = &units[index];
+        cblc_translation_unit_init(unit);
+        if (pipeline_read_file(context->source_paths[index], &sources[index]) != FT_SUCCESS)
         {
             if (pf_snprintf(message, sizeof(message), "Unable to read input file '%s'",
                     context->source_paths[index]) >= 0)
                 (void)pipeline_emit_error(context, message);
-            cblc_translation_unit_dispose(&unit);
-            return (FT_FAILURE);
+            status = FT_FAILURE;
+            goto cleanup;
         }
-        if (cblc_parse_translation_unit(source_text, &unit) != FT_SUCCESS)
+        if (cblc_parse_translation_unit(sources[index], unit) != FT_SUCCESS)
         {
             if (pf_snprintf(message, sizeof(message), "Failed to parse CBL-C source '%s'",
                     context->source_paths[index]) >= 0)
                 (void)pipeline_emit_error(context, message);
-            cblc_translation_unit_dispose(&unit);
-            if (source_text)
-                cma_free(source_text);
-            return (FT_FAILURE);
+            status = FT_FAILURE;
+            goto cleanup;
         }
-        if (!unit.saw_return)
+        if (unit->function_count == 0)
         {
             if (pf_snprintf(message, sizeof(message),
-                    "CBL-C source '%s' is missing a terminating return;", context->source_paths[index]) >= 0)
+                    "CBL-C source '%s' does not declare any functions;", context->source_paths[index]) >= 0)
                 (void)pipeline_emit_error(context, message);
-            cblc_translation_unit_dispose(&unit);
-            if (source_text)
-                cma_free(source_text);
-            return (FT_FAILURE);
+            status = FT_FAILURE;
+            goto cleanup;
         }
-        if (cblc_generate_cobol(&unit, &cobol_text) != FT_SUCCESS)
+        else
         {
-            if (pf_snprintf(message, sizeof(message), "Failed to generate COBOL for '%s'",
+            size_t entry_index;
+
+            entry_index = unit->entry_function_index;
+            if (entry_index == static_cast<size_t>(-1) || entry_index >= unit->function_count)
+                entry_index = 0;
+            if (!unit->functions[entry_index].saw_return)
+            {
+                if (pf_snprintf(message, sizeof(message),
+                        "CBL-C source '%s' is missing a terminating return;", context->source_paths[index]) >= 0)
+                    (void)pipeline_emit_error(context, message);
+                status = FT_FAILURE;
+                goto cleanup;
+            }
+        }
+        pipeline_choose_module_name(context->source_paths[index], unit, module_name,
+            sizeof(module_name));
+        ft_strlcpy(module_names[index], module_name, TRANSPILE_MODULE_NAME_MAX);
+        if (transpiler_context_register_module(context, module_name, context->source_paths[index])
+            != FT_SUCCESS)
+        {
+            if (pf_snprintf(message, sizeof(message), "Failed to register module for '%s'",
                     context->source_paths[index]) >= 0)
                 (void)pipeline_emit_error(context, message);
-            cblc_translation_unit_dispose(&unit);
-            if (source_text)
-                cma_free(source_text);
-            return (FT_FAILURE);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        if (context->module_count == 0)
+        {
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        module_indices[index] = context->module_count - 1;
+        import_index = 0;
+        while (import_index < unit->import_count)
+        {
+            if (transpiler_context_register_module_import(context, module_name,
+                    unit->imports[import_index].path) != FT_SUCCESS)
+            {
+                if (pf_snprintf(message, sizeof(message),
+                        "Failed to register import '%s' for module '%s'", unit->imports[import_index].path,
+                        module_name) >= 0)
+                    (void)pipeline_emit_error(context, message);
+                status = FT_FAILURE;
+                goto cleanup;
+            }
+            import_index += 1;
+        }
+        if (cblc_register_translation_unit_exports(context, module_name, unit) != FT_SUCCESS)
+        {
+            if (pf_snprintf(message, sizeof(message),
+                    "Failed to register exports for module '%s'", module_name) >= 0)
+                (void)pipeline_emit_error(context, message);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        index += 1;
+    }
+    index = 0;
+    while (index < file_count)
+    {
+        if (cblc_resolve_translation_unit_calls(context, module_names[index], &units[index]) != FT_SUCCESS)
+        {
+            if (pf_snprintf(message, sizeof(message),
+                    "Failed to resolve function calls for module '%s'", module_names[index]) >= 0)
+                (void)pipeline_emit_error(context, message);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        index += 1;
+    }
+    if (transpiler_context_compute_module_initialization_order(context) != FT_SUCCESS)
+    {
+        (void)pipeline_emit_error(context, "Unable to compute module initialization order");
+        status = FT_FAILURE;
+        goto cleanup;
+    }
+    order = transpiler_context_get_module_initialization_order(context, &order_count);
+    if (!order || order_count == 0)
+    {
+        status = FT_FAILURE;
+        goto cleanup;
+    }
+    index = 0;
+    while (index < order_count)
+    {
+        size_t module_index;
+        size_t source_index;
+        char resolved_path[TRANSPILE_FILE_PATH_MAX];
+        char *cobol_text;
+
+        cobol_text = NULL;
+        module_index = order[index];
+        source_index = 0;
+        while (source_index < file_count)
+        {
+            if (module_indices[source_index] == module_index)
+                break ;
+            source_index += 1;
+        }
+        if (source_index >= file_count)
+        {
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        if (cblc_generate_cobol(&units[source_index], &cobol_text) != FT_SUCCESS)
+        {
+            if (pf_snprintf(message, sizeof(message), "Failed to generate COBOL for '%s'",
+                    context->source_paths[source_index]) >= 0)
+                (void)pipeline_emit_error(context, message);
+            status = FT_FAILURE;
+            goto cleanup;
         }
         if (transpiler_validate_generated_cobol(cobol_text) != FT_SUCCESS)
         {
             if (pf_snprintf(message, sizeof(message), "Generated COBOL failed validation for '%s'",
-                    context->source_paths[index]) >= 0)
+                    context->source_paths[source_index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             if (cobol_text)
                 cma_free(cobol_text);
-            cblc_translation_unit_dispose(&unit);
-            if (source_text)
-                cma_free(source_text);
-            return (FT_FAILURE);
+            status = FT_FAILURE;
+            goto cleanup;
         }
-        if (pipeline_resolve_output_path(context, context->target_paths[index], resolved_path,
+        if (pipeline_resolve_output_path(context, context->target_paths[source_index], resolved_path,
                 sizeof(resolved_path)) != FT_SUCCESS)
         {
             if (pf_snprintf(message, sizeof(message), "Unable to resolve output path for '%s'",
-                    context->target_paths[index]) >= 0)
+                    context->target_paths[source_index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             if (cobol_text)
                 cma_free(cobol_text);
-            cblc_translation_unit_dispose(&unit);
-            if (source_text)
-                cma_free(source_text);
-            return (FT_FAILURE);
+            status = FT_FAILURE;
+            goto cleanup;
         }
         if (pipeline_write_file(resolved_path, cobol_text) != FT_SUCCESS)
         {
@@ -357,19 +592,42 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
                 (void)pipeline_emit_error(context, message);
             if (cobol_text)
                 cma_free(cobol_text);
-            cblc_translation_unit_dispose(&unit);
-            if (source_text)
-                cma_free(source_text);
-            return (FT_FAILURE);
+            status = FT_FAILURE;
+            goto cleanup;
         }
         if (cobol_text)
             cma_free(cobol_text);
-        cblc_translation_unit_dispose(&unit);
-        if (source_text)
-            cma_free(source_text);
+        module_indices[source_index] = static_cast<size_t>(-1);
         index += 1;
     }
-    return (FT_SUCCESS);
+    status = FT_SUCCESS;
+cleanup:
+    if (module_indices)
+        cma_free(module_indices);
+    if (module_names)
+        cma_free(module_names);
+    if (units)
+    {
+        index = 0;
+        while (index < file_count)
+        {
+            cblc_translation_unit_dispose(&units[index]);
+            index += 1;
+        }
+        cma_free(units);
+    }
+    if (sources)
+    {
+        index = 0;
+        while (index < file_count)
+        {
+            if (sources[index])
+                cma_free(sources[index]);
+            index += 1;
+        }
+        cma_free(sources);
+    }
+    return (status);
 }
 
 int main(int argc, const char **argv)
@@ -410,7 +668,16 @@ int main(int argc, const char **argv)
         return (1);
     }
     status = FT_FAILURE;
-    if (context.source_language == TRANSPILE_LANGUAGE_COBOL
+    if (context.emit_standard_library)
+    {
+        if (transpiler_pipeline_add_stage(&pipeline, "emit-standard-library",
+                pipeline_stage_emit_standard_library, NULL) != FT_SUCCESS)
+        {
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+    }
+    else if (context.source_language == TRANSPILE_LANGUAGE_COBOL
         && context.target_language == TRANSPILE_LANGUAGE_CBL_C)
     {
         if (transpiler_pipeline_add_stage(&pipeline, "cobol-to-cblc",
