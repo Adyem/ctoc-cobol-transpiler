@@ -39,6 +39,16 @@ typedef struct s_runtime_int
     int value;
 }   t_runtime_int;
 
+typedef struct s_runtime_long
+{
+    long value;
+}   t_runtime_long;
+
+typedef struct s_runtime_long_long
+{
+    long long value;
+}   t_runtime_long_long;
+
 typedef struct s_runtime_char
 {
     char value;
@@ -50,6 +60,29 @@ int runtime_int_add(t_runtime_int left, t_runtime_int right, t_runtime_int *resu
 int runtime_int_subtract(t_runtime_int left, t_runtime_int right, t_runtime_int *result);
 int runtime_int_multiply(t_runtime_int left, t_runtime_int right, t_runtime_int *result);
 int runtime_int_divide(t_runtime_int dividend, t_runtime_int divisor, t_runtime_int *result);
+int runtime_int_unary_plus(t_runtime_int value, t_runtime_int *result);
+int runtime_int_unary_minus(t_runtime_int value, t_runtime_int *result);
+int runtime_int_absolute(t_runtime_int value, t_runtime_int *result);
+void runtime_long_set(t_runtime_long *destination, long value);
+int runtime_long_add(t_runtime_long left, t_runtime_long right, t_runtime_long *result);
+int runtime_long_subtract(t_runtime_long left, t_runtime_long right, t_runtime_long *result);
+int runtime_long_multiply(t_runtime_long left, t_runtime_long right, t_runtime_long *result);
+int runtime_long_divide(t_runtime_long dividend, t_runtime_long divisor, t_runtime_long *result);
+int runtime_long_unary_plus(t_runtime_long value, t_runtime_long *result);
+int runtime_long_unary_minus(t_runtime_long value, t_runtime_long *result);
+int runtime_long_absolute(t_runtime_long value, t_runtime_long *result);
+void runtime_long_long_set(t_runtime_long_long *destination, long long value);
+int runtime_long_long_add(t_runtime_long_long left, t_runtime_long_long right,
+    t_runtime_long_long *result);
+int runtime_long_long_subtract(t_runtime_long_long left, t_runtime_long_long right,
+    t_runtime_long_long *result);
+int runtime_long_long_multiply(t_runtime_long_long left, t_runtime_long_long right,
+    t_runtime_long_long *result);
+int runtime_long_long_divide(t_runtime_long_long dividend, t_runtime_long_long divisor,
+    t_runtime_long_long *result);
+int runtime_long_long_unary_plus(t_runtime_long_long value, t_runtime_long_long *result);
+int runtime_long_long_unary_minus(t_runtime_long_long value, t_runtime_long_long *result);
+int runtime_long_long_absolute(t_runtime_long_long value, t_runtime_long_long *result);
 int runtime_int_compare(t_runtime_int left, t_runtime_int right);
 int runtime_int_to_string(t_runtime_int value, char *buffer, size_t buffer_size);
 

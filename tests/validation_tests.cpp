@@ -204,6 +204,52 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_generate_cobol_handles_multiplication_and_division)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "int left;\n"
+        "int right;\n"
+        "int product;\n"
+        "int quotient;\n"
+        "function void main()\n"
+        "{\n"
+        "    product = left * right;\n"
+        "    quotient = product / right;\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "numeric declarations should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "numeric declarations should convert to COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol, "COMPUTE PRODUCT = LEFT * RIGHT", ft_strlen(generated_cobol)))
+    {
+        pf_printf("Assertion failed: multiplication should translate into COMPUTE statement\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "COMPUTE QUOTIENT = PRODUCT / RIGHT", ft_strlen(generated_cobol)))
+    {
+        pf_printf("Assertion failed: division should translate into COMPUTE statement\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_transpiler_validation_accepts_valid_cobol)
 {
     const char *source;
@@ -267,6 +313,8 @@ const t_test_case *get_validation_tests(size_t *count)
         {"cblc_generate_cobol_emits_string_group", test_cblc_generate_cobol_emits_string_group},
         {"cblc_generate_cobol_handles_string_assignments_and_length_computations",
             test_cblc_generate_cobol_handles_string_assignments_and_length_computations},
+        {"cblc_generate_cobol_handles_multiplication_and_division",
+            test_cblc_generate_cobol_handles_multiplication_and_division},
         {"transpiler_validation_accepts_valid_cobol", test_transpiler_validation_accepts_valid_cobol},
         {"transpiler_validation_accepts_working_storage_program", test_transpiler_validation_accepts_working_storage_program},
         {"transpiler_validation_rejects_invalid_cobol", test_transpiler_validation_rejects_invalid_cobol}
