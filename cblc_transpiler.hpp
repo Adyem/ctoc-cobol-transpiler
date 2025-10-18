@@ -27,12 +27,25 @@ typedef struct s_runtime_record
     size_t capacity;
 }   t_runtime_record;
 
+typedef struct s_runtime_record_key
+{
+    size_t offset;
+    size_t length;
+    int ascending;
+}   t_runtime_record_key;
+
 int runtime_record_init(t_runtime_record *record, size_t initial_capacity);
 void runtime_record_dispose(t_runtime_record *record);
 int runtime_record_set_length(t_runtime_record *record, size_t length);
 int runtime_record_fill(t_runtime_record *record, char value);
 int runtime_record_copy_from_buffer(t_runtime_record *record, const char *buffer, size_t length);
 int runtime_record_copy_to_buffer(const t_runtime_record *record, char *buffer, size_t buffer_size, size_t *written);
+int runtime_record_compare_keys(const t_runtime_record *left, const t_runtime_record *right,
+    const t_runtime_record_key *keys, size_t key_count, int *result);
+int runtime_record_sort(t_runtime_record *records, size_t record_count, const t_runtime_record_key *keys,
+    size_t key_count);
+int runtime_record_search_all(const t_runtime_record *records, size_t record_count, const t_runtime_record *target,
+    const t_runtime_record_key *keys, size_t key_count, size_t *found_index, int *found);
 
 typedef struct s_runtime_int
 {
@@ -111,6 +124,51 @@ int runtime_string_to_int(const t_runtime_string *value, t_runtime_int *destinat
 int runtime_string_equals(const t_runtime_string *left, const t_runtime_string *right);
 int runtime_string_concat(t_runtime_string *destination, const t_runtime_string *left,
     const t_runtime_string *right);
+int runtime_string_blank(char *destination, size_t destination_length);
+int runtime_string_copy_checked(char *destination, size_t destination_length, const char *source,
+    size_t source_length, size_t *written_length, int *was_truncated);
+int runtime_line_read_fixed(t_runtime_file *file, size_t record_length, t_runtime_string *destination,
+    int *end_of_file);
+int runtime_line_read_variable(t_runtime_file *file, char terminator, t_runtime_string *destination,
+    int *end_of_file);
+int runtime_line_write_fixed(t_runtime_file *file, const char *buffer, size_t length, size_t record_length);
+int runtime_line_write_variable(t_runtime_file *file, const char *buffer, size_t length, char terminator);
+int runtime_csv_parse_line(const char *line, t_runtime_string *fields, size_t field_capacity, size_t *field_count);
+int runtime_csv_format_line(const t_runtime_string *fields, size_t field_count, t_runtime_string *destination);
+
+int runtime_memory_copy_checked(void *destination, size_t destination_length, const void *source,
+    size_t source_length);
+
+#define RUNTIME_ENCODING_TABLE_SIZE 256
+
+typedef struct s_runtime_encoding_table
+{
+    unsigned char to_ascii[RUNTIME_ENCODING_TABLE_SIZE];
+    unsigned char from_ascii[RUNTIME_ENCODING_TABLE_SIZE];
+}   t_runtime_encoding_table;
+
+int runtime_encoding_get_active(t_runtime_encoding_table *table);
+int runtime_encoding_set_active(const t_runtime_encoding_table *table);
+int runtime_encoding_reset(void);
+int runtime_encoding_transcode_to_ascii(const unsigned char *source, size_t source_length,
+    unsigned char *destination, size_t destination_length, size_t *written_length);
+int runtime_encoding_transcode_to_ebcdic(const unsigned char *source, size_t source_length,
+    unsigned char *destination, size_t destination_length, size_t *written_length);
+
+typedef int (*t_runtime_collation_compare_callback)(const char *left, size_t left_length,
+    const char *right, size_t right_length, int *result, void *user_data);
+
+typedef struct s_runtime_collation_bridge
+{
+    t_runtime_collation_compare_callback compare;
+    void *user_data;
+}   t_runtime_collation_bridge;
+
+void runtime_collation_get_bridge(t_runtime_collation_bridge *bridge);
+int runtime_collation_set_bridge(const t_runtime_collation_bridge *bridge);
+void runtime_collation_clear_bridge(void);
+int runtime_collation_compare(const char *left, size_t left_length, const char *right,
+    size_t right_length, int *result);
 
 // ===============================
 // Context management and helpers
@@ -142,6 +200,24 @@ int transpiler_diagnostics_init(t_transpiler_diagnostic_list *list);
 void transpiler_diagnostics_dispose(t_transpiler_diagnostic_list *list);
 int transpiler_diagnostics_push(t_transpiler_diagnostic_list *list, t_transpiler_severity severity, int code,
     const char *message);
+
+typedef enum e_transpiler_warning_group
+{
+    TRANSPILE_WARNING_GROUP_CONVERSION = 0,
+    TRANSPILE_WARNING_GROUP_OVERFLOW,
+    TRANSPILE_WARNING_GROUP_STRING_TRUNCATION,
+    TRANSPILE_WARNING_GROUP_SHADOW,
+    TRANSPILE_WARNING_GROUP_UNUSED
+}   t_transpiler_warning_group;
+
+typedef struct s_transpiler_warning_settings
+{
+    int conversion;
+    int overflow;
+    int string_truncation;
+    int shadow;
+    int unused;
+}   t_transpiler_warning_settings;
 
 typedef enum e_transpiler_language
 {
@@ -310,6 +386,7 @@ typedef struct s_transpiler_context
     t_transpiler_format_mode format_mode;
     t_transpiler_diagnostic_level diagnostic_level;
     int warnings_as_errors;
+    t_transpiler_warning_settings warning_settings;
     t_transpiler_diagnostic_list diagnostics;
     int last_error_code;
     t_transpiler_function_signature *functions;
@@ -346,6 +423,8 @@ void transpiler_context_set_output_directory(t_transpiler_context *context, cons
 void transpiler_context_set_format_mode(t_transpiler_context *context, t_transpiler_format_mode mode);
 void transpiler_context_set_diagnostic_level(t_transpiler_context *context, t_transpiler_diagnostic_level level);
 void transpiler_context_set_warnings_as_errors(t_transpiler_context *context, int warnings_as_errors);
+void transpiler_context_set_warning_settings(t_transpiler_context *context, const t_transpiler_warning_settings *settings);
+int transpiler_context_warning_group_enabled(const t_transpiler_context *context, t_transpiler_warning_group group);
 void transpiler_context_reset_unit_state(t_transpiler_context *context);
 void transpiler_context_record_error(t_transpiler_context *context, int error_code);
 int transpiler_context_has_errors(const t_transpiler_context *context);
@@ -599,6 +678,19 @@ void transpiler_pipeline_reset(t_transpiler_pipeline *pipeline);
 #define TRANSPILE_ERROR_SEMANTIC_NUMERIC_OVERFLOW 2011
 #define TRANSPILE_ERROR_SEMANTIC_FLOATING_TRUNCATION 2012
 #define TRANSPILE_ERROR_SEMANTIC_DECIMAL_SCALE_MISMATCH 2013
+
+#define TRANSPILE_WARNING_SEMANTIC_FLOAT_TO_DOUBLE 3001
+#define TRANSPILE_WARNING_SEMANTIC_DOUBLE_TO_FLOAT 3002
+#define TRANSPILE_WARNING_SEMANTIC_INTEGRAL_TO_FLOATING 3003
+#define TRANSPILE_WARNING_SEMANTIC_INTEGRAL_TO_ALPHANUMERIC 3004
+#define TRANSPILE_WARNING_SEMANTIC_BOOLEAN_TO_NUMERIC 3005
+#define TRANSPILE_WARNING_SEMANTIC_NUMERIC_TO_BOOLEAN 3006
+#define TRANSPILE_WARNING_SEMANTIC_BOOLEAN_TO_ALPHANUMERIC 3007
+#define TRANSPILE_WARNING_SEMANTIC_ALPHANUMERIC_TO_BOOLEAN 3008
+#define TRANSPILE_WARNING_SEMANTIC_UNREACHABLE_CODE 3009
+#define TRANSPILE_WARNING_SEMANTIC_UNUSED_DATA_ITEM 3010
+#define TRANSPILE_WARNING_SEMANTIC_WRITE_ONLY_DATA_ITEM 3011
+#define TRANSPILE_WARNING_SEMANTIC_READ_WITHOUT_WRITE 3012
 
 int transpiler_semantics_analyze_program(t_transpiler_context *context, const t_ast_node *program);
 
@@ -874,6 +966,8 @@ void transpiler_standard_library_note_strlen_usage(size_t declared_length);
 size_t transpiler_standard_library_get_strlen_limit(void);
 void transpiler_standard_library_note_strlen_string_usage(size_t declared_length);
 size_t transpiler_standard_library_get_strlen_string_limit(void);
+int transpiler_standard_library_generate_date_duration(char **out_text);
+int transpiler_standard_library_generate_date_yyyymmdd(char **out_text);
 int transpiler_standard_library_generate_strlen(char **out_text);
 int transpiler_standard_library_generate_strlen_string(char **out_text);
 int transpiler_standard_library_generate_strnlen_string(char **out_text);
@@ -899,6 +993,8 @@ int transpiler_standard_library_generate_log(char **out_text);
 int transpiler_standard_library_generate_sin(char **out_text);
 int transpiler_standard_library_generate_cos(char **out_text);
 int transpiler_standard_library_generate_tan(char **out_text);
+int transpiler_standard_library_generate_rounded(char **out_text);
+int transpiler_standard_library_generate_banker_round(char **out_text);
 int transpiler_standard_library_generate_atoi(char **out_text);
 int transpiler_standard_library_generate_atoi_string(char **out_text);
 int transpiler_standard_library_generate_atol(char **out_text);
@@ -907,6 +1003,8 @@ int transpiler_standard_library_generate_atoll(char **out_text);
 int transpiler_standard_library_generate_atoll_string(char **out_text);
 int transpiler_standard_library_generate_powerof(char **out_text);
 int transpiler_standard_library_generate_sqrt(char **out_text);
+int transpiler_standard_library_generate_min(char **out_text);
+int transpiler_standard_library_generate_max(char **out_text);
 int transpiler_standard_library_generate_toupper(char **out_text);
 int transpiler_standard_library_generate_toupper_string(char **out_text);
 int transpiler_standard_library_generate_tolower(char **out_text);
@@ -936,6 +1034,7 @@ typedef struct s_transpiler_cli_options
     t_transpiler_format_mode format_mode;
     t_transpiler_diagnostic_level diagnostic_level;
     int warnings_as_errors;
+    t_transpiler_warning_settings warning_settings;
     int show_help;
 }   t_transpiler_cli_options;
 

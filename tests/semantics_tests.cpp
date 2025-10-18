@@ -2,7 +2,7 @@
 
 const t_test_case *get_semantics_tests(size_t *count)
 {
-    static t_test_case tests[80];
+    static t_test_case tests[96];
     static size_t total_count = 0;
     static int initialized = 0;
     size_t offset;
@@ -30,6 +30,22 @@ const t_test_case *get_semantics_tests(size_t *count)
         }
         offset += subset_count;
         subset = get_semantics_condition_tests(&subset_count);
+        index = 0;
+        while (index < subset_count)
+        {
+            tests[offset + index] = subset[index];
+            index++;
+        }
+        offset += subset_count;
+        subset = get_semantics_control_flow_tests(&subset_count);
+        index = 0;
+        while (index < subset_count)
+        {
+            tests[offset + index] = subset[index];
+            index++;
+        }
+        offset += subset_count;
+        subset = get_semantics_usage_tests(&subset_count);
         index = 0;
         while (index < subset_count)
         {

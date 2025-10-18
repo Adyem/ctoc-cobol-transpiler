@@ -26,6 +26,120 @@ void transpiler_semantics_scope_dispose(t_transpiler_semantic_scope *scope)
     scope->item_capacity = 0;
 }
 
+static const char *g_transpiler_semantics_flag_suffixes[] = {
+    "FLAG",
+    "SWITCH",
+    "IND",
+    "INDICATOR",
+    "BOOL",
+    "BOOLEAN",
+    NULL
+};
+
+static void transpiler_semantics_normalize_identifier(const char *name,
+    char *buffer, size_t buffer_size)
+{
+    size_t index;
+    size_t write_index;
+    int previous_was_separator;
+    int has_significant;
+
+    if (!buffer)
+        return ;
+    if (buffer_size == 0)
+        return ;
+    ft_bzero(buffer, buffer_size);
+    if (!name)
+        return ;
+    index = 0;
+    write_index = 0;
+    previous_was_separator = 0;
+    has_significant = 0;
+    while (name[index] != '\0' && write_index + 1 < buffer_size)
+    {
+        char value;
+
+        value = name[index];
+        if ((value >= 'a' && value <= 'z')
+            || (value >= 'A' && value <= 'Z'))
+        {
+            if (value >= 'a' && value <= 'z')
+                value = static_cast<char>(value - ('a' - 'A'));
+            buffer[write_index] = value;
+            write_index += 1;
+            previous_was_separator = 0;
+            has_significant = 1;
+        }
+        else if (value >= '0' && value <= '9')
+        {
+            buffer[write_index] = value;
+            write_index += 1;
+            previous_was_separator = 0;
+            has_significant = 1;
+        }
+        else if (value == '-' || value == '_' || value == ' ')
+        {
+            if (!previous_was_separator && has_significant)
+            {
+                buffer[write_index] = '_';
+                write_index += 1;
+                previous_was_separator = 1;
+            }
+        }
+        index += 1;
+    }
+    if (write_index < buffer_size)
+        buffer[write_index] = '\0';
+}
+
+static int transpiler_semantics_identifier_is_flag(const char *name)
+{
+    char normalized[(TRANSPILE_IDENTIFIER_MAX * 2)];
+    size_t suffix_index;
+
+    ft_bzero(normalized, sizeof(normalized));
+    transpiler_semantics_normalize_identifier(name, normalized,
+        sizeof(normalized));
+    suffix_index = 0;
+    while (g_transpiler_semantics_flag_suffixes[suffix_index])
+    {
+        const char *suffix;
+        size_t normalized_length;
+        size_t suffix_length;
+
+        suffix = g_transpiler_semantics_flag_suffixes[suffix_index];
+        normalized_length = ft_strlen(normalized);
+        suffix_length = ft_strlen(suffix);
+        if (suffix_length > 0 && suffix_length <= normalized_length)
+        {
+            size_t start_index;
+
+            start_index = normalized_length - suffix_length;
+            if (ft_strncmp(&normalized[start_index], suffix, suffix_length) == 0)
+                return (1);
+        }
+        suffix_index += 1;
+    }
+    return (0);
+}
+
+static int transpiler_semantics_identifier_should_be_boolean(const char *name,
+    t_transpiler_semantic_data_kind kind, size_t declared_length)
+{
+    size_t effective_length;
+
+    if (!name)
+        return (0);
+    if (kind != TRANSPILE_SEMANTIC_DATA_ALPHANUMERIC)
+        return (0);
+    effective_length = declared_length;
+    if (effective_length == 0)
+        effective_length = 1;
+    if (effective_length > 1)
+        return (0);
+    return (transpiler_semantics_identifier_is_flag(name));
+}
+
 static int transpiler_semantics_scope_reserve(t_transpiler_semantic_scope *scope,
     size_t desired_capacity)
 {
@@ -51,6 +165,9 @@ static int transpiler_semantics_scope_reserve(t_transpiler_semantic_scope *scope
         new_items[index].declared_scale = scope->items[index].declared_scale;
         new_items[index].has_declared_scale = scope->items[index].has_declared_scale;
         new_items[index].is_read_only = scope->items[index].is_read_only;
+        new_items[index].read_count = scope->items[index].read_count;
+        new_items[index].write_count = scope->items[index].write_count;
+        new_items[index].has_initial_value = scope->items[index].has_initial_value;
         index += 1;
     }
     if (scope->items)
@@ -99,6 +216,9 @@ static int transpiler_semantics_register_data_item(t_transpiler_semantic_scope *
         return (transpiler_semantics_emit_error(context,
             TRANSPILE_ERROR_SEMANTIC_INVALID_MOVE, message));
     }
+    if (transpiler_semantics_identifier_should_be_boolean(name, kind,
+            declared_length))
+        kind = TRANSPILE_SEMANTIC_DATA_BOOLEAN;
     existing = transpiler_semantics_scope_lookup(scope, name);
     if (existing)
     {
@@ -120,6 +240,11 @@ static int transpiler_semantics_register_data_item(t_transpiler_semantic_scope *
     item->declared_scale = declared_scale;
     item->has_declared_scale = has_declared_scale;
     item->is_read_only = is_read_only;
+    item->read_count = 0;
+    item->write_count = 0;
+    item->has_initial_value = 0;
+    if (is_read_only)
+        item->has_initial_value = 1;
     if (transpiler_context_register_data_item(context, name,
             transpiler_semantics_convert_kind(kind), declared_length, is_read_only) != FT_SUCCESS)
     {
@@ -127,6 +252,9 @@ static int transpiler_semantics_register_data_item(t_transpiler_semantic_scope *
         item->kind = TRANSPILE_SEMANTIC_DATA_UNKNOWN;
         item->declared_length = 0;
         item->is_read_only = 0;
+        item->read_count = 0;
+        item->write_count = 0;
+        item->has_initial_value = 0;
         return (FT_FAILURE);
     }
     scope->item_count += 1;
@@ -376,5 +504,90 @@ int transpiler_semantics_validate_identifier_use(const t_transpiler_semantic_sco
         *out_scale_known = item->has_declared_scale;
     if (out_is_read_only)
         *out_is_read_only = item->is_read_only;
+    if (item)
+    {
+        t_transpiler_semantic_data_item *mutable_item;
+
+        mutable_item = const_cast<t_transpiler_semantic_data_item *>(item);
+        if (mutable_item)
+        {
+            if (is_target)
+                mutable_item->write_count += 1;
+            else
+                mutable_item->read_count += 1;
+        }
+    }
     return (FT_SUCCESS);
+}
+
+static int transpiler_semantics_emit_usage_warning(t_transpiler_context *context,
+    int code, const char *name)
+{
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+    if (!context)
+        return (FT_FAILURE);
+    if (!name || name[0] == '\0')
+        name = "<data item>";
+    if (code == TRANSPILE_WARNING_SEMANTIC_UNUSED_DATA_ITEM)
+        pf_snprintf(message, sizeof(message),
+            "data item '%s' is declared but never referenced", name);
+    else if (code == TRANSPILE_WARNING_SEMANTIC_WRITE_ONLY_DATA_ITEM)
+        pf_snprintf(message, sizeof(message),
+            "data item '%s' is written but its value is never read", name);
+    else if (code == TRANSPILE_WARNING_SEMANTIC_READ_WITHOUT_WRITE)
+        pf_snprintf(message, sizeof(message),
+            "data item '%s' is read before any assignments", name);
+    else
+        return (FT_FAILURE);
+    if (transpiler_semantics_emit_warning(context, code, message) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+int transpiler_semantics_analyze_usage(const t_transpiler_semantic_scope *scope,
+    t_transpiler_context *context)
+{
+    size_t index;
+    int status;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (!scope)
+        return (FT_SUCCESS);
+    status = FT_SUCCESS;
+    index = 0;
+    while (index < scope->item_count)
+    {
+        const t_transpiler_semantic_data_item *item;
+
+        item = &scope->items[index];
+        if (item->name[0] != '\0')
+        {
+            if (item->read_count == 0 && item->write_count == 0)
+            {
+                if (transpiler_semantics_emit_usage_warning(context,
+                        TRANSPILE_WARNING_SEMANTIC_UNUSED_DATA_ITEM,
+                        item->name) != FT_SUCCESS)
+                    status = FT_FAILURE;
+            }
+            else if (item->write_count > 0 && item->read_count == 0)
+            {
+                if (transpiler_semantics_emit_usage_warning(context,
+                        TRANSPILE_WARNING_SEMANTIC_WRITE_ONLY_DATA_ITEM,
+                        item->name) != FT_SUCCESS)
+                    status = FT_FAILURE;
+            }
+            else if (item->read_count > 0 && item->write_count == 0
+                && item->has_initial_value == 0)
+            {
+                if (transpiler_semantics_emit_usage_warning(context,
+                        TRANSPILE_WARNING_SEMANTIC_READ_WITHOUT_WRITE,
+                        item->name) != FT_SUCCESS)
+                    status = FT_FAILURE;
+            }
+        }
+        index += 1;
+    }
+    return (status);
 }

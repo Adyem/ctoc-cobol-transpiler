@@ -47,6 +47,14 @@ static int transpiler_semantics_classify_condition_identifier(const t_ast_node *
         *out_scale = item->declared_scale;
     if (out_scale_known)
         *out_scale_known = item->has_declared_scale;
+    if (item)
+    {
+        t_transpiler_semantic_data_item *mutable_item;
+
+        mutable_item = const_cast<t_transpiler_semantic_data_item *>(item);
+        if (mutable_item)
+            mutable_item->read_count += 1;
+    }
     return (FT_SUCCESS);
 }
 

@@ -132,6 +132,110 @@ FT_TEST(test_runtime_string_to_int_parses_numbers)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_runtime_string_blank_fills_spaces)
+{
+    char buffer[6];
+    size_t index;
+
+    index = 0;
+    while (index < 6)
+    {
+        buffer[index] = 'X';
+        index += 1;
+    }
+    if (test_expect_success(runtime_string_blank(buffer, 6),
+            "runtime_string_blank should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < 6)
+    {
+        if (test_expect_char_equal(buffer[index], ' ',
+                "runtime_string_blank should fill spaces") != FT_SUCCESS)
+            return (FT_FAILURE);
+        index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_runtime_string_copy_checked_reports_truncation)
+{
+    char destination[5];
+    const char source[] = "ABCDEFG";
+    size_t written;
+    int truncated;
+    size_t index;
+
+    if (test_expect_success(runtime_string_copy_checked(destination, 5, source, 7, &written,
+                &truncated),
+            "runtime_string_copy_checked should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_size_t_equal(written, 5,
+            "runtime_string_copy_checked should report written length") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_int_equal(truncated, 1,
+            "runtime_string_copy_checked should report truncation") != FT_SUCCESS)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < 5)
+    {
+        if (test_expect_char_equal(destination[index], source[index],
+                "runtime_string_copy_checked should copy bytes before truncation") != FT_SUCCESS)
+            return (FT_FAILURE);
+        index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_runtime_string_copy_checked_pads_destination)
+{
+    char destination[6];
+    const char source[] = "HI";
+    size_t written;
+    int truncated;
+    size_t index;
+
+    index = 0;
+    while (index < 6)
+    {
+        destination[index] = '?';
+        index += 1;
+    }
+    if (test_expect_success(runtime_string_copy_checked(destination, 6, source, 2, &written,
+                &truncated),
+            "runtime_string_copy_checked should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_size_t_equal(written, 2,
+            "runtime_string_copy_checked should report copied length") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_int_equal(truncated, 0,
+            "runtime_string_copy_checked should report no truncation") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_char_equal(destination[0], 'H',
+            "runtime_string_copy_checked should copy first character") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_char_equal(destination[1], 'I',
+            "runtime_string_copy_checked should copy second character") != FT_SUCCESS)
+        return (FT_FAILURE);
+    index = 2;
+    while (index < 6)
+    {
+        if (test_expect_char_equal(destination[index], ' ',
+                "runtime_string_copy_checked should pad remaining bytes") != FT_SUCCESS)
+            return (FT_FAILURE);
+        index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_runtime_string_copy_checked_rejects_null_source_with_length)
+{
+    char destination[3];
+
+    if (runtime_string_copy_checked(destination, 3, NULL, 2, NULL, NULL) != FT_FAILURE)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_runtime_string_equals_detects_matches)
 {
     t_runtime_string left;

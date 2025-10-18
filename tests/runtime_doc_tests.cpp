@@ -57,6 +57,11 @@ FT_TEST(test_runtime_doc_lists_modules)
     static const char *snippets[] = {
         "runtime_scalar",
         "runtime_string",
+        "runtime_memory",
+        "runtime_sort",
+        "runtime_csv",
+        "runtime_collation",
+        "runtime_encoding",
         "runtime_record",
         "runtime_file"
     };

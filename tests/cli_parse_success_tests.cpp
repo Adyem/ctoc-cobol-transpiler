@@ -316,6 +316,119 @@ FT_TEST(test_cli_enables_warning_escalation)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_cli_warning_group_toggles)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cblc-to-cobol",
+        "--input",
+        "input.cblc",
+        "--output",
+        "output.cob",
+        "-Wno-conversion",
+        "-Wno-overflow",
+        "-Wno-string-trunc",
+        "-Wstring-trunc",
+        "-Wno-shadow",
+        "-Wno-unused",
+        "-Werror"
+    };
+    t_transpiler_cli_options options;
+    t_transpiler_context context;
+
+    if (test_expect_success(transpiler_cli_parse(&options, 14, argv),
+            "transpiler_cli_parse should accept -W flags") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_int_equal(options.warning_settings.conversion, 0,
+            "conversion warnings should be disabled") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(options.warning_settings.overflow, 0,
+            "overflow warnings should be disabled") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(options.warning_settings.string_truncation, 1,
+            "string truncation warnings should be re-enabled") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(options.warning_settings.shadow, 0,
+            "shadow warnings should be disabled") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(options.warning_settings.unused, 0,
+            "unused warnings should be disabled") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(options.warnings_as_errors, 1,
+            "-Werror should enable warning escalation") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_init(&context),
+            "context init should succeed") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_cli_apply(&options, &context),
+            "transpiler_cli_apply should propagate warning toggles") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(context.warning_settings.conversion, 0,
+            "context should disable conversion warnings") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(context.warning_settings.overflow, 0,
+            "context should disable overflow warnings") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(context.warning_settings.string_truncation, 1,
+            "context should enable string truncation warnings") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(context.warning_settings.shadow, 0,
+            "context should disable shadow warnings") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(context.warning_settings.unused, 0,
+            "context should disable unused warnings") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    transpiler_cli_options_dispose(&options);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_cli_supports_multiple_inputs)
 {
     const char *argv[] = {

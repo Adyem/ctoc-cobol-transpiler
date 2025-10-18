@@ -21,6 +21,9 @@ t_ast_node *semantics_create_arithmetic_expression_node_with_operator(
     const char *operator_lexeme, const char *right_name);
 t_ast_node *semantics_create_arithmetic_expression_node(
     const char *left_name, const char *right_name);
+t_ast_node *semantics_create_move_statement(const char *source_name,
+    const char *target_name);
+t_ast_node *semantics_create_stop_run_statement(void);
 t_ast_node *semantics_build_program_with_storage_level(
     const char *storage_name, const char *picture_text,
     const char *level_text);
@@ -44,6 +47,8 @@ int semantics_attach_procedure_with_move(t_ast_node *program,
 int semantics_attach_procedure_with_assignment(t_ast_node *program,
     const char *source_name, const char *target_name,
     int use_literal_source);
+int semantics_attach_procedure_with_statements(t_ast_node *program,
+    t_ast_node **statements, size_t statement_count);
 int semantics_attach_procedure_with_if_comparison(t_ast_node *program,
     const char *left_name, t_lexer_token_kind operator_kind,
     const char *operator_lexeme, const char *right_name);

@@ -8,6 +8,8 @@ const char *transpiler_semantics_kind_to_string(t_transpiler_semantic_data_kind 
 {
     if (kind == TRANSPILE_SEMANTIC_DATA_ALPHANUMERIC)
         return ("alphanumeric");
+    if (kind == TRANSPILE_SEMANTIC_DATA_BOOLEAN)
+        return ("boolean");
     if (kind == TRANSPILE_SEMANTIC_DATA_NUMERIC)
         return ("numeric");
     if (kind == TRANSPILE_SEMANTIC_DATA_FLOATING)
@@ -400,6 +402,8 @@ size_t transpiler_semantics_literal_decimal_scale(const t_ast_node *literal)
 t_transpiler_data_item_kind transpiler_semantics_convert_kind(t_transpiler_semantic_data_kind kind)
 {
     if (kind == TRANSPILE_SEMANTIC_DATA_ALPHANUMERIC)
+        return (TRANSPILE_DATA_ITEM_ALPHANUMERIC);
+    if (kind == TRANSPILE_SEMANTIC_DATA_BOOLEAN)
         return (TRANSPILE_DATA_ITEM_ALPHANUMERIC);
     if (kind == TRANSPILE_SEMANTIC_DATA_NUMERIC)
         return (TRANSPILE_DATA_ITEM_NUMERIC);

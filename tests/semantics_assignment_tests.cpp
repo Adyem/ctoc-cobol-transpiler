@@ -679,6 +679,361 @@ FT_TEST(test_semantics_accepts_floating_scale_widening_move)
     return (status);
 }
 
+FT_TEST(test_semantics_warns_on_float_to_double_assignment)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("DOUBLE-TARGET", "PIC 9V9(18)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "FLOAT-SOURCE", "PIC 9V9(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move(program, "FLOAT-SOURCE", "DOUBLE-TARGET", 0) != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) == FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 0)
+        {
+            if (context.diagnostics.count >= 1
+                && context.diagnostics.items[0].code == TRANSPILE_WARNING_SEMANTIC_FLOAT_TO_DOUBLE
+                && context.diagnostics.items[0].severity == TRANSPILE_SEVERITY_WARNING)
+                status = FT_SUCCESS;
+        }
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_warns_on_integral_to_floating_assignment)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("FLOAT-TARGET", "PIC 9V9(6)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "INT-SOURCE", "PIC 9(9)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move(program, "INT-SOURCE", "FLOAT-TARGET", 0) != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) == FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 0)
+        {
+            if (context.diagnostics.count >= 1
+                && context.diagnostics.items[0].code == TRANSPILE_WARNING_SEMANTIC_INTEGRAL_TO_FLOATING
+                && context.diagnostics.items[0].severity == TRANSPILE_SEVERITY_WARNING)
+                status = FT_SUCCESS;
+        }
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_warns_on_integral_to_alphanumeric_assignment)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("TEXT-TARGET", "PIC X(8)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "INT-SOURCE", "PIC 9(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move(program, "INT-SOURCE", "TEXT-TARGET", 0) != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) != FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 1)
+        {
+            if (context.diagnostics.count >= 2
+                && context.diagnostics.items[0].code == TRANSPILE_WARNING_SEMANTIC_INTEGRAL_TO_ALPHANUMERIC
+                && context.diagnostics.items[0].severity == TRANSPILE_SEVERITY_WARNING
+                && context.diagnostics.items[1].code == TRANSPILE_ERROR_SEMANTIC_TYPE_MISMATCH
+                && context.diagnostics.items[1].severity == TRANSPILE_SEVERITY_ERROR)
+                status = FT_SUCCESS;
+        }
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_warns_on_boolean_to_numeric_assignment)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("NUMERIC-TARGET", "PIC 9(4)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "STATUS-FLAG", "PIC X") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move(program, "STATUS-FLAG",
+            "NUMERIC-TARGET", 0) != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) != FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 1)
+        {
+            if (context.diagnostics.count >= 2
+                && context.diagnostics.items[0].code == TRANSPILE_WARNING_SEMANTIC_BOOLEAN_TO_NUMERIC
+                && context.diagnostics.items[0].severity == TRANSPILE_SEVERITY_WARNING
+                && context.diagnostics.items[1].code == TRANSPILE_ERROR_SEMANTIC_TYPE_MISMATCH
+                && context.diagnostics.items[1].severity == TRANSPILE_SEVERITY_ERROR)
+                status = FT_SUCCESS;
+        }
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_warns_on_numeric_to_boolean_assignment)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("RESULT-FLAG", "PIC X");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "NUMERIC-SOURCE", "PIC 9(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move(program, "NUMERIC-SOURCE",
+            "RESULT-FLAG", 0) != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) != FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 1)
+        {
+            if (context.diagnostics.count >= 2
+                && context.diagnostics.items[0].code == TRANSPILE_WARNING_SEMANTIC_NUMERIC_TO_BOOLEAN
+                && context.diagnostics.items[0].severity == TRANSPILE_SEVERITY_WARNING
+                && context.diagnostics.items[1].code == TRANSPILE_ERROR_SEMANTIC_TYPE_MISMATCH
+                && context.diagnostics.items[1].severity == TRANSPILE_SEVERITY_ERROR)
+                status = FT_SUCCESS;
+        }
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_warns_on_boolean_to_alphanumeric_assignment)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("TEXT-TARGET", "PIC X(6)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "CONTROL-FLAG", "PIC X") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move(program, "CONTROL-FLAG",
+            "TEXT-TARGET", 0) != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) != FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 1)
+        {
+            if (context.diagnostics.count >= 2
+                && context.diagnostics.items[0].code == TRANSPILE_WARNING_SEMANTIC_BOOLEAN_TO_ALPHANUMERIC
+                && context.diagnostics.items[0].severity == TRANSPILE_SEVERITY_WARNING
+                && context.diagnostics.items[1].code == TRANSPILE_ERROR_SEMANTIC_TYPE_MISMATCH
+                && context.diagnostics.items[1].severity == TRANSPILE_SEVERITY_ERROR)
+                status = FT_SUCCESS;
+        }
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_warns_on_alphanumeric_to_boolean_assignment)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("STATE-FLAG", "PIC X");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "TEXT-SOURCE", "PIC X(8)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move(program, "TEXT-SOURCE",
+            "STATE-FLAG", 0) != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) != FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 1)
+        {
+            if (context.diagnostics.count >= 2
+                && context.diagnostics.items[0].code == TRANSPILE_WARNING_SEMANTIC_ALPHANUMERIC_TO_BOOLEAN
+                && context.diagnostics.items[0].severity == TRANSPILE_SEVERITY_WARNING
+                && context.diagnostics.items[1].code == TRANSPILE_ERROR_SEMANTIC_TYPE_MISMATCH
+                && context.diagnostics.items[1].severity == TRANSPILE_SEVERITY_ERROR)
+                status = FT_SUCCESS;
+        }
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_suppresses_conversion_warnings_when_disabled)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    t_transpiler_warning_settings settings;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    settings.conversion = 0;
+    settings.overflow = 1;
+    settings.string_truncation = 1;
+    settings.shadow = 1;
+    settings.unused = 1;
+    transpiler_context_set_warning_settings(&context, &settings);
+    program = semantics_build_program_with_storage("DOUBLE-TARGET", "PIC 9V9(18)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "FLOAT-SOURCE", "PIC 9V9(4)") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move(program, "FLOAT-SOURCE", "DOUBLE-TARGET", 0) != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) == FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 0)
+        {
+            if (context.diagnostics.count == 0)
+                status = FT_SUCCESS;
+        }
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
 FT_TEST(test_semantics_rejects_floating_scale_mismatch_move)
 {
     t_transpiler_context context;
@@ -713,6 +1068,49 @@ FT_TEST(test_semantics_rejects_floating_scale_mismatch_move)
             if (context.diagnostics.count >= 1
                 && context.diagnostics.items[0].code == TRANSPILE_ERROR_SEMANTIC_DECIMAL_SCALE_MISMATCH
                 && context.diagnostics.items[0].severity == TRANSPILE_SEVERITY_ERROR)
+                status = FT_SUCCESS;
+        }
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_semantics_warns_on_double_to_float_assignment)
+{
+    t_transpiler_context context;
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    program = semantics_build_program_with_storage("FLOAT-TARGET", "PIC 9V9(4)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_data_item(program, "DOUBLE-SOURCE", "PIC 999999999999999V999") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move(program, "DOUBLE-SOURCE", "FLOAT-TARGET", 0) != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) != FT_SUCCESS)
+    {
+        if (transpiler_context_has_errors(&context) == 1)
+        {
+            if (context.diagnostics.count >= 2
+                && context.diagnostics.items[0].code == TRANSPILE_WARNING_SEMANTIC_DOUBLE_TO_FLOAT
+                && context.diagnostics.items[0].severity == TRANSPILE_SEVERITY_WARNING
+                && context.diagnostics.items[1].severity == TRANSPILE_SEVERITY_ERROR)
                 status = FT_SUCCESS;
         }
     }
@@ -902,8 +1300,10 @@ const t_test_case *get_semantics_assignment_tests(size_t *count)
         {"semantics_rejects_floating_to_numeric_move", test_semantics_rejects_floating_to_numeric_move},
         {"semantics_accepts_matching_floating_scale_move", test_semantics_accepts_matching_floating_scale_move},
         {"semantics_accepts_floating_scale_widening_move", test_semantics_accepts_floating_scale_widening_move},
+        {"semantics_warns_on_float_to_double_assignment", test_semantics_warns_on_float_to_double_assignment},
         {"semantics_rejects_floating_scale_mismatch_move", test_semantics_rejects_floating_scale_mismatch_move},
         {"semantics_rejects_floating_integer_overflow_move", test_semantics_rejects_floating_integer_overflow_move},
+        {"semantics_warns_on_double_to_float_assignment", test_semantics_warns_on_double_to_float_assignment},
         {"semantics_rejects_truncating_identifier_move", test_semantics_rejects_truncating_identifier_move},
         {"semantics_rejects_truncating_identifier_assignment", test_semantics_rejects_truncating_identifier_assignment},
         {"semantics_rejects_truncating_literal_move", test_semantics_rejects_truncating_literal_move}

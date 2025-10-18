@@ -86,6 +86,58 @@ int runtime_string_assign(t_runtime_string *value, const char *text)
     return (FT_SUCCESS);
 }
 
+int runtime_string_blank(char *destination, size_t destination_length)
+{
+    size_t index;
+
+    if (!destination)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < destination_length)
+    {
+        destination[index] = ' ';
+        index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+int runtime_string_copy_checked(char *destination, size_t destination_length, const char *source,
+    size_t source_length, size_t *written_length, int *was_truncated)
+{
+    size_t copy_length;
+    size_t index;
+
+    if (!destination)
+        return (FT_FAILURE);
+    if (!source)
+    {
+        if (source_length > 0)
+            return (FT_FAILURE);
+        source_length = 0;
+    }
+    if (runtime_string_blank(destination, destination_length) != FT_SUCCESS)
+        return (FT_FAILURE);
+    copy_length = source_length;
+    if (destination_length < copy_length)
+        copy_length = destination_length;
+    index = 0;
+    while (index < copy_length)
+    {
+        destination[index] = source[index];
+        index += 1;
+    }
+    if (written_length)
+        *written_length = copy_length;
+    if (was_truncated)
+    {
+        if (source_length > copy_length)
+            *was_truncated = 1;
+        else
+            *was_truncated = 0;
+    }
+    return (FT_SUCCESS);
+}
+
 static int runtime_string_is_trim_char(char value)
 {
     if (value == ' ')
@@ -151,30 +203,17 @@ int runtime_string_trim(t_runtime_string *value)
 
 int runtime_string_compare(const t_runtime_string *left, const t_runtime_string *right)
 {
-    size_t index;
-    unsigned char left_char;
-    unsigned char right_char;
+    int result;
 
     if (!left || !right)
         return (0);
     if (!left->data || !right->data)
         return (0);
-    index = 0;
-    while (index < left->length && index < right->length)
-    {
-        left_char = static_cast<unsigned char>(left->data[index]);
-        right_char = static_cast<unsigned char>(right->data[index]);
-        if (left_char < right_char)
-            return (-1);
-        if (left_char > right_char)
-            return (1);
-        index += 1;
-    }
-    if (left->length < right->length)
-        return (-1);
-    if (left->length > right->length)
-        return (1);
-    return (0);
+    result = 0;
+    if (runtime_collation_compare(left->data, left->length, right->data, right->length, &result)
+        != FT_SUCCESS)
+        return (0);
+    return (result);
 }
 
 int runtime_string_to_int(const t_runtime_string *value, t_runtime_int *destination)
