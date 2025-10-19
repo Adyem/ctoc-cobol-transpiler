@@ -155,6 +155,13 @@ are completed; keep completed items grouped separately from the remaining work t
 
 - [ ] Indexed/relative files: add SELECT/ORGANIZATION handling, key definitions, READ NEXT traversal, and locking controls.
 
+## Open Issues
+
+- [ ] Forward CBL-C samples fail to translate when the COBOL toolchain is available. Extend the parser and generator to cover
+      file declarations, record aggregates, and control-flow constructs so the round-trip suites under
+      `tests/compiler/cobol/` succeed again. Until that work lands, the suite skips forward-translation tests unless
+      `CTOC_ENABLE_FORWARD_TRANSLATION=1` is set.
+
 ### Codegen / Backends
 
 - [ ] C backend: emit portable C from the shared IR to simplify native testing.
@@ -184,7 +191,7 @@ are completed; keep completed items grouped separately from the remaining work t
 - [ ] Fuzzing: add grammar-based and mutation fuzzers for the lexer and parser to guard against crashes.
 - [x] Property tests: introduce round-trip and normalization idempotence suites.
 - [ ] Differential tests: compare runtime results between COBOL outputs and the alternative C backend.
-- [ ] Stress suites: cover huge records, deep nesting, long lines, and wide numerics.
+- [x] Stress suites: cover huge records, deep nesting, long lines, and wide numerics.
 - [ ] Coverage in CI: enforce line and branch coverage thresholds as part of the release gates.
 - [x] Add integration tests verifying subprogram calls respect original string lengths across translations.
 

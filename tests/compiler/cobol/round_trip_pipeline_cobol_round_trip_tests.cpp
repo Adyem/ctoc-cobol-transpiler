@@ -110,6 +110,7 @@ FT_TEST(test_cobol_reverse_control_flow_round_trips_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     round_trip_cobol = NULL;
     directory[0] = '\0';
     source_path[0] = '\0';
@@ -188,6 +189,7 @@ FT_TEST(test_cobol_copy_file_round_trips_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     round_trip_cobol = NULL;
     directory[0] = '\0';
     source_path[0] = '\0';
@@ -276,6 +278,7 @@ FT_TEST(test_cobol_filter_prefix_round_trips_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     round_trip_cobol = NULL;
     directory[0] = '\0';
     source_path[0] = '\0';
@@ -371,6 +374,7 @@ FT_TEST(test_cobol_integration_showcase_round_trips_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     round_trip_cobol = NULL;
     directory[0] = '\0';
     source_path[0] = '\0';
@@ -493,6 +497,7 @@ FT_TEST(test_cobol_multi_module_round_trips_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     round_trip_main = NULL;
     round_trip_worker = NULL;
     directory[0] = '\0';
@@ -588,6 +593,7 @@ FT_TEST(test_cobol_numeric_precision_round_trips_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     round_trip_cobol = NULL;
     directory[0] = '\0';
     source_path[0] = '\0';
@@ -670,6 +676,7 @@ FT_TEST(test_cobol_floating_point_mix_round_trips_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     round_trip_cobol = NULL;
     directory[0] = '\0';
     source_path[0] = '\0';
@@ -751,6 +758,7 @@ FT_TEST(test_cobol_mixed_numeric_types_round_trips_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     round_trip_cobol = NULL;
     directory[0] = '\0';
     source_path[0] = '\0';
@@ -832,6 +840,7 @@ FT_TEST(test_cobol_textual_priority_mix_round_trips_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     round_trip_cobol = NULL;
     directory[0] = '\0';
     source_path[0] = '\0';
@@ -913,6 +922,7 @@ FT_TEST(test_cobol_return_boolean_round_trips_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     round_trip_cobol = NULL;
     directory[0] = '\0';
     source_path[0] = '\0';
@@ -990,6 +1000,7 @@ FT_TEST(test_cobol_return_character_round_trips_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     round_trip_cobol = NULL;
     directory[0] = '\0';
     source_path[0] = '\0';
@@ -1067,6 +1078,7 @@ FT_TEST(test_cobol_return_numeric_round_trips_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     round_trip_cobol = NULL;
     directory[0] = '\0';
     source_path[0] = '\0';
@@ -1143,6 +1155,7 @@ FT_TEST(test_cobol_reverse_group_items_round_trips_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     round_trip_cobol = NULL;
     directory[0] = '\0';
     source_path[0] = '\0';

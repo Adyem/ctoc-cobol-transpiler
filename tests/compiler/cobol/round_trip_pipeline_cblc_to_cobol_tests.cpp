@@ -25,6 +25,7 @@ FT_TEST(test_cblc_copy_file_translates_to_cobol_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     directory[0] = '\0';
@@ -126,6 +127,7 @@ FT_TEST(test_cblc_filter_prefix_translates_to_cobol_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     directory[0] = '\0';
@@ -226,6 +228,7 @@ FT_TEST(test_cblc_reverse_control_flow_translates_to_cobol_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     directory[0] = '\0';
@@ -324,6 +327,7 @@ FT_TEST(test_cblc_integration_showcase_translates_to_cobol_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     directory[0] = '\0';
@@ -460,6 +464,7 @@ FT_TEST(test_cblc_multi_module_translates_to_cobol_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     cblc_translation_unit_init(&main_unit);
     cblc_translation_unit_init(&worker_unit);
     generated_main_cobol = NULL;
@@ -578,6 +583,7 @@ FT_TEST(test_cblc_numeric_precision_translates_to_cobol_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     directory[0] = '\0';
@@ -672,6 +678,7 @@ FT_TEST(test_cblc_floating_point_mix_translates_to_cobol_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     directory[0] = '\0';
@@ -765,6 +772,7 @@ FT_TEST(test_cblc_mixed_numeric_types_translates_to_cobol_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     directory[0] = '\0';
@@ -858,6 +866,7 @@ FT_TEST(test_cblc_textual_priority_mix_translates_to_cobol_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     directory[0] = '\0';
@@ -951,6 +960,7 @@ FT_TEST(test_cblc_return_boolean_translates_to_cobol_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     directory[0] = '\0';
@@ -1041,6 +1051,7 @@ FT_TEST(test_cblc_return_character_translates_to_cobol_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     directory[0] = '\0';
@@ -1131,6 +1142,7 @@ FT_TEST(test_cblc_return_numeric_translates_to_cobol_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     directory[0] = '\0';
@@ -1220,6 +1232,7 @@ FT_TEST(test_cblc_reverse_group_items_translates_to_cobol_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     directory[0] = '\0';

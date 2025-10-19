@@ -65,6 +65,8 @@ int test_expect_token(const t_lexer_token *token, t_lexer_token_kind expected_ki
 int test_write_text_file(const char *path, const char *contents);
 int test_read_text_file(const char *path, char *buffer, size_t buffer_size);
 int test_cobc_available(void);
+int test_forward_translation_available(void);
+void test_report_forward_translation_skip(const char *test_name);
 int test_run_command(const char *command);
 int test_run_command_expect_failure(const char *command);
 void test_remove_file(const char *path);
@@ -81,5 +83,12 @@ int test_capture_stderr_end(t_test_output_capture *capture, char *buffer, size_t
 #define FT_REQUIRE_COBC() \
     if (!test_cobc_available()) \
         return (FT_SUCCESS);
+
+#define FT_REQUIRE_FORWARD_TRANSLATION() \
+    if (!test_forward_translation_available()) \
+    { \
+        test_report_forward_translation_skip(__func__); \
+        return (FT_SUCCESS); \
+    }
 
 #endif

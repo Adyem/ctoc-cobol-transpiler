@@ -9,7 +9,7 @@ This guide explains how to prepare your environment, exercise the command-line i
 3. Clone the repository with submodules enabled: `git clone --recurse-submodules`.
 4. Inside the checkout, run `make initialize` once to build the bundled `libft` runtime helpers.
 
-Refer to `docs/onboarding_checklist.md` for a full environment audit before committing changes.
+Refer to `docs/onboarding_checklist.md` for a full environment audit before committing changes. If you need platform-specific setup help, see `docs/platform_bootstrap.md` for macOS, Linux, and Windows Subsystem for Linux instructions.
 
 ## Quick Start Workflow
 
@@ -32,7 +32,7 @@ Refer to `docs/onboarding_checklist.md` for a full environment audit before comm
    cat build/minimal_program.cblc
    ```
 
-The `docs/cli_usage_examples.md` file contains additional flag combinations. The forward CBL-C to COBOL pipeline will return once the code generator is wired into the CLI; until then, `--direction cblc-to-cobol` reports a diagnostic instead of writing output.
+The `docs/cli_usage_examples.md` file contains additional flag combinations. The forward CBL-C to COBOL pipeline is still stabilizing. By default the automated test suite skips the forward translation scenarios until file/record lowering is complete. Once you have an experimental build that covers those features, set `CTOC_ENABLE_FORWARD_TRANSLATION=1` in your environment and re-run the tests to exercise the CBL-C→COBOL direction end to end.
 
 ## New Language and Diagnostics Features
 

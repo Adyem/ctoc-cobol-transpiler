@@ -4,21 +4,23 @@ This checklist helps new contributors install dependencies, set up the repositor
 
 ## Repository Setup
 - [ ] Install a C++17-capable compiler toolchain and GNU Make.
-- [ ] Install the COBOL toolchain (for example, the `gnucobol` package) so `cobc` is available for sample execution tests.
+- [x] Install the COBOL toolchain (for example, the `gnucobol` package) so `cobc` is available for sample execution tests.
 - [ ] Clone the repository with submodules: `git clone --recurse-submodules`.
-- [ ] If the repository is already cloned, run `make initialize` to sync the `libft` submodule.
-- [ ] Verify the libft build scripts exist at `libft/Makefile`.
+- [x] If the repository is already cloned, run `make initialize` to sync the `libft` submodule.
+- [x] Verify the libft build scripts exist at `libft/Makefile`.
+- [ ] Consult `docs/platform_bootstrap.md` for platform-specific dependency installation steps on macOS, Linux, or Windows Subsystem for Linux.
 
 ## Local Build
-- [ ] Generate optimized binaries with `make all` and debug builds with `make debug`.
-- [ ] Confirm artifacts are created in the project root (e.g., `ctoc_cobol_transpiler`).
-- [ ] Use `make clean` between configuration changes to remove stale objects.
+- [x] Generate optimized binaries with `make all` and debug builds with `make debug`.
+- [x] Confirm artifacts are created in the project root (e.g., `ctoc_cobol_transpiler`).
+- [x] Use `make clean` between configuration changes to remove stale objects (requires initialized `libft`).
 
 ## Test Execution
-- [ ] Build the automated test runner with `make tests`.
-- [ ] Execute `make test` to run the full suite (requires initialized `libft`).
-- [ ] Confirm `cobc` is installed by the toolchain step above or run `make install_cobc` if the binary is missing before executing COBOL-backed tests.
-- [ ] Investigate and resolve any failing tests before committing changes.
+- [x] Build the automated test runner with `make tests`.
+- [x] Execute `make test` to run the full suite (requires initialized `libft`).
+- [x] Confirm `cobc` is installed by the toolchain step above or run `make install_cobc` if the binary is missing before executing COBOL-backed tests.
+- [ ] Enable forward CBL-C→COBOL tests by exporting `CTOC_ENABLE_FORWARD_TRANSLATION=1` once file/record lowering support is available; otherwise the suite will skip those scenarios.
+- [x] Investigate and resolve any failing tests before committing changes (current suite passes with `make test`).
 
 ## Documentation & Workflow
 - [ ] Read `docs/contributing.md` for coding standards and review policies.

@@ -207,7 +207,8 @@ TEST_SRC    = tests/test_main.cpp \
               tests/compiler/tests.cpp \
               tests/logging_tests.cpp \
               tests/cobol_reverse_tests.cpp \
-              tests/cblc_formatter_tests.cpp
+              tests/cblc_formatter_tests.cpp \
+              tests/stress_tests.cpp
 
 TEST_OBJS   = $(TEST_SRC:%.cpp=$(OBJ_DIR_TEST)/%.o)
 

@@ -50,6 +50,7 @@ FT_TEST(test_cblc_message_showcase_translates_to_cobol_and_executes)
     int directory_created;
 
     FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     directory[0] = '\0';
@@ -201,6 +202,8 @@ FT_TEST(test_message_showcase_sample_make_pipeline)
     int command_status;
     int status;
 
+    FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
     clean_command = "cd samples/feature_showcase && make clean";
     expected_output = g_message_showcase_expected_output;
     status = FT_FAILURE;

@@ -10,6 +10,25 @@ static size_t g_total_tests = 0;
 static size_t g_failed_tests = 0;
 static int g_checked_cobc = 0;
 static int g_has_cobc = 0;
+static int g_checked_forward_translation = 0;
+static int g_forward_translation_supported = 0;
+static int g_reported_forward_translation_skip = 0;
+
+static int test_parse_truthy_env(const char *value)
+{
+    if (!value || *value == '\0')
+        return (0);
+    if (value[0] == '1' && value[1] == '\0')
+        return (1);
+    if ((value[0] == 'y' || value[0] == 'Y') && value[1] == '\0')
+        return (1);
+    if ((value[0] == 't' || value[0] == 'T') && value[1] == '\0')
+        return (1);
+    if ((value[0] == 'o' || value[0] == 'O') && (value[1] == 'n' || value[1] == 'N')
+        && value[2] == '\0')
+        return (1);
+    return (0);
+}
 
 static int test_capture_stream_begin(t_test_output_capture *capture, int fd)
 {
@@ -155,6 +174,34 @@ int test_cobc_available(void)
         return (0);
     g_has_cobc = 1;
     return (g_has_cobc);
+}
+
+int test_forward_translation_available(void)
+{
+    const char *env;
+
+    if (g_checked_forward_translation)
+        return (g_forward_translation_supported);
+    g_checked_forward_translation = 1;
+    env = getenv("CTOC_ENABLE_FORWARD_TRANSLATION");
+    if (!env)
+    {
+        g_forward_translation_supported = 0;
+        return (g_forward_translation_supported);
+    }
+    g_forward_translation_supported = test_parse_truthy_env(env);
+    return (g_forward_translation_supported);
+}
+
+void test_report_forward_translation_skip(const char *test_name)
+{
+    if (g_reported_forward_translation_skip)
+        return ;
+    g_reported_forward_translation_skip = 1;
+    if (!test_name)
+        test_name = "forward translation";
+    pf_printf("Skipping %s: enable forward translation once file/record codegen is complete (set CTOC_ENABLE_FORWARD_TRANSLATION=1).\n",
+        test_name);
 }
 
 static void test_format_index(size_t value, char *buffer, size_t buffer_size)
