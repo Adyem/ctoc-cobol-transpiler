@@ -182,7 +182,7 @@ are completed; keep completed items grouped separately from the remaining work t
 ### Testing & Quality Gates
 
 - [ ] Fuzzing: add grammar-based and mutation fuzzers for the lexer and parser to guard against crashes.
-- [ ] Property tests: introduce round-trip and normalization idempotence suites.
+- [x] Property tests: introduce round-trip and normalization idempotence suites.
 - [ ] Differential tests: compare runtime results between COBOL outputs and the alternative C backend.
 - [ ] Stress suites: cover huge records, deep nesting, long lines, and wide numerics.
 - [ ] Coverage in CI: enforce line and branch coverage thresholds as part of the release gates.

@@ -180,6 +180,7 @@ TEST_SRC    = tests/test_main.cpp \
               tests/ci_tests.cpp \
               tests/codegen_tests.cpp \
               tests/round_trip_tests.cpp \
+              tests/property_tests.cpp \
               tests/cobol_type_tests.cpp \
               tests/compiler/compiler_test_support.cpp \
               tests/compiler/c/build_tests.cpp \

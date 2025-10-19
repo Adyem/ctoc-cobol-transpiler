@@ -11,6 +11,7 @@ const t_test_case *get_parser_tests(size_t *count);
 const t_test_case *get_semantics_tests(size_t *count);
 const t_test_case *get_codegen_tests(size_t *count);
 const t_test_case *get_round_trip_tests(size_t *count);
+const t_test_case *get_property_tests(size_t *count);
 const t_test_case *get_cobol_type_tests(size_t *count);
 const t_test_case *get_golden_file_tests(size_t *count);
 const t_test_case *get_runtime_int_tests(size_t *count);
