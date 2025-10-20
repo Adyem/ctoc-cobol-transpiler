@@ -188,11 +188,12 @@ are completed; keep completed items grouped separately from the remaining work t
 
 ### Testing & Quality Gates
 
-- [ ] Fuzzing: add grammar-based and mutation fuzzers for the lexer and parser to guard against crashes.
+- [x] Fuzzing: add grammar-based and mutation fuzzers for the lexer and parser to guard against crashes (`make fuzz` invokes
+      `scripts/fuzz_transpiler.py`).
 - [x] Property tests: introduce round-trip and normalization idempotence suites.
 - [ ] Differential tests: compare runtime results between COBOL outputs and the alternative C backend.
 - [x] Stress suites: cover huge records, deep nesting, long lines, and wide numerics.
-- [ ] Coverage in CI: enforce line and branch coverage thresholds as part of the release gates.
+- [x] Coverage in CI: enforce line and branch coverage thresholds as part of the release gates (`make coverage` guards 60% line / 65% branch coverage).
 - [x] Add integration tests verifying subprogram calls respect original string lengths across translations.
 
 ### Stretch / Future Enhancements

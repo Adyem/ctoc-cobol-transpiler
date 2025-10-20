@@ -9,8 +9,13 @@ endif
 NAME        = ctoc_cobol_transpiler$(EXE_EXT)
 NAME_DEBUG  = ctoc_cobol_transpiler_debug$(EXE_EXT)
 TEST_NAME   = automated_tests$(EXE_EXT)
-PYTHON      ?= python3
-LINT_SCRIPT  = scripts/lint_sources.py
+PYTHON          ?= python3
+LINT_SCRIPT      = scripts/lint_sources.py
+FUZZ_SCRIPT      = scripts/fuzz_transpiler.py
+COVERAGE_SCRIPT  = scripts/coverage_report.py
+FUZZ_ITERATIONS ?= 50
+FUZZ_MODE ?= all
+FUZZ_ARGS ?=
 
 SRC         = main.cpp runtime_scalar.cpp runtime_string.cpp runtime_collation.cpp runtime_encoding.cpp runtime_record.cpp runtime_file.cpp runtime_memory.cpp runtime_csv.cpp runtime_sort.cpp lexer.cpp lexer_token.cpp ast.cpp parser.cpp transpiler_diagnostics.cpp transpiler_context.cpp transpiler_pipeline.cpp transpiler_cblc.cpp transpiler_cli.cpp cblc_formatter.cpp transpiler_logging.cpp transpiler_validation.cpp transpiler_semantics.cpp transpiler_semantics_errors.cpp transpiler_semantics_helpers.cpp transpiler_semantics_scope.cpp transpiler_semantics_classifiers.cpp transpiler_semantics_conditions.cpp transpiler_semantics_assignments.cpp transpiler_semantics_statements.cpp transpiler_codegen.cpp transpiler_cobol_types.cpp transpiler_cobol_procedure.cpp transpiler_cobol_reverse.cpp transpiler_standard_library.cpp transpiler_standard_library_state.cpp transpiler_standard_library_strlen.cpp transpiler_standard_library_strlen_string.cpp transpiler_standard_library_strnlen.cpp transpiler_standard_library_strnlen_string.cpp transpiler_standard_library_strcmp.cpp transpiler_standard_library_strcmp_string.cpp transpiler_standard_library_strcpy.cpp transpiler_standard_library_strcpy_string.cpp transpiler_standard_library_strncpy.cpp transpiler_standard_library_strncpy_string.cpp transpiler_standard_library_memcmp.cpp transpiler_standard_library_memcmp_string.cpp transpiler_standard_library_strcat.cpp transpiler_standard_library_strcat_string.cpp transpiler_standard_library_strtod.cpp transpiler_standard_library_strtod_string.cpp transpiler_standard_library_abs.cpp transpiler_standard_library_fabs.cpp transpiler_standard_library_floor.cpp transpiler_standard_library_ceil.cpp transpiler_standard_library_exp.cpp transpiler_standard_library_log.cpp transpiler_standard_library_sin.cpp transpiler_standard_library_cos.cpp transpiler_standard_library_tan.cpp transpiler_standard_library_rounded.cpp transpiler_standard_library_banker_round.cpp transpiler_standard_library_date_yyyymmdd.cpp transpiler_standard_library_date_duration.cpp transpiler_standard_library_atoi.cpp transpiler_standard_library_atoi_string.cpp transpiler_standard_library_atol.cpp transpiler_standard_library_atol_string.cpp transpiler_standard_library_atoll.cpp transpiler_standard_library_atoll_string.cpp transpiler_standard_library_powerof.cpp transpiler_standard_library_sqrt.cpp transpiler_standard_library_min.cpp transpiler_standard_library_max.cpp transpiler_standard_library_toupper.cpp transpiler_standard_library_toupper_string.cpp transpiler_standard_library_tolower.cpp transpiler_standard_library_tolower_string.cpp transpiler_standard_library_isdigit.cpp transpiler_standard_library_isalpha.cpp
 
@@ -59,7 +64,10 @@ OBJ_DIR_TEST    = ./objs_tests
 
 ENABLE_LTO  ?= 0
 ENABLE_PGO  ?= 0
-export ENABLE_LTO ENABLE_PGO
+COVERAGE    ?= 0
+COVERAGE_LINE_THRESHOLD ?= 60
+COVERAGE_BRANCH_THRESHOLD ?= 65
+export ENABLE_LTO ENABLE_PGO COVERAGE
 
 ifeq ($(ENABLE_LTO),1)
     COMPILE_FLAGS   += -flto
@@ -68,6 +76,11 @@ endif
 
 ifeq ($(ENABLE_PGO),1)
     COMPILE_FLAGS  += -fprofile-generate
+endif
+
+ifeq ($(COVERAGE),1)
+    COMPILE_FLAGS  += --coverage
+    LDFLAGS        += --coverage
 endif
 
 ifeq ($(DEBUG),1)
@@ -337,6 +350,23 @@ re_both: re both
 lint:
 	$(PYTHON) $(LINT_SCRIPT)
 
+fuzz: $(TARGET)
+	$(PYTHON) $(FUZZ_SCRIPT) --iterations $(FUZZ_ITERATIONS) --mode $(FUZZ_MODE) $(FUZZ_ARGS)
+
+coverage:
+	@-$(RMDIR) $(OBJ_DIR)
+	@-$(RMDIR) $(OBJ_DIR_DEBUG)
+	@-$(RMDIR) $(OBJ_DIR_TEST)
+	@-$(RM) $(TARGET)
+	@-$(RM) $(NAME_DEBUG)
+	@-$(RM) $(TEST_NAME)
+	$(MAKE) tests OPT_LEVEL=0 COVERAGE=1
+	$(MAKE) test COVERAGE=1
+	$(PYTHON) $(COVERAGE_SCRIPT) --object-dir $(OBJ_DIR) --threshold-lines $(COVERAGE_LINE_THRESHOLD) --threshold-branches $(COVERAGE_BRANCH_THRESHOLD)
+
+ci-coverage:
+	$(MAKE) coverage
+
 ci-build:
 	$(MAKE) fclean
 	$(MAKE) all OPT_LEVEL=2
@@ -351,5 +381,6 @@ ci:
 	$(MAKE) ci-build
 	$(MAKE) ci-test
 	$(MAKE) ci-lint
+	$(MAKE) ci-coverage
 
-.PHONY: all dirs clean fclean re debug both re_both tests test initialize ensure_libft lint ci-build ci-test ci-lint ci
+.PHONY: all dirs clean fclean re debug both re_both tests test initialize ensure_libft lint fuzz coverage ci-build ci-test ci-lint ci-coverage ci
