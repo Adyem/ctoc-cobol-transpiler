@@ -22,7 +22,7 @@ int transpiler_standard_library_generate_fabs(char **out_text)
         "       PROCEDURE DIVISION USING BY REFERENCE LNK-OPERAND\n"
         "           BY REFERENCE LNK-RESULT BY REFERENCE LNK-STATUS.\n"
         "       MAIN.\n"
-        "           MOVE 0 TO LNK-STATUS.\n"
+        "           MOVE " TRANSPILE_STANDARD_LIBRARY_STATUS_LITERAL_SUCCESS " TO LNK-STATUS.\n"
         "           COMPUTE LNK-RESULT = FUNCTION ABS(LNK-OPERAND).\n"
         "           GOBACK.\n"
         "       END PROGRAM CBLC-FABS.\n";
