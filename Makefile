@@ -43,6 +43,14 @@ COMPILE_FLAGS = -Wall -Werror -Wextra -std=c++17 -Wmissing-declarations \
 
 CFLAGS = $(COMPILE_FLAGS)
 
+REPRODUCIBLE ?= 1
+SOURCE_DATE_EPOCH ?= 1700000000
+
+ifneq ($(REPRODUCIBLE),0)
+    export SOURCE_DATE_EPOCH
+    COMPILE_FLAGS += -ffile-prefix-map=$(CURDIR)=. -fmacro-prefix-map=$(CURDIR)=. -fdebug-prefix-map=$(CURDIR)=. -frandom-seed=ctoc
+endif
+
 ifeq ($(OS),Windows_NT)
     MKDIR   = mkdir
     RMDIR   = rmdir /S /Q

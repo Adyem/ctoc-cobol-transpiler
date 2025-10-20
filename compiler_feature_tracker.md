@@ -165,7 +165,7 @@ are completed; keep completed items grouped separately from the remaining work t
 ### Codegen / Backends
 
 - [ ] C backend: emit portable C from the shared IR to simplify native testing.
-- [ ] Deterministic builds: scrub timestamps and paths to guarantee reproducible output.
+- [x] Deterministic builds: scrub timestamps and paths to guarantee reproducible output.
 - [ ] Parallel compilation: build a translation-unit DAG, cache per-file outputs, and support incremental rebuilds.
 
 ### Runtime / Stdlib
@@ -180,8 +180,8 @@ are completed; keep completed items grouped separately from the remaining work t
 - [ ] Comment preservation: carry comments as trivia and re-emit them near original anchors.
 - [x] Layout fidelity knobs: provide "normalize" and "preserve" modes for regenerated source.
 - [ ] Copybook reconstruction: prefer re-emitting COPY directives instead of fully expanded fields when possible.
-- [ ] Recover long, long long, and floating-point picture clauses into canonical CBL-C type annotations.
-- [ ] Reconstruct string length metadata so regenerated CBL-C declarations reflect original caller sizes.
+- [x] Recover long, long long, and floating-point picture clauses into canonical CBL-C type annotations.
+- [x] Reconstruct string length metadata so regenerated CBL-C declarations reflect original caller sizes.
 - [ ] Emit operator forms that maintain precision across widened numeric ranges.
 
 ### Tooling & CLI

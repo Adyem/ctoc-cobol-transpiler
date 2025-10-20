@@ -6,9 +6,11 @@ samples/cobol/reverse_constructs.cob
 samples/cobol/reverse_normalization.cob
 samples/cobol/reverse_control_flow.cob
 samples/cobol/reverse_numeric_scalars.cob
+samples/cobol/reverse_numeric_widths.cob
 samples/cobol/reverse_copybook.cob
 samples/cobol/reverse_group_items.cob
 samples/cobol/reverse_value_defaults.cob
+samples/cobol/reverse_string_length_metadata.cob
 samples/cobol/abs_magnitude_report.cob
 samples/cobol/numeric_precision.cob
 samples/cobol/integration_showcase.cob

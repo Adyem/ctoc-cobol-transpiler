@@ -904,6 +904,8 @@ static int cobol_reverse_infer_scalar_metadata(t_transpiler_context *context,
         {
             if (integer_digits <= 9)
                 type_text = "int";
+            else if (integer_digits <= 18)
+                type_text = "long";
             else
                 type_text = "long long";
         }
@@ -912,10 +914,36 @@ static int cobol_reverse_infer_scalar_metadata(t_transpiler_context *context,
     {
         int treat_as_flag;
         int treat_as_buffer;
+        size_t effective_length;
+        size_t context_length;
+        int has_context_length;
 
         treat_as_flag = 0;
         treat_as_buffer = 0;
-        if (picture->length <= 1)
+        effective_length = picture->length;
+        context_length = 0;
+        has_context_length = 0;
+        if (context && name_node && name_node->token.lexeme)
+        {
+            const t_transpiler_data_item *context_item;
+
+            context_item = transpiler_context_find_data_item(context,
+                    name_node->token.lexeme);
+            if (context_item && context_item->kind == TRANSPILE_DATA_ITEM_ALPHANUMERIC
+                && context_item->declared_length > 0)
+            {
+                context_length = context_item->declared_length;
+                has_context_length = 1;
+            }
+        }
+        if (has_context_length)
+        {
+            if (effective_length == 0 || effective_length < context_length)
+                effective_length = context_length;
+        }
+        if (effective_length == 0)
+            effective_length = 1;
+        if (effective_length <= 1)
         {
             treat_as_flag = cobol_reverse_identifier_token_is_flag(&name_node->token);
             treat_as_buffer = cobol_reverse_identifier_token_matches_any_marker(&name_node->token,
@@ -928,7 +956,7 @@ static int cobol_reverse_infer_scalar_metadata(t_transpiler_context *context,
                 if (treat_as_buffer)
                 {
                     is_array = 1;
-                    array_length = picture->length;
+                    array_length = effective_length;
                     if (array_length == 0)
                         array_length = 1;
                 }
@@ -938,7 +966,7 @@ static int cobol_reverse_infer_scalar_metadata(t_transpiler_context *context,
         {
             type_text = "char";
             is_array = 1;
-            array_length = picture->length;
+            array_length = effective_length;
             if (array_length == 0)
                 array_length = 1;
         }
@@ -1996,10 +2024,10 @@ static int cobol_reverse_emit_copybook_item(t_transpiler_context *context, t_cbl
     declared_length = item->declared_length;
     treat_as_flag = 0;
     treat_as_buffer = 0;
-    if (declared_length == 0)
-        declared_length = 1;
     if (item->kind == TRANSPILE_DATA_ITEM_ALPHANUMERIC)
     {
+        if (declared_length == 0)
+            declared_length = 1;
         treat_as_flag = cobol_reverse_identifier_text_is_flag(item->name);
         treat_as_buffer = cobol_reverse_identifier_text_matches_any_marker(item->name,
                 g_cobol_reverse_character_array_markers);
@@ -2028,13 +2056,22 @@ static int cobol_reverse_emit_copybook_item(t_transpiler_context *context, t_cbl
     }
     else if (item->kind == TRANSPILE_DATA_ITEM_NUMERIC)
     {
+        if (declared_length == 0)
+            declared_length = 1;
         if (declared_length <= 9)
             type_text = "int";
+        else if (declared_length <= 18)
+            type_text = "long";
         else
             type_text = "long long";
     }
     else if (item->kind == TRANSPILE_DATA_ITEM_FLOATING)
-        type_text = "double";
+    {
+        if (declared_length > 0 && declared_length <= 9)
+            type_text = "float";
+        else
+            type_text = "double";
+    }
     else
     {
         if (context)

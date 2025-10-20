@@ -24,6 +24,10 @@ make ci-build
 This target invokes `make fclean` to clear previous outputs, builds the optimized release configuration (`OPT_LEVEL=2`), and
 builds the debug configuration via `make debug`. Both outputs must succeed for the target to pass.
 
+> **Note:** Builds default to reproducible outputs. The Makefile exports `SOURCE_DATE_EPOCH` and applies GCC/GNU Make prefix-map
+> flags so binaries omit absolute paths and timestamps. Set `REPRODUCIBLE=0` on the command line if you need to inspect local
+> debug paths or embed environment-specific metadata during troubleshooting.
+
 ## Test Execution
 
 Execute the full automated test suite with:

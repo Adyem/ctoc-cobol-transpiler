@@ -1,0 +1,12 @@
+long LONG_COUNT = 0;
+long long EXTREME_COUNT = 0;
+float FLOAT_RATE = 0;
+double DOUBLE_RATE = 0;
+
+function void MAIN() {
+    LONG_COUNT = 100000000000;
+    EXTREME_COUNT = 500000000000000000;
+    FLOAT_RATE = 1;
+    DOUBLE_RATE = 2;
+    return ;
+}
