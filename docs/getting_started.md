@@ -34,6 +34,19 @@ Refer to `docs/onboarding_checklist.md` for a full environment audit before comm
 
 The `docs/cli_usage_examples.md` file contains additional flag combinations. The forward CBL-C to COBOL pipeline is still stabilizing. By default the automated test suite skips the forward translation scenarios until file/record lowering is complete. Once you have an experimental build that covers those features, set `CTOC_ENABLE_FORWARD_TRANSLATION=1` in your environment and re-run the tests to exercise the CBL-C→COBOL direction end to end.
 
+### Standard Library Status Codes
+
+Every generated standard-library subprogram now shares the same trailing status enumeration so callers can branch on results without remembering helper-specific codes. The trailing slot reports one of the following values:
+
+| Status literal | Meaning | When it occurs |
+| --- | --- | --- |
+| `TRANSPILE_STANDARD_LIBRARY_STATUS_LITERAL_SUCCESS` (`0`) | Success | The helper completed without validation problems. |
+| `TRANSPILE_STANDARD_LIBRARY_STATUS_LITERAL_INVALID_ARGUMENT` (`1`) | Invalid argument | Callers provided malformed input, such as non-digit characters to `CBLC-ATOI`. |
+| `TRANSPILE_STANDARD_LIBRARY_STATUS_LITERAL_RANGE_ERROR` (`2`) | Range error | The helper detected overflow or a value that could not fit in the target. |
+| `TRANSPILE_STANDARD_LIBRARY_STATUS_LITERAL_DOMAIN_ERROR` (`3`) | Domain error | Mathematical domain checks failed (for example, a negative operand passed to `CBLC-SQRT`). |
+
+The [`docs/abi_spec.md`](abi_spec.md) appendix documents the ABI expectations for these slots, and the individual generator templates in `transpiler_standard_library_*.cpp` import the literals from `t_transpiler_standard_library_status`. When you add a new helper, reuse the shared enum so runtime diagnostics remain consistent.【F:docs/abi_spec.md†L18-L59】【F:cblc_transpiler.hpp†L1017-L1044】
+
 ## New Language and Diagnostics Features
 
 Recent development cycles added several capabilities that are immediately available when you use the current toolchain:

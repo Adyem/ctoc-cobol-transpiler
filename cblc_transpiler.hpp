@@ -1041,6 +1041,19 @@ typedef struct s_transpiler_standard_library_entry
     int (*generator)(char **out_text);
 }   t_transpiler_standard_library_entry;
 
+typedef enum e_transpiler_standard_library_status
+{
+    TRANSPILE_STANDARD_LIBRARY_STATUS_SUCCESS = 0,
+    TRANSPILE_STANDARD_LIBRARY_STATUS_INVALID_ARGUMENT = 1,
+    TRANSPILE_STANDARD_LIBRARY_STATUS_RANGE_ERROR = 2,
+    TRANSPILE_STANDARD_LIBRARY_STATUS_DOMAIN_ERROR = 3
+}   t_transpiler_standard_library_status;
+
+#define TRANSPILE_STANDARD_LIBRARY_STATUS_LITERAL_SUCCESS "0"
+#define TRANSPILE_STANDARD_LIBRARY_STATUS_LITERAL_INVALID_ARGUMENT "1"
+#define TRANSPILE_STANDARD_LIBRARY_STATUS_LITERAL_RANGE_ERROR "2"
+#define TRANSPILE_STANDARD_LIBRARY_STATUS_LITERAL_DOMAIN_ERROR "3"
+
 void transpiler_standard_library_reset_usage(void);
 void transpiler_standard_library_note_strlen_usage(size_t declared_length);
 size_t transpiler_standard_library_get_strlen_limit(void);

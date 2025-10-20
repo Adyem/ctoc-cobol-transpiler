@@ -26,7 +26,7 @@ int transpiler_standard_library_generate_tolower(char **out_text)
         "       PROCEDURE DIVISION USING BY REFERENCE LNK-TARGET\n"
         "           BY VALUE LNK-TARGET-LENGTH BY REFERENCE LNK-STATUS.\n"
         "       MAIN.\n"
-        "           MOVE 0 TO LNK-STATUS.\n"
+        "           MOVE " TRANSPILE_STANDARD_LIBRARY_STATUS_LITERAL_SUCCESS " TO LNK-STATUS.\n"
         "           MOVE LNK-TARGET-LENGTH TO TARGET-LIMIT.\n"
         "           IF TARGET-LIMIT > 255\n"
         "               MOVE 255 TO TARGET-LIMIT\n"

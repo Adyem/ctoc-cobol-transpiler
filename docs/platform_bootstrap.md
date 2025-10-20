@@ -17,9 +17,13 @@ After installing the prerequisites, clone the repository with submodules and run
 git clone --recurse-submodules https://example.com/ctoc-cobol-transpiler.git
 cd ctoc-cobol-transpiler
 make initialize
+# optional sanity check once builds are ready
+make test
 ```
 
 `make initialize` builds the bundled `libft` dependency and verifies the submodule is ready for subsequent compilation steps.
+
+Running `make test` immediately after initialization confirms the host toolchain can compile the harmonized standard-library helpers that now share trailing status codes. If the suite fails while linking COBOL fixtures, revisit the package installation steps below before continuing development.
 
 ## macOS (Homebrew)
 

@@ -27,7 +27,7 @@ int transpiler_standard_library_generate_date_duration(char **out_text)
         "           BY REFERENCE LNK-END-SERIAL BY REFERENCE LNK-DURATION\n"
         "           BY REFERENCE LNK-COMPARISON BY REFERENCE LNK-STATUS.\n"
         "       MAIN.\n"
-        "           MOVE 0 TO LNK-STATUS.\n"
+        "           MOVE " TRANSPILE_STANDARD_LIBRARY_STATUS_LITERAL_SUCCESS " TO LNK-STATUS.\n"
         "           MOVE 0 TO LNK-DURATION.\n"
         "           MOVE 0 TO LNK-COMPARISON.\n"
         "           MOVE LNK-END-SERIAL TO WS-DIFF.\n"

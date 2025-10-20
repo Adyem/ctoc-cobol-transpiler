@@ -170,7 +170,7 @@ are completed; keep completed items grouped separately from the remaining work t
 
 ### Runtime / Stdlib
 
-- [ ] Error model: define uniform status enums and propagate them through trailing return slots.
+- [x] Error model: define uniform status enums and propagate them through trailing return slots.
 
 ### Diagnostics & Tooling
 - [x] Pretty diagnostics: include line snippets, caret ranges, and suggestion text in diagnostics.

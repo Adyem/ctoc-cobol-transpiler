@@ -31,7 +31,13 @@ last in the call sequence described above. 【F:transpiler_codegen.cpp†L401-L4
 Many helpers also expose a trailing status flag that reports truncation, overflow,
 or domain errors. The checked copy helpers and numeric subprograms map these status
 flags to single-digit `PIC 9` fields so callers can branch on zero versus non-zero
-results without decoding strings. 【F:transpiler_standard_library_min.cpp†L16-L34】【F:runtime_string.cpp†L72-L112】
+results without decoding strings. 【F:transpiler_standard_library_min.cpp†L16-L34】【F:runtime_string.cpp†L72-L112】 The
+generator now centralizes those codes in `t_transpiler_standard_library_status` so
+every template uses the same literals for "success" (`0`), "invalid argument" (`1`),
+"range error" (`2`), and domain-specific violations such as invalid day values (`3`).
+Templates embed the associated macros when moving values into or comparing against
+`LNK-STATUS`, ensuring downstream emitters and documentation stay synchronized with
+the canonical meanings. 【F:cblc_transpiler.hpp†L1044-L1055】【F:transpiler_standard_library_log.cpp†L20-L36】【F:transpiler_standard_library_strtod.cpp†L30-L139】
 
 ## 3. Data Representation
 

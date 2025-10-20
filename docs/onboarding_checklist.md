@@ -8,7 +8,7 @@ This checklist helps new contributors install dependencies, set up the repositor
 - [ ] Clone the repository with submodules: `git clone --recurse-submodules`.
 - [x] If the repository is already cloned, run `make initialize` to sync the `libft` submodule.
 - [x] Verify the libft build scripts exist at `libft/Makefile`.
-- [ ] Consult `docs/platform_bootstrap.md` for platform-specific dependency installation steps on macOS, Linux, or Windows Subsystem for Linux.
+- [x] Consult `docs/platform_bootstrap.md` for platform-specific dependency installation steps on macOS, Linux, or Windows Subsystem for Linux.
 
 ## Local Build
 - [x] Generate optimized binaries with `make all` and debug builds with `make debug`.
@@ -25,7 +25,7 @@ This checklist helps new contributors install dependencies, set up the repositor
 ## Documentation & Workflow
 - [ ] Read `docs/contributing.md` for coding standards and review policies.
 - [ ] Skim `docs/runtime_api_reference.md` to understand available runtime helpers.
-- [ ] Review `docs/getting_started.md` for an end-to-end tour of the toolchain and recent feature additions.
+- [x] Review `docs/getting_started.md` for an end-to-end tour of the toolchain and recent feature additions.
 - [ ] Update relevant guides when adding new features or modifying workflows.
 
 Keep this checklist updated as the project evolves so newcomers can get productive quickly.
