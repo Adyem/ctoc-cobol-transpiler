@@ -11,6 +11,9 @@ samples/cblc/reverse_copybook.cblc
 samples/cblc/reverse_group_items.cblc
 samples/cblc/reverse_value_defaults.cblc
 samples/cblc/reverse_string_length_metadata.cblc
+samples/cblc/reverse_comments.cblc
+samples/cblc/reverse_comment_paragraphs.cblc
+samples/cblc/reverse_comment_inline_control.cblc
 samples/cblc/numeric_precision.cblc
 samples/cblc/integration_showcase.cblc
 samples/cblc/abs_magnitude_report.cblc

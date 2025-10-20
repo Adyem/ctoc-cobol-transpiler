@@ -1,0 +1,14 @@
+bool CONTROL_FLAG = false;
+
+function void MAIN() {
+    /* comment before top-level if */
+    if (CONTROL_FLAG == false) {
+        /* comment before then display */
+        display("THEN BRANCH");
+    } else {
+        /* comment before else display */
+        display("ELSE BRANCH");
+    }
+    /* comment before stop run */
+    return ;
+}

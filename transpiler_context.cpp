@@ -208,6 +208,31 @@ static int transpiler_context_source_maps_reserve(t_transpiler_context *context,
     return (FT_SUCCESS);
 }
 
+static int transpiler_context_comments_reserve(t_transpiler_context *context, size_t desired_capacity)
+{
+    t_transpiler_comment *comments;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (context->comment_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    comments = static_cast<t_transpiler_comment *>(cma_calloc(desired_capacity,
+        sizeof(t_transpiler_comment)));
+    if (!comments)
+        return (FT_FAILURE);
+    if (context->comments)
+    {
+        ft_memcpy(comments, context->comments,
+            context->comment_count * sizeof(t_transpiler_comment));
+        cma_free(context->comments);
+    }
+    context->comments = comments;
+    context->comment_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
 static int transpiler_context_copybooks_reserve(t_transpiler_context *context, size_t desired_capacity)
 {
     t_transpiler_copybook *copybooks;
@@ -342,6 +367,10 @@ int transpiler_context_init(t_transpiler_context *context)
     context->copybooks = NULL;
     context->copybook_count = 0;
     context->copybook_capacity = 0;
+    context->comments = NULL;
+    context->comment_count = 0;
+    context->comment_capacity = 0;
+    context->comment_emit_index = 0;
     if (transpiler_diagnostics_init(&context->diagnostics) != FT_SUCCESS)
         return (FT_FAILURE);
     if (transpiler_context_functions_reserve(context, 4) != FT_SUCCESS)
@@ -554,6 +583,12 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->source_maps = NULL;
     context->source_map_count = 0;
     context->source_map_capacity = 0;
+    if (context->comments)
+        cma_free(context->comments);
+    context->comments = NULL;
+    context->comment_count = 0;
+    context->comment_capacity = 0;
+    context->comment_emit_index = 0;
     if (context->copybooks)
     {
         size_t index;
@@ -1828,4 +1863,39 @@ const t_transpiler_source_map_entry *transpiler_context_map_cobol_to_cblc(const 
         index += 1;
     }
     return (NULL);
+}
+
+void transpiler_context_clear_comments(t_transpiler_context *context)
+{
+    if (!context)
+        return ;
+    context->comment_count = 0;
+    context->comment_emit_index = 0;
+}
+
+void transpiler_context_reset_comment_iteration(t_transpiler_context *context)
+{
+    if (!context)
+        return ;
+    context->comment_emit_index = 0;
+}
+
+int transpiler_context_record_comment(t_transpiler_context *context, size_t line, size_t column,
+    const char *text, size_t length)
+{
+    t_transpiler_comment *comment;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (!text || length == 0)
+        return (FT_SUCCESS);
+    if (transpiler_context_comments_reserve(context, context->comment_count + 1) != FT_SUCCESS)
+        return (FT_FAILURE);
+    comment = &context->comments[context->comment_count];
+    comment->text = text;
+    comment->length = length;
+    comment->line = line;
+    comment->column = column;
+    context->comment_count += 1;
+    return (FT_SUCCESS);
 }

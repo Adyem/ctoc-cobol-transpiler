@@ -30,7 +30,16 @@ static int cobol_reverse_run_fixture(const char *cobol_path, const char *expecte
                     expected_buffer, sizeof(expected_buffer)),
             label) != FT_SUCCESS)
         return (FT_FAILURE);
-    parser_init(&parser, cobol_buffer);
+    if (test_expect_success(transpiler_context_init(&context),
+            label) != FT_SUCCESS)
+        return (FT_FAILURE);
+    context_initialized = 1;
+    transpiler_context_set_languages(&context, TRANSPILE_LANGUAGE_COBOL,
+        TRANSPILE_LANGUAGE_CBL_C);
+    context.active_source_text = cobol_buffer;
+    context.active_source_length = ft_strlen(cobol_buffer);
+    transpiler_context_clear_comments(&context);
+    parser_init_with_context(&parser, cobol_buffer, &context);
     status = parser_parse_program(&parser, &program);
     if (status != FT_SUCCESS && parser.has_current && parser.current.lexeme)
     {
@@ -51,25 +60,20 @@ static int cobol_reverse_run_fixture(const char *cobol_path, const char *expecte
         parser_dispose(&parser);
         if (program)
             ast_node_destroy(program);
+        transpiler_context_dispose(&context);
+        context_initialized = 0;
         return (FT_FAILURE);
     }
     parser_dispose(&parser);
     if (test_expect_success(program ? FT_SUCCESS : FT_FAILURE,
             label) != FT_SUCCESS)
     {
+        transpiler_context_dispose(&context);
+        context_initialized = 0;
         if (program)
             ast_node_destroy(program);
         return (FT_FAILURE);
     }
-    if (test_expect_success(transpiler_context_init(&context),
-            label) != FT_SUCCESS)
-    {
-        ast_node_destroy(program);
-        return (FT_FAILURE);
-    }
-    context_initialized = 1;
-    transpiler_context_set_languages(&context, TRANSPILE_LANGUAGE_COBOL,
-        TRANSPILE_LANGUAGE_CBL_C);
     if (setup)
     {
         if (test_expect_success(setup(&context), label) != FT_SUCCESS)
@@ -196,6 +200,16 @@ FT_TEST(test_cobol_reverse_fixtures)
         return (FT_FAILURE);
     if (cobol_reverse_run_fixture("samples/cobol/reverse_numeric_widths.cob",
             "samples/cblc/reverse_numeric_widths.cblc", "reverse_numeric_widths", NULL) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_reverse_run_fixture("samples/cobol/reverse_comments.cob",
+            "samples/cblc/reverse_comments.cblc", "reverse_comments", NULL) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_reverse_run_fixture("samples/cobol/reverse_comment_paragraphs.cob",
+            "samples/cblc/reverse_comment_paragraphs.cblc", "reverse_comment_paragraphs", NULL) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_reverse_run_fixture("samples/cobol/reverse_comment_inline_control.cob",
+            "samples/cblc/reverse_comment_inline_control.cblc",
+            "reverse_comment_inline_control", NULL) != FT_SUCCESS)
         return (FT_FAILURE);
     if (cobol_reverse_run_fixture("samples/cobol/reverse_group_items.cob",
             "samples/cblc/reverse_group_items.cblc", "reverse_group_items", NULL) != FT_SUCCESS)

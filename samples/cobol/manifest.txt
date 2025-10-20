@@ -7,6 +7,9 @@ samples/cobol/reverse_normalization.cob
 samples/cobol/reverse_control_flow.cob
 samples/cobol/reverse_numeric_scalars.cob
 samples/cobol/reverse_numeric_widths.cob
+samples/cobol/reverse_comments.cob
+samples/cobol/reverse_comment_paragraphs.cob
+samples/cobol/reverse_comment_inline_control.cob
 samples/cobol/reverse_copybook.cob
 samples/cobol/reverse_group_items.cob
 samples/cobol/reverse_value_defaults.cob

@@ -1,0 +1,21 @@
+bool STATUS_FLAG = true;
+
+/* header note before first paragraph */
+/* secondary description for entry point */
+function void MAIN() {
+    /* comment before assignment */
+    STATUS_FLAG = false;
+    /* inline comment for assignment */
+    if (STATUS_FLAG == false) {
+        /* comment inside IF */
+        display(STATUS_FLAG);
+    }
+    /* trailing note prior to next paragraph */
+    return ;
+}
+
+function void NEXT_PARAGRAPH() {
+    /* comment nested within next paragraph */
+    display(STATUS_FLAG);
+    return ;
+}

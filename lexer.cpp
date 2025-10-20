@@ -13,6 +13,7 @@ static void lexer_reset(t_lexer *lexer)
     lexer->offset = 0;
     lexer->line = 1;
     lexer->column = 1;
+    lexer->context = NULL;
 }
 
 void lexer_init(t_lexer *lexer, const char *text)
@@ -24,6 +25,13 @@ void lexer_init(t_lexer *lexer, const char *text)
         return ;
     lexer->text = text;
     lexer->length = ft_strlen(text);
+}
+
+void lexer_set_context(t_lexer *lexer, t_transpiler_context *context)
+{
+    if (!lexer)
+        return ;
+    lexer->context = context;
 }
 
 static int lexer_is_at_end(const t_lexer *lexer)
@@ -100,8 +108,16 @@ static int lexer_starts_comment(const t_lexer *lexer)
 
 static void lexer_skip_comment(t_lexer *lexer)
 {
+    size_t start_offset;
+    size_t start_line;
+    size_t start_column;
+    size_t end_offset;
+
     if (!lexer)
         return ;
+    start_offset = lexer->offset;
+    start_line = lexer->line;
+    start_column = lexer->column;
     lexer_advance(lexer);
     if (!lexer_is_at_end(lexer) && lexer_peek(lexer) == '>')
         lexer_advance(lexer);
@@ -113,6 +129,14 @@ static void lexer_skip_comment(t_lexer *lexer)
         lexer_advance(lexer);
         if (value == '\n')
             break ;
+    }
+    end_offset = lexer->offset;
+    if (end_offset > start_offset && lexer->text && lexer->text[end_offset - 1] == '\n')
+        end_offset -= 1;
+    if (lexer->context && lexer->text && end_offset > start_offset)
+    {
+        (void)transpiler_context_record_comment(lexer->context, start_line, start_column,
+            lexer->text + start_offset, end_offset - start_offset);
     }
 }
 

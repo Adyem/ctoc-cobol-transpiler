@@ -212,6 +212,160 @@ static int cblc_builder_ensure_trailing_newline(t_cblc_builder *builder)
     return (cblc_builder_append_newline(builder));
 }
 
+static int cobol_reverse_emit_comment_line(t_cblc_builder *builder, const t_transpiler_comment *comment,
+    size_t indentation)
+{
+    size_t offset;
+    size_t trimmed_length;
+
+    if (!builder || !comment)
+        return (FT_FAILURE);
+    if (!comment->text || comment->length == 0)
+        return (FT_SUCCESS);
+    offset = 0;
+    while (offset < comment->length)
+    {
+        char value;
+
+        value = comment->text[offset];
+        if (value != ' ' && value != '\t')
+            break ;
+        offset += 1;
+    }
+    if (offset + 1 < comment->length && comment->text[offset] == '*' && comment->text[offset + 1] == '>')
+    {
+        offset += 2;
+        while (offset < comment->length)
+        {
+            char value;
+
+            value = comment->text[offset];
+            if (value != ' ' && value != '\t')
+                break ;
+            offset += 1;
+        }
+    }
+    trimmed_length = comment->length - offset;
+    while (trimmed_length > 0)
+    {
+        char value;
+
+        value = comment->text[offset + trimmed_length - 1];
+        if (value != ' ' && value != '\t')
+            break ;
+        trimmed_length -= 1;
+    }
+    if (cblc_builder_append_indentation(builder, indentation) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_string(builder, "/*") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (trimmed_length > 0)
+    {
+        if (cblc_builder_append_string(builder, " ") != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_builder_append_span(builder, comment->text + offset, trimmed_length) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_builder_append_string(builder, " */") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    else
+    {
+        if (cblc_builder_append_string(builder, " */") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (cblc_builder_append_newline(builder) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_emit_comments_before_line(t_transpiler_context *context, t_cblc_builder *builder,
+    size_t line, size_t indentation)
+{
+    if (!context || !builder)
+        return (FT_SUCCESS);
+    if (context->comment_emit_index >= context->comment_count)
+        return (FT_SUCCESS);
+    while (context->comment_emit_index < context->comment_count)
+    {
+        const t_transpiler_comment *comment;
+
+        comment = &context->comments[context->comment_emit_index];
+        if (line > 0 && comment->line >= line)
+            break ;
+        if (cobol_reverse_emit_comment_line(builder, comment, indentation) != FT_SUCCESS)
+            return (FT_FAILURE);
+        context->comment_emit_index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_emit_comments_on_line(t_transpiler_context *context, t_cblc_builder *builder,
+    size_t line, size_t indentation)
+{
+    if (!context || !builder)
+        return (FT_SUCCESS);
+    if (line == 0)
+        return (FT_SUCCESS);
+    while (context->comment_emit_index < context->comment_count)
+    {
+        const t_transpiler_comment *comment;
+
+        comment = &context->comments[context->comment_emit_index];
+        if (comment->line > line)
+            break ;
+        if (comment->line < line)
+        {
+            if (cobol_reverse_emit_comment_line(builder, comment, indentation) != FT_SUCCESS)
+                return (FT_FAILURE);
+            context->comment_emit_index += 1;
+            continue ;
+        }
+        if (cobol_reverse_emit_comment_line(builder, comment, indentation) != FT_SUCCESS)
+            return (FT_FAILURE);
+        context->comment_emit_index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_emit_remaining_comments(t_transpiler_context *context, t_cblc_builder *builder)
+{
+    if (!context || !builder)
+        return (FT_SUCCESS);
+    while (context->comment_emit_index < context->comment_count)
+    {
+        const t_transpiler_comment *comment;
+
+        comment = &context->comments[context->comment_emit_index];
+        if (cobol_reverse_emit_comment_line(builder, comment, 0) != FT_SUCCESS)
+            return (FT_FAILURE);
+        context->comment_emit_index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+static size_t cobol_reverse_node_line(const t_ast_node *node)
+{
+    size_t index;
+    size_t line;
+
+    if (!node)
+        return (0);
+    if (node->token.line > 0)
+        return (node->token.line);
+    index = 0;
+    while (index < ast_node_child_count(node))
+    {
+        const t_ast_node *child;
+
+        child = ast_node_get_child(node, index);
+        line = cobol_reverse_node_line(child);
+        if (line > 0)
+            return (line);
+        index += 1;
+    }
+    return (0);
+}
+
 static int cobol_reverse_emit_error(t_transpiler_context *context, const char *message)
 {
     if (!context || !message)
@@ -1667,10 +1821,22 @@ static int cobol_reverse_emit_statement_sequence(t_transpiler_context *context, 
     while (index < ast_node_child_count(sequence))
     {
         const t_ast_node *statement;
+        size_t statement_line;
 
         statement = ast_node_get_child(sequence, index);
+        statement_line = cobol_reverse_node_line(statement);
+        if (context && statement_line > 0)
+        {
+            if (cobol_reverse_emit_comments_before_line(context, builder, statement_line, indentation) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
         if (cobol_reverse_emit_statement(context, builder, statement, indentation) != FT_SUCCESS)
             return (FT_FAILURE);
+        if (context && statement_line > 0)
+        {
+            if (cobol_reverse_emit_comments_on_line(context, builder, statement_line, indentation) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
         index += 1;
     }
     return (FT_SUCCESS);
@@ -1680,11 +1846,18 @@ static int cobol_reverse_emit_paragraph(t_transpiler_context *context, t_cblc_bu
     const t_ast_node *paragraph)
 {
     const t_ast_node *body;
+    size_t paragraph_line;
 
     if (!paragraph)
         return (FT_FAILURE);
     if (paragraph->kind != AST_NODE_PARAGRAPH)
         return (FT_FAILURE);
+    paragraph_line = cobol_reverse_node_line(paragraph);
+    if (context && paragraph_line > 0)
+    {
+        if (cobol_reverse_emit_comments_before_line(context, builder, paragraph_line, 0) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
     if (cblc_builder_append_string(builder, "function void ") != FT_SUCCESS)
         return (FT_FAILURE);
     if (cobol_reverse_append_identifier(builder, &paragraph->token) != FT_SUCCESS)
@@ -1693,6 +1866,11 @@ static int cobol_reverse_emit_paragraph(t_transpiler_context *context, t_cblc_bu
         return (FT_FAILURE);
     if (cblc_builder_append_newline(builder) != FT_SUCCESS)
         return (FT_FAILURE);
+    if (context && paragraph_line > 0)
+    {
+        if (cobol_reverse_emit_comments_on_line(context, builder, paragraph_line, 0) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
     if (ast_node_child_count(paragraph) < 1)
         return (FT_FAILURE);
     body = ast_node_get_child(paragraph, 0);
@@ -1713,6 +1891,7 @@ static int cobol_reverse_emit_data_item(t_transpiler_context *context, t_cblc_bu
     t_cobol_reverse_picture picture;
     t_cobol_reverse_scalar_metadata metadata;
     const t_ast_node *value_literal;
+    size_t anchor_line;
 
     if (!builder)
         return (FT_FAILURE);
@@ -1723,6 +1902,14 @@ static int cobol_reverse_emit_data_item(t_transpiler_context *context, t_cblc_bu
         if (context)
             cobol_reverse_emit_error(context, "WORKING-STORAGE item missing level or name");
         return (FT_FAILURE);
+    }
+    anchor_line = cobol_reverse_node_line(info.name_node);
+    if (anchor_line == 0)
+        anchor_line = cobol_reverse_node_line(item);
+    if (context && anchor_line > 0)
+    {
+        if (cobol_reverse_emit_comments_before_line(context, builder, anchor_line, 0) != FT_SUCCESS)
+            return (FT_FAILURE);
     }
     if (cobol_reverse_get_data_item_level(&info, &level_value) != FT_SUCCESS)
     {
@@ -1854,6 +2041,11 @@ static int cobol_reverse_emit_data_item(t_transpiler_context *context, t_cblc_bu
         return (FT_FAILURE);
     if (cblc_builder_append_newline(builder) != FT_SUCCESS)
         return (FT_FAILURE);
+    if (context && anchor_line > 0)
+    {
+        if (cobol_reverse_emit_comments_on_line(context, builder, anchor_line, 0) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
     return (FT_SUCCESS);
 }
 
@@ -1865,15 +2057,29 @@ static int cobol_reverse_emit_group_item(t_transpiler_context *context, t_cblc_b
     size_t child_index;
     size_t section_count;
     size_t field_count;
+    size_t group_line;
+    const t_ast_node *group_node;
 
     if (!builder || !section)
         return (FT_FAILURE);
-    if (cobol_reverse_collect_data_item_info(ast_node_get_child(section, item_index),
+
+    group_node = NULL;
+    if (section)
+        group_node = ast_node_get_child(section, item_index);
+    if (cobol_reverse_collect_data_item_info(group_node,
             &group_info) != FT_SUCCESS)
     {
         if (context)
             cobol_reverse_emit_error(context, "Group item missing identifier");
         return (FT_FAILURE);
+    }
+    group_line = cobol_reverse_node_line(group_info.name_node);
+    if (group_line == 0)
+        group_line = cobol_reverse_node_line(group_node);
+    if (context && group_line > 0)
+    {
+        if (cobol_reverse_emit_comments_before_line(context, builder, group_line, 0) != FT_SUCCESS)
+            return (FT_FAILURE);
     }
     if (cobol_reverse_get_data_item_level(&group_info, &group_level) != FT_SUCCESS)
     {
@@ -1909,6 +2115,7 @@ static int cobol_reverse_emit_group_item(t_transpiler_context *context, t_cblc_b
         long field_level;
         t_cobol_reverse_picture picture;
         t_cobol_reverse_scalar_metadata metadata;
+        size_t field_line;
 
         child = ast_node_get_child(section, child_index);
         if (!child || child->kind != AST_NODE_DATA_ITEM)
@@ -1953,6 +2160,14 @@ static int cobol_reverse_emit_group_item(t_transpiler_context *context, t_cblc_b
         if (cobol_reverse_infer_scalar_metadata(context, field_info.name_node, &picture,
                 "Unsupported group item member", &metadata) != FT_SUCCESS)
             return (FT_FAILURE);
+        field_line = cobol_reverse_node_line(field_info.name_node);
+        if (field_line == 0)
+            field_line = cobol_reverse_node_line(child);
+        if (context && field_line > 0)
+        {
+            if (cobol_reverse_emit_comments_before_line(context, builder, field_line, 1) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
         if (cblc_builder_append_indentation(builder, 1) != FT_SUCCESS)
             return (FT_FAILURE);
         if (cblc_builder_append_string(builder, metadata.type_text) != FT_SUCCESS)
@@ -1975,6 +2190,11 @@ static int cobol_reverse_emit_group_item(t_transpiler_context *context, t_cblc_b
             return (FT_FAILURE);
         if (cblc_builder_append_newline(builder) != FT_SUCCESS)
             return (FT_FAILURE);
+        if (context && field_line > 0)
+        {
+            if (cobol_reverse_emit_comments_on_line(context, builder, field_line, 1) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
         field_count += 1;
         child_index += 1;
     }
@@ -2002,6 +2222,11 @@ static int cobol_reverse_emit_group_item(t_transpiler_context *context, t_cblc_b
         return (FT_FAILURE);
     if (cblc_builder_append_newline(builder) != FT_SUCCESS)
         return (FT_FAILURE);
+    if (context && group_line > 0)
+    {
+        if (cobol_reverse_emit_comments_on_line(context, builder, group_line, 0) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
     return (FT_SUCCESS);
 }
 
@@ -2339,6 +2564,8 @@ int transpiler_cobol_program_to_cblc(t_transpiler_context *context, const t_ast_
         cblc_builder_dispose(&builder);
         return (FT_FAILURE);
     }
+    if (context)
+        transpiler_context_reset_comment_iteration(context);
     data_division = cobol_reverse_find_data_division(program);
     if (data_division)
     {
@@ -2380,6 +2607,14 @@ int transpiler_cobol_program_to_cblc(t_transpiler_context *context, const t_ast_
             }
         }
         index += 1;
+    }
+    if (context)
+    {
+        if (cobol_reverse_emit_remaining_comments(context, &builder) != FT_SUCCESS)
+        {
+            cblc_builder_dispose(&builder);
+            return (FT_FAILURE);
+        }
     }
     if (cblc_builder_ensure_trailing_newline(&builder) != FT_SUCCESS)
     {

@@ -176,8 +176,8 @@ static int sample_basename_exists(const char *needle, char names[][64], size_t c
 
 static int validate_sample_pairs_match(void)
 {
-    char cobol_names[32][64];
-    char cblc_names[32][64];
+    char cobol_names[64][64];
+    char cblc_names[64][64];
     size_t cobol_count;
     size_t cblc_count;
     size_t index;

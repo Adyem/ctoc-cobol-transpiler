@@ -3,6 +3,7 @@
 #include "../compiler_test_support.hpp"
 
 #include "libft/CMA/CMA.hpp"
+#include "libft/Libft/libft.hpp"
 
 #include "round_trip_pipeline_helpers.hpp"
 
@@ -37,7 +38,10 @@ static int round_trip_cobol_fixture(const char *fixture_path,
     context_initialized = 1;
     transpiler_context_set_languages(&context, TRANSPILE_LANGUAGE_COBOL,
         TRANSPILE_LANGUAGE_CBL_C);
-    parser_init(&parser, cobol_buffer);
+    context.active_source_text = cobol_buffer;
+    context.active_source_length = ft_strlen(cobol_buffer);
+    transpiler_context_clear_comments(&context);
+    parser_init_with_context(&parser, cobol_buffer, &context);
     if (test_expect_success(parser_parse_program(&parser, &program),
             fixture_label) != FT_SUCCESS)
     {
@@ -49,6 +53,8 @@ static int round_trip_cobol_fixture(const char *fixture_path,
             "fixture should produce an AST") != FT_SUCCESS)
         goto cleanup;
     transpiler_context_reset_unit_state(&context);
+    context.active_source_text = cobol_buffer;
+    context.active_source_length = ft_strlen(cobol_buffer);
     if (test_expect_success(transpiler_semantics_analyze_program(&context,
                 program), "semantic analysis should succeed") != FT_SUCCESS)
         goto cleanup;

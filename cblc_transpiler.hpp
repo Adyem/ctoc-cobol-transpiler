@@ -249,6 +249,14 @@ int transpiler_diagnostics_push_with_details(t_transpiler_diagnostic_list *list,
     int code, const char *message, const t_transpiler_source_span *span, const char *snippet,
     const char *suggestion);
 
+typedef struct s_transpiler_comment
+{
+    const char *text;
+    size_t length;
+    size_t line;
+    size_t column;
+}   t_transpiler_comment;
+
 typedef enum e_transpiler_warning_group
 {
     TRANSPILE_WARNING_GROUP_CONVERSION = 0,
@@ -430,6 +438,10 @@ typedef struct s_transpiler_context
     t_transpiler_copybook *copybooks;
     size_t copybook_count;
     size_t copybook_capacity;
+    t_transpiler_comment *comments;
+    size_t comment_count;
+    size_t comment_capacity;
+    size_t comment_emit_index;
 }   t_transpiler_context;
 
 int transpiler_context_init(t_transpiler_context *context);
@@ -490,6 +502,10 @@ const t_transpiler_source_map_entry *transpiler_context_map_cblc_to_cobol(const 
     const char *path, size_t line, size_t column);
 const t_transpiler_source_map_entry *transpiler_context_map_cobol_to_cblc(const t_transpiler_context *context,
     const char *path, size_t line, size_t column);
+void transpiler_context_clear_comments(t_transpiler_context *context);
+void transpiler_context_reset_comment_iteration(t_transpiler_context *context);
+int transpiler_context_record_comment(t_transpiler_context *context, size_t line, size_t column,
+    const char *text, size_t length);
 
 // ===============================
 // Lexing, parsing, and AST nodes
@@ -585,9 +601,11 @@ typedef struct s_lexer
     size_t offset;
     size_t line;
     size_t column;
+    struct s_transpiler_context *context;
 }   t_lexer;
 
 void lexer_init(t_lexer *lexer, const char *text);
+void lexer_set_context(t_lexer *lexer, struct s_transpiler_context *context);
 int lexer_next_token(t_lexer *lexer, t_lexer_token *token);
 
 typedef enum e_ast_node_kind
@@ -659,6 +677,7 @@ typedef struct s_parser
 }   t_parser;
 
 void parser_init(t_parser *parser, const char *text);
+void parser_init_with_context(t_parser *parser, const char *text, t_transpiler_context *context);
 void parser_dispose(t_parser *parser);
 int parser_parse_program(t_parser *parser, t_ast_node **out_program);
 
