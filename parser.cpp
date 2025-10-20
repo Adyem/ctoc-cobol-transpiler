@@ -217,6 +217,18 @@ void parser_init(t_parser *parser, const char *text)
     if (!parser)
         return ;
     lexer_init(&parser->lexer, text);
+    lexer_set_context(&parser->lexer, NULL);
+    parser->has_current = 0;
+    parser->last_error = FT_SUCCESS;
+    parser->error_count = 0;
+}
+
+void parser_init_with_context(t_parser *parser, const char *text, t_transpiler_context *context)
+{
+    if (!parser)
+        return ;
+    lexer_init(&parser->lexer, text);
+    lexer_set_context(&parser->lexer, context);
     parser->has_current = 0;
     parser->last_error = FT_SUCCESS;
     parser->error_count = 0;

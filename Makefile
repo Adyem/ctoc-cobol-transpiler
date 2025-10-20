@@ -184,7 +184,17 @@ TEST_SRC    = tests/test_main.cpp \
               tests/runtime_file_tests.cpp \
               tests/pipeline_tests.cpp \
               tests/validation_tests.cpp \
-              tests/transpiler_context_tests.cpp \
+             tests/transpiler_context_tests.cpp \
+             tests/transpiler_context_registration_tests.cpp \
+             tests/transpiler_context_copybook_tests.cpp \
+             tests/transpiler_context_visibility_tests.cpp \
+             tests/cblc_translation_unit_export_tests.cpp \
+             tests/transpiler_context_import_tests.cpp \
+             tests/transpiler_context_call_metadata_tests.cpp \
+             tests/transpiler_context_file_tests.cpp \
+             tests/transpiler_context_source_map_tests.cpp \
+             tests/transpiler_context_comment_basic_tests.cpp \
+             tests/transpiler_context_comment_capacity_tests.cpp \
               tests/sample_inventory_tests.cpp \
               tests/golden_file_tests.cpp \
               tests/grammar_doc_tests.cpp \

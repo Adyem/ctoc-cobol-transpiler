@@ -197,7 +197,8 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
     context->target_path = output_path;
     context->active_source_text = source_text;
     context->active_source_length = ft_strlen(source_text);
-    parser_init(&parser, source_text);
+    transpiler_context_clear_comments(context);
+    parser_init_with_context(&parser, source_text, context);
     if (parser_parse_program(&parser, &program) != FT_SUCCESS)
     {
         parser_dispose(&parser);
@@ -207,6 +208,8 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
     }
     parser_dispose(&parser);
     transpiler_context_reset_unit_state(context);
+    context->active_source_text = source_text;
+    context->active_source_length = ft_strlen(source_text);
     if (transpiler_semantics_analyze_program(context, program) != FT_SUCCESS)
     {
         if (pf_snprintf(message, sizeof(message), "Semantic analysis failed for '%s'", input_path) >= 0)

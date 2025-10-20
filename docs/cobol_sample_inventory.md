@@ -92,6 +92,23 @@ filesystem synchronized. The quick-start example pairs its COBOL artifact with t
 - **Constructs:** Simple `COPY` include resolved through the registered copybook table, a single-character code that remains a
   scalar, buffer identifiers that keep their array form, and a minimal `STOP RUN` procedure body.
 
+### `samples/cobol/reverse_comments.cob`
+- **Purpose:** Verifies that inline `*>` comments in WORKING-STORAGE and PROCEDURE DIVISION survive lexing so the reverse
+  pipeline can re-emit them near the reconstructed statements.
+- **Constructs:** Consecutive comment lines annotating level-01 declarations, inline trailing comments after `MOVE`
+  statements, paragraph header notes, and straightforward `DISPLAY`/`STOP RUN` control flow that keeps the focus on comment
+  preservation.
+
+### `samples/cobol/reverse_comment_paragraphs.cob`
+- **Purpose:** Exercises the comment iterator across paragraph boundaries so remarks that bracket nested statements surface in
+  the regenerated CBL-C at the correct indentation level.
+- **Constructs:** 77-level boolean declarations with defaults, inline `MOVE` commentary, conditional `IF` blocks containing
+  annotated statements, and paragraph transitions that include remarks between routines.
+
+### `samples/cobol/reverse_comment_inline_control.cob`
+- **Purpose:** Verifies that inline remarks placed immediately before COBOL statements survive translation when they appear ahead of control flow constructs.
+- **Constructs:** Boolean status flag storage, comments that precede `IF` branching and nested statements within both branches, literal `DISPLAY` calls, and a trailing remark ahead of the terminating `STOP RUN`.
+
 ### `samples/cobol/return_numeric.cob`
 - **Purpose:** Demonstrates value-returning helpers expressed as separate COBOL subprograms that accept arguments by reference
   and populate a trailing return slot.

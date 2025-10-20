@@ -1,0 +1,13 @@
+/* leading comment for flag */
+bool STATUS_FLAG = true;
+/* additional buffer comment */
+char BUFFER_TEXT[16];
+
+/* paragraph level note */
+function void MAIN() {
+    STATUS_FLAG = false;
+    /* inline comment after move */
+    /* comment before display */
+    display(STATUS_FLAG);
+    return ;
+}

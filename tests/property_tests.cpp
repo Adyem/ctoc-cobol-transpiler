@@ -87,7 +87,16 @@ static int run_round_trip_fixture(const t_round_trip_fixture *fixture)
     terminator = ft_strstr(cobol_buffer, "END PROGRAM");
     if (terminator)
         *terminator = '\0';
-    parser_init(&parser, cobol_buffer);
+    if (test_expect_success(transpiler_context_init(&context), fixture->label)
+        != FT_SUCCESS)
+        goto cleanup;
+    context_initialized = 1;
+    transpiler_context_set_languages(&context, TRANSPILE_LANGUAGE_COBOL,
+        TRANSPILE_LANGUAGE_CBL_C);
+    context.active_source_text = cobol_buffer;
+    context.active_source_length = ft_strlen(cobol_buffer);
+    transpiler_context_clear_comments(&context);
+    parser_init_with_context(&parser, cobol_buffer, &context);
     status = parser_parse_program(&parser, &program);
     parser_dispose(&parser);
     if (test_expect_success(status, fixture->label) != FT_SUCCESS)
@@ -98,12 +107,6 @@ static int run_round_trip_fixture(const t_round_trip_fixture *fixture)
         message_status = FT_FAILURE;
     if (test_expect_success(message_status, fixture->label) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(transpiler_context_init(&context), fixture->label)
-        != FT_SUCCESS)
-        goto cleanup;
-    context_initialized = 1;
-    transpiler_context_set_languages(&context, TRANSPILE_LANGUAGE_COBOL,
-        TRANSPILE_LANGUAGE_CBL_C);
     if (fixture->requires_copybook)
     {
         if (test_expect_success(register_customer_status_copybook(&context),
@@ -154,7 +157,10 @@ static int run_round_trip_fixture(const t_round_trip_fixture *fixture)
     terminator = ft_strstr(generated_copy, "END PROGRAM");
     if (terminator)
         *terminator = '\0';
-    parser_init(&regenerated_parser, generated_copy);
+    context.active_source_text = generated_copy;
+    context.active_source_length = ft_strlen(generated_copy);
+    transpiler_context_clear_comments(&context);
+    parser_init_with_context(&regenerated_parser, generated_copy, &context);
     status = parser_parse_program(&regenerated_parser, &regenerated_program);
     parser_dispose(&regenerated_parser);
     if (test_expect_success(status, fixture->label) != FT_SUCCESS)
@@ -166,6 +172,8 @@ static int run_round_trip_fixture(const t_round_trip_fixture *fixture)
     if (test_expect_success(message_status, fixture->label) != FT_SUCCESS)
         goto cleanup;
     transpiler_context_reset_unit_state(&context);
+    context.active_source_text = generated_copy;
+    context.active_source_length = ft_strlen(generated_copy);
     if (test_expect_success(transpiler_cobol_program_to_cblc(&context,
                 regenerated_program, &second_pass_cblc), fixture->label)
         != FT_SUCCESS)

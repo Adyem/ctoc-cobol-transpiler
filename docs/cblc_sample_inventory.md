@@ -386,6 +386,79 @@ function void MAIN() {
 }
 ```
 
+### `samples/cblc/reverse_comments.cblc`
+- **Purpose:** Locks down comment preservation by verifying that COBOL `*>` remarks attached to declarations and statements are
+  re-emitted near the corresponding CBL-C constructs.
+- **Constructs:** Consecutive block comments above global declarations, inline comments positioned around assignments, and
+  paragraph-level annotations that ensure the emitter threads comment trivia through lexical gaps.
+
+```cblc
+bool STATUS_FLAG = true;
+char BUFFER_TEXT[16];
+
+/* leading comment for flag */
+/* additional buffer comment */
+/* paragraph level note */
+function void MAIN() {
+    STATUS_FLAG = false;
+    display(STATUS_FLAG);
+    /* inline comment after move */
+    /* comment before display */
+    return ;
+}
+```
+
+### `samples/cblc/reverse_comment_paragraphs.cblc`
+- **Purpose:** Verifies that comment emission honors nested paragraph transitions so remarks that precede function headers or
+  trail inline statements appear adjacent to their regenerated counterparts.
+- **Constructs:** Boolean scalar declarations, consecutive paragraph prolog comments, inline assignment notes, `if` blocks with
+  annotated bodies, and trailing remarks that land before the generated `return ;` guard.
+
+```cblc
+bool STATUS_FLAG = true;
+
+/* header note before first paragraph */
+/* secondary description for entry point */
+function void MAIN() {
+    /* comment before assignment */
+    STATUS_FLAG = false;
+    /* inline comment for assignment */
+    if (STATUS_FLAG == false) {
+        /* comment inside IF */
+        display(STATUS_FLAG);
+    }
+    /* trailing note prior to next paragraph */
+    return ;
+}
+
+function void NEXT_PARAGRAPH() {
+    /* comment nested within next paragraph */
+    display(STATUS_FLAG);
+    return ;
+}
+```
+### `samples/cblc/reverse_comment_inline_control.cblc`
+- **Purpose:** Ensures comments that land immediately before regenerated control flow stay attached to the corresponding `if` blocks and their branch bodies.
+- **Constructs:** Boolean flag declaration, leading comment ahead of an `if` statement, annotated statements in both branches, and a trailing remark before the synthesized `return ;`.
+
+```cblc
+bool CONTROL_FLAG = false;
+
+function void MAIN() {
+    /* comment before top-level if */
+    if (CONTROL_FLAG == false) {
+        /* comment before then display */
+        display("THEN BRANCH");
+    } else {
+        /* comment before else display */
+        display("ELSE BRANCH");
+    }
+    /* comment before stop run */
+    return ;
+}
+```
+
+
 ### `samples/cblc/return_numeric.cblc`
 - **Purpose:** Demonstrates scalar functions that return values through the trailing BY REFERENCE slot with integer arithmetic.
 - **Constructs:** Global integer declarations, a value-returning helper, `return` statements with expressions, and a `function void main()` caller that captures the result.

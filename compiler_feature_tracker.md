@@ -177,7 +177,17 @@ are completed; keep completed items grouped separately from the remaining work t
 
 ### Reverse Pipeline (COBOL → CBL-C)
 
-- [ ] Comment preservation: carry comments as trivia and re-emit them near original anchors.
+- [x] Comment preservation: carry comments as trivia and re-emit them near original anchors.
+    - [x] Fix the `t_transpiler_comment` typedef ordering in `cblc_transpiler.hpp` so reverse builds succeed.
+    - [x] Run `make test` after the header fix to confirm the COBOL → CBL-C path compiles and the new fixtures execute.
+    - [x] Review comment emission heuristics for nested paragraphs and ensure additional fixtures cover edge positioning.
+    - [x] Wire `cobol_reverse_node_line` through reverse emission anchors so comment attachment uses fallback line information.
+    - [x] Refresh reverse comment fixtures to reflect the updated ordering heuristics.
+    - [x] Add regression coverage for inline comments preceding statements and within control flow constructs.
+    - [x] Add targeted unit tests for comment lifecycle management within the reverse pipeline context.
+    - [x] Verify reverse comment recording rejects null contexts and ignores empty comment payloads.
+    - [x] Extend reverse comment lifecycle tests to cover ordering, capacity reuse, and null-guard behavior.
+    - [x] Add reverse comment capacity growth and disposal regression tests.
 - [x] Layout fidelity knobs: provide "normalize" and "preserve" modes for regenerated source.
 - [ ] Copybook reconstruction: prefer re-emitting COPY directives instead of fully expanded fields when possible.
 - [x] Recover long, long long, and floating-point picture clauses into canonical CBL-C type annotations.
