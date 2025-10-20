@@ -189,7 +189,7 @@ are completed; keep completed items grouped separately from the remaining work t
     - [x] Extend reverse comment lifecycle tests to cover ordering, capacity reuse, and null-guard behavior.
     - [x] Add reverse comment capacity growth and disposal regression tests.
 - [x] Layout fidelity knobs: provide "normalize" and "preserve" modes for regenerated source.
-- [ ] Copybook reconstruction: prefer re-emitting COPY directives instead of fully expanded fields when possible.
+- [x] Copybook reconstruction: prefer re-emitting COPY directives instead of fully expanded fields when possible.
 - [x] Recover long, long long, and floating-point picture clauses into canonical CBL-C type annotations.
 - [x] Reconstruct string length metadata so regenerated CBL-C declarations reflect original caller sizes.
 - [ ] Emit operator forms that maintain precision across widened numeric ranges.

@@ -105,6 +105,39 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_parse_translation_unit_records_copy_includes)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "copy \"shared-status\";\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "copy directives should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (unit.copy_include_count != 1)
+    {
+        pf_printf("Assertion failed: expected exactly one copy include\\n");
+        goto cleanup;
+    }
+    if (ft_strncmp(unit.copy_includes[0].name, "shared-status",
+            TRANSPILE_IDENTIFIER_MAX) != 0)
+    {
+        pf_printf("Assertion failed: copy include should record source name\\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_parse_translation_unit_tracks_multiple_functions)
 {
     const char *source;
@@ -213,6 +246,45 @@ FT_TEST(test_cblc_generate_cobol_emits_string_group)
             ft_strlen(generated_cobol)))
     {
         pf_printf("Assertion failed: generated COBOL should display buffer slice using length\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_emits_copy_includes)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "copy \"shared-status\";\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "copy directives should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "copy directives should regenerate COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+    {
+        pf_printf("Assertion failed: expected COBOL generation to produce text\\n");
+        goto cleanup;
+    }
+    if (!ft_strstr(generated_cobol, "       COPY SHARED-STATUS."))
+    {
+        pf_printf("Assertion failed: COBOL should include COPY directive for shared-status\\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -582,7 +654,12 @@ const t_test_case *get_validation_tests(size_t *count)
         {"transpiler_validation_accepts_string_declaration", test_transpiler_validation_accepts_string_declaration},
         {"transpiler_validation_accepts_string_assignment_and_length_usage",
             test_transpiler_validation_accepts_string_assignment_and_length_usage},
+        {"cblc_parse_translation_unit_records_imports", test_cblc_parse_translation_unit_records_imports},
+        {"cblc_parse_translation_unit_records_copy_includes", test_cblc_parse_translation_unit_records_copy_includes},
+        {"cblc_parse_translation_unit_tracks_multiple_functions",
+            test_cblc_parse_translation_unit_tracks_multiple_functions},
         {"cblc_generate_cobol_emits_string_group", test_cblc_generate_cobol_emits_string_group},
+        {"cblc_generate_cobol_emits_copy_includes", test_cblc_generate_cobol_emits_copy_includes},
         {"cblc_generate_cobol_emits_multiple_paragraphs",
             test_cblc_generate_cobol_emits_multiple_paragraphs},
         {"cblc_generate_cobol_emits_perform_and_call_statements",
