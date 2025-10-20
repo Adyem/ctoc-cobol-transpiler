@@ -163,6 +163,16 @@ static int cobol_reverse_register_customer_status_copybook(t_transpiler_context 
     return (FT_SUCCESS);
 }
 
+static int cobol_reverse_register_shared_arg_metadata(t_transpiler_context *context)
+{
+    if (!context)
+        return (FT_FAILURE);
+    if (transpiler_context_register_data_item(context,
+            "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 12, 0) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_cobol_reverse_fixtures)
 {
     /*
@@ -184,6 +194,9 @@ FT_TEST(test_cobol_reverse_fixtures)
     if (cobol_reverse_run_fixture("samples/cobol/reverse_numeric_scalars.cob",
             "samples/cblc/reverse_numeric_scalars.cblc", "reverse_numeric_scalars", NULL) != FT_SUCCESS)
         return (FT_FAILURE);
+    if (cobol_reverse_run_fixture("samples/cobol/reverse_numeric_widths.cob",
+            "samples/cblc/reverse_numeric_widths.cblc", "reverse_numeric_widths", NULL) != FT_SUCCESS)
+        return (FT_FAILURE);
     if (cobol_reverse_run_fixture("samples/cobol/reverse_group_items.cob",
             "samples/cblc/reverse_group_items.cblc", "reverse_group_items", NULL) != FT_SUCCESS)
         return (FT_FAILURE);
@@ -193,6 +206,11 @@ FT_TEST(test_cobol_reverse_fixtures)
     if (cobol_reverse_run_fixture("samples/cobol/reverse_copybook.cob",
             "samples/cblc/reverse_copybook.cblc", "reverse_copybook",
             cobol_reverse_register_customer_status_copybook) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_reverse_run_fixture("samples/cobol/reverse_string_length_metadata.cob",
+            "samples/cblc/reverse_string_length_metadata.cblc",
+            "reverse_string_length_metadata",
+            cobol_reverse_register_shared_arg_metadata) != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }

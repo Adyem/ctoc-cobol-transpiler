@@ -303,6 +303,27 @@ function void MAIN() {
 }
 ```
 
+### `samples/cblc/reverse_numeric_widths.cblc`
+- **Purpose:** Verifies that reverse translation recovers wide integer `PIC` clauses as `long`/`long long` declarations while
+  still mapping fractional scales to `float` and `double`.
+- **Constructs:** Mixed-width numeric scalars initialized through literal `MOVE` statements, canonical literal formatting, and the
+  baseline `function void MAIN()` container emitted for declarative storage programs.
+
+```cblc
+long LONG_COUNT = 0;
+long long EXTREME_COUNT = 0;
+float FLOAT_RATE = 0;
+double DOUBLE_RATE = 0;
+
+function void MAIN() {
+    LONG_COUNT = 100000000000;
+    EXTREME_COUNT = 500000000000000000;
+    FLOAT_RATE = 1;
+    DOUBLE_RATE = 2;
+    return ;
+}
+```
+
 ### `samples/cblc/reverse_group_items.cblc`
 - **Purpose:** Locks down recovery of COBOL level 01 group items by asserting that the reverse emitter produces a `record`
   declaration, mirrors the group variable, and still surfaces each subordinate field as an addressable scalar for existing
@@ -325,6 +346,21 @@ float DISCOUNT_RATE = 1.25;
 char STATUS_MESSAGE[12] = "READY";
 
 function void MAIN() {
+    return ;
+}
+```
+
+### `samples/cblc/reverse_string_length_metadata.cblc`
+- **Purpose:** Exercises reverse translation when the transpiler context records caller-supplied buffer widths that exceed the
+  callee's `PIC` clause so regenerated declarations preserve the original size.
+- **Constructs:** Global `char` array with an initializer, a single `function` definition with an assignment statement, and an
+  implicit dependency on metadata registered through `transpiler_context_register_data_item`.
+
+```cblc
+char SHARED_ARG[12];
+
+function void MAIN() {
+    SHARED_ARG = "A";
     return ;
 }
 ```

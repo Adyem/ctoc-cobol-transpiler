@@ -72,6 +72,33 @@ FT_TEST(test_makefile_defines_ci_targets)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_makefile_enables_reproducible_builds)
+{
+    static const char *snippets[] = {
+        "REPRODUCIBLE ?= 1",
+        "SOURCE_DATE_EPOCH ?=",
+        "-ffile-prefix-map=$(CURDIR)=.",
+        "-fmacro-prefix-map=$(CURDIR)=.",
+        "-fdebug-prefix-map=$(CURDIR)=.",
+        "-frandom-seed=ctoc"
+    };
+    char buffer[65536];
+    size_t index;
+    size_t count;
+
+    if (load_file("Makefile", buffer, sizeof(buffer)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    index = 0;
+    count = sizeof(snippets) / sizeof(snippets[0]);
+    while (index < count)
+    {
+        if (expect_contains(buffer, snippets[index], "Makefile") != FT_SUCCESS)
+            return (FT_FAILURE);
+        index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_ci_document_lists_targets)
 {
     static const char *commands[] = {
@@ -105,6 +132,19 @@ FT_TEST(test_ci_document_mentions_lint_script)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_ci_document_mentions_reproducible_flag)
+{
+    char buffer[65536];
+
+    if (load_file("docs/ci_pipeline.md", buffer, sizeof(buffer)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (expect_contains(buffer, "REPRODUCIBLE=0", "docs/ci_pipeline.md") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (expect_contains(buffer, "SOURCE_DATE_EPOCH", "docs/ci_pipeline.md") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_ci_document_referenced_by_design_doc)
 {
     FILE *file;
@@ -133,8 +173,10 @@ const t_test_case *get_ci_tests(size_t *count)
 {
     static const t_test_case tests[] = {
         {"makefile_defines_ci_targets", test_makefile_defines_ci_targets},
+        {"makefile_enables_reproducible_builds", test_makefile_enables_reproducible_builds},
         {"ci_document_lists_targets", test_ci_document_lists_targets},
         {"ci_document_mentions_lint_script", test_ci_document_mentions_lint_script},
+        {"ci_document_mentions_reproducible_flag", test_ci_document_mentions_reproducible_flag},
         {"ci_document_referenced_by_design_doc", test_ci_document_referenced_by_design_doc}
     };
 

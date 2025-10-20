@@ -62,6 +62,12 @@ filesystem synchronized. The quick-start example pairs its COBOL artifact with t
 - **Constructs:** Level-01 `PIC S9V9(4)` and `PIC S9(12)V9(6)` fields, display-mode numeric counters, status bytes ending in
   `-IND`, literal `MOVE` statements, and `STOP RUN` termination.
 
+### `samples/cobol/reverse_numeric_widths.cob`
+- **Purpose:** Adds wide integer and scaled decimal `PIC` clauses so the reverse pipeline emits canonical `long`, `long long`,
+  `float`, and `double` declarations.
+- **Constructs:** Level-01 `PIC S9(12)` and `PIC S9(19)` items with matching assignments, literal `MOVE` statements that drive
+  widened integer and floating declarations, and a terminating `STOP RUN.` paragraph.
+
 ### `samples/cobol/reverse_group_items.cob`
 - **Purpose:** Validates that a level-01 group without a PIC clause survives reverse translation by materializing a record
   declaration and mirrored scalars in the generated CBL-C.
@@ -73,6 +79,12 @@ filesystem synchronized. The quick-start example pairs its COBOL artifact with t
   numerics, and text buffers directly into CBL-C.
 - **Constructs:** Level-01 flag, integer, and decimal items with VALUE defaults, an alphanumeric buffer populated through a
   literal VALUE clause, and a bare `STOP RUN` procedure that leaves the recovered storage untouched.
+
+### `samples/cobol/reverse_string_length_metadata.cob`
+- **Purpose:** Captures a callee that advertises a narrow `PIC X(5)` buffer while the caller provides a wider region so the
+  reverse pipeline can honor the recorded caller length when regenerating CBL-C declarations.
+- **Constructs:** Level-01 alphanumeric item with a `PIC X(5)` clause, literal `MOVE` into the buffer, and a terminating `STOP
+  RUN.` paragraph.
 
 ### `samples/cobol/reverse_copybook.cob`
 - **Purpose:** Extends the reverse fixtures with a `COPY` directive and character heuristics so shared working-storage and
