@@ -244,6 +244,35 @@ static int cblc_translation_unit_ensure_import_capacity(t_cblc_translation_unit 
     return (FT_SUCCESS);
 }
 
+static int cblc_translation_unit_ensure_copy_capacity(t_cblc_translation_unit *unit,
+    size_t desired_capacity)
+{
+    t_cblc_copy_include *new_copies;
+    size_t index;
+
+    if (!unit)
+        return (FT_FAILURE);
+    if (unit->copy_include_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    new_copies = static_cast<t_cblc_copy_include *>(cma_calloc(desired_capacity,
+            sizeof(*new_copies)));
+    if (!new_copies)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < unit->copy_include_count)
+    {
+        new_copies[index] = unit->copy_includes[index];
+        index += 1;
+    }
+    if (unit->copy_includes)
+        cma_free(unit->copy_includes);
+    unit->copy_includes = new_copies;
+    unit->copy_include_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
 static int cblc_translation_unit_ensure_function_capacity(t_cblc_translation_unit *unit,
     size_t desired_capacity)
 {
@@ -515,6 +544,33 @@ static int cblc_parse_import(const char **cursor, t_cblc_translation_unit *unit)
     ft_strlcpy(unit->imports[unit->import_count].path, path,
         sizeof(unit->imports[unit->import_count].path));
     unit->import_count += 1;
+    return (FT_SUCCESS);
+}
+
+static int cblc_parse_copy(const char **cursor, t_cblc_translation_unit *unit)
+{
+    char name[TRANSPILE_IDENTIFIER_MAX];
+
+    if (!cursor || !*cursor || !unit)
+        return (FT_FAILURE);
+    if (!cblc_match_keyword(cursor, "copy"))
+        return (FT_FAILURE);
+    cblc_skip_whitespace(cursor);
+    if (cblc_parse_string_literal(cursor, name, sizeof(name)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    cblc_skip_whitespace(cursor);
+    if (**cursor != ';')
+        return (FT_FAILURE);
+    *cursor += 1;
+    if (unit->copy_include_count >= unit->copy_include_capacity)
+    {
+        if (cblc_translation_unit_ensure_copy_capacity(unit,
+                unit->copy_include_capacity == 0 ? 4 : unit->copy_include_capacity * 2) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    ft_strlcpy(unit->copy_includes[unit->copy_include_count].name, name,
+        sizeof(unit->copy_includes[unit->copy_include_count].name));
+    unit->copy_include_count += 1;
     return (FT_SUCCESS);
 }
 
@@ -1114,6 +1170,9 @@ void cblc_translation_unit_init(t_cblc_translation_unit *unit)
     unit->imports = NULL;
     unit->import_count = 0;
     unit->import_capacity = 0;
+    unit->copy_includes = NULL;
+    unit->copy_include_count = 0;
+    unit->copy_include_capacity = 0;
     unit->functions = NULL;
     unit->function_count = 0;
     unit->function_capacity = 0;
@@ -1129,6 +1188,8 @@ void cblc_translation_unit_dispose(t_cblc_translation_unit *unit)
         cma_free(unit->data_items);
     if (unit->imports)
         cma_free(unit->imports);
+    if (unit->copy_includes)
+        cma_free(unit->copy_includes);
     if (unit->functions)
     {
         size_t index;
@@ -1151,6 +1212,9 @@ void cblc_translation_unit_dispose(t_cblc_translation_unit *unit)
     unit->imports = NULL;
     unit->import_count = 0;
     unit->import_capacity = 0;
+    unit->copy_includes = NULL;
+    unit->copy_include_count = 0;
+    unit->copy_include_capacity = 0;
     unit->functions = NULL;
     unit->function_count = 0;
     unit->function_capacity = 0;
@@ -1170,6 +1234,13 @@ int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit)
         cblc_skip_whitespace(&cursor);
         if (*cursor == '\0')
             break ;
+        if (cblc_match_keyword(&cursor, "copy"))
+        {
+            cursor -= ft_strlen("copy");
+            if (cblc_parse_copy(&cursor, unit) != FT_SUCCESS)
+                return (FT_FAILURE);
+            continue ;
+        }
         if (cblc_match_keyword(&cursor, "import"))
         {
             cursor -= ft_strlen("import");
@@ -1320,6 +1391,26 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
         goto cleanup;
     if (cobol_text_builder_append_line(&builder, "       WORKING-STORAGE SECTION.") != FT_SUCCESS)
         goto cleanup;
+    index = 0;
+    while (index < unit->copy_include_count)
+    {
+        char copy_name[TRANSPILE_IDENTIFIER_MAX];
+        size_t name_index;
+
+        ft_strlcpy(copy_name, unit->copy_includes[index].name, sizeof(copy_name));
+        name_index = 0;
+        while (copy_name[name_index] != '\0')
+        {
+            if (copy_name[name_index] >= 'a' && copy_name[name_index] <= 'z')
+                copy_name[name_index] = static_cast<char>(copy_name[name_index] - 'a' + 'A');
+            name_index += 1;
+        }
+        if (pf_snprintf(line, sizeof(line), "       COPY %s.", copy_name) < 0)
+            goto cleanup;
+        if (cobol_text_builder_append_line(&builder, line) != FT_SUCCESS)
+            goto cleanup;
+        index += 1;
+    }
     index = 0;
     while (index < unit->data_count)
     {

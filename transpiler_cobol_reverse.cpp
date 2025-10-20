@@ -1260,18 +1260,6 @@ static int cobol_reverse_identifier_token_matches_any_marker(const t_lexer_token
     return (result);
 }
 
-static int cobol_reverse_identifier_text_matches_any_marker(const char *text, const char **markers)
-{
-    t_lexer_token token;
-
-    if (!text)
-        return (0);
-    ft_bzero(&token, sizeof(token));
-    token.lexeme = text;
-    token.length = ft_strlen(text);
-    return (cobol_reverse_identifier_token_matches_any_marker(&token, markers));
-}
-
 static int cobol_reverse_identifier_token_is_flag(const t_lexer_token *token)
 {
     size_t index;
@@ -1286,18 +1274,6 @@ static int cobol_reverse_identifier_token_is_flag(const t_lexer_token *token)
         index += 1;
     }
     return (0);
-}
-
-static int cobol_reverse_identifier_text_is_flag(const char *text)
-{
-    t_lexer_token token;
-
-    if (!text)
-        return (0);
-    ft_bzero(&token, sizeof(token));
-    token.lexeme = text;
-    token.length = ft_strlen(text);
-    return (cobol_reverse_identifier_token_is_flag(&token));
 }
 
 static int cobol_reverse_append_operator(t_cblc_builder *builder, const t_ast_node *node)
@@ -2230,124 +2206,11 @@ static int cobol_reverse_emit_group_item(t_transpiler_context *context, t_cblc_b
     return (FT_SUCCESS);
 }
 
-static int cobol_reverse_emit_copybook_item(t_transpiler_context *context, t_cblc_builder *builder,
-    const t_transpiler_copybook_item *item)
-{
-    const char *type_text;
-    int is_array;
-    size_t array_length;
-    t_lexer_token name_token;
-    size_t declared_length;
-    int treat_as_flag;
-    int treat_as_buffer;
-
-    if (!builder || !item)
-        return (FT_FAILURE);
-    type_text = NULL;
-    is_array = 0;
-    array_length = 0;
-    declared_length = item->declared_length;
-    treat_as_flag = 0;
-    treat_as_buffer = 0;
-    if (item->kind == TRANSPILE_DATA_ITEM_ALPHANUMERIC)
-    {
-        if (declared_length == 0)
-            declared_length = 1;
-        treat_as_flag = cobol_reverse_identifier_text_is_flag(item->name);
-        treat_as_buffer = cobol_reverse_identifier_text_matches_any_marker(item->name,
-                g_cobol_reverse_character_array_markers);
-        if (declared_length <= 1)
-        {
-            if (treat_as_flag)
-                type_text = "bool";
-            else
-            {
-                type_text = "char";
-                if (treat_as_buffer)
-                {
-                    is_array = 1;
-                    array_length = declared_length;
-                }
-                else
-                    is_array = 0;
-            }
-        }
-        else
-        {
-            type_text = "char";
-            is_array = 1;
-            array_length = declared_length;
-        }
-    }
-    else if (item->kind == TRANSPILE_DATA_ITEM_NUMERIC)
-    {
-        if (declared_length == 0)
-            declared_length = 1;
-        if (declared_length <= 9)
-            type_text = "int";
-        else if (declared_length <= 18)
-            type_text = "long";
-        else
-            type_text = "long long";
-    }
-    else if (item->kind == TRANSPILE_DATA_ITEM_FLOATING)
-    {
-        if (declared_length > 0 && declared_length <= 9)
-            type_text = "float";
-        else
-            type_text = "double";
-    }
-    else
-    {
-        if (context)
-            cobol_reverse_emit_error(context, "Unsupported copybook item kind in reverse translation");
-        return (FT_FAILURE);
-    }
-    if (!type_text)
-    {
-        if (context)
-            cobol_reverse_emit_error(context, "Unsupported copybook item in reverse translation");
-        return (FT_FAILURE);
-    }
-    if (item->is_read_only)
-    {
-        if (cblc_builder_append_string(builder, "const ") != FT_SUCCESS)
-            return (FT_FAILURE);
-    }
-    if (cblc_builder_append_string(builder, type_text) != FT_SUCCESS)
-        return (FT_FAILURE);
-    if (cblc_builder_append_string(builder, " ") != FT_SUCCESS)
-        return (FT_FAILURE);
-    ft_bzero(&name_token, sizeof(name_token));
-    name_token.lexeme = item->name;
-    name_token.length = ft_strlen(item->name);
-    if (cobol_reverse_append_identifier(builder, &name_token) != FT_SUCCESS)
-        return (FT_FAILURE);
-    if (is_array)
-    {
-        if (array_length == 0)
-            array_length = 1;
-        if (cblc_builder_append_char(builder, '[') != FT_SUCCESS)
-            return (FT_FAILURE);
-        if (cblc_builder_append_unsigned(builder,
-                static_cast<unsigned long long>(array_length)) != FT_SUCCESS)
-            return (FT_FAILURE);
-        if (cblc_builder_append_char(builder, ']') != FT_SUCCESS)
-            return (FT_FAILURE);
-    }
-    if (cblc_builder_append_string(builder, ";") != FT_SUCCESS)
-        return (FT_FAILURE);
-    if (cblc_builder_append_newline(builder) != FT_SUCCESS)
-        return (FT_FAILURE);
-    return (FT_SUCCESS);
-}
-
 static int cobol_reverse_emit_copybook_include(t_transpiler_context *context, t_cblc_builder *builder,
     const t_ast_node *include)
 {
     const t_ast_node *name_node;
     const t_transpiler_copybook *copybook;
-    size_t index;
 
     if (!builder)
         return (FT_FAILURE);
@@ -2369,22 +2232,15 @@ static int cobol_reverse_emit_copybook_include(t_transpiler_context *context, t_
             cobol_reverse_emit_error(context, "COPY statement refers to unknown copybook");
         return (FT_FAILURE);
     }
-    if (cblc_builder_append_string(builder, "/* COPY ") != FT_SUCCESS)
+    if (cblc_builder_append_string(builder, "copy \"") != FT_SUCCESS)
         return (FT_FAILURE);
     if (cblc_builder_append_span(builder, name_node->token.lexeme,
             name_node->token.length) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (cblc_builder_append_string(builder, " */") != FT_SUCCESS)
+    if (cblc_builder_append_string(builder, "\";") != FT_SUCCESS)
         return (FT_FAILURE);
     if (cblc_builder_append_newline(builder) != FT_SUCCESS)
         return (FT_FAILURE);
-    index = 0;
-    while (index < copybook->item_count)
-    {
-        if (cobol_reverse_emit_copybook_item(context, builder, &copybook->items[index]) != FT_SUCCESS)
-            return (FT_FAILURE);
-        index += 1;
-    }
     if (copybook->item_count == 0)
     {
         if (cblc_builder_append_string(builder, "/* copybook had no registered items */\n") != FT_SUCCESS)

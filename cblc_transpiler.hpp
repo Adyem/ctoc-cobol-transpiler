@@ -767,6 +767,11 @@ typedef struct s_cblc_import
     char path[TRANSPILE_FILE_PATH_MAX];
 }   t_cblc_import;
 
+typedef struct s_cblc_copy_include
+{
+    char name[TRANSPILE_IDENTIFIER_MAX];
+}   t_cblc_copy_include;
+
 typedef enum e_cblc_statement_type
 {
     CBLC_STATEMENT_ASSIGNMENT,
@@ -803,6 +808,9 @@ typedef struct s_cblc_translation_unit
     t_cblc_import *imports;
     size_t import_count;
     size_t import_capacity;
+    t_cblc_copy_include *copy_includes;
+    size_t copy_include_count;
+    size_t copy_include_capacity;
     t_cblc_function *functions;
     size_t function_count;
     size_t function_capacity;

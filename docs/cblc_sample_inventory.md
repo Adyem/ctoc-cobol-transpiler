@@ -366,18 +366,14 @@ function void MAIN() {
 ```
 
 ### `samples/cblc/reverse_copybook.cblc`
-- **Purpose:** Demonstrates how the reverse emitter expands registered `COPY` books and keeps single-character codes as scalars
-  while preserving buffer-style identifiers as arrays.
-- **Constructs:** Leading comment for the originating `COPY` directive, boolean and character scalars, fixed-length buffers,
-  numeric and floating-point fields, and an empty `function void MAIN()` body that mirrors the COBOL stub.
+- **Purpose:** Demonstrates how the reverse emitter restores registered `COPY` books as explicit CBL-C copy directives so
+  downstream tools can round-trip includes without relying on the expanded field listings while keeping local data declarations
+  alongside the shared working-storage.
+- **Constructs:** `copy` directive referencing the original copybook name, scalar declarations for local state, and an empty
+  `function void MAIN()` body that mirrors the COBOL stub.
 
 ```cblc
-/* COPY CUSTOMER-STATUS */
-bool CUSTOMER_FLAG;
-char CUSTOMER_CODE;
-char CUSTOMER_NAME[32];
-int CUSTOMER_RATING;
-const double CUSTOMER_BALANCE;
+copy "CUSTOMER-STATUS";
 char STATE_CODE = "A";
 char BUFFER_NAME[8];
 
