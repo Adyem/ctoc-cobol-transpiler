@@ -321,6 +321,21 @@ typedef enum e_transpiler_file_role
     TRANSPILE_FILE_ROLE_DATA
 }   t_transpiler_file_role;
 
+typedef enum e_transpiler_file_organization
+{
+    TRANSPILE_FILE_ORGANIZATION_LINE_SEQUENTIAL = 0,
+    TRANSPILE_FILE_ORGANIZATION_SEQUENTIAL,
+    TRANSPILE_FILE_ORGANIZATION_INDEXED,
+    TRANSPILE_FILE_ORGANIZATION_RELATIVE
+}   t_transpiler_file_organization;
+
+typedef enum e_transpiler_file_lock_mode
+{
+    TRANSPILE_FILE_LOCK_MODE_NONE = 0,
+    TRANSPILE_FILE_LOCK_MODE_MANUAL,
+    TRANSPILE_FILE_LOCK_MODE_AUTOMATIC
+}   t_transpiler_file_lock_mode;
+
 typedef struct s_transpiler_file_declaration
 {
     char name[TRANSPILE_IDENTIFIER_MAX];
@@ -328,6 +343,10 @@ typedef struct s_transpiler_file_declaration
     char path[TRANSPILE_FILE_PATH_MAX];
     size_t explicit_record_length;
     size_t inferred_record_length;
+    t_transpiler_file_organization organization;
+    char record_key[TRANSPILE_IDENTIFIER_MAX];
+    char alternate_key[TRANSPILE_IDENTIFIER_MAX];
+    t_transpiler_file_lock_mode lock_mode;
 }   t_transpiler_file_declaration;
 
 typedef struct s_transpiler_module_import
@@ -387,6 +406,29 @@ typedef struct s_transpiler_copybook
     t_transpiler_copybook_item *items;
     size_t item_count;
 }   t_transpiler_copybook;
+
+typedef struct s_transpiler_incremental_cache_entry
+{
+    char input_path[TRANSPILE_FILE_PATH_MAX];
+    char output_path[TRANSPILE_FILE_PATH_MAX];
+    char ast_path[TRANSPILE_FILE_PATH_MAX];
+    long long input_timestamp;
+    unsigned long long input_size;
+    long long output_timestamp;
+    unsigned long long output_size;
+    long long ast_timestamp;
+    unsigned long long ast_size;
+}   t_transpiler_incremental_cache_entry;
+
+typedef struct s_transpiler_incremental_cache
+{
+    t_transpiler_incremental_cache_entry *entries;
+    size_t entry_count;
+    size_t entry_capacity;
+    char manifest_path[TRANSPILE_FILE_PATH_MAX];
+    int dirty;
+    int loaded;
+}   t_transpiler_incremental_cache;
 
 typedef struct s_transpiler_source_map_entry
 {
@@ -492,6 +534,12 @@ int transpiler_context_register_file(t_transpiler_context *context, const char *
     const char *path, size_t explicit_record_length);
 int transpiler_context_record_file_length_hint(t_transpiler_context *context, const char *name, size_t record_length);
 const t_transpiler_file_declaration *transpiler_context_get_files(const t_transpiler_context *context, size_t *count);
+int transpiler_context_configure_file_organization(t_transpiler_context *context, const char *name,
+    t_transpiler_file_organization organization);
+int transpiler_context_configure_file_keys(t_transpiler_context *context, const char *name,
+    const char *record_key, const char *alternate_key);
+int transpiler_context_configure_file_lock_mode(t_transpiler_context *context, const char *name,
+    t_transpiler_file_lock_mode lock_mode);
 int transpiler_context_register_data_item(t_transpiler_context *context, const char *name,
     t_transpiler_data_item_kind kind, size_t declared_length, int is_read_only);
 const t_transpiler_data_item *transpiler_context_find_data_item(const t_transpiler_context *context, const char *name);
@@ -513,6 +561,16 @@ int transpiler_context_record_comment(t_transpiler_context *context, size_t line
     const char *text, size_t length);
 int transpiler_context_get_ast_dump_enabled(const t_transpiler_context *context);
 const char *transpiler_context_get_ast_dump_directory(const t_transpiler_context *context);
+
+int transpiler_incremental_cache_init(t_transpiler_incremental_cache *cache);
+void transpiler_incremental_cache_dispose(t_transpiler_incremental_cache *cache);
+int transpiler_incremental_cache_set_manifest(t_transpiler_incremental_cache *cache, const char *path);
+int transpiler_incremental_cache_load(t_transpiler_incremental_cache *cache);
+int transpiler_incremental_cache_save(t_transpiler_incremental_cache *cache);
+int transpiler_incremental_cache_should_skip(t_transpiler_incremental_cache *cache, const char *input_path,
+    const char *output_path, int *should_skip);
+int transpiler_incremental_cache_record(t_transpiler_incremental_cache *cache, const char *input_path,
+    const char *output_path, const char *ast_path);
 
 // ===============================
 // Lexing, parsing, and AST nodes
@@ -660,6 +718,7 @@ typedef struct s_ast_node
     struct s_ast_node **children;
     size_t child_count;
     size_t child_capacity;
+    unsigned int flags;
 }   t_ast_node;
 
 int ast_node_init(t_ast_node *node, t_ast_node_kind kind);
@@ -687,6 +746,10 @@ void parser_init(t_parser *parser, const char *text);
 void parser_init_with_context(t_parser *parser, const char *text, t_transpiler_context *context);
 void parser_dispose(t_parser *parser);
 int parser_parse_program(t_parser *parser, t_ast_node **out_program);
+
+#define AST_READ_FLAG_NEXT 0x1
+#define AST_READ_FLAG_WITH_LOCK 0x2
+#define AST_READ_FLAG_WITH_NO_LOCK 0x4
 
 // =============================================
 // Pipeline orchestration and semantic validation
@@ -1141,6 +1204,15 @@ const t_transpiler_standard_library_entry *transpiler_standard_library_get_entri
 const t_transpiler_standard_library_entry *transpiler_standard_library_lookup(const char *qualified_name);
 const t_transpiler_standard_library_entry *transpiler_standard_library_lookup_with_buffer_kind(
     const char *qualified_name, t_transpiler_standard_library_buffer_kind buffer_kind);
+
+typedef struct s_transpiler_runtime_helper_entry
+{
+    const char *identifier;
+    const char *source;
+}   t_transpiler_runtime_helper_entry;
+
+const t_transpiler_runtime_helper_entry *transpiler_runtime_helpers_get_entries(size_t *count);
+int transpiler_runtime_helpers_render_c_source(char **out_text);
 
 // ============================
 // Command line and diagnostics

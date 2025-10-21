@@ -160,10 +160,16 @@ static size_t transpiler_codegen_determine_record_length(const t_transpiler_file
     return (256);
 }
 
-static const char *transpiler_codegen_organization_for_role(t_transpiler_file_role role)
+static const char *transpiler_codegen_organization_text(const t_transpiler_file_declaration *file)
 {
-    if (role == TRANSPILE_FILE_ROLE_DATA)
+    if (!file)
+        return ("LINE SEQUENTIAL");
+    if (file->organization == TRANSPILE_FILE_ORGANIZATION_SEQUENTIAL)
         return ("SEQUENTIAL");
+    if (file->organization == TRANSPILE_FILE_ORGANIZATION_INDEXED)
+        return ("INDEXED");
+    if (file->organization == TRANSPILE_FILE_ORGANIZATION_RELATIVE)
+        return ("RELATIVE");
     return ("LINE SEQUENTIAL");
 }
 
@@ -566,9 +572,15 @@ int transpiler_codegen_build_file_sections(const t_transpiler_context *context,
     while (index < file_count)
     {
         char upper_name[TRANSPILE_IDENTIFIER_MAX];
+        char upper_record_key[TRANSPILE_IDENTIFIER_MAX];
+        char upper_alternate_key[TRANSPILE_IDENTIFIER_MAX];
         size_t record_length;
 
         transpiler_codegen_uppercase_copy(files[index].name, upper_name, sizeof(upper_name));
+        transpiler_codegen_uppercase_copy(files[index].record_key, upper_record_key,
+            sizeof(upper_record_key));
+        transpiler_codegen_uppercase_copy(files[index].alternate_key, upper_alternate_key,
+            sizeof(upper_alternate_key));
         if (transpiler_codegen_buffer_begin_area_b_line(&environment_buffer, 0) != FT_SUCCESS)
             goto cleanup;
         if (transpiler_codegen_buffer_append_format(&environment_buffer,
@@ -581,10 +593,49 @@ int transpiler_codegen_build_file_sections(const t_transpiler_context *context,
             goto cleanup;
         if (transpiler_codegen_buffer_append_format(&environment_buffer,
             "ORGANIZATION IS %s.",
-            transpiler_codegen_organization_for_role(files[index].role)) != FT_SUCCESS)
+            transpiler_codegen_organization_text(&files[index])) != FT_SUCCESS)
             goto cleanup;
         if (transpiler_codegen_buffer_end_line(&environment_buffer) != FT_SUCCESS)
             goto cleanup;
+        if (upper_record_key[0] != '\0')
+        {
+            const char *clause_format;
+
+            clause_format = "RECORD KEY IS %s.";
+            if (files[index].organization == TRANSPILE_FILE_ORGANIZATION_RELATIVE)
+                clause_format = "RELATIVE KEY IS %s.";
+            if (transpiler_codegen_buffer_begin_area_b_line(&environment_buffer, 1) != FT_SUCCESS)
+                goto cleanup;
+            if (transpiler_codegen_buffer_append_format(&environment_buffer, clause_format,
+                    upper_record_key) != FT_SUCCESS)
+                goto cleanup;
+            if (transpiler_codegen_buffer_end_line(&environment_buffer) != FT_SUCCESS)
+                goto cleanup;
+        }
+        if (upper_alternate_key[0] != '\0')
+        {
+            if (transpiler_codegen_buffer_begin_area_b_line(&environment_buffer, 1) != FT_SUCCESS)
+                goto cleanup;
+            if (transpiler_codegen_buffer_append_format(&environment_buffer,
+                    "ALTERNATE RECORD KEY IS %s.", upper_alternate_key) != FT_SUCCESS)
+                goto cleanup;
+            if (transpiler_codegen_buffer_end_line(&environment_buffer) != FT_SUCCESS)
+                goto cleanup;
+        }
+        if (files[index].lock_mode != TRANSPILE_FILE_LOCK_MODE_NONE)
+        {
+            const char *lock_clause;
+
+            lock_clause = "LOCK MODE IS MANUAL.";
+            if (files[index].lock_mode == TRANSPILE_FILE_LOCK_MODE_AUTOMATIC)
+                lock_clause = "LOCK MODE IS AUTOMATIC.";
+            if (transpiler_codegen_buffer_begin_area_b_line(&environment_buffer, 1) != FT_SUCCESS)
+                goto cleanup;
+            if (transpiler_codegen_buffer_append_string(&environment_buffer, lock_clause) != FT_SUCCESS)
+                goto cleanup;
+            if (transpiler_codegen_buffer_end_line(&environment_buffer) != FT_SUCCESS)
+                goto cleanup;
+        }
         record_length = transpiler_codegen_determine_record_length(&files[index]);
         if (transpiler_codegen_buffer_begin_area_a_line(&data_buffer) != FT_SUCCESS)
             goto cleanup;

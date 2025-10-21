@@ -7,6 +7,9 @@
 #include "libft/Libft/libft.hpp"
 #include "libft/Printf/printf.hpp"
 
+static t_transpiler_incremental_cache g_incremental_cache;
+static int g_incremental_cache_ready = 0;
+
 static int pipeline_emit_error(t_transpiler_context *context, const char *message)
 {
     if (!context || !message)
@@ -15,6 +18,72 @@ static int pipeline_emit_error(t_transpiler_context *context, const char *messag
         return (FT_FAILURE);
     transpiler_context_record_error(context, FT_FAILURE);
     return (FT_FAILURE);
+}
+
+static int pipeline_select_cache_manifest(const t_transpiler_context *context, char *buffer, size_t buffer_size)
+{
+    const char *directory;
+    size_t length;
+
+    if (!buffer || buffer_size == 0)
+        return (FT_FAILURE);
+    buffer[0] = '\0';
+    directory = NULL;
+    if (context)
+        directory = context->output_directory;
+    if (directory && directory[0] != '\0')
+    {
+        if (pf_snprintf(buffer, buffer_size, "%s/.ctoc-cache", directory) < 0)
+            return (FT_FAILURE);
+        length = static_cast<size_t>(ft_strlen(buffer));
+        if (length + 1 > buffer_size)
+            return (FT_FAILURE);
+        return (FT_SUCCESS);
+    }
+    if (pf_snprintf(buffer, buffer_size, ".ctoc-cache") < 0)
+        return (FT_FAILURE);
+    length = static_cast<size_t>(ft_strlen(buffer));
+    if (length + 1 > buffer_size)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int pipeline_initialize_incremental_cache(t_transpiler_context *context)
+{
+    char manifest_path[TRANSPILE_FILE_PATH_MAX];
+
+    if (!context)
+        return (FT_FAILURE);
+    if (transpiler_incremental_cache_init(&g_incremental_cache) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (pipeline_select_cache_manifest(context, manifest_path, sizeof(manifest_path)) != FT_SUCCESS)
+    {
+        transpiler_incremental_cache_dispose(&g_incremental_cache);
+        return (FT_FAILURE);
+    }
+    if (transpiler_incremental_cache_set_manifest(&g_incremental_cache, manifest_path) != FT_SUCCESS)
+    {
+        transpiler_incremental_cache_dispose(&g_incremental_cache);
+        return (FT_FAILURE);
+    }
+    if (transpiler_incremental_cache_load(&g_incremental_cache) != FT_SUCCESS)
+    {
+        transpiler_incremental_cache_dispose(&g_incremental_cache);
+        return (FT_FAILURE);
+    }
+    g_incremental_cache_ready = 1;
+    return (FT_SUCCESS);
+}
+
+static void pipeline_finalize_incremental_cache(t_transpiler_context *context)
+{
+    if (!g_incremental_cache_ready)
+        return ;
+    if (transpiler_incremental_cache_save(&g_incremental_cache) != FT_SUCCESS && context)
+        (void)transpiler_logging_emit(context, TRANSPILE_SEVERITY_WARNING, 0,
+            "Unable to persist incremental cache manifest");
+    transpiler_incremental_cache_dispose(&g_incremental_cache);
+    g_incremental_cache_ready = 0;
 }
 
 static int pipeline_read_file(const char *path, char **out_text)
@@ -260,14 +329,41 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
     program = NULL;
     status = FT_FAILURE;
     ast_path[0] = '\0';
+    context->source_path = input_path;
+    context->target_path = output_path;
+    context->active_source_text = NULL;
+    context->active_source_length = 0;
+    if (pipeline_resolve_output_path(context, output_path, resolved_path, sizeof(resolved_path)) != FT_SUCCESS)
+    {
+        if (pf_snprintf(message, sizeof(message), "Unable to resolve output path for '%s'", output_path) >= 0)
+            (void)pipeline_emit_error(context, message);
+        goto cleanup;
+    }
+    if (g_incremental_cache_ready)
+    {
+        int should_skip;
+
+        should_skip = 0;
+        if (transpiler_incremental_cache_should_skip(&g_incremental_cache, input_path, resolved_path, &should_skip)
+            != FT_SUCCESS)
+        {
+            if (pf_snprintf(message, sizeof(message), "Unable to query incremental cache for '%s'", input_path) >= 0)
+                (void)transpiler_logging_emit(context, TRANSPILE_SEVERITY_WARNING, 0, message);
+        }
+        else if (should_skip)
+        {
+            if (pf_snprintf(message, sizeof(message), "Skipping '%s'; cached output is current", input_path) >= 0)
+                (void)transpiler_logging_emit(context, TRANSPILE_SEVERITY_INFO, 0, message);
+            status = FT_SUCCESS;
+            goto cleanup;
+        }
+    }
     if (pipeline_read_file(input_path, &source_text) != FT_SUCCESS)
     {
         if (pf_snprintf(message, sizeof(message), "Unable to read input file '%s'", input_path) >= 0)
             (void)pipeline_emit_error(context, message);
         goto cleanup;
     }
-    context->source_path = input_path;
-    context->target_path = output_path;
     context->active_source_text = source_text;
     context->active_source_length = ft_strlen(source_text);
     transpiler_context_clear_comments(context);
@@ -308,12 +404,6 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
             (void)pipeline_emit_error(context, message);
         goto cleanup;
     }
-    if (pipeline_resolve_output_path(context, output_path, resolved_path, sizeof(resolved_path)) != FT_SUCCESS)
-    {
-        if (pf_snprintf(message, sizeof(message), "Unable to resolve output path for '%s'", output_path) >= 0)
-            (void)pipeline_emit_error(context, message);
-        goto cleanup;
-    }
     if (transpiler_context_get_ast_dump_enabled(context))
     {
         if (pipeline_build_ast_output_path(context, input_path, resolved_path, ast_path,
@@ -345,6 +435,20 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
             (void)pipeline_emit_error(context, message);
         goto cleanup;
     }
+    if (g_incremental_cache_ready)
+    {
+        const char *record_ast_path;
+
+        record_ast_path = NULL;
+        if (ast_path[0] != '\0')
+            record_ast_path = ast_path;
+        if (transpiler_incremental_cache_record(&g_incremental_cache, input_path, resolved_path, record_ast_path)
+            != FT_SUCCESS)
+        {
+            if (pf_snprintf(message, sizeof(message), "Failed to update incremental cache for '%s'", input_path) >= 0)
+                (void)transpiler_logging_emit(context, TRANSPILE_SEVERITY_WARNING, 0, message);
+        }
+    }
     status = FT_SUCCESS;
 cleanup:
     if (context)
@@ -366,12 +470,14 @@ cleanup:
 static int pipeline_stage_emit_standard_library(t_transpiler_context *context, void *user_data)
 {
     const t_transpiler_standard_library_entry *entries;
+    char *helper_source;
     size_t entry_count;
     size_t index;
 
     (void)user_data;
     if (!context)
         return (FT_FAILURE);
+    helper_source = NULL;
     entries = transpiler_standard_library_get_entries(&entry_count);
     index = 0;
     while (index < entry_count)
@@ -429,6 +535,62 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
         }
         cma_free(program_text);
         index += 1;
+    }
+    if (transpiler_runtime_helpers_render_c_source(&helper_source) != FT_SUCCESS)
+    {
+        char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+        if (pf_snprintf(message, sizeof(message),
+                "Unable to assemble runtime helper source for packaging") >= 0)
+            (void)pipeline_emit_error(context, message);
+        if (helper_source)
+            cma_free(helper_source);
+        return (FT_FAILURE);
+    }
+    if (helper_source)
+    {
+        char helper_path[TRANSPILE_FILE_PATH_MAX];
+        char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+        const char *prefix;
+        size_t prefix_length;
+        size_t helper_length;
+        char *prefixed_source;
+
+        if (pipeline_resolve_output_path(context, "cblc_runtime_helpers.c", helper_path,
+                sizeof(helper_path)) != FT_SUCCESS)
+        {
+            if (pf_snprintf(message, sizeof(message),
+                    "Unable to resolve output path for runtime helper source") >= 0)
+                (void)pipeline_emit_error(context, message);
+            cma_free(helper_source);
+            return (FT_FAILURE);
+        }
+        prefix = "#include <stddef.h>\n#include <stdio.h>\n\n";
+        prefix_length = ft_strlen(prefix);
+        helper_length = ft_strlen(helper_source);
+        prefixed_source = static_cast<char *>(cma_calloc(prefix_length + helper_length + 1,
+            sizeof(char)));
+        if (!prefixed_source)
+        {
+            if (pf_snprintf(message, sizeof(message),
+                    "Unable to allocate buffer for runtime helper source") >= 0)
+                (void)pipeline_emit_error(context, message);
+            cma_free(helper_source);
+            return (FT_FAILURE);
+        }
+        ft_memcpy(prefixed_source, prefix, prefix_length);
+        ft_memcpy(prefixed_source + prefix_length, helper_source, helper_length);
+        if (pipeline_write_file(helper_path, prefixed_source) != FT_SUCCESS)
+        {
+            if (pf_snprintf(message, sizeof(message),
+                    "Unable to write runtime helper source to '%s'", helper_path) >= 0)
+                (void)pipeline_emit_error(context, message);
+            cma_free(prefixed_source);
+            cma_free(helper_source);
+            return (FT_FAILURE);
+        }
+        cma_free(prefixed_source);
+        cma_free(helper_source);
     }
     return (FT_SUCCESS);
 }
@@ -1083,6 +1245,13 @@ int main(int argc, const char **argv)
         transpiler_cli_options_dispose(&options);
         return (1);
     }
+    if (pipeline_initialize_incremental_cache(&context) != FT_SUCCESS)
+    {
+        transpiler_incremental_cache_dispose(&g_incremental_cache);
+        g_incremental_cache_ready = 0;
+        (void)transpiler_logging_emit(&context, TRANSPILE_SEVERITY_WARNING, 0,
+            "Incremental cache disabled; manifest load failed");
+    }
     status = FT_FAILURE;
     if (context.emit_standard_library)
     {
@@ -1131,6 +1300,7 @@ int main(int argc, const char **argv)
     }
     status = transpiler_pipeline_execute(&pipeline, &context);
 cleanup:
+    pipeline_finalize_incremental_cache(&context);
     transpiler_logging_flush(&context);
     transpiler_context_dispose(&context);
     transpiler_pipeline_dispose(&pipeline);

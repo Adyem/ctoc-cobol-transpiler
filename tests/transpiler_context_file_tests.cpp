@@ -142,6 +142,84 @@ FT_TEST(test_transpiler_context_tracks_record_length_hint)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_transpiler_context_configures_indexed_file_metadata)
+{
+    t_transpiler_context context;
+    const t_transpiler_file_declaration *files;
+    size_t count;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_file(&context, "orders", TRANSPILE_FILE_ROLE_DATA,
+            "orders.dat", 0), "file registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_configure_file_organization(&context, "orders",
+                TRANSPILE_FILE_ORGANIZATION_INDEXED),
+            "organization configuration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_configure_file_keys(&context, "orders",
+                "order-key", "customer-key"),
+            "key configuration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_context_configure_file_lock_mode(&context, "orders",
+                TRANSPILE_FILE_LOCK_MODE_AUTOMATIC),
+            "lock configuration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    files = transpiler_context_get_files(&context, &count);
+    if (!files)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected file registry to be available\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(count), 1,
+            "indexed configuration should keep single entry") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(files[0].organization),
+            static_cast<int>(TRANSPILE_FILE_ORGANIZATION_INDEXED),
+            "organization should record indexed mode") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(files[0].record_key, "order-key",
+            "record key should be stored") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(files[0].alternate_key, "customer-key",
+            "alternate key should be stored") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(static_cast<int>(files[0].lock_mode),
+            static_cast<int>(TRANSPILE_FILE_LOCK_MODE_AUTOMATIC),
+            "lock mode should record automatic selection") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_transpiler_context_records_multiple_io_paths)
 {
     t_transpiler_context context;

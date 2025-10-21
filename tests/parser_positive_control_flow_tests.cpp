@@ -248,3 +248,92 @@ FT_TEST(test_parser_parses_control_flow_statements)
     ast_node_destroy(program);
     return (FT_SUCCESS);
 }
+
+FT_TEST(test_parser_parses_read_next_with_lock_clause)
+{
+    const char *source;
+    t_parser parser;
+    t_ast_node *program;
+    t_ast_node *procedure_division;
+    t_ast_node *paragraph;
+    t_ast_node *sequence;
+    t_ast_node *read_next;
+    t_ast_node *read_with_no_lock;
+
+    source = "IDENTIFICATION DIVISION.\n"
+        "PROGRAM-ID. FILE-TEST.\n"
+        "ENVIRONMENT DIVISION.\n"
+        "DATA DIVISION.\n"
+        "WORKING-STORAGE SECTION.\n"
+        "PROCEDURE DIVISION.\n"
+        "MAIN.\n"
+        "    READ ORDERS NEXT RECORD INTO CURRENT-REC WITH LOCK.\n"
+        "    READ HISTORY WITH NO LOCK.\n"
+        "    STOP RUN.\n";
+    parser_init(&parser, source);
+    program = NULL;
+    if (parser_parse_program(&parser, &program) != FT_SUCCESS)
+    {
+        parser_dispose(&parser);
+        return (FT_FAILURE);
+    }
+    parser_dispose(&parser);
+    if (!program)
+        return (FT_FAILURE);
+    procedure_division = ast_node_get_child(program, 3);
+    if (!procedure_division || procedure_division->kind != AST_NODE_PROCEDURE_DIVISION)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    if (ast_node_child_count(procedure_division) != 1)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    paragraph = ast_node_get_child(procedure_division, 0);
+    if (!paragraph || paragraph->kind != AST_NODE_PARAGRAPH)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    sequence = ast_node_get_child(paragraph, 0);
+    if (!sequence || sequence->kind != AST_NODE_STATEMENT_SEQUENCE)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    if (ast_node_child_count(sequence) != 3)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    read_next = ast_node_get_child(sequence, 0);
+    if (!read_next || read_next->kind != AST_NODE_READ_STATEMENT)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    if ((read_next->flags & AST_READ_FLAG_NEXT) == 0
+        || (read_next->flags & AST_READ_FLAG_WITH_LOCK) == 0
+        || (read_next->flags & AST_READ_FLAG_WITH_NO_LOCK) != 0)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    read_with_no_lock = ast_node_get_child(sequence, 1);
+    if (!read_with_no_lock || read_with_no_lock->kind != AST_NODE_READ_STATEMENT)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    if ((read_with_no_lock->flags & AST_READ_FLAG_WITH_NO_LOCK) == 0
+        || (read_with_no_lock->flags & AST_READ_FLAG_NEXT) != 0
+        || (read_with_no_lock->flags & AST_READ_FLAG_WITH_LOCK) != 0)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    ast_node_destroy(program);
+    return (FT_SUCCESS);
+}

@@ -11,6 +11,7 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Document runtime APIs consumed by generated code for future maintenance.
 - [x] Document contribution guidelines and coding standards for future collaborators.
 - [x] Add a developer onboarding checklist covering setup, build, and test steps.
+- [x] Indexed/relative files: add SELECT/ORGANIZATION handling, key definitions, READ NEXT traversal, and locking controls.
 - [x] Implement file I/O shims (open/read/write/close) that align with COBOL runtime expectations.
 - [x] Establish token definitions, keyword tables, and trivia handling for the lexer.
 - [x] Implement a libft-based lexer that produces token streams without relying on the C++ standard library.
@@ -157,7 +158,6 @@ are completed; keep completed items grouped separately from the remaining work t
 
 ### Data / Encoding / I/O
 
-- [ ] Indexed/relative files: add SELECT/ORGANIZATION handling, key definitions, READ NEXT traversal, and locking controls.
 
 ## Open Issues
 
@@ -165,7 +165,7 @@ are completed; keep completed items grouped separately from the remaining work t
 
 - [x] Deterministic builds: scrub timestamps and paths to guarantee reproducible output.
 - [x] Parallel compilation: build a translation-unit DAG, cache per-file outputs, and support incremental rebuilds.
-- [ ] Factor shared helper emission so the COBOL and C backends reuse a single registry before introducing runtime library packaging.
+- [x] Factor shared helper emission so the COBOL and C backends reuse a single registry before introducing runtime library packaging.
 
 ### Runtime / Stdlib
 
@@ -200,7 +200,7 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Fuzzing: add grammar-based and mutation fuzzers for the lexer and parser to guard against crashes (`make fuzz` invokes
       `scripts/fuzz_transpiler.py`).
 - [x] Property tests: introduce round-trip and normalization idempotence suites.
-- [ ] Differential tests: compare runtime results between COBOL outputs and the alternative C backend.
+- [x] Differential tests: compare runtime results between COBOL outputs and the alternative C backend.
 - [x] Multi-module C backend integration suite: emit several translation units via `--direction cblc-to-c`, compile them together, and confirm helper registration and call graphs remain deterministic.
 - [x] Stress suites: cover huge records, deep nesting, long lines, and wide numerics.
 - [x] Coverage in CI: enforce line and branch coverage thresholds as part of the release gates (`make coverage` guards 60% line / 65% branch coverage).
@@ -209,7 +209,7 @@ are completed; keep completed items grouped separately from the remaining work t
 ### Stretch / Future Enhancements
 - [ ] Extend the grammar to support advanced numeric picture clauses, OCCURS tables, and paragraph factoring.
 - [x] Offer alternate backends (e.g., direct C output) sharing the same AST and semantic pipeline.
-- [ ] Explore performance optimizations (incremental recompilation, caching intermediate representations).
+- [x] Explore performance optimizations (incremental recompilation, caching intermediate representations).
 - [x] Investigate IDE integration hooks (language server, syntax highlighting, code completion).
     - [x] Publish an initial VS Code TextMate grammar and cross-editor setup guide so contributors can enable highlighting quickly.
 - [x] Prototype visualization tooling for pipeline stages and intermediate representations (Graphviz AST dumps via `--dump-ast`).

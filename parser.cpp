@@ -1345,6 +1345,25 @@ static int parser_parse_read_statement(t_parser *parser, t_ast_node *sequence)
         return (FT_FAILURE);
     }
     if (parser->has_current && parser->current.kind == LEXER_TOKEN_IDENTIFIER
+        && parser_token_equals(&parser->current, "NEXT"))
+    {
+        node->flags |= AST_READ_FLAG_NEXT;
+        if (parser_advance(parser) != FT_SUCCESS)
+        {
+            ast_node_destroy(node);
+            return (FT_FAILURE);
+        }
+        if (parser->has_current && parser->current.kind == LEXER_TOKEN_IDENTIFIER
+            && parser_token_equals(&parser->current, "RECORD"))
+        {
+            if (parser_advance(parser) != FT_SUCCESS)
+            {
+                ast_node_destroy(node);
+                return (FT_FAILURE);
+            }
+        }
+    }
+    if (parser->has_current && parser->current.kind == LEXER_TOKEN_IDENTIFIER
         && parser_token_equals(&parser->current, "INTO"))
     {
         if (parser_advance(parser) != FT_SUCCESS)
@@ -1361,6 +1380,52 @@ static int parser_parse_read_statement(t_parser *parser, t_ast_node *sequence)
         {
             ast_node_destroy(node);
             return (FT_FAILURE);
+        }
+    }
+    if (parser->has_current && parser->current.kind == LEXER_TOKEN_IDENTIFIER
+        && parser_token_equals(&parser->current, "WITH"))
+    {
+        if (parser_advance(parser) != FT_SUCCESS)
+        {
+            ast_node_destroy(node);
+            return (FT_FAILURE);
+        }
+        node->flags &= ~(AST_READ_FLAG_WITH_LOCK | AST_READ_FLAG_WITH_NO_LOCK);
+        if (parser->has_current && parser->current.kind == LEXER_TOKEN_IDENTIFIER
+            && parser_token_equals(&parser->current, "NO"))
+        {
+            if (parser_advance(parser) != FT_SUCCESS)
+            {
+                ast_node_destroy(node);
+                return (FT_FAILURE);
+            }
+            if (!parser->has_current || parser->current.kind != LEXER_TOKEN_IDENTIFIER
+                || !parser_token_equals(&parser->current, "LOCK"))
+            {
+                ast_node_destroy(node);
+                return (FT_FAILURE);
+            }
+            node->flags |= AST_READ_FLAG_WITH_NO_LOCK;
+            if (parser_advance(parser) != FT_SUCCESS)
+            {
+                ast_node_destroy(node);
+                return (FT_FAILURE);
+            }
+        }
+        else
+        {
+            if (!parser->has_current || parser->current.kind != LEXER_TOKEN_IDENTIFIER
+                || !parser_token_equals(&parser->current, "LOCK"))
+            {
+                ast_node_destroy(node);
+                return (FT_FAILURE);
+            }
+            node->flags |= AST_READ_FLAG_WITH_LOCK;
+            if (parser_advance(parser) != FT_SUCCESS)
+            {
+                ast_node_destroy(node);
+                return (FT_FAILURE);
+            }
         }
     }
     if (parser->has_current && parser->current.kind == LEXER_TOKEN_PERIOD)

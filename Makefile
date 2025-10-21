@@ -43,6 +43,8 @@ SRC         = \
     transpiler_cli.cpp \
     cblc_formatter.cpp \
     transpiler_logging.cpp \
+    transpiler_incremental_cache.cpp \
+    transpiler_runtime_helpers.cpp \
     transpiler_validation.cpp \
     transpiler_ast_visualizer.cpp \
     transpiler_semantics.cpp \
@@ -306,6 +308,8 @@ TEST_SRC    = tests/test_main.cpp \
               tests/compiler/c/exit_tests.cpp \
               tests/compiler/c/multi_module_tests.cpp \
               tests/compiler/c/tests.cpp \
+              tests/compiler/differential_tests.cpp \
+              tests/compiler/incremental_cache_tests.cpp \
               tests/compiler/cobol/copy_file_tests.cpp \
               tests/compiler/cobol/filter_prefix_tests.cpp \
               tests/compiler/cobol/return_numeric_tests.cpp \
