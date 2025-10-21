@@ -1,58 +1,90 @@
-char headline[40];
-char status_line[32];
-char detail_line[48];
-int base_count;
-int processed_count;
-int combined_total;
-int difference_total;
-int doubled_total;
-int average_batch;
+char audit_header[40];
+char stage_label[32];
+char stage_detail[64];
+char report_line[64];
+char detail_summary[64];
+int policies_in_force;
+int claims_reported;
+int open_investigations;
+int net_premium;
+int claim_payout;
+int loss_ratio_percent;
+int claim_clearance_delta;
+int payout_scaled;
+int audit_header_length;
+int report_line_length;
 
 function void main()
 {
-    headline = "CBL-C FEATURE SHOWCASE";
-    display(headline);
+    std::strcpy(audit_header, "DAILY INSURANCE SNAPSHOT");
+    display(audit_header);
+    audit_header_length = std::strlen(audit_header);
+    display("Header length");
+    display(audit_header_length);
 
-    status_line = "STAGE 1";
-    display(status_line);
-    detail_line = "Load shared buffers";
-    display(detail_line);
+    std::strcpy(stage_label, "STEP 1");
+    display(stage_label);
+    std::strcpy(stage_detail, "Load underwriting context");
+    display(stage_detail);
+    std::strcpy(detail_summary, "Detail summary: Load underwriting context");
+    display(detail_summary);
 
-    status_line = "STAGE 2";
-    display(status_line);
-    detail_line = "Copy headline into detail";
-    display(detail_line);
-    detail_line = headline;
-    display(detail_line);
+    std::strcpy(stage_label, "STEP 2");
+    display(stage_label);
+    std::strcpy(stage_detail, "Sync policy counters");
+    display(stage_detail);
+    std::strcpy(detail_summary, "Detail summary: Sync policy counters");
+    display(detail_summary);
 
-    status_line = "STAGE 3";
-    display(status_line);
-    detail_line = "Reset headline";
-    display(detail_line);
-    headline = "SHOWCASE COMPLETE";
-    display(headline);
+    policies_in_force = 1250;
+    claims_reported = 32;
+    open_investigations = 5;
 
-    status_line = "STAGE 4";
-    display(status_line);
-    detail_line = "Perform numeric calculations";
-    display(detail_line);
+    std::strcpy(stage_detail, "Copy header into report buffer");
+    display(stage_detail);
+    std::strcpy(report_line, audit_header);
+    display(report_line);
+    report_line_length = std::strlen(report_line);
+    display("Report line length");
+    display(report_line_length);
 
-    base_count = 27;
-    processed_count = 15;
-    combined_total = base_count + processed_count;
-    difference_total = base_count - processed_count;
-    doubled_total = combined_total * 2;
-    average_batch = combined_total / 2;
+    std::strcpy(stage_label, "STEP 3");
+    display(stage_label);
+    std::strcpy(stage_detail, "Evaluate reserve impact");
+    display(stage_detail);
+    std::strcpy(detail_summary, "Reserve impact review complete");
+    display(detail_summary);
 
-    display("Combined total (base + processed)");
-    display(combined_total);
-    display("Difference (base - processed)");
-    display(difference_total);
-    display("Double total (combined * 2)");
-    display(doubled_total);
-    display("Average batch (combined / 2)");
-    display(average_batch);
+    net_premium = 480000;
+    claim_payout = 72000;
+    payout_scaled = claim_payout * 100;
+    loss_ratio_percent = payout_scaled / net_premium;
+    claim_clearance_delta = claims_reported - open_investigations;
 
-    display("RUN COMPLETE");
+    std::strcpy(report_line, "Policies in force");
+    display(report_line);
+    display(policies_in_force);
+
+    std::strcpy(report_line, "Claims reported");
+    display(report_line);
+    display(claims_reported);
+
+    std::strcpy(report_line, "Open investigations");
+    display(report_line);
+    display(open_investigations);
+
+    std::strcpy(report_line, "Loss ratio percent");
+    display(report_line);
+    display(loss_ratio_percent);
+
+    std::strcpy(report_line, "Claim clearance delta");
+    display(report_line);
+    display(claim_clearance_delta);
+
+    std::strcpy(stage_label, "STEP 4");
+    display(stage_label);
+    std::strcpy(stage_detail, "All metrics published");
+    display(stage_detail);
+    display("AUDIT COMPLETE");
     return;
 }

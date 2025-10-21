@@ -536,7 +536,8 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
         cma_free(program_text);
         index += 1;
     }
-    if (transpiler_runtime_helpers_render_c_source(&helper_source) != FT_SUCCESS)
+    if (transpiler_runtime_helpers_render_c_source(&helper_source) != FT_SUCCESS
+        || !helper_source || helper_source[0] == '\0')
     {
         char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 
@@ -544,7 +545,10 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
                 "Unable to assemble runtime helper source for packaging") >= 0)
             (void)pipeline_emit_error(context, message);
         if (helper_source)
+        {
             cma_free(helper_source);
+            helper_source = NULL;
+        }
         return (FT_FAILURE);
     }
     if (helper_source)

@@ -198,6 +198,8 @@ static int parser_is_statement_start(t_parser *parser)
         return (1);
     if (parser->current.kind == LEXER_TOKEN_KEYWORD_WRITE)
         return (1);
+    if (parser->current.kind == LEXER_TOKEN_KEYWORD_CALL)
+        return (1);
     if (parser->current.kind == LEXER_TOKEN_KEYWORD_DISPLAY)
         return (1);
     if (parser->current.kind == LEXER_TOKEN_KEYWORD_STOP)
@@ -1538,6 +1540,88 @@ static int parser_parse_display_statement(t_parser *parser, t_ast_node *sequence
     return (parser_set_success(parser));
 }
 
+static int parser_parse_call_statement(t_parser *parser, t_ast_node *sequence)
+{
+    t_ast_node *node;
+    t_ast_node *target_node;
+
+    if (!sequence)
+        return (FT_FAILURE);
+    node = parser_create_node(parser, AST_NODE_CALL_STATEMENT);
+    if (!node)
+        return (FT_FAILURE);
+    if (parser_expect(parser, LEXER_TOKEN_KEYWORD_CALL, NULL) != FT_SUCCESS)
+    {
+        ast_node_destroy(node);
+        return (FT_FAILURE);
+    }
+    if (parser_parse_value_node(parser, &target_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(node);
+        return (FT_FAILURE);
+    }
+    if (parser_add_child(parser, node, target_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(target_node);
+        ast_node_destroy(node);
+        return (FT_FAILURE);
+    }
+    if (parser->has_current && parser->current.kind == LEXER_TOKEN_KEYWORD_USING)
+    {
+        if (parser_advance(parser) != FT_SUCCESS)
+        {
+            ast_node_destroy(node);
+            return (FT_FAILURE);
+        }
+        while (parser->has_current)
+        {
+            if (parser->current.kind == LEXER_TOKEN_PERIOD)
+            {
+                if (parser_expect(parser, LEXER_TOKEN_PERIOD, NULL) != FT_SUCCESS)
+                {
+                    ast_node_destroy(node);
+                    return (FT_FAILURE);
+                }
+                break ;
+            }
+            if (parser_is_statement_start(parser))
+                break ;
+            if (parser->current.kind == LEXER_TOKEN_KEYWORD_BY
+                || parser->current.kind == LEXER_TOKEN_KEYWORD_REFERENCE
+                || parser->current.kind == LEXER_TOKEN_KEYWORD_VALUE
+                || parser->current.kind == LEXER_TOKEN_KEYWORD_CONTENT
+                || parser->current.kind == LEXER_TOKEN_KEYWORD_LENGTH
+                || parser->current.kind == LEXER_TOKEN_KEYWORD_OF
+                || parser->current.kind == LEXER_TOKEN_IDENTIFIER
+                || parser->current.kind == LEXER_TOKEN_NUMERIC_LITERAL
+                || parser->current.kind == LEXER_TOKEN_STRING_LITERAL
+                || parser->current.kind == LEXER_TOKEN_PLUS
+                || parser->current.kind == LEXER_TOKEN_MINUS
+                || parser->current.kind == LEXER_TOKEN_COMMA)
+            {
+                if (parser_advance(parser) != FT_SUCCESS)
+                {
+                    ast_node_destroy(node);
+                    return (FT_FAILURE);
+                }
+                continue ;
+            }
+            break ;
+        }
+    }
+    else if (parser->has_current && parser->current.kind == LEXER_TOKEN_PERIOD)
+    {
+        if (parser_expect(parser, LEXER_TOKEN_PERIOD, NULL) != FT_SUCCESS)
+        {
+            ast_node_destroy(node);
+            return (FT_FAILURE);
+        }
+    }
+    if (parser_add_child(parser, sequence, node) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (parser_set_success(parser));
+}
+
 static int parser_parse_statement(t_parser *parser, t_ast_node *sequence)
 {
     if (!parser)
@@ -1562,6 +1646,8 @@ static int parser_parse_statement(t_parser *parser, t_ast_node *sequence)
         return (parser_parse_read_statement(parser, sequence));
     if (parser->current.kind == LEXER_TOKEN_KEYWORD_WRITE)
         return (parser_parse_write_statement(parser, sequence));
+    if (parser->current.kind == LEXER_TOKEN_KEYWORD_CALL)
+        return (parser_parse_call_statement(parser, sequence));
     if (parser->current.kind == LEXER_TOKEN_KEYWORD_DISPLAY)
         return (parser_parse_display_statement(parser, sequence));
     if (parser->current.kind == LEXER_TOKEN_KEYWORD_STOP)

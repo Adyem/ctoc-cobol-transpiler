@@ -28,6 +28,14 @@ const t_test_case *get_cli_tests(size_t *count)
             total_count++;
             index++;
         }
+        subset = get_cli_standard_library_tests(&subset_count);
+        index = 0;
+        while (index < subset_count)
+        {
+            tests[total_count] = subset[index];
+            total_count++;
+            index++;
+        }
         initialized = 1;
     }
     if (count)

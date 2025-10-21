@@ -621,10 +621,16 @@ typedef enum e_lexer_token_kind
     LEXER_TOKEN_KEYWORD_CLOSE,
     LEXER_TOKEN_KEYWORD_READ,
     LEXER_TOKEN_KEYWORD_WRITE,
+    LEXER_TOKEN_KEYWORD_CALL,
     LEXER_TOKEN_KEYWORD_DISPLAY,
     LEXER_TOKEN_KEYWORD_VARYING,
     LEXER_TOKEN_KEYWORD_FROM,
     LEXER_TOKEN_KEYWORD_BY,
+    LEXER_TOKEN_KEYWORD_USING,
+    LEXER_TOKEN_KEYWORD_REFERENCE,
+    LEXER_TOKEN_KEYWORD_CONTENT,
+    LEXER_TOKEN_KEYWORD_LENGTH,
+    LEXER_TOKEN_KEYWORD_OF,
     LEXER_TOKEN_KEYWORD_END_IF,
     LEXER_TOKEN_KEYWORD_END_PERFORM,
     LEXER_TOKEN_KEYWORD_NOT,
@@ -699,6 +705,7 @@ typedef enum e_ast_node_kind
     AST_NODE_CLOSE_STATEMENT,
     AST_NODE_READ_STATEMENT,
     AST_NODE_WRITE_STATEMENT,
+    AST_NODE_CALL_STATEMENT,
     AST_NODE_DISPLAY_STATEMENT,
     AST_NODE_STOP_STATEMENT,
     AST_NODE_CONDITION,
@@ -886,6 +893,8 @@ typedef struct s_cblc_translation_unit
     size_t function_count;
     size_t function_capacity;
     size_t entry_function_index;
+    size_t helper_literal_counter;
+    int helper_status_index;
     char program_name[TRANSPILE_IDENTIFIER_MAX];
 }   t_cblc_translation_unit;
 

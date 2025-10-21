@@ -7,5 +7,6 @@
 
 const t_test_case *get_cli_parse_success_tests(size_t *count);
 const t_test_case *get_cli_parse_failure_tests(size_t *count);
+const t_test_case *get_cli_standard_library_tests(size_t *count);
 
 #endif

@@ -1,43 +1,57 @@
 REPO_ROOT := $(abspath ../..)
 ifeq ($(OS),Windows_NT)
 EXE_EXT := .exe
+MODULE_EXT := .dll
 else
 EXE_EXT :=
+MODULE_EXT := .so
 endif
 
 TRANSPILER := $(REPO_ROOT)/ctoc_cobol_transpiler$(EXE_EXT)
 COBC ?= cobc
 
 CBLC_PROGRAMS := message_showcase message_showcase_banner message_showcase_metrics
-COBOL_PROGRAMS := message_showcase_io
 CBLC_SOURCES := $(addsuffix .cblc,$(CBLC_PROGRAMS))
 GENERATED_COB := $(addsuffix .cob,$(CBLC_PROGRAMS))
-STATIC_COB := $(addsuffix .cob,$(COBOL_PROGRAMS))
-ALL_PROGRAMS := $(CBLC_PROGRAMS) $(COBOL_PROGRAMS)
-EXECUTABLES := $(addsuffix $(EXE_EXT),$(ALL_PROGRAMS))
+EXECUTABLES := $(addsuffix $(EXE_EXT),$(CBLC_PROGRAMS))
+
 STD_DIR := stdlib
 STD_SENTINEL := $(STD_DIR)/.standard_library_built
-IO_INPUT := showcase_transactions.dat
-IO_OUTPUT := showcase_success.txt showcase_failure.txt
-IO_SENTINEL := .io_seeded
-
+STD_HELPERS := CBLC-ABS CBLC-STRCAT CBLC-STRCPY CBLC-STRLEN
+STD_SOURCES := $(addprefix $(STD_DIR)/,$(addsuffix .cob,$(STD_HELPERS)))
+STD_MODULES := $(addprefix $(STD_DIR)/,$(addsuffix $(MODULE_EXT),$(STD_HELPERS)))
 SETUP_SENTINEL := .environment_ready
+ACTUAL_OUTPUT := actual_output.log
 
-.PHONY: all clean run transpile compile compiler ensure_environment ensure_cobc stdlib io-fixtures
+RUN_SHOWCASE = ./message_showcase$(EXE_EXT); \
+printf '\n'; \
+./message_showcase_banner$(EXE_EXT); \
+printf '\n'; \
+./message_showcase_metrics$(EXE_EXT); \
+printf '\n'; \
+printf '%s\n' "Standard library functions bundled with the showcase:"; \
+printf '%s\n' $(foreach helper,$(STD_HELPERS),$(STD_DIR)/$(helper).cob $(STD_DIR)/$(helper)$(MODULE_EXT))
 
-all: stdlib transpile compile
+.PHONY: all clean run verify transpile compile stdlib ensure_environment ensure_cobc
+
+all: ensure_environment stdlib transpile compile
 
 transpile: $(GENERATED_COB)
 
-stdlib: $(STD_SENTINEL)
+stdlib: $(STD_SENTINEL) $(STD_MODULES)
 
-compile: $(EXECUTABLES)
+compile: $(EXECUTABLES) $(STD_MODULES)
 
-run: io-fixtures $(EXECUTABLES)
-	./message_showcase$(EXE_EXT)
-	./message_showcase_banner$(EXE_EXT)
-	./message_showcase_metrics$(EXE_EXT)
-	./message_showcase_io$(EXE_EXT)
+run: $(EXECUTABLES) $(STD_MODULES)
+	@set -e; \
+	export COB_LIBRARY_PATH=$(abspath $(STD_DIR)); \
+	$(RUN_SHOWCASE)
+
+verify: $(EXECUTABLES) $(STD_MODULES)
+	@set -e; \
+	export COB_LIBRARY_PATH=$(abspath $(STD_DIR)); \
+	{ $(RUN_SHOWCASE); } | sed 's/[[:space:]]*$$//' | tee $(ACTUAL_OUTPUT)
+	@diff -u EXPECTED_OUTPUT.txt $(ACTUAL_OUTPUT)
 
 %$(EXE_EXT): %.cob | ensure_cobc
 	$(COBC) -x -free -o $@ $<
@@ -55,24 +69,23 @@ run: io-fixtures $(EXECUTABLES)
 $(STD_SENTINEL): $(TRANSPILER)
 	mkdir -p $(STD_DIR)
 	CTOC_SKIP_STANDARD_LIBRARY_VALIDATION=1 $(TRANSPILER) --direction standard-library \
-		--output-dir $(abspath $(STD_DIR)) \
-		--diagnostics silent
+	        --output-dir $(abspath $(STD_DIR)) \
+	        --diagnostics silent
 	touch $@
 
-io-fixtures: $(IO_SENTINEL)
-
-$(IO_SENTINEL):
-	printf 'A 00027\nR 00015\nA 00012\n' > $(IO_INPUT)
-	touch $(IO_SENTINEL)
-
-compiler: $(TRANSPILER)
+$(STD_DIR)/%$(MODULE_EXT): $(STD_SENTINEL) | ensure_cobc
+	@if [ ! -f $(STD_DIR)/$*.cob ]; then \
+	        printf 'The standard library source %s is missing.\n' "$(STD_DIR)/$*.cob"; \
+	        exit 1; \
+	fi
+	$(COBC) -m -free -o $@ $(STD_DIR)/$*.cob
 
 ensure_environment: $(SETUP_SENTINEL)
 
 $(SETUP_SENTINEL):
 	$(MAKE) -C $(REPO_ROOT) initialize
 	$(MAKE) -C $(REPO_ROOT) install_cobc
-	touch $(SETUP_SENTINEL)
+	touch $@
 
 ensure_cobc:
 	@if ! command -v $(COBC) >/dev/null 2>&1; then \
@@ -88,5 +101,6 @@ $(TRANSPILER): | $(SETUP_SENTINEL)
 	$(MAKE) -C $(REPO_ROOT) all
 
 clean:
-	rm -f $(GENERATED_COB) $(EXECUTABLES) $(SETUP_SENTINEL) $(STD_SENTINEL) $(IO_SENTINEL) $(IO_INPUT) $(IO_OUTPUT)
+	rm -f $(GENERATED_COB) $(EXECUTABLES) $(SETUP_SENTINEL) $(STD_SENTINEL) $(ACTUAL_OUTPUT)
+	rm -f $(STD_MODULES)
 	rm -rf $(STD_DIR)

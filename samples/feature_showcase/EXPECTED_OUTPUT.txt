@@ -1,53 +1,78 @@
-CBL-C FEATURE SHOWCASE
-STAGE 1
-Load shared buffers
-STAGE 2
-Copy headline into detail
-CBL-C FEATURE SHOWCASE
-STAGE 3
-Reset headline
-SHOWCASE COMPLETE
-STAGE 4
-Perform numeric calculations
-Combined total (base + processed)
-+000000042
-Difference (base - processed)
-+000000012
-Double total (combined * 2)
-+000000084
-Average batch (combined / 2)
-+000000021
-RUN COMPLETE
+DAILY INSURANCE SNAPSHOT
+Header length
++000000024
+STEP 1
+Load underwriting context
+Detail summary: Load underwriting context
+STEP 2
+Sync policy counters
+Detail summary: Sync policy counters
+Copy header into report buffer
+DAILY INSURANCE SNAPSHOT
+Report line length
++000000024
+STEP 3
+Evaluate reserve impact
+Reserve impact review complete
+Policies in force
++000001250
+Claims reported
++000000032
+Open investigations
++000000005
+Loss ratio percent
++000000015
+Claim clearance delta
++000000027
+STEP 4
+All metrics published
+AUDIT COMPLETE
 
-SHOWCASE MODULES
-Activating banner helpers
-STAGE 1
-Initialize counters
-STAGE 2
-Display worker status
-Worker module online
-BANNER TOTAL
-+000000002
+RISK ENGINE MODULES
+Bootstrapping analytics banner
+Header chars
++000000019
+UNDERWRITING
+Policy analytics active
+UNDERWRITING / Policy analytics active
+CLAIMS
+Claims triage active
+CLAIMS / Claims triage active
+REPORTING
+Compliance publishing ready
+REPORTING / Compliance publishing ready
+Latest summary length
++000000039
+MODULE COUNT
++000000003
 
-METRIC STAGE
-Combined total (base + processed)
-+000000042
-Difference (base - processed)
-+000000012
-Double total (combined * 2)
-+000000084
-Average batch (combined / 2)
-+000000021
-FINAL METRIC TOTALS
-+000000042
-+000000012
-+000000084
-+000000021
+DAILY RISK METRICS
+Net premium written
++000480000
+Claim payout total
++000072000
+Loss ratio percent
++000000015
+Reserve target gap
++000120000
+Average paid claim
++000036000
+Trend note: Average claim stable
+Note length
++000000032
+SUMMARY TOTALS
++000480000
++000072000
++000000015
++000120000
++000036000
 
-IO SHOWCASE
-SUCCESS COUNT
-        2
-FAILURE COUNT
-        1
-TOTAL AMOUNT
-       39
+Standard library functions bundled with the showcase:
+stdlib/CBLC-ABS.cob
+stdlib/CBLC-ABS.so
+stdlib/CBLC-STRCAT.cob
+stdlib/CBLC-STRCAT.so
+stdlib/CBLC-STRCPY.cob
+stdlib/CBLC-STRCPY.so
+stdlib/CBLC-STRLEN.cob
+stdlib/CBLC-STRLEN.so
