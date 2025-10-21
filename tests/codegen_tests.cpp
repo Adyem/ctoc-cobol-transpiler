@@ -83,6 +83,59 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_transpiler_codegen_emits_indexed_file_metadata)
+{
+    t_transpiler_context context;
+    t_transpiler_cobol_file_sections sections;
+    int status;
+
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    transpiler_codegen_file_sections_init(&sections);
+    if (test_expect_success(transpiler_context_register_file(&context, "indexed_store", TRANSPILE_FILE_ROLE_DATA,
+            "indexed.dat", 64), "indexed file registration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(transpiler_context_configure_file_organization(&context, "indexed_store",
+                TRANSPILE_FILE_ORGANIZATION_INDEXED),
+            "organization configuration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(transpiler_context_configure_file_keys(&context, "indexed_store",
+                "primary-key", "alt-key"),
+            "key configuration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(transpiler_context_configure_file_lock_mode(&context, "indexed_store",
+                TRANSPILE_FILE_LOCK_MODE_MANUAL),
+            "lock mode configuration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(transpiler_codegen_build_file_sections(&context, &sections),
+            "codegen should include indexed metadata") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(sections.environment_division,
+            "       ENVIRONMENT DIVISION.\n"
+            "       INPUT-OUTPUT SECTION.\n"
+            "       FILE-CONTROL.\n"
+            "           SELECT INDEXED_STORE ASSIGN TO \"indexed.dat\"\n"
+            "               ORGANIZATION IS INDEXED.\n"
+            "               RECORD KEY IS PRIMARY-KEY.\n"
+            "               ALTERNATE RECORD KEY IS ALT-KEY.\n"
+            "               LOCK MODE IS MANUAL.\n",
+            "environment division should include indexed clauses") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(sections.data_division,
+            "       DATA DIVISION.\n"
+            "       FILE SECTION.\n"
+            "       FD INDEXED_STORE.\n"
+            "       01 INDEXED_STORE-REC PIC X(64).\n",
+            "data division should reflect explicit record length") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    transpiler_codegen_file_sections_dispose(&sections);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
 FT_TEST(test_transpiler_codegen_formats_if_else)
 {
     t_transpiler_cobol_procedure procedure;

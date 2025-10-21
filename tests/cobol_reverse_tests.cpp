@@ -229,10 +229,85 @@ FT_TEST(test_cobol_reverse_fixtures)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_cobol_reverse_emits_read_lock_variants)
+{
+    const char *source;
+    t_transpiler_context context;
+    t_parser parser;
+    t_ast_node *program;
+    char *output;
+    int status;
+
+    source = "IDENTIFICATION DIVISION.\n"
+        "PROGRAM-ID. LOCKING.\n"
+        "ENVIRONMENT DIVISION.\n"
+        "DATA DIVISION.\n"
+        "WORKING-STORAGE SECTION.\n"
+        "01 INPUT-REC PIC X(8).\n"
+        "PROCEDURE DIVISION.\n"
+        "MAIN.\n"
+        "    READ INPUT-FILE NEXT RECORD INTO INPUT-REC WITH LOCK.\n"
+        "    READ HISTORY WITH NO LOCK.\n"
+        "    STOP RUN.\n";
+    output = NULL;
+    program = NULL;
+    if (test_expect_success(transpiler_context_init(&context),
+            "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    transpiler_context_set_languages(&context, TRANSPILE_LANGUAGE_COBOL,
+        TRANSPILE_LANGUAGE_CBL_C);
+    context.active_source_text = source;
+    context.active_source_length = ft_strlen(source);
+    transpiler_context_clear_comments(&context);
+    parser_init_with_context(&parser, source, &context);
+    status = parser_parse_program(&parser, &program);
+    parser_dispose(&parser);
+    if (test_expect_success(status, "parsing inline COBOL should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        if (program)
+            ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(transpiler_cobol_program_to_cblc(&context, program, &output),
+            "reverse translation should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        ast_node_destroy(program);
+        if (output)
+            cma_free(output);
+        return (FT_FAILURE);
+    }
+    if (!output || !ft_strstr(output, "read_next_with_lock(INPUT_FILE, INPUT_REC);"))
+    {
+        transpiler_context_dispose(&context);
+        ast_node_destroy(program);
+        if (output)
+            cma_free(output);
+        pf_printf("Assertion failed: expected read_next_with_lock call in output\n");
+        return (FT_FAILURE);
+    }
+    if (!ft_strstr(output, "read_with_no_lock(HISTORY);"))
+    {
+        transpiler_context_dispose(&context);
+        ast_node_destroy(program);
+        if (output)
+            cma_free(output);
+        pf_printf("Assertion failed: expected read_with_no_lock call in output\n");
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    ast_node_destroy(program);
+    if (output)
+        cma_free(output);
+    return (FT_SUCCESS);
+}
+
 const t_test_case *get_cobol_reverse_tests(size_t *count)
 {
     static const t_test_case tests[] = {
-        {"cobol_reverse_fixtures", test_cobol_reverse_fixtures}
+        {"cobol_reverse_fixtures", test_cobol_reverse_fixtures},
+        {"cobol_reverse_emits_read_lock_variants", test_cobol_reverse_emits_read_lock_variants}
     };
 
     if (count)

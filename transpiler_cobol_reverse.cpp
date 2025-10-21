@@ -1653,6 +1653,7 @@ static int cobol_reverse_emit_read(t_transpiler_context *context, t_cblc_builder
 {
     const t_ast_node *file_node;
     const t_ast_node *target_node;
+    const char *call_name;
 
     (void)context;
     if (!statement)
@@ -1663,9 +1664,25 @@ static int cobol_reverse_emit_read(t_transpiler_context *context, t_cblc_builder
     target_node = NULL;
     if (ast_node_child_count(statement) > 1)
         target_node = ast_node_get_child(statement, 1);
+    call_name = "read";
+    if ((statement->flags & AST_READ_FLAG_NEXT) != 0)
+    {
+        if ((statement->flags & AST_READ_FLAG_WITH_LOCK) != 0)
+            call_name = "read_next_with_lock";
+        else if ((statement->flags & AST_READ_FLAG_WITH_NO_LOCK) != 0)
+            call_name = "read_next_with_no_lock";
+        else
+            call_name = "read_next";
+    }
+    else if ((statement->flags & AST_READ_FLAG_WITH_LOCK) != 0)
+        call_name = "read_with_lock";
+    else if ((statement->flags & AST_READ_FLAG_WITH_NO_LOCK) != 0)
+        call_name = "read_with_no_lock";
     if (cblc_builder_append_indentation(builder, indentation) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (cblc_builder_append_string(builder, "read(") != FT_SUCCESS)
+    if (cblc_builder_append_string(builder, call_name) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_string(builder, "(") != FT_SUCCESS)
         return (FT_FAILURE);
     if (cobol_reverse_append_value(builder, file_node) != FT_SUCCESS)
         return (FT_FAILURE);

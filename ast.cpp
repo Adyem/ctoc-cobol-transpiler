@@ -50,6 +50,7 @@ int ast_node_init(t_ast_node *node, t_ast_node_kind kind)
     node->children = NULL;
     node->child_count = 0;
     node->child_capacity = 0;
+    node->flags = 0;
     ast_node_reset_token(node);
     return (FT_SUCCESS);
 }

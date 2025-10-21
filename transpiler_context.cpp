@@ -1515,6 +1515,25 @@ const t_transpiler_entrypoint *transpiler_context_get_entrypoint(const t_transpi
     return (&context->entrypoint);
 }
 
+static t_transpiler_file_declaration *transpiler_context_find_file_mutable(t_transpiler_context *context,
+    const char *name)
+{
+    size_t index;
+
+    if (!context)
+        return (NULL);
+    if (!name)
+        return (NULL);
+    index = 0;
+    while (index < context->file_count)
+    {
+        if (ft_strncmp(context->files[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+            return (&context->files[index]);
+        index += 1;
+    }
+    return (NULL);
+}
+
 int transpiler_context_register_file(t_transpiler_context *context, const char *name, t_transpiler_file_role role,
     const char *path, size_t explicit_record_length)
 {
@@ -1552,6 +1571,12 @@ int transpiler_context_register_file(t_transpiler_context *context, const char *
     file->role = role;
     file->explicit_record_length = explicit_record_length;
     file->inferred_record_length = explicit_record_length;
+    file->organization = TRANSPILE_FILE_ORGANIZATION_LINE_SEQUENTIAL;
+    if (role == TRANSPILE_FILE_ROLE_DATA)
+        file->organization = TRANSPILE_FILE_ORGANIZATION_SEQUENTIAL;
+    file->record_key[0] = '\0';
+    file->alternate_key[0] = '\0';
+    file->lock_mode = TRANSPILE_FILE_LOCK_MODE_NONE;
     context->file_count += 1;
     return (FT_SUCCESS);
 }
@@ -1599,6 +1624,79 @@ const t_transpiler_file_declaration *transpiler_context_get_files(const t_transp
     if (count)
         *count = context->file_count;
     return (context->files);
+}
+
+int transpiler_context_configure_file_organization(t_transpiler_context *context, const char *name,
+    t_transpiler_file_organization organization)
+{
+    t_transpiler_file_declaration *file;
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+    if (!context)
+        return (FT_FAILURE);
+    file = transpiler_context_find_file_mutable(context, name);
+    if (!file)
+    {
+        pf_snprintf(message, sizeof(message),
+            "file '%s' not declared before configuring organization", name ? name : "");
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_FILE_UNKNOWN, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_FILE_UNKNOWN);
+        return (FT_FAILURE);
+    }
+    file->organization = organization;
+    return (FT_SUCCESS);
+}
+
+int transpiler_context_configure_file_keys(t_transpiler_context *context, const char *name,
+    const char *record_key, const char *alternate_key)
+{
+    t_transpiler_file_declaration *file;
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+    if (!context)
+        return (FT_FAILURE);
+    file = transpiler_context_find_file_mutable(context, name);
+    if (!file)
+    {
+        pf_snprintf(message, sizeof(message),
+            "file '%s' not declared before configuring keys", name ? name : "");
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_FILE_UNKNOWN, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_FILE_UNKNOWN);
+        return (FT_FAILURE);
+    }
+    if (record_key)
+        ft_strlcpy(file->record_key, record_key, sizeof(file->record_key));
+    else
+        file->record_key[0] = '\0';
+    if (alternate_key)
+        ft_strlcpy(file->alternate_key, alternate_key, sizeof(file->alternate_key));
+    else
+        file->alternate_key[0] = '\0';
+    return (FT_SUCCESS);
+}
+
+int transpiler_context_configure_file_lock_mode(t_transpiler_context *context, const char *name,
+    t_transpiler_file_lock_mode lock_mode)
+{
+    t_transpiler_file_declaration *file;
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+    if (!context)
+        return (FT_FAILURE);
+    file = transpiler_context_find_file_mutable(context, name);
+    if (!file)
+    {
+        pf_snprintf(message, sizeof(message),
+            "file '%s' not declared before configuring lock mode", name ? name : "");
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_FILE_UNKNOWN, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_FILE_UNKNOWN);
+        return (FT_FAILURE);
+    }
+    file->lock_mode = lock_mode;
+    return (FT_SUCCESS);
 }
 
 int transpiler_context_register_data_item(t_transpiler_context *context, const char *name,
