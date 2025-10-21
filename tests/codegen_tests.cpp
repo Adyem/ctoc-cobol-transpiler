@@ -172,6 +172,63 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_transpiler_codegen_formats_compute_with_rounding)
+{
+    t_transpiler_cobol_procedure procedure;
+    t_transpiler_cobol_paragraph *paragraph;
+    t_transpiler_cobol_statement_block *block;
+    t_transpiler_cobol_statement *compute_statement;
+    char *procedure_text;
+    int status;
+
+    transpiler_cobol_procedure_init(&procedure);
+    paragraph = transpiler_cobol_paragraph_create("main");
+    if (!paragraph)
+        return (FT_FAILURE);
+    block = transpiler_cobol_paragraph_get_statements(paragraph);
+    if (!block)
+    {
+        transpiler_cobol_paragraph_destroy(paragraph);
+        return (FT_FAILURE);
+    }
+    compute_statement = NULL;
+    procedure_text = NULL;
+    status = FT_FAILURE;
+    compute_statement = transpiler_cobol_statement_create_compute("TOTAL",
+        "LEFT + RIGHT", 1);
+    if (!compute_statement)
+        goto cleanup;
+    if (transpiler_cobol_statement_block_append(block, compute_statement) != FT_SUCCESS)
+    {
+        transpiler_cobol_statement_destroy(compute_statement);
+        compute_statement = NULL;
+        goto cleanup;
+    }
+    compute_statement = NULL;
+    if (transpiler_cobol_procedure_append(&procedure, paragraph) != FT_SUCCESS)
+        goto cleanup;
+    paragraph = NULL;
+    if (test_expect_success(transpiler_codegen_build_procedure_division(&procedure, &procedure_text),
+            "procedure generation should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(procedure_text,
+            "       PROCEDURE DIVISION.\n"
+            "       MAIN.\n"
+            "           COMPUTE TOTAL ROUNDED = LEFT + RIGHT\n",
+            "procedure division should format COMPUTE with ROUNDED clause") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (procedure_text)
+        cma_free(procedure_text);
+    if (compute_statement)
+        transpiler_cobol_statement_destroy(compute_statement);
+    if (paragraph)
+        transpiler_cobol_paragraph_destroy(paragraph);
+    transpiler_cobol_procedure_dispose(&procedure);
+    return (status);
+}
+
 FT_TEST(test_transpiler_codegen_formats_perform_until)
 {
     t_transpiler_cobol_procedure procedure;

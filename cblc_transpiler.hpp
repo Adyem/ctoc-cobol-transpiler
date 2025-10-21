@@ -187,7 +187,8 @@ typedef enum e_transpiler_language
 {
     TRANSPILE_LANGUAGE_NONE = 0,
     TRANSPILE_LANGUAGE_CBL_C,
-    TRANSPILE_LANGUAGE_COBOL
+    TRANSPILE_LANGUAGE_COBOL,
+    TRANSPILE_LANGUAGE_C
 }   t_transpiler_language;
 
 typedef enum e_transpiler_format_mode
@@ -408,12 +409,14 @@ typedef struct s_transpiler_context
     size_t target_count;
     size_t target_capacity;
     const char *output_directory;
+    const char *ast_dump_directory;
     int emit_standard_library;
     t_transpiler_format_mode format_mode;
     t_transpiler_layout_mode layout_mode;
     t_transpiler_diagnostic_level diagnostic_level;
     int warnings_as_errors;
     t_transpiler_warning_settings warning_settings;
+    int ast_dump_enabled;
     t_transpiler_diagnostic_list diagnostics;
     int last_error_code;
     t_transpiler_function_signature *functions;
@@ -452,6 +455,8 @@ int transpiler_context_set_io_paths(t_transpiler_context *context, const char **
     const char **target_paths, size_t target_count);
 void transpiler_context_set_output_directory(t_transpiler_context *context, const char *output_directory);
 void transpiler_context_set_emit_standard_library(t_transpiler_context *context, int emit);
+void transpiler_context_set_ast_dump_directory(t_transpiler_context *context, const char *directory);
+void transpiler_context_set_ast_dump_enabled(t_transpiler_context *context, int enabled);
 void transpiler_context_set_format_mode(t_transpiler_context *context, t_transpiler_format_mode mode);
 void transpiler_context_set_layout_mode(t_transpiler_context *context, t_transpiler_layout_mode mode);
 void transpiler_context_set_diagnostic_level(t_transpiler_context *context, t_transpiler_diagnostic_level level);
@@ -506,6 +511,8 @@ void transpiler_context_clear_comments(t_transpiler_context *context);
 void transpiler_context_reset_comment_iteration(t_transpiler_context *context);
 int transpiler_context_record_comment(t_transpiler_context *context, size_t line, size_t column,
     const char *text, size_t length);
+int transpiler_context_get_ast_dump_enabled(const t_transpiler_context *context);
+const char *transpiler_context_get_ast_dump_directory(const t_transpiler_context *context);
 
 // ===============================
 // Lexing, parsing, and AST nodes
@@ -741,6 +748,7 @@ int transpiler_semantics_analyze_program(t_transpiler_context *context, const t_
 
 int transpiler_validate_generated_cblc(const char *text);
 int transpiler_validate_generated_cobol(const char *text);
+int transpiler_ast_visualize_program(const t_ast_node *program, const char *path);
 
 // ==================================
 // COBOL and CBLC transformation APIs
@@ -822,10 +830,23 @@ void cblc_translation_unit_init(t_cblc_translation_unit *unit);
 void cblc_translation_unit_dispose(t_cblc_translation_unit *unit);
 int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit);
 int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text);
+int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text);
 int cblc_register_translation_unit_exports(t_transpiler_context *context, const char *module_name,
     const t_cblc_translation_unit *unit);
 int cblc_resolve_translation_unit_calls(t_transpiler_context *context, const char *module_name,
     t_cblc_translation_unit *unit);
+
+typedef struct s_transpiler_parallel_result
+{
+    char *text;
+    int status;
+    char error_message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+}   t_transpiler_parallel_result;
+
+int transpiler_parallel_generate_cobol(const t_cblc_translation_unit *const *units,
+    const char *const *source_paths, size_t job_count,
+    t_transpiler_parallel_result **out_results);
+void transpiler_parallel_results_dispose(t_transpiler_parallel_result *results, size_t job_count);
 
 int transpiler_cobol_program_to_cblc(t_transpiler_context *context, const t_ast_node *program,
     char **out_text);
@@ -914,6 +935,7 @@ typedef struct s_transpiler_cobol_statement_block
 typedef enum e_transpiler_cobol_statement_kind
 {
     TRANSPILE_COBOL_STATEMENT_MOVE = 0,
+    TRANSPILE_COBOL_STATEMENT_COMPUTE,
     TRANSPILE_COBOL_STATEMENT_IF,
     TRANSPILE_COBOL_STATEMENT_PERFORM_UNTIL,
     TRANSPILE_COBOL_STATEMENT_PERFORM_VARYING,
@@ -925,6 +947,13 @@ typedef struct s_transpiler_cobol_move_statement
     const char *source;
     const char *target;
 }   t_transpiler_cobol_move_statement;
+
+typedef struct s_transpiler_cobol_compute_statement
+{
+    const char *target;
+    const char *expression;
+    int rounded;
+}   t_transpiler_cobol_compute_statement;
 
 typedef struct s_transpiler_cobol_call_statement
 {
@@ -961,6 +990,7 @@ typedef struct s_transpiler_cobol_statement
 {
     t_transpiler_cobol_statement_kind kind;
     t_transpiler_cobol_move_statement move;
+    t_transpiler_cobol_compute_statement compute;
     t_transpiler_cobol_if_statement if_statement;
     t_transpiler_cobol_perform_until perform_until;
     t_transpiler_cobol_perform_varying perform_varying;
@@ -985,6 +1015,8 @@ void transpiler_cobol_statement_block_dispose(t_transpiler_cobol_statement_block
 int transpiler_cobol_statement_block_append(t_transpiler_cobol_statement_block *block,
     t_transpiler_cobol_statement *statement);
 t_transpiler_cobol_statement *transpiler_cobol_statement_create_move(const char *source, const char *target);
+t_transpiler_cobol_statement *transpiler_cobol_statement_create_compute(const char *target,
+    const char *expression, int rounded);
 t_transpiler_cobol_statement *transpiler_cobol_statement_create_if(const t_transpiler_cobol_condition *condition);
 t_transpiler_cobol_statement *transpiler_cobol_statement_create_perform_until(
     const t_transpiler_cobol_condition *condition);
@@ -1131,6 +1163,8 @@ typedef struct s_transpiler_cli_options
     t_transpiler_warning_settings warning_settings;
     int show_help;
     int emit_standard_library;
+    int dump_ast;
+    const char *dump_ast_directory;
 }   t_transpiler_cli_options;
 
 int transpiler_cli_options_init(t_transpiler_cli_options *options);

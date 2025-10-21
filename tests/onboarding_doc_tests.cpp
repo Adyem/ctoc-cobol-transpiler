@@ -52,17 +52,19 @@ FT_TEST(test_onboarding_doc_exists)
     return (FT_SUCCESS);
 }
 
-FT_TEST(test_onboarding_doc_covers_repository_setup)
+FT_TEST(test_onboarding_doc_covers_local_build)
 {
     char buffer[65536];
 
     if (onboarding_doc_load(buffer, sizeof(buffer)) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (onboarding_doc_expect_contains(buffer, "Repository Setup") != FT_SUCCESS)
+    if (onboarding_doc_expect_contains(buffer, "Local Build") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (onboarding_doc_expect_contains(buffer, "git clone --recurse-submodules") != FT_SUCCESS)
+    if (onboarding_doc_expect_contains(buffer, "make all") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (onboarding_doc_expect_contains(buffer, "make initialize") != FT_SUCCESS)
+    if (onboarding_doc_expect_contains(buffer, "make debug") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (onboarding_doc_expect_contains(buffer, "make clean") != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
@@ -110,7 +112,7 @@ const t_test_case *get_onboarding_doc_tests(size_t *count)
 {
     static const t_test_case tests[] = {
         {"onboarding_doc_exists", test_onboarding_doc_exists},
-        {"onboarding_doc_covers_repository_setup", test_onboarding_doc_covers_repository_setup},
+        {"onboarding_doc_covers_local_build", test_onboarding_doc_covers_local_build},
         {"onboarding_doc_highlights_testing_steps", test_onboarding_doc_highlights_testing_steps},
         {"design_doc_links_onboarding_checklist", test_design_doc_links_onboarding_checklist}
     };

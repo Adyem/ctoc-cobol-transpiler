@@ -594,6 +594,129 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_generate_c_emits_main_and_helpers)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "string greeting[8];\n"
+        "int counter;\n"
+        "function void helper()\n"
+        "{\n"
+        "    display(\"HI\");\n"
+        "    return;\n"
+        "}\n"
+        "function void main()\n"
+        "{\n"
+        "    greeting = \"HELLO\";\n"
+        "    counter = 1 + 2;\n"
+        "    display(greeting);\n"
+        "    helper();\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "sample CBL-C should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "C backend should generate C code") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "#include <stddef.h>", ft_strlen(generated_c)))
+    {
+        pf_printf("Assertion failed: generated C should include stddef header\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "static size_t greeting_len = 0;", ft_strlen(generated_c)))
+    {
+        pf_printf("Assertion failed: generated C should declare greeting length variable\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "static char greeting_buf[8] = {0};", ft_strlen(generated_c)))
+    {
+        pf_printf("Assertion failed: generated C should declare greeting buffer\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "void helper(void);", ft_strlen(generated_c)))
+    {
+        pf_printf("Assertion failed: generated C should prototype helper function\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "int main(void)", ft_strlen(generated_c)))
+    {
+        pf_printf("Assertion failed: generated C should define an int main wrapper\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "cblc_string_assign_literal(greeting_buf, 8, &greeting_len, \"HELLO\");",
+            ft_strlen(generated_c)))
+    {
+        pf_printf("Assertion failed: generated C should assign greeting literal via helper\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "cblc_display_string(greeting_buf, greeting_len);",
+            ft_strlen(generated_c)))
+    {
+        pf_printf("Assertion failed: generated C should display greeting using helper\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_omits_main_for_library)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "function void helper()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "library CBL-C should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "C backend should generate library code") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (ft_strnstr(generated_c, "int main(void)", ft_strlen(generated_c)))
+    {
+        pf_printf("Assertion failed: library output should not define main\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "void helper(void);", ft_strlen(generated_c)))
+    {
+        pf_printf("Assertion failed: library output should declare helper prototype\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "void helper(void)", ft_strlen(generated_c)))
+    {
+        pf_printf("Assertion failed: library output should define helper function\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_transpiler_validation_accepts_valid_cobol)
 {
     const char *source;

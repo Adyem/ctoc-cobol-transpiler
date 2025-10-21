@@ -5,6 +5,7 @@
 const t_test_case *get_compiler_c_tests(size_t *count);
 const t_test_case *get_compiler_c_build_tests(size_t *count);
 const t_test_case *get_compiler_c_exit_tests(size_t *count);
+const t_test_case *get_compiler_c_multi_module_tests(size_t *count);
 
 const t_test_case *get_compiler_c_tests(size_t *count)
 {
@@ -13,8 +14,10 @@ const t_test_case *get_compiler_c_tests(size_t *count)
     static int initialized = 0;
     const t_test_case *build_tests;
     const t_test_case *exit_tests;
+    const t_test_case *multi_tests;
     size_t build_count;
     size_t exit_count;
+    size_t multi_count;
     size_t index;
     size_t offset;
 
@@ -22,7 +25,8 @@ const t_test_case *get_compiler_c_tests(size_t *count)
     {
         build_tests = get_compiler_c_build_tests(&build_count);
         exit_tests = get_compiler_c_exit_tests(&exit_count);
-        combined_count = build_count + exit_count;
+        multi_tests = get_compiler_c_multi_module_tests(&multi_count);
+        combined_count = build_count + exit_count + multi_count;
         if (combined_count > 0)
         {
             combined = static_cast<t_test_case *>(calloc(combined_count, sizeof(t_test_case)));
@@ -45,6 +49,13 @@ const t_test_case *get_compiler_c_tests(size_t *count)
             while (index < exit_count)
             {
                 combined[offset + index] = exit_tests[index];
+                index += 1;
+            }
+            offset += exit_count;
+            index = 0;
+            while (index < multi_count)
+            {
+                combined[offset + index] = multi_tests[index];
                 index += 1;
             }
         }

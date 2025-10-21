@@ -34,7 +34,7 @@ The CTOC COBOL Transpiler lets you author business logic in a lightweight C-styl
 
 Additional walkthroughs live in [`docs/getting_started.md`](docs/getting_started.md), while [`docs/cli_usage_examples.md`](docs/cli_usage_examples.md) catalogues common flag combinations.
 
-> **Note:** The CLI currently supports the COBOL → CBL-C direction. Attempting to run with `--direction cblc-to-cobol` reports a diagnostic until the forward pipeline is implemented.
+> **Note:** The CLI now supports the COBOL → CBL-C, CBL-C → COBOL, and CBL-C → C directions. Pick the translation that matches your workflow and pair each `--input` with a matching `--output` path.
 
 ## Example: Filtering Lines in CBL-C
 
@@ -74,6 +74,14 @@ ctoc_cobol_transpiler --direction cblc-to-cobol \
     --input metrics_worker.cblc --output build/metrics_worker.cob
 ```
 
+You can also emit portable C instead of COBOL when you want to run comparisons without a COBOL toolchain:
+
+```text
+ctoc_cobol_transpiler --direction cblc-to-c \
+    --input metrics_main.cblc --output build/metrics_main.c \
+    --input metrics_worker.cblc --output build/metrics_worker.c
+```
+
 With the command above you can compile multiple CBL-C translation units in one invocation. A main module can `import "metrics_worker.cblc";` and call helpers like `add_sale(total, amount)` to update running totals while keeping the bookkeeping logic in a dedicated file. See [`docs/cblc_multi_file_arguments.md`](docs/cblc_multi_file_arguments.md) for full listings that pass integers and booleans between modules.
 
 ## Explore Further
@@ -82,6 +90,7 @@ With the command above you can compile multiple CBL-C translation units in one i
 - Review [`docs/runtime_api_reference.md`](docs/runtime_api_reference.md) when writing CBL-C that interacts with the provided runtime helpers.
 - Study [`docs/abi_spec.md`](docs/abi_spec.md) for the runtime ABI, calling conventions, and linkage layout shared by generated COBOL and native integrations.
 - Use [`compiler_feature_tracker.md`](compiler_feature_tracker.md) to follow the roadmap and discover which capabilities ship next.
+- Explore [`docs/ide_integration.md`](docs/ide_integration.md) for syntax highlighting and editor automation tips that streamline daily workflows.
 
 Whether you're modernizing existing COBOL or prototyping new workflows in CBL-C, the transpiler provides repeatable builds, actionable diagnostics, and modular composition patterns so you can stay productive in either language.
 

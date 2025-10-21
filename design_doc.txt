@@ -184,7 +184,19 @@ the expected `IF`/`PERFORM` layout from the CBL-C semantics.
 
 **Boolean `read()` expansion.** Any `while (read(f, v)) { ... }` becomes a `PERFORM UNTIL EOF` loop with `AT END` clause. A single `if (read(...))` expands to one `READ` with conditional body and optional `ELSE` when `AT END` occurs via an internal temp flag.
 
-### 4.4 Records & Structs
+### 4.4 Arithmetic Precision
+
+Assignments that involve arithmetic expressions now emit dedicated `COMPUTE`
+statements instead of lowering through chained `MOVE` operations. When the
+destination is narrower than the operands (for example, storing a floating
+result into an integral accumulator), the generator attaches the COBOL
+`ROUNDED` clause so widened intermediates preserve their significant digits
+before truncation. This ensures that mixed-width math such as `long long`
+accumulators receiving `long` increments, or fractional totals feeding integer
+targets, retain the expected precision and match the round-trip semantics that
+CBL-C developers observe in the source language.
+
+### 4.5 Records & Structs
 
 **CBL‑C:**
 
@@ -212,7 +224,7 @@ WRITE OUTPUT-REC
 
 **Rule.** `record` becomes a group item; field order and sizes map directly to `PIC`.
 
-### 4.5 Scalars & Types
+### 4.6 Scalars & Types
 
 Default numeric size policy (configurable):
 
@@ -232,7 +244,7 @@ Custom helpers complement the built-in `int`/`char` presets so callers can size 
 `transpiler_cobol_describe_fixed_point(integral, fractional, is_signed, usage, ...)` when integral/fractional precision must be
 configured independently.
 
-### 4.6 Control Flow
+### 4.7 Control Flow
 
 | CBL‑C                    | COBOL                                                             |
 | ------------------------ | ----------------------------------------------------------------- |
@@ -243,7 +255,7 @@ configured independently.
 
 Boolean expressions lower to COBOL relational operators with generated temp condition variables if needed.
 
-### 4.7 Display & Literals
+### 4.8 Display & Literals
 
 `display(expr)` → `DISPLAY expr` with proper quoting for strings and UPPERCASE identifiers. Numeric literals preserved.
 
@@ -493,7 +505,7 @@ PROCEDURE DIVISION.
 * **Status codes:** Optional `FILE STATUS` codes and error branches.
 * **Configurable PIC policies:** Signed/unsigned ints, decimal scaling, COMP‑3.
 * **Multi‑file pipelines:** Map‑reduce style transforms with reusable paragraphs.
-* **Interoperability:** Optional backend to C (bypass COBOL) for dual targets.
+* **Interoperability:** Portable C backend now ships alongside the COBOL emitter. The CLI exposes it through `--direction cblc-to-c`, reusing the same semantic analysis and emitting helper-backed C so native builds can be diffed against generated COBOL without a COBOL toolchain.
 
 ---
 

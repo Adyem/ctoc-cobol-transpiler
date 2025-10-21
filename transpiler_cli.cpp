@@ -115,6 +115,14 @@ static int transpiler_cli_parse_direction_value(const char *value, t_transpiler_
         options->emit_standard_library = 0;
         return (FT_SUCCESS);
     }
+    length = ft_strlen("cblc-to-c");
+    if (ft_strncmp(value, "cblc-to-c", length + 1) == 0)
+    {
+        options->source_language = TRANSPILE_LANGUAGE_CBL_C;
+        options->target_language = TRANSPILE_LANGUAGE_C;
+        options->emit_standard_library = 0;
+        return (FT_SUCCESS);
+    }
     length = ft_strlen("cobol-to-cblc");
     if (ft_strncmp(value, "cobol-to-cblc", length + 1) == 0)
     {
@@ -131,7 +139,7 @@ static int transpiler_cli_parse_direction_value(const char *value, t_transpiler_
         options->target_language = TRANSPILE_LANGUAGE_NONE;
         return (FT_SUCCESS);
     }
-    pf_printf("Unknown direction '%s'. Expected 'cblc-to-cobol', 'cobol-to-cblc', or 'standard-library'.\n", value);
+    pf_printf("Unknown direction '%s'. Expected 'cblc-to-cobol', 'cblc-to-c', 'cobol-to-cblc', or 'standard-library'.\n", value);
     return (FT_FAILURE);
 }
 
@@ -353,6 +361,8 @@ int transpiler_cli_options_init(t_transpiler_cli_options *options)
     transpiler_cli_warning_settings_enable_all(&options->warning_settings);
     options->show_help = 0;
     options->emit_standard_library = 0;
+    options->dump_ast = 0;
+    options->dump_ast_directory = NULL;
     return (FT_SUCCESS);
 }
 
@@ -380,6 +390,8 @@ void transpiler_cli_options_dispose(t_transpiler_cli_options *options)
     transpiler_cli_warning_settings_enable_all(&options->warning_settings);
     options->show_help = 0;
     options->emit_standard_library = 0;
+    options->dump_ast = 0;
+    options->dump_ast_directory = NULL;
 }
 
 static int transpiler_cli_parse_long_option(t_transpiler_cli_options *options, const char **argv, int argc, int *index)
@@ -480,6 +492,24 @@ static int transpiler_cli_parse_long_option(t_transpiler_cli_options *options, c
         options->warnings_as_errors = 1;
         return (FT_SUCCESS);
     }
+    if (ft_strncmp(argument, "--dump-ast", 11) == 0 && ft_strlen(argument) == 10)
+    {
+        size_t auto_length;
+
+        *index += 1;
+        if (*index >= argc)
+        {
+            pf_printf("Missing value for --dump-ast option.\n");
+            return (FT_FAILURE);
+        }
+        options->dump_ast = 1;
+        auto_length = ft_strlen("auto");
+        if (ft_strncmp(argv[*index], "auto", auto_length + 1) == 0)
+            options->dump_ast_directory = NULL;
+        else
+            options->dump_ast_directory = argv[*index];
+        return (FT_SUCCESS);
+    }
     pf_printf("Unknown option '%s'.\n", argument);
     return (FT_FAILURE);
 }
@@ -540,6 +570,8 @@ int transpiler_cli_apply(const t_transpiler_cli_options *options, t_transpiler_c
         return (FT_FAILURE);
     transpiler_context_set_output_directory(context, options->output_directory);
     transpiler_context_set_emit_standard_library(context, options->emit_standard_library);
+    transpiler_context_set_ast_dump_enabled(context, options->dump_ast);
+    transpiler_context_set_ast_dump_directory(context, options->dump_ast_directory);
     transpiler_context_set_format_mode(context, options->format_mode);
     transpiler_context_set_layout_mode(context, options->layout_mode);
     transpiler_context_set_diagnostic_level(context, options->diagnostic_level);
@@ -552,13 +584,14 @@ void transpiler_cli_print_usage(void)
 {
     pf_printf("Usage: ctoc_cobol_transpiler --direction <dir> --input <path> [--input <path> ...]\n");
     pf_printf("       --output <path> [--output <path> ...]\n");
-    pf_printf("       Direction: cblc-to-cobol | cobol-to-cblc | standard-library\n");
+    pf_printf("       Direction: cblc-to-cobol | cblc-to-c | cobol-to-cblc | standard-library\n");
     pf_printf("       Environment: CTOC_DEFAULT_DIRECTION can supply the direction.\n");
     pf_printf("       Standard-library builds emit all cataloged programs to the selected directory.\n");
     pf_printf("       Optional: --output-dir <directory> to override emission path base.\n");
     pf_printf("                 --format <default|minimal|pretty> to control COBOL layout.\n");
     pf_printf("                 --layout <normalize|preserve> to control regenerated CBL-C layout.\n");
     pf_printf("                 --diagnostics <silent|normal|verbose> to tune logging.\n");
+    pf_printf("                 --dump-ast <auto|directory> to emit Graphviz AST visualizations.\n");
     pf_printf("                 --warnings-as-errors to treat warnings as build errors.\n");
     pf_printf("                 -Werror to escalate warnings.\n");
     pf_printf("                 -Wconversion / -Wno-conversion to toggle conversion warnings.\n");
