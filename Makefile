@@ -9,6 +9,8 @@ endif
 NAME        = ctoc_cobol_transpiler$(EXE_EXT)
 NAME_DEBUG  = ctoc_cobol_transpiler_debug$(EXE_EXT)
 TEST_NAME   = automated_tests$(EXE_EXT)
+FORWARD_TRANSLATION ?= 1
+export CTOC_ENABLE_FORWARD_TRANSLATION ?= $(FORWARD_TRANSLATION)
 PYTHON          ?= python3
 LINT_SCRIPT      = scripts/lint_sources.py
 FUZZ_SCRIPT      = scripts/fuzz_transpiler.py
@@ -17,7 +19,91 @@ FUZZ_ITERATIONS ?= 50
 FUZZ_MODE ?= all
 FUZZ_ARGS ?=
 
-SRC         = main.cpp runtime_scalar.cpp runtime_string.cpp runtime_collation.cpp runtime_encoding.cpp runtime_record.cpp runtime_file.cpp runtime_memory.cpp runtime_csv.cpp runtime_sort.cpp lexer.cpp lexer_token.cpp ast.cpp parser.cpp transpiler_diagnostics.cpp transpiler_context.cpp transpiler_pipeline.cpp transpiler_cblc.cpp transpiler_cli.cpp cblc_formatter.cpp transpiler_logging.cpp transpiler_validation.cpp transpiler_semantics.cpp transpiler_semantics_errors.cpp transpiler_semantics_helpers.cpp transpiler_semantics_scope.cpp transpiler_semantics_classifiers.cpp transpiler_semantics_conditions.cpp transpiler_semantics_assignments.cpp transpiler_semantics_statements.cpp transpiler_codegen.cpp transpiler_cobol_types.cpp transpiler_cobol_procedure.cpp transpiler_cobol_reverse.cpp transpiler_standard_library.cpp transpiler_standard_library_state.cpp transpiler_standard_library_strlen.cpp transpiler_standard_library_strlen_string.cpp transpiler_standard_library_strnlen.cpp transpiler_standard_library_strnlen_string.cpp transpiler_standard_library_strcmp.cpp transpiler_standard_library_strcmp_string.cpp transpiler_standard_library_strcpy.cpp transpiler_standard_library_strcpy_string.cpp transpiler_standard_library_strncpy.cpp transpiler_standard_library_strncpy_string.cpp transpiler_standard_library_memcmp.cpp transpiler_standard_library_memcmp_string.cpp transpiler_standard_library_strcat.cpp transpiler_standard_library_strcat_string.cpp transpiler_standard_library_strtod.cpp transpiler_standard_library_strtod_string.cpp transpiler_standard_library_abs.cpp transpiler_standard_library_fabs.cpp transpiler_standard_library_floor.cpp transpiler_standard_library_ceil.cpp transpiler_standard_library_exp.cpp transpiler_standard_library_log.cpp transpiler_standard_library_sin.cpp transpiler_standard_library_cos.cpp transpiler_standard_library_tan.cpp transpiler_standard_library_rounded.cpp transpiler_standard_library_banker_round.cpp transpiler_standard_library_date_yyyymmdd.cpp transpiler_standard_library_date_duration.cpp transpiler_standard_library_atoi.cpp transpiler_standard_library_atoi_string.cpp transpiler_standard_library_atol.cpp transpiler_standard_library_atol_string.cpp transpiler_standard_library_atoll.cpp transpiler_standard_library_atoll_string.cpp transpiler_standard_library_powerof.cpp transpiler_standard_library_sqrt.cpp transpiler_standard_library_min.cpp transpiler_standard_library_max.cpp transpiler_standard_library_toupper.cpp transpiler_standard_library_toupper_string.cpp transpiler_standard_library_tolower.cpp transpiler_standard_library_tolower_string.cpp transpiler_standard_library_isdigit.cpp transpiler_standard_library_isalpha.cpp
+SRC         = \
+    main.cpp \
+    runtime_scalar.cpp \
+    runtime_string.cpp \
+    runtime_collation.cpp \
+    runtime_encoding.cpp \
+    runtime_record.cpp \
+    runtime_file.cpp \
+    runtime_memory.cpp \
+    runtime_csv.cpp \
+    runtime_sort.cpp \
+    lexer.cpp \
+    lexer_token.cpp \
+    ast.cpp \
+    parser.cpp \
+    transpiler_diagnostics.cpp \
+    transpiler_context.cpp \
+    transpiler_pipeline.cpp \
+    transpiler_parallel.cpp \
+    transpiler_cblc.cpp \
+    transpiler_c_backend.cpp \
+    transpiler_cli.cpp \
+    cblc_formatter.cpp \
+    transpiler_logging.cpp \
+    transpiler_validation.cpp \
+    transpiler_ast_visualizer.cpp \
+    transpiler_semantics.cpp \
+    transpiler_semantics_errors.cpp \
+    transpiler_semantics_helpers.cpp \
+    transpiler_semantics_scope.cpp \
+    transpiler_semantics_classifiers.cpp \
+    transpiler_semantics_conditions.cpp \
+    transpiler_semantics_assignments.cpp \
+    transpiler_semantics_statements.cpp \
+    transpiler_codegen.cpp \
+    transpiler_cobol_types.cpp \
+    transpiler_cobol_procedure.cpp \
+    transpiler_cobol_reverse.cpp \
+    transpiler_standard_library.cpp \
+    transpiler_standard_library_state.cpp \
+    transpiler_standard_library_strlen.cpp \
+    transpiler_standard_library_strlen_string.cpp \
+    transpiler_standard_library_strnlen.cpp \
+    transpiler_standard_library_strnlen_string.cpp \
+    transpiler_standard_library_strcmp.cpp \
+    transpiler_standard_library_strcmp_string.cpp \
+    transpiler_standard_library_strcpy.cpp \
+    transpiler_standard_library_strcpy_string.cpp \
+    transpiler_standard_library_strncpy.cpp \
+    transpiler_standard_library_strncpy_string.cpp \
+    transpiler_standard_library_memcmp.cpp \
+    transpiler_standard_library_memcmp_string.cpp \
+    transpiler_standard_library_strcat.cpp \
+    transpiler_standard_library_strcat_string.cpp \
+    transpiler_standard_library_strtod.cpp \
+    transpiler_standard_library_strtod_string.cpp \
+    transpiler_standard_library_abs.cpp \
+    transpiler_standard_library_fabs.cpp \
+    transpiler_standard_library_floor.cpp \
+    transpiler_standard_library_ceil.cpp \
+    transpiler_standard_library_exp.cpp \
+    transpiler_standard_library_log.cpp \
+    transpiler_standard_library_sin.cpp \
+    transpiler_standard_library_cos.cpp \
+    transpiler_standard_library_tan.cpp \
+    transpiler_standard_library_rounded.cpp \
+    transpiler_standard_library_banker_round.cpp \
+    transpiler_standard_library_date_yyyymmdd.cpp \
+    transpiler_standard_library_date_duration.cpp \
+    transpiler_standard_library_atoi.cpp \
+    transpiler_standard_library_atoi_string.cpp \
+    transpiler_standard_library_atol.cpp \
+    transpiler_standard_library_atol_string.cpp \
+    transpiler_standard_library_atoll.cpp \
+    transpiler_standard_library_atoll_string.cpp \
+    transpiler_standard_library_powerof.cpp \
+    transpiler_standard_library_sqrt.cpp \
+    transpiler_standard_library_min.cpp \
+    transpiler_standard_library_max.cpp \
+    transpiler_standard_library_toupper.cpp \
+    transpiler_standard_library_toupper_string.cpp \
+    transpiler_standard_library_tolower.cpp \
+    transpiler_standard_library_tolower_string.cpp \
+    transpiler_standard_library_isdigit.cpp \
+    transpiler_standard_library_isalpha.cpp
 
 CC          = g++
 
@@ -120,6 +206,7 @@ TOTAL_OBJS          := $(words $(OBJS))
 TEST_SRC    = tests/test_main.cpp \
               tests/test_support.cpp \
               tests/ast_tests.cpp \
+              tests/ast_visualizer_tests.cpp \
               tests/lexer_tests.cpp \
               tests/parser_tests.cpp \
              tests/parser_positive_program_tests.cpp \
@@ -181,7 +268,8 @@ TEST_SRC    = tests/test_main.cpp \
              tests/standard_library/standard_library_toupper_tests.cpp \
               tests/runtime_audit_tests.cpp \
               tests/runtime_record_tests.cpp \
-              tests/runtime_file_tests.cpp \
+             tests/runtime_file_tests.cpp \
+             tests/parallel_generation_tests.cpp \
               tests/pipeline_tests.cpp \
               tests/validation_tests.cpp \
              tests/transpiler_context_tests.cpp \
@@ -216,6 +304,7 @@ TEST_SRC    = tests/test_main.cpp \
               tests/compiler/compiler_test_support.cpp \
               tests/compiler/c/build_tests.cpp \
               tests/compiler/c/exit_tests.cpp \
+              tests/compiler/c/multi_module_tests.cpp \
               tests/compiler/c/tests.cpp \
               tests/compiler/cobol/copy_file_tests.cpp \
               tests/compiler/cobol/filter_prefix_tests.cpp \
@@ -277,7 +366,7 @@ $(TARGET): $(LIBFT) $(OBJS)
 	@printf '\033[1;36m[CTOC BUILD] Linking %s\033[0m\n' "$@"
 	@$(CC) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
 
-$(TEST_NAME): $(LIBFT) $(TEST_OBJS) $(OBJS_NO_MAIN)
+$(TEST_NAME): $(LIBFT) $(TEST_OBJS) $(OBJS_NO_MAIN) $(TARGET)
 	@printf '\033[1;36m[CTOC BUILD] Linking %s\033[0m\n' "$@"
 	@$(CC) $(CFLAGS) $(TEST_OBJS) $(OBJS_NO_MAIN) -o $@ $(LDFLAGS)
 

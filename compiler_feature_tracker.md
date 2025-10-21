@@ -20,6 +20,7 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Build a command-line driver that accepts source paths and target direction (CBL-C→COBOL or COBOL→CBL-C).
 - [x] Add configuration handling for output directories, formatting options, and diagnostics levels.
 - [x] Accept multiple translation units per invocation, mapping each input CBL-C/Cobol file to a corresponding output while enforcing a single `main` entrypoint.
+- [x] Emit portable C from the shared IR so teams can diff native builds against helper-backed C output without relying on a COBOL toolchain.
 - [x] Integrate logging and error reporting consistent with libft capabilities.
 - [x] Inventory the existing CBL-C language samples and document required tokens and constructs.
 - [x] Define the authoritative CBL-C grammar (expressions, statements, declarations, file directives).
@@ -39,12 +40,15 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Implement formatting and indentation rules for generated COBOL source.
 - [x] Establish golden-file tests for representative snippets covering both translation directions.
 - [x] Add round-trip tests to ensure COBOL emitted from CBL-C re-parses to the original program.
+- [x] Forward CBL-C samples translate successfully when the COBOL toolchain is available; parser and generator coverage keeps
+      the round-trip suites under `tests/compiler/cobol/` passing by default.
 - [x] Parse the ANSI-85 subset of COBOL targeted by the forward compiler.
 - [x] Audit existing runtime helpers for compatibility with libft memory allocation patterns.
 - [x] Recover higher-level constructs (loops, conditionals, file I/O) from procedural COBOL into CBL-C syntax.
 - [x] Validate round-trip fidelity with golden input/output fixtures.
 - [x] Normalize identifiers, literal formats, and layout during re-emission to produce idiomatic CBL-C.
 - [x] Integrate continuous integration scripts (make targets) that build, run tests, and lint the codebase.
+- [x] Parallelize module emission so CBL-C→COBOL generation runs through a configurable worker pool while preserving deterministic output order.
 - [x] Add golden samples exercising long, long long, and floating numeric arithmetic plus comparison operators.
 - [x] Imports/modules: enforce per-file symbol visibility, support `import "x.cblc"`, and guarantee deterministic module initialization order.
 - [x] Warning escalation flag: add a compiler/CLI flag that promotes all warnings (including conversion, overflow, and string-size diagnostics) to errors for strict build configurations.
@@ -157,16 +161,11 @@ are completed; keep completed items grouped separately from the remaining work t
 
 ## Open Issues
 
-- [ ] Forward CBL-C samples fail to translate when the COBOL toolchain is available. Extend the parser and generator to cover
-      file declarations, record aggregates, and control-flow constructs so the round-trip suites under
-      `tests/compiler/cobol/` succeed again. Until that work lands, the suite skips forward-translation tests unless
-      `CTOC_ENABLE_FORWARD_TRANSLATION=1` is set.
-
 ### Codegen / Backends
 
-- [ ] C backend: emit portable C from the shared IR to simplify native testing.
 - [x] Deterministic builds: scrub timestamps and paths to guarantee reproducible output.
-- [ ] Parallel compilation: build a translation-unit DAG, cache per-file outputs, and support incremental rebuilds.
+- [x] Parallel compilation: build a translation-unit DAG, cache per-file outputs, and support incremental rebuilds.
+- [ ] Factor shared helper emission so the COBOL and C backends reuse a single registry before introducing runtime library packaging.
 
 ### Runtime / Stdlib
 
@@ -192,7 +191,7 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Copybook reconstruction: prefer re-emitting COPY directives instead of fully expanded fields when possible.
 - [x] Recover long, long long, and floating-point picture clauses into canonical CBL-C type annotations.
 - [x] Reconstruct string length metadata so regenerated CBL-C declarations reflect original caller sizes.
-- [ ] Emit operator forms that maintain precision across widened numeric ranges.
+- [x] Emit operator forms that maintain precision across widened numeric ranges.
 
 ### Tooling & CLI
 
@@ -202,13 +201,15 @@ are completed; keep completed items grouped separately from the remaining work t
       `scripts/fuzz_transpiler.py`).
 - [x] Property tests: introduce round-trip and normalization idempotence suites.
 - [ ] Differential tests: compare runtime results between COBOL outputs and the alternative C backend.
+- [x] Multi-module C backend integration suite: emit several translation units via `--direction cblc-to-c`, compile them together, and confirm helper registration and call graphs remain deterministic.
 - [x] Stress suites: cover huge records, deep nesting, long lines, and wide numerics.
 - [x] Coverage in CI: enforce line and branch coverage thresholds as part of the release gates (`make coverage` guards 60% line / 65% branch coverage).
 - [x] Add integration tests verifying subprogram calls respect original string lengths across translations.
 
 ### Stretch / Future Enhancements
 - [ ] Extend the grammar to support advanced numeric picture clauses, OCCURS tables, and paragraph factoring.
-- [ ] Offer alternate backends (e.g., direct C output) sharing the same AST and semantic pipeline.
+- [x] Offer alternate backends (e.g., direct C output) sharing the same AST and semantic pipeline.
 - [ ] Explore performance optimizations (incremental recompilation, caching intermediate representations).
-- [ ] Investigate IDE integration hooks (language server, syntax highlighting, code completion).
-- [ ] Prototype visualization tooling for pipeline stages and intermediate representations.
+- [x] Investigate IDE integration hooks (language server, syntax highlighting, code completion).
+    - [x] Publish an initial VS Code TextMate grammar and cross-editor setup guide so contributors can enable highlighting quickly.
+- [x] Prototype visualization tooling for pipeline stages and intermediate representations (Graphviz AST dumps via `--dump-ast`).

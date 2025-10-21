@@ -10,7 +10,7 @@ Translation runs must specify the transformation direction alongside at least on
 ctoc_cobol_transpiler --direction cobol-to-cblc --input samples/cobol/copy_file.cob --output build/copy_file.cblc
 ```
 
-* `--direction` accepts `cblc-to-cobol`, `cobol-to-cblc`, or `standard-library` and determines which pipeline the tool assembles. The conversion directions select the appropriate frontend/parser and backend/emitter pair. The reverse path now lifts level 01/77 scalars (`PIC X(n)`, `PIC 9(n)`, and decimal patterns such as `PIC S9V9(n)`/`USAGE COMP-2`) into CBL-C declarations alongside the paragraph bodies reconstructed from `MOVE`, `IF`, `PERFORM`, file I/O, and `STOP` statements while distinguishing flag suffixes from single-character buffers, re-emitting registered `COPY` includes as explicit `copy` directives, and preserving VALUE clause defaults on those recovered scalars. Level 01 group items without PIC clauses emit `record` definitions with mirrored group variables and subordinate fields so structured data survives the round-trip.
+* `--direction` accepts `cblc-to-cobol`, `cblc-to-c`, `cobol-to-cblc`, or `standard-library` and determines which pipeline the tool assembles. Each conversion path selects the appropriate frontend/parser and backend/emitter pair. The reverse path now lifts level 01/77 scalars (`PIC X(n)`, `PIC 9(n)`, and decimal patterns such as `PIC S9V9(n)`/`USAGE COMP-2`) into CBL-C declarations alongside the paragraph bodies reconstructed from `MOVE`, `IF`, `PERFORM`, file I/O, and `STOP` statements while distinguishing flag suffixes from single-character buffers, re-emitting registered `COPY` includes as explicit `copy` directives, and preserving VALUE clause defaults on those recovered scalars. Level 01 group items without PIC clauses emit `record` definitions with mirrored group variables and subordinate fields so structured data survives the round-trip. The CBL-C→C backend emits portable C with helper functions that mirror the COBOL runtime so you can diff behavior against native builds without a COBOL toolchain.
 * `--input` points at the source file that the pipeline reads. Repeat the flag to queue additional translation units.
 * `--output` names the artifact written by the code generator. Provide one `--output` per input so the files can be emitted side by side.
 
@@ -23,6 +23,13 @@ ctoc_cobol_transpiler --direction cobol-to-cblc \
 ```
 
 The tool rejects mismatched counts to ensure every generated COBOL file has a designated destination.
+
+To emit portable C instead of COBOL, switch the direction while keeping the same input/output pairing:
+
+```
+ctoc_cobol_transpiler --direction cblc-to-c \
+  --input src/runtime.cblc --output build/runtime.c
+```
 
 ## Building the standard library
 
@@ -43,6 +50,15 @@ ctoc_cobol_transpiler --direction cobol-to-cblc --input samples/cobol/copy_file.
 * `--output-dir` overrides the directory that hosts generated files. When omitted, the tool writes next to the provided `--output` path.
 * `--format` accepts `default`, `minimal`, or `pretty` to toggle whitespace and alignment policies for COBOL emission. `pretty` feeds generated COBOL through the canonical formatter so braces, indentation, and operator spacing remain consistent across runs.
 * `--layout` accepts `normalize` or `preserve` to control the regenerated CBL-C layout when translating from COBOL. `normalize` routes output through the formatter, while `preserve` copies the recovered structure verbatim so existing spacing can be reviewed without modification.
+
+## AST visualization exports
+
+```
+ctoc_cobol_transpiler --direction cobol-to-cblc --input samples/cobol/copy_file.cob --output build/copy_file.cblc --dump-ast build/ast_graphs
+```
+
+* `--dump-ast <auto|directory>` enables Graphviz `.dot` generation for each parsed translation unit. Pass a directory to collect the graphs in a dedicated folder or `auto` to place the visualization alongside the emitted source file with a `.dot` suffix.
+* Each node label includes the AST node kind plus the captured token lexeme (when available) so you can trace COBOL statements through parsing and semantic analysis when debugging pipeline changes.
 
 ## Diagnostics and help
 
@@ -72,6 +88,21 @@ ctoc_cobol_transpiler --input samples/cobol/record_writer.cob --output build/rec
 ```
 
 Unset or change the variable to swap the default compilation direction.
+
+### Controlling parallel compilation throughput
+
+The CBL-C→COBOL pipeline emits each module in parallel. By default it launches one worker per available hardware thread and
+caps the pool at the number of translation units scheduled for emission. Override the default by exporting `CTOC_PARALLELISM`
+with a positive integer to force a specific worker count (set the value to `1` to fall back to sequential generation during
+debugging):
+
+```
+export CTOC_PARALLELISM=4
+ctoc_cobol_transpiler --direction cblc-to-cobol --input src/runtime.cblc --output build/runtime.cob
+```
+
+Each worker validates the generated COBOL locally; failures surface through the usual diagnostic stream, and the CLI retains the
+same deterministic output order regardless of the pool size.
 
 ## End-to-end sample workflow
 

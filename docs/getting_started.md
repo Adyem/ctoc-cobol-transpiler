@@ -32,7 +32,15 @@ Refer to `docs/onboarding_checklist.md` for a full environment audit before comm
    cat build/minimal_program.cblc
    ```
 
-The `docs/cli_usage_examples.md` file contains additional flag combinations. The forward CBL-C to COBOL pipeline is still stabilizing. By default the automated test suite skips the forward translation scenarios until file/record lowering is complete. Once you have an experimental build that covers those features, set `CTOC_ENABLE_FORWARD_TRANSLATION=1` in your environment and re-run the tests to exercise the CBL-C→COBOL direction end to end.
+4. When you need a native baseline for debugging, emit the same CBL-C inputs as portable C:
+   ```
+   ./ctoc_cobol_transpiler --direction cblc-to-c \
+       --input samples/cblc/minimal_program.cblc \
+       --output build/minimal_program.c
+   ```
+   The generated C pulls in lightweight helper routines (`cblc_string_assign_literal`, `cblc_display_*`, etc.) so you can build and execute the translation with any C toolchain while preserving the runtime semantics exercised by the COBOL backend.
+
+The `docs/cli_usage_examples.md` file contains additional flag combinations. Forward CBL-C→COBOL coverage now runs automatically because the test harness exports `CTOC_ENABLE_FORWARD_TRANSLATION=1`. If you are iterating on unrelated components and want to skip the COBOL toolchain stage temporarily, invoke `make test FORWARD_TRANSLATION=0` (or set `CTOC_ENABLE_FORWARD_TRANSLATION=0`) to restore the previous opt-in behavior.
 
 ### Standard Library Status Codes
 
@@ -80,5 +88,6 @@ Source maps now capture the relationship between generated CBL-C output and the 
 * `docs/runtime_api_reference.md` documents the libft-backed runtime helpers that generated programs link against.
 * `docs/cobol_dialect_requirements.md` captures the supported COBOL subset.
 * `design_doc.txt` describes the architecture and planned surface area for future releases.
+* `docs/ide_integration.md` explains how to wire editor support (VS Code, Vim, Emacs) into daily workflows using the bundled grammar and automation tips.
 
 Keeping these documents up to date ensures users understand the toolchain and the protections added in recent iterations.

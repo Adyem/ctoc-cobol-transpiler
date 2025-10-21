@@ -387,6 +387,29 @@ static int transpiler_codegen_append_statement(t_transpiler_codegen_buffer *buff
             return (FT_FAILURE);
         return (FT_SUCCESS);
     }
+    if (statement->kind == TRANSPILE_COBOL_STATEMENT_COMPUTE)
+    {
+        if (!statement->compute.target || !statement->compute.expression)
+            return (FT_FAILURE);
+        if (transpiler_codegen_buffer_begin_area_b_line(buffer, indentation) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (transpiler_codegen_buffer_append_string(buffer, "COMPUTE ") != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (transpiler_codegen_buffer_append_string(buffer, statement->compute.target) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (statement->compute.rounded)
+        {
+            if (transpiler_codegen_buffer_append_string(buffer, " ROUNDED") != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        if (transpiler_codegen_buffer_append_string(buffer, " = ") != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (transpiler_codegen_buffer_append_string(buffer, statement->compute.expression) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (transpiler_codegen_buffer_end_line(buffer) != FT_SUCCESS)
+            return (FT_FAILURE);
+        return (FT_SUCCESS);
+    }
     if (statement->kind == TRANSPILE_COBOL_STATEMENT_IF)
         return (transpiler_codegen_append_if_statement(buffer, &statement->if_statement, indentation));
     if (statement->kind == TRANSPILE_COBOL_STATEMENT_PERFORM_UNTIL)

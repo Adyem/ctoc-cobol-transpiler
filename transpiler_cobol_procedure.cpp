@@ -172,6 +172,25 @@ t_transpiler_cobol_statement *transpiler_cobol_statement_create_move(const char 
     return (statement);
 }
 
+t_transpiler_cobol_statement *transpiler_cobol_statement_create_compute(const char *target,
+    const char *expression, int rounded)
+{
+    t_transpiler_cobol_statement *statement;
+
+    if (!target)
+        return (NULL);
+    if (!expression)
+        return (NULL);
+    statement = transpiler_cobol_statement_allocate();
+    if (!statement)
+        return (NULL);
+    statement->kind = TRANSPILE_COBOL_STATEMENT_COMPUTE;
+    statement->compute.target = target;
+    statement->compute.expression = expression;
+    statement->compute.rounded = rounded ? 1 : 0;
+    return (statement);
+}
+
 t_transpiler_cobol_statement *transpiler_cobol_statement_create_if(const t_transpiler_cobol_condition *condition)
 {
     t_transpiler_cobol_statement *statement;

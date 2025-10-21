@@ -71,7 +71,7 @@ FT_TEST(test_cli_rejects_unknown_direction)
 
     argc = sizeof(argv) / sizeof(argv[0]);
     return (expect_cli_parse_failure(argv, argc,
-        "Unknown direction 'invalid-direction'. Expected 'cblc-to-cobol', 'cobol-to-cblc', or 'standard-library'.\n",
+        "Unknown direction 'invalid-direction'. Expected 'cblc-to-cobol', 'cblc-to-c', 'cobol-to-cblc', or 'standard-library'.\n",
         "CLI should reject unknown direction"));
 }
 
@@ -89,7 +89,7 @@ FT_TEST(test_cli_rejects_missing_direction_value)
 
     argc = sizeof(argv) / sizeof(argv[0]);
     return (expect_cli_parse_failure(argv, argc,
-        "Unknown direction '--input'. Expected 'cblc-to-cobol', 'cobol-to-cblc', or 'standard-library'.\n",
+        "Unknown direction '--input'. Expected 'cblc-to-cobol', 'cblc-to-c', 'cobol-to-cblc', or 'standard-library'.\n",
         "CLI should reject missing direction value"));
 }
 

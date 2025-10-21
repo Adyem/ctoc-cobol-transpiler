@@ -334,6 +334,7 @@ int transpiler_context_init(t_transpiler_context *context)
     context->target_count = 0;
     context->target_capacity = 0;
     context->output_directory = NULL;
+    context->ast_dump_directory = NULL;
     context->emit_standard_library = 0;
     context->format_mode = TRANSPILE_FORMAT_DEFAULT;
     context->layout_mode = TRANSPILE_LAYOUT_NORMALIZE;
@@ -344,6 +345,7 @@ int transpiler_context_init(t_transpiler_context *context)
     context->warning_settings.string_truncation = 1;
     context->warning_settings.shadow = 1;
     context->warning_settings.unused = 1;
+    context->ast_dump_enabled = 0;
     context->last_error_code = FT_SUCCESS;
     context->functions = NULL;
     context->function_count = 0;
@@ -523,6 +525,7 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->active_source_text = NULL;
     context->active_source_length = 0;
     context->output_directory = NULL;
+    context->ast_dump_directory = NULL;
     context->format_mode = TRANSPILE_FORMAT_DEFAULT;
     context->layout_mode = TRANSPILE_LAYOUT_NORMALIZE;
     context->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
@@ -532,6 +535,7 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->warning_settings.string_truncation = 1;
     context->warning_settings.shadow = 1;
     context->warning_settings.unused = 1;
+    context->ast_dump_enabled = 0;
     context->last_error_code = FT_SUCCESS;
     if (context->functions)
         cma_free(context->functions);
@@ -661,6 +665,23 @@ void transpiler_context_set_emit_standard_library(t_transpiler_context *context,
         context->emit_standard_library = 1;
     else
         context->emit_standard_library = 0;
+}
+
+void transpiler_context_set_ast_dump_directory(t_transpiler_context *context, const char *directory)
+{
+    if (!context)
+        return ;
+    context->ast_dump_directory = directory;
+}
+
+void transpiler_context_set_ast_dump_enabled(t_transpiler_context *context, int enabled)
+{
+    if (!context)
+        return ;
+    if (enabled)
+        context->ast_dump_enabled = 1;
+    else
+        context->ast_dump_enabled = 0;
 }
 
 void transpiler_context_set_format_mode(t_transpiler_context *context, t_transpiler_format_mode mode)
@@ -1898,4 +1919,18 @@ int transpiler_context_record_comment(t_transpiler_context *context, size_t line
     comment->column = column;
     context->comment_count += 1;
     return (FT_SUCCESS);
+}
+
+int transpiler_context_get_ast_dump_enabled(const t_transpiler_context *context)
+{
+    if (!context)
+        return (0);
+    return (context->ast_dump_enabled);
+}
+
+const char *transpiler_context_get_ast_dump_directory(const t_transpiler_context *context)
+{
+    if (!context)
+        return (NULL);
+    return (context->ast_dump_directory);
 }

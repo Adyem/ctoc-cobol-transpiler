@@ -1,0 +1,117 @@
+{
+    "name": "CBL-C",
+    "scopeName": "source.cblc",
+    "patterns": [
+        {
+            "include": "#comments"
+        },
+        {
+            "include": "#strings"
+        },
+        {
+            "include": "#keywords"
+        },
+        {
+            "include": "#types"
+        },
+        {
+            "include": "#constants"
+        }
+    ],
+    "repository": {
+        "comments": {
+            "patterns": [
+                {
+                    "name": "comment.line.double-slash.cblc",
+                    "begin": "//",
+                    "beginCaptures": {
+                        "0": {
+                            "name": "punctuation.definition.comment.cblc"
+                        }
+                    },
+                    "end": "\\n"
+                },
+                {
+                    "name": "comment.block.cblc",
+                    "begin": "/\\*",
+                    "beginCaptures": {
+                        "0": {
+                            "name": "punctuation.definition.comment.begin.cblc"
+                        }
+                    },
+                    "end": "\\*/",
+                    "endCaptures": {
+                        "0": {
+                            "name": "punctuation.definition.comment.end.cblc"
+                        }
+                    }
+                }
+            ]
+        },
+        "strings": {
+            "patterns": [
+                {
+                    "name": "string.quoted.double.cblc",
+                    "begin": "\"",
+                    "beginCaptures": {
+                        "0": {
+                            "name": "punctuation.definition.string.begin.cblc"
+                        }
+                    },
+                    "end": "\"",
+                    "endCaptures": {
+                        "0": {
+                            "name": "punctuation.definition.string.end.cblc"
+                        }
+                    },
+                    "patterns": [
+                        {
+                            "name": "constant.character.escape.cblc",
+                            "match": "\\\\."
+                        }
+                    ]
+                }
+            ]
+        },
+        "keywords": {
+            "patterns": [
+                {
+                    "name": "keyword.control.cblc",
+                    "match": "\\b(?:if|else|while|return|break|continue|import|copy)\\b"
+                },
+                {
+                    "name": "keyword.operator.cblc",
+                    "match": "\\b(?:open|close|read|write|display|perform|stop|compute|move)\\b"
+                },
+                {
+                    "name": "keyword.declaration.cblc",
+                    "match": "\\b(?:file|function|record)\\b"
+                }
+            ]
+        },
+        "types": {
+            "patterns": [
+                {
+                    "name": "storage.type.cblc",
+                    "match": "\\b(?:bool|char|int|long|double|void)\\b"
+                }
+            ]
+        },
+        "constants": {
+            "patterns": [
+                {
+                    "name": "constant.numeric.cblc",
+                    "match": "\\b0x[0-9A-Fa-f]+\\b"
+                },
+                {
+                    "name": "constant.numeric.cblc",
+                    "match": "\\b(?:[0-9]+(?:\\.[0-9]+)?)\\b"
+                },
+                {
+                    "name": "constant.language.boolean.cblc",
+                    "match": "\\b(?:true|false)\\b"
+                }
+            ]
+        }
+    }
+}
