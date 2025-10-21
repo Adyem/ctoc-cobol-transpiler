@@ -111,6 +111,19 @@ static void cblc_skip_whitespace(const char **cursor)
         *cursor += 1;
 }
 
+static int cblc_is_identifier_char(char character)
+{
+    if (character == '_')
+        return (1);
+    if (character >= 'a' && character <= 'z')
+        return (1);
+    if (character >= 'A' && character <= 'Z')
+        return (1);
+    if (character >= '0' && character <= '9')
+        return (1);
+    return (0);
+}
+
 static int cblc_parse_identifier(const char **cursor, char *buffer, size_t buffer_size)
 {
     size_t length;
@@ -118,11 +131,16 @@ static int cblc_parse_identifier(const char **cursor, char *buffer, size_t buffe
     if (!cursor || !*cursor || !buffer || buffer_size == 0)
         return (FT_FAILURE);
     length = 0;
-    while ((*cursor)[length] == '_' || ((*cursor)[length] >= 'a'
-            && (*cursor)[length] <= 'z') || ((*cursor)[length] >= 'A'
-            && (*cursor)[length] <= 'Z') || ((*cursor)[length] >= '0'
-            && (*cursor)[length] <= '9'))
+    while (cblc_is_identifier_char((*cursor)[length]))
         length += 1;
+    while ((*cursor)[length] == ':' && (*cursor)[length + 1] == ':'
+        && (*cursor)[length + 2] != '\0'
+        && cblc_is_identifier_char((*cursor)[length + 2]))
+    {
+        length += 2;
+        while (cblc_is_identifier_char((*cursor)[length]))
+            length += 1;
+    }
     if (length == 0)
         return (FT_FAILURE);
     if (length + 1 > buffer_size)
@@ -591,6 +609,90 @@ static t_cblc_data_item *cblc_find_data_item(t_cblc_translation_unit *unit, cons
     return (NULL);
 }
 
+static t_cblc_data_item *cblc_add_generated_char_item(t_cblc_translation_unit *unit,
+    const char *identifier, size_t length)
+{
+    t_cblc_data_item *item;
+
+    if (!unit || !identifier)
+        return (NULL);
+    item = cblc_find_data_item(unit, identifier);
+    if (item)
+        return (item);
+    if (length == 0)
+        length = 1;
+    if (unit->data_count >= unit->data_capacity)
+    {
+        if (cblc_translation_unit_ensure_data_capacity(unit,
+                unit->data_capacity == 0 ? 4 : unit->data_capacity * 2) != FT_SUCCESS)
+            return (NULL);
+    }
+    item = &unit->data_items[unit->data_count];
+    ft_strlcpy(item->source_name, identifier, sizeof(item->source_name));
+    cblc_identifier_to_cobol(identifier, item->cobol_name, sizeof(item->cobol_name));
+    item->length = length;
+    item->kind = CBLC_DATA_KIND_CHAR;
+    unit->data_count += 1;
+    return (item);
+}
+
+static t_cblc_data_item *cblc_add_generated_int_item(t_cblc_translation_unit *unit,
+    const char *identifier)
+{
+    t_cblc_data_item *item;
+
+    if (!unit || !identifier)
+        return (NULL);
+    item = cblc_find_data_item(unit, identifier);
+    if (item)
+        return (item);
+    if (unit->data_count >= unit->data_capacity)
+    {
+        if (cblc_translation_unit_ensure_data_capacity(unit,
+                unit->data_capacity == 0 ? 4 : unit->data_capacity * 2) != FT_SUCCESS)
+            return (NULL);
+    }
+    item = &unit->data_items[unit->data_count];
+    ft_strlcpy(item->source_name, identifier, sizeof(item->source_name));
+    cblc_identifier_to_cobol(identifier, item->cobol_name, sizeof(item->cobol_name));
+    item->length = 0;
+    item->kind = CBLC_DATA_KIND_INT;
+    unit->data_count += 1;
+    return (item);
+}
+
+static t_cblc_data_item *cblc_ensure_helper_status(t_cblc_translation_unit *unit)
+{
+    t_cblc_data_item *item;
+
+    if (!unit)
+        return (NULL);
+    if (unit->helper_status_index >= 0
+        && static_cast<size_t>(unit->helper_status_index) < unit->data_count)
+        return (&unit->data_items[unit->helper_status_index]);
+    item = cblc_add_generated_int_item(unit, "cblc_helper_status");
+    if (!item)
+        return (NULL);
+    unit->helper_status_index = static_cast<int>(item - unit->data_items);
+    return (item);
+}
+
+static t_cblc_data_item *cblc_create_literal_buffer(t_cblc_translation_unit *unit,
+    size_t literal_length)
+{
+    char identifier[TRANSPILE_IDENTIFIER_MAX];
+    size_t index;
+
+    if (!unit)
+        return (NULL);
+    unit->helper_literal_counter += 1;
+    index = unit->helper_literal_counter;
+    if (pf_snprintf(identifier, sizeof(identifier), "cblc_literal_%zu", index) < 0)
+        return (NULL);
+    return (cblc_add_generated_char_item(unit, identifier,
+        literal_length > 0 ? literal_length : 1));
+}
+
 static const t_cblc_function *cblc_find_function_in_unit(const t_cblc_translation_unit *unit,
     const char *identifier)
 {
@@ -634,6 +736,227 @@ static int cblc_append_statement(t_cblc_function *function, t_cblc_statement_typ
     if (source)
         ft_strlcpy(statement->source, source, sizeof(statement->source));
     function->statement_count += 1;
+    return (FT_SUCCESS);
+}
+
+static int cblc_append_call_statement(t_cblc_function *function, const char *identifier,
+    const char *arguments)
+{
+    t_cblc_statement *statement;
+
+    if (!function || !identifier)
+        return (FT_FAILURE);
+    if (cblc_append_statement(function, CBLC_STATEMENT_CALL, NULL, NULL, 0) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (function->statement_count == 0)
+        return (FT_FAILURE);
+    statement = &function->statements[function->statement_count - 1];
+    ft_strlcpy(statement->call_identifier, identifier, sizeof(statement->call_identifier));
+    statement->call_is_external = 1;
+    if (arguments)
+        ft_strlcpy(statement->source, arguments, sizeof(statement->source));
+    else
+        statement->source[0] = '\0';
+    return (FT_SUCCESS);
+}
+
+static int cblc_parse_std_strcpy(const char **cursor, t_cblc_translation_unit *unit,
+    t_cblc_function *function)
+{
+    const char *start;
+    char identifier[TRANSPILE_IDENTIFIER_MAX];
+    char destination_identifier[TRANSPILE_IDENTIFIER_MAX];
+    char source_identifier[TRANSPILE_IDENTIFIER_MAX];
+    char literal_buffer[TRANSPILE_STATEMENT_TEXT_MAX];
+    char literal_text[TRANSPILE_STATEMENT_TEXT_MAX];
+    char destination_length_literal[32];
+    char source_length_literal[32];
+    char call_arguments[TRANSPILE_STATEMENT_TEXT_MAX];
+    char cobol_source_name[TRANSPILE_IDENTIFIER_MAX];
+    t_cblc_data_item *target_item;
+    t_cblc_data_item *source_item;
+    t_cblc_data_item *status_item;
+    size_t source_length;
+    size_t target_index;
+    size_t source_index;
+
+    if (!cursor || !*cursor || !unit || !function)
+        return (FT_FAILURE);
+    start = *cursor;
+    if (cblc_parse_identifier(cursor, identifier, sizeof(identifier)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (ft_strncmp(identifier, "std::strcpy", sizeof(identifier)) != 0)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    cblc_skip_whitespace(cursor);
+    if (**cursor != '(')
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    *cursor += 1;
+    cblc_skip_whitespace(cursor);
+    if (cblc_parse_identifier(cursor, destination_identifier,
+            sizeof(destination_identifier)) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    target_item = cblc_find_data_item(unit, destination_identifier);
+    if (!target_item || target_item->kind != CBLC_DATA_KIND_CHAR)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    target_index = static_cast<size_t>(target_item - unit->data_items);
+    cblc_skip_whitespace(cursor);
+    if (**cursor != ',')
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    *cursor += 1;
+    cblc_skip_whitespace(cursor);
+    source_item = NULL;
+    literal_text[0] = '\0';
+    source_length = 0;
+    source_index = 0;
+    if (**cursor == '"')
+    {
+        if (cblc_parse_string_literal(cursor, literal_buffer, sizeof(literal_buffer))
+            != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        source_length = ft_strlen(literal_buffer);
+        literal_text[0] = '\"';
+        literal_text[1] = '\0';
+        ft_strlcat(literal_text, literal_buffer, sizeof(literal_text));
+        ft_strlcat(literal_text, "\"", sizeof(literal_text));
+        source_item = cblc_create_literal_buffer(unit, source_length);
+        if (!source_item)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        if (cblc_append_statement(function, CBLC_STATEMENT_ASSIGNMENT,
+                source_item->cobol_name, literal_text, 1) != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        source_index = static_cast<size_t>(source_item - unit->data_items);
+        target_item = &unit->data_items[target_index];
+    }
+    else if (**cursor == '\'')
+    {
+        char literal_value;
+        char literal_token[4];
+
+        if (cblc_parse_char_literal(cursor, &literal_value) != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        literal_token[0] = literal_value;
+        literal_token[1] = '\0';
+        literal_text[0] = '\"';
+        literal_text[1] = '\0';
+        if (literal_value == '"')
+            ft_strlcat(literal_text, "\"\"", sizeof(literal_text));
+        else
+            ft_strlcat(literal_text, literal_token, sizeof(literal_text));
+        ft_strlcat(literal_text, "\"", sizeof(literal_text));
+        source_length = 1;
+        source_item = cblc_create_literal_buffer(unit, source_length);
+        if (!source_item)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        if (cblc_append_statement(function, CBLC_STATEMENT_ASSIGNMENT,
+                source_item->cobol_name, literal_text, 1) != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        source_index = static_cast<size_t>(source_item - unit->data_items);
+        target_item = &unit->data_items[target_index];
+    }
+    else
+    {
+        if (cblc_parse_identifier(cursor, source_identifier,
+                sizeof(source_identifier)) != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        source_item = cblc_find_data_item(unit, source_identifier);
+        if (!source_item || source_item->kind != CBLC_DATA_KIND_CHAR)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        source_length = source_item->length;
+        source_index = static_cast<size_t>(source_item - unit->data_items);
+    }
+    cblc_skip_whitespace(cursor);
+    if (**cursor != ')')
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    *cursor += 1;
+    cblc_skip_whitespace(cursor);
+    if (**cursor != ';')
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    *cursor += 1;
+    if (!source_item)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    if (pf_snprintf(destination_length_literal, sizeof(destination_length_literal),
+            "%zu", target_item->length) < 0)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    if (pf_snprintf(source_length_literal, sizeof(source_length_literal), "%zu",
+            source_length) < 0)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    status_item = cblc_ensure_helper_status(unit);
+    if (!status_item)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    target_item = &unit->data_items[target_index];
+    source_item = &unit->data_items[source_index];
+    ft_strlcpy(cobol_source_name, source_item->cobol_name,
+        sizeof(cobol_source_name));
+    if (pf_snprintf(call_arguments, sizeof(call_arguments),
+            "BY REFERENCE %s BY VALUE %s BY REFERENCE %s BY VALUE %s BY REFERENCE %s",
+            target_item->cobol_name, destination_length_literal, cobol_source_name,
+            source_length_literal, status_item->cobol_name) < 0)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    if (cblc_append_call_statement(function, "CBLC-STRCPY", call_arguments) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
     return (FT_SUCCESS);
 }
 
@@ -709,40 +1032,72 @@ static int cblc_parse_numeric_expression(const char **cursor, t_cblc_translation
                 *cursor += 1;
                 continue ;
             }
-        if ((**cursor >= 'a' && **cursor <= 'z') || (**cursor >= 'A' && **cursor <= 'Z')
-            || **cursor == '_')
-        {
-            char identifier[TRANSPILE_IDENTIFIER_MAX];
-            t_cblc_data_item *item;
-
-            if (cblc_parse_identifier(cursor, identifier, sizeof(identifier)) != FT_SUCCESS)
-                return (FT_FAILURE);
-            item = cblc_find_data_item(unit, identifier);
-            if (!item)
-                return (FT_FAILURE);
-            if (**cursor == '.')
+            if ((**cursor >= 'a' && **cursor <= 'z') || (**cursor >= 'A' && **cursor <= 'Z')
+                || **cursor == '_')
             {
-                char length_name[TRANSPILE_IDENTIFIER_MAX];
+                char identifier[TRANSPILE_IDENTIFIER_MAX];
+                t_cblc_data_item *item;
 
-                *cursor += 1;
-                if (!cblc_match_keyword(cursor, "len"))
+                if (cblc_parse_identifier(cursor, identifier, sizeof(identifier)) != FT_SUCCESS)
                     return (FT_FAILURE);
-                if (item->kind != CBLC_DATA_KIND_STRING)
+                if (ft_strncmp(identifier, "std::abs", sizeof(identifier)) == 0)
+                {
+                    char function_buffer[TRANSPILE_STATEMENT_TEXT_MAX];
+                    char argument_identifier[TRANSPILE_IDENTIFIER_MAX];
+                    char cobol_argument[TRANSPILE_IDENTIFIER_MAX];
+                    t_cblc_data_item *argument_item;
+
+                    cblc_skip_whitespace(cursor);
+                    if (**cursor != '(')
+                        return (FT_FAILURE);
+                    *cursor += 1;
+                    cblc_skip_whitespace(cursor);
+                    if (cblc_parse_identifier(cursor, argument_identifier,
+                            sizeof(argument_identifier)) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    argument_item = cblc_find_data_item(unit, argument_identifier);
+                    if (!argument_item || argument_item->kind != CBLC_DATA_KIND_INT)
+                        return (FT_FAILURE);
+                    ft_strlcpy(cobol_argument, argument_item->cobol_name,
+                        sizeof(cobol_argument));
+                    cblc_skip_whitespace(cursor);
+                    if (**cursor != ')')
+                        return (FT_FAILURE);
+                    *cursor += 1;
+                    if (pf_snprintf(function_buffer, sizeof(function_buffer),
+                            "FUNCTION ABS(%s)", cobol_argument) < 0)
+                        return (FT_FAILURE);
+                    if (cblc_expression_append(buffer, buffer_size, function_buffer) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    expect_operand = 0;
+                    continue ;
+                }
+                item = cblc_find_data_item(unit, identifier);
+                if (!item)
                     return (FT_FAILURE);
-                cblc_build_string_component_name(item->cobol_name, "-LEN", length_name,
-                    sizeof(length_name));
-                if (cblc_expression_append(buffer, buffer_size, length_name) != FT_SUCCESS)
+                if (**cursor == '.')
+                {
+                    char length_name[TRANSPILE_IDENTIFIER_MAX];
+
+                    *cursor += 1;
+                    if (!cblc_match_keyword(cursor, "len"))
+                        return (FT_FAILURE);
+                    if (item->kind != CBLC_DATA_KIND_STRING)
+                        return (FT_FAILURE);
+                    cblc_build_string_component_name(item->cobol_name, "-LEN", length_name,
+                        sizeof(length_name));
+                    if (cblc_expression_append(buffer, buffer_size, length_name) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    expect_operand = 0;
+                    continue ;
+                }
+                if (item->kind != CBLC_DATA_KIND_INT)
+                    return (FT_FAILURE);
+                if (cblc_expression_append(buffer, buffer_size, item->cobol_name) != FT_SUCCESS)
                     return (FT_FAILURE);
                 expect_operand = 0;
                 continue ;
             }
-            if (item->kind != CBLC_DATA_KIND_INT)
-                return (FT_FAILURE);
-            if (cblc_expression_append(buffer, buffer_size, item->cobol_name) != FT_SUCCESS)
-                return (FT_FAILURE);
-            expect_operand = 0;
-            continue ;
-        }
             return (FT_FAILURE);
         }
         if (**cursor == '+' || **cursor == '-' || **cursor == '*' || **cursor == '/')
@@ -761,6 +1116,81 @@ static int cblc_parse_numeric_expression(const char **cursor, t_cblc_translation
     }
     if (expect_operand)
         return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int cblc_parse_std_strlen_assignment(const char **cursor, t_cblc_translation_unit *unit,
+    t_cblc_function *function, t_cblc_data_item *target_item)
+{
+    const char *start;
+    char identifier[TRANSPILE_IDENTIFIER_MAX];
+    char argument_identifier[TRANSPILE_IDENTIFIER_MAX];
+    char declared_length_literal[32];
+    char call_arguments[TRANSPILE_STATEMENT_TEXT_MAX];
+    t_cblc_data_item *argument_item;
+
+    if (!cursor || !*cursor || !unit || !function || !target_item)
+        return (FT_FAILURE);
+    start = *cursor;
+    if (cblc_parse_identifier(cursor, identifier, sizeof(identifier)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (ft_strncmp(identifier, "std::strlen", sizeof(identifier)) != 0)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    cblc_skip_whitespace(cursor);
+    if (**cursor != '(')
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    *cursor += 1;
+    cblc_skip_whitespace(cursor);
+    if (cblc_parse_identifier(cursor, argument_identifier,
+            sizeof(argument_identifier)) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    argument_item = cblc_find_data_item(unit, argument_identifier);
+    if (!argument_item || argument_item->kind != CBLC_DATA_KIND_CHAR)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    cblc_skip_whitespace(cursor);
+    if (**cursor != ')')
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    *cursor += 1;
+    cblc_skip_whitespace(cursor);
+    if (**cursor != ';')
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    *cursor += 1;
+    if (pf_snprintf(declared_length_literal, sizeof(declared_length_literal), "%zu",
+            argument_item->length) < 0)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    if (pf_snprintf(call_arguments, sizeof(call_arguments),
+            "BY REFERENCE %s BY VALUE %s BY REFERENCE %s", argument_item->cobol_name,
+            declared_length_literal, target_item->cobol_name) < 0)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    if (cblc_append_call_statement(function, "CBLC-STRLEN", call_arguments) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
     return (FT_SUCCESS);
 }
 
@@ -926,6 +1356,9 @@ static int cblc_parse_assignment(const char **cursor, t_cblc_translation_unit *u
     }
     if (target_item->kind == CBLC_DATA_KIND_INT)
     {
+        if (cblc_parse_std_strlen_assignment(cursor, unit, function, target_item)
+            == FT_SUCCESS)
+            return (FT_SUCCESS);
         if (cblc_parse_numeric_expression(cursor, unit, expression_buffer,
                 sizeof(expression_buffer)) != FT_SUCCESS)
             return (FT_FAILURE);
@@ -1153,6 +1586,8 @@ static int cblc_parse_function(const char **cursor, t_cblc_translation_unit *uni
         }
         if (cblc_parse_call(cursor, function) == FT_SUCCESS)
             continue ;
+        if (cblc_parse_std_strcpy(cursor, unit, function) == FT_SUCCESS)
+            continue ;
         if (cblc_parse_assignment(cursor, unit, function) == FT_SUCCESS)
             continue ;
         return (FT_FAILURE);
@@ -1177,6 +1612,8 @@ void cblc_translation_unit_init(t_cblc_translation_unit *unit)
     unit->function_count = 0;
     unit->function_capacity = 0;
     unit->entry_function_index = static_cast<size_t>(-1);
+    unit->helper_literal_counter = 0;
+    unit->helper_status_index = -1;
     unit->program_name[0] = '\0';
 }
 
@@ -1219,6 +1656,8 @@ void cblc_translation_unit_dispose(t_cblc_translation_unit *unit)
     unit->function_count = 0;
     unit->function_capacity = 0;
     unit->entry_function_index = static_cast<size_t>(-1);
+    unit->helper_literal_counter = 0;
+    unit->helper_status_index = -1;
     unit->program_name[0] = '\0';
 }
 
@@ -1341,9 +1780,19 @@ static int cblc_emit_function(const t_cblc_function *function,
                 sizeof(cobol_name));
             if (statement->call_is_external)
             {
-                if (pf_snprintf(line, sizeof(line), "           CALL '%s'",
-                        cobol_name) < 0)
-                    return (FT_FAILURE);
+                if (statement->source[0] != '\0')
+                {
+                    if (pf_snprintf(line, sizeof(line),
+                            "           CALL '%s' USING %s", cobol_name,
+                            statement->source) < 0)
+                        return (FT_FAILURE);
+                }
+                else
+                {
+                    if (pf_snprintf(line, sizeof(line), "           CALL '%s'",
+                            cobol_name) < 0)
+                        return (FT_FAILURE);
+                }
             }
             else
             {
@@ -1518,6 +1967,12 @@ int cblc_resolve_translation_unit_calls(t_transpiler_context *context, const cha
             statement = &function->statements[statement_index];
             if (statement->type == CBLC_STATEMENT_CALL)
             {
+                if (ft_strncmp(statement->call_identifier, "CBLC-", 5) == 0)
+                {
+                    statement->call_is_external = 1;
+                    statement_index += 1;
+                    continue ;
+                }
                 const t_cblc_function *local_target;
 
                 local_target = cblc_find_function_in_unit(unit, statement->call_identifier);

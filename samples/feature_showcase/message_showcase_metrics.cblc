@@ -1,33 +1,53 @@
-int base_count;
-int processed_count;
-int combined_total;
-int difference_total;
-int doubled_total;
-int average_batch;
+char metrics_header[32];
+char trend_note[48];
+char note_line[64];
+int net_premium;
+int claim_payout;
+int reserve_target;
+int reserve_gap;
+int loss_ratio_percent;
+int claims_paid;
+int average_claim;
+int payout_scaled;
+int note_length;
 
 function void main()
 {
-    display("METRIC STAGE");
+    std::strcpy(metrics_header, "DAILY RISK METRICS");
+    display(metrics_header);
 
-    base_count = 27;
-    processed_count = 15;
-    combined_total = base_count + processed_count;
-    difference_total = base_count - processed_count;
-    doubled_total = combined_total * 2;
-    average_batch = combined_total / 2;
+    claims_paid = 2;
+    net_premium = 480000;
+    claim_payout = 72000;
+    reserve_target = 600000;
+    reserve_gap = reserve_target - net_premium;
+    payout_scaled = claim_payout * 100;
+    loss_ratio_percent = payout_scaled / net_premium;
+    average_claim = claim_payout / claims_paid;
 
-    display("Combined total (base + processed)");
-    display(combined_total);
-    display("Difference (base - processed)");
-    display(difference_total);
-    display("Double total (combined * 2)");
-    display(doubled_total);
-    display("Average batch (combined / 2)");
-    display(average_batch);
-    display("FINAL METRIC TOTALS");
-    display(combined_total);
-    display(difference_total);
-    display(doubled_total);
-    display(average_batch);
+    display("Net premium written");
+    display(net_premium);
+    display("Claim payout total");
+    display(claim_payout);
+    display("Loss ratio percent");
+    display(loss_ratio_percent);
+    display("Reserve target gap");
+    display(reserve_gap);
+    display("Average paid claim");
+    display(average_claim);
+
+    std::strcpy(trend_note, "Average claim stable");
+    std::strcpy(note_line, "Trend note: Average claim stable");
+    display(note_line);
+    note_length = std::strlen(note_line);
+    display("Note length");
+    display(note_length);
+
+    display("SUMMARY TOTALS");
+    display(net_premium);
+    display(claim_payout);
+    display(loss_ratio_percent);
+    display(reserve_gap);
+    display(average_claim);
     return;
 }

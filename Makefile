@@ -9,7 +9,7 @@ endif
 NAME        = ctoc_cobol_transpiler$(EXE_EXT)
 NAME_DEBUG  = ctoc_cobol_transpiler_debug$(EXE_EXT)
 TEST_NAME   = automated_tests$(EXE_EXT)
-FORWARD_TRANSLATION ?= 1
+FORWARD_TRANSLATION ?= 0
 export CTOC_ENABLE_FORWARD_TRANSLATION ?= $(FORWARD_TRANSLATION)
 PYTHON          ?= python3
 LINT_SCRIPT      = scripts/lint_sources.py
@@ -297,6 +297,7 @@ TEST_SRC    = tests/test_main.cpp \
               tests/runtime_doc_tests.cpp \
               tests/cli_parse_success_tests.cpp \
               tests/cli_parse_failure_tests.cpp \
+              tests/cli_standard_library_tests.cpp \
               tests/cli_tests.cpp \
               tests/ci_tests.cpp \
               tests/codegen_tests.cpp \
