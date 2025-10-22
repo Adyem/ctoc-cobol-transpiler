@@ -813,6 +813,7 @@ void transpiler_pipeline_reset(t_transpiler_pipeline *pipeline);
 #define TRANSPILE_WARNING_SEMANTIC_UNUSED_DATA_ITEM 3010
 #define TRANSPILE_WARNING_SEMANTIC_WRITE_ONLY_DATA_ITEM 3011
 #define TRANSPILE_WARNING_SEMANTIC_READ_WITHOUT_WRITE 3012
+#define TRANSPILE_WARNING_SEMANTIC_DUPLICATE_COPYBOOK_INCLUDE 3013
 
 int transpiler_semantics_analyze_program(t_transpiler_context *context, const t_ast_node *program);
 

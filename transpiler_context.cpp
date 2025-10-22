@@ -1,4 +1,7 @@
 #include <cstdlib>
+#include <filesystem>
+#include <string>
+#include <system_error>
 
 #include "libft/CMA/CMA.hpp"
 #include "libft/Printf/printf.hpp"
@@ -937,6 +940,152 @@ static int transpiler_context_find_module_index(const t_transpiler_context *cont
     return (transpiler_context_find_module_index_by_path(context, identifier));
 }
 
+static int transpiler_context_copy_path_string(const std::filesystem::path &path, char *buffer, size_t buffer_size)
+{
+    std::string string_value;
+    size_t length;
+
+    if (!buffer)
+        return (FT_FAILURE);
+    if (buffer_size == 0)
+        return (FT_FAILURE);
+    string_value = path.string();
+    length = ft_strlcpy(buffer, string_value.c_str(), buffer_size);
+    if (length >= buffer_size)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int transpiler_context_normalize_module_path(const char *path, char *buffer, size_t buffer_size)
+{
+    std::filesystem::path fs_path;
+    std::filesystem::path absolute_path;
+    std::error_code error;
+
+    if (!buffer)
+        return (FT_FAILURE);
+    if (buffer_size == 0)
+        return (FT_FAILURE);
+    if (!path || path[0] == '\0')
+    {
+        buffer[0] = '\0';
+        return (FT_SUCCESS);
+    }
+    fs_path = std::filesystem::path(path);
+    if (!fs_path.is_absolute())
+    {
+        error = std::error_code();
+        absolute_path = std::filesystem::absolute(fs_path, error);
+        if (error)
+            return (FT_FAILURE);
+        fs_path = absolute_path;
+    }
+    fs_path = fs_path.lexically_normal();
+    return (transpiler_context_copy_path_string(fs_path, buffer, buffer_size));
+}
+
+static int transpiler_context_normalize_import_path(t_transpiler_context *context,
+    const t_transpiler_module *module, const char *import_path, char *buffer, size_t buffer_size)
+{
+    std::filesystem::path fs_path;
+    std::filesystem::path module_path;
+    std::filesystem::path module_directory;
+    std::filesystem::path absolute_path;
+    std::filesystem::path relative_candidate;
+    std::error_code error;
+    std::string candidate_string;
+    size_t copied_length;
+    int has_module_directory;
+    int module_index;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (!buffer)
+        return (FT_FAILURE);
+    if (buffer_size == 0)
+        return (FT_FAILURE);
+    if (transpiler_context_string_is_blank(import_path))
+        return (FT_FAILURE);
+    module_index = transpiler_context_find_module_index(context, import_path);
+    if (module_index >= 0)
+    {
+        if (context->modules[module_index].path[0] != '\0')
+        {
+            module_path = std::filesystem::path(context->modules[module_index].path);
+            module_path = module_path.lexically_normal();
+            return (transpiler_context_copy_path_string(module_path, buffer, buffer_size));
+        }
+        copied_length = ft_strlcpy(buffer, context->modules[module_index].name, buffer_size);
+        if (copied_length >= buffer_size)
+            return (FT_FAILURE);
+        return (FT_SUCCESS);
+    }
+    fs_path = std::filesystem::path(import_path);
+    if (!fs_path.is_absolute())
+    {
+        error = std::error_code();
+        absolute_path = std::filesystem::absolute(fs_path, error);
+        if (!error)
+        {
+            absolute_path = absolute_path.lexically_normal();
+            candidate_string = absolute_path.string();
+            module_index = transpiler_context_find_module_index_by_path(context, candidate_string.c_str());
+            if (module_index >= 0 && context->modules[module_index].path[0] != '\0')
+            {
+                module_path = std::filesystem::path(context->modules[module_index].path);
+                module_path = module_path.lexically_normal();
+                return (transpiler_context_copy_path_string(module_path, buffer, buffer_size));
+            }
+            fs_path = absolute_path;
+        }
+    }
+    has_module_directory = 0;
+    if (module && module->path[0] != '\0')
+    {
+        module_path = std::filesystem::path(module->path);
+        module_directory = module_path.parent_path();
+        has_module_directory = 1;
+    }
+    if (has_module_directory)
+    {
+        relative_candidate = module_directory / std::filesystem::path(import_path);
+        relative_candidate = relative_candidate.lexically_normal();
+        if (!relative_candidate.is_absolute())
+        {
+            error = std::error_code();
+            absolute_path = std::filesystem::absolute(relative_candidate, error);
+            if (!error)
+                relative_candidate = absolute_path.lexically_normal();
+        }
+        candidate_string = relative_candidate.string();
+        module_index = transpiler_context_find_module_index_by_path(context, candidate_string.c_str());
+        if (module_index >= 0 && context->modules[module_index].path[0] != '\0')
+        {
+            module_path = std::filesystem::path(context->modules[module_index].path);
+            module_path = module_path.lexically_normal();
+            return (transpiler_context_copy_path_string(module_path, buffer, buffer_size));
+        }
+        fs_path = relative_candidate;
+    }
+    if (!fs_path.is_absolute())
+    {
+        error = std::error_code();
+        absolute_path = std::filesystem::absolute(fs_path, error);
+        if (!error)
+            fs_path = absolute_path;
+    }
+    fs_path = fs_path.lexically_normal();
+    candidate_string = fs_path.string();
+    if (candidate_string.length() == 0)
+    {
+        copied_length = ft_strlcpy(buffer, import_path, buffer_size);
+        if (copied_length >= buffer_size)
+            return (FT_FAILURE);
+        return (FT_SUCCESS);
+    }
+    return (transpiler_context_copy_path_string(fs_path, buffer, buffer_size));
+}
+
 static int transpiler_context_module_has_import(const t_transpiler_context *context,
     size_t requester_index, size_t target_index)
 {
@@ -974,12 +1123,15 @@ int transpiler_context_register_module(t_transpiler_context *context, const char
     t_transpiler_module *module;
     char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
     size_t index;
+    char normalized_path[TRANSPILE_FILE_PATH_MAX];
 
     if (!context)
         return (FT_FAILURE);
     if (transpiler_context_string_is_blank(name))
         return (FT_FAILURE);
     if (path && transpiler_context_string_is_blank(path))
+        return (FT_FAILURE);
+    if (transpiler_context_normalize_module_path(path, normalized_path, sizeof(normalized_path)) != FT_SUCCESS)
         return (FT_FAILURE);
     index = 0;
     while (index < context->module_count)
@@ -993,11 +1145,11 @@ int transpiler_context_register_module(t_transpiler_context *context, const char
             transpiler_context_record_error(context, TRANSPILE_ERROR_MODULE_DUPLICATE_NAME);
             return (FT_FAILURE);
         }
-        if (path && path[0] != '\0'
-            && ft_strncmp(context->modules[index].path, path, TRANSPILE_FILE_PATH_MAX) == 0)
+        if (normalized_path[0] != '\0'
+            && ft_strncmp(context->modules[index].path, normalized_path, TRANSPILE_FILE_PATH_MAX) == 0)
         {
             pf_snprintf(message, sizeof(message),
-                "module path '%s' already registered", path);
+                "module path '%s' already registered", normalized_path);
             transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
                 TRANSPILE_ERROR_MODULE_DUPLICATE_NAME, message);
             transpiler_context_record_error(context, TRANSPILE_ERROR_MODULE_DUPLICATE_NAME);
@@ -1013,8 +1165,8 @@ int transpiler_context_register_module(t_transpiler_context *context, const char
     module = &context->modules[context->module_count];
     ft_bzero(module, sizeof(*module));
     ft_strlcpy(module->name, name, sizeof(module->name));
-    if (path)
-        ft_strlcpy(module->path, path, sizeof(module->path));
+    if (normalized_path[0] != '\0')
+        ft_strlcpy(module->path, normalized_path, sizeof(module->path));
     module->imports = NULL;
     module->import_count = 0;
     module->import_capacity = 0;
@@ -1050,6 +1202,7 @@ int transpiler_context_register_module_import(t_transpiler_context *context, con
     int module_index;
     size_t index;
     size_t insert_index;
+    char normalized_path[TRANSPILE_FILE_PATH_MAX];
 
     if (!context)
         return (FT_FAILURE);
@@ -1067,10 +1220,13 @@ int transpiler_context_register_module_import(t_transpiler_context *context, con
         return (FT_FAILURE);
     }
     module = &context->modules[static_cast<size_t>(module_index)];
+    if (transpiler_context_normalize_import_path(context, module, import_path, normalized_path,
+            sizeof(normalized_path)) != FT_SUCCESS)
+        return (FT_FAILURE);
     index = 0;
     while (index < module->import_count)
     {
-        if (ft_strncmp(module->imports[index].path, import_path, TRANSPILE_FILE_PATH_MAX) == 0)
+        if (ft_strncmp(module->imports[index].path, normalized_path, TRANSPILE_FILE_PATH_MAX) == 0)
             return (FT_SUCCESS);
         index += 1;
     }
@@ -1086,12 +1242,12 @@ int transpiler_context_register_module_import(t_transpiler_context *context, con
     }
     insert_index = module->import_count;
     while (insert_index > 0
-        && ft_strncmp(module->imports[insert_index - 1].path, import_path, TRANSPILE_FILE_PATH_MAX) > 0)
+        && ft_strncmp(module->imports[insert_index - 1].path, normalized_path, TRANSPILE_FILE_PATH_MAX) > 0)
     {
         module->imports[insert_index] = module->imports[insert_index - 1];
         insert_index -= 1;
     }
-    ft_strlcpy(module->imports[insert_index].path, import_path, TRANSPILE_FILE_PATH_MAX);
+    ft_strlcpy(module->imports[insert_index].path, normalized_path, TRANSPILE_FILE_PATH_MAX);
     module->imports[insert_index].resolved_index = static_cast<size_t>(-1);
     module->import_count += 1;
     return (FT_SUCCESS);
