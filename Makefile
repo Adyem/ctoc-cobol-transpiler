@@ -9,8 +9,10 @@ endif
 NAME        = ctoc_cobol_transpiler$(EXE_EXT)
 NAME_DEBUG  = ctoc_cobol_transpiler_debug$(EXE_EXT)
 TEST_NAME   = automated_tests$(EXE_EXT)
-FORWARD_TRANSLATION ?= 0
-export CTOC_ENABLE_FORWARD_TRANSLATION ?= $(FORWARD_TRANSLATION)
+
+ifdef FORWARD_TRANSLATION
+export CTOC_ENABLE_FORWARD_TRANSLATION := $(FORWARD_TRANSLATION)
+endif
 PYTHON          ?= python3
 LINT_SCRIPT      = scripts/lint_sources.py
 FUZZ_SCRIPT      = scripts/fuzz_transpiler.py

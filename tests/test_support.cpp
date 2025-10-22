@@ -184,12 +184,17 @@ int test_forward_translation_available(void)
         return (g_forward_translation_supported);
     g_checked_forward_translation = 1;
     env = getenv("CTOC_ENABLE_FORWARD_TRANSLATION");
-    if (!env)
+    if (env)
     {
-        g_forward_translation_supported = 0;
+        g_forward_translation_supported = test_parse_truthy_env(env);
         return (g_forward_translation_supported);
     }
-    g_forward_translation_supported = test_parse_truthy_env(env);
+    if (test_cobc_available())
+    {
+        g_forward_translation_supported = 1;
+        return (g_forward_translation_supported);
+    }
+    g_forward_translation_supported = 0;
     return (g_forward_translation_supported);
 }
 
@@ -200,7 +205,7 @@ void test_report_forward_translation_skip(const char *test_name)
     g_reported_forward_translation_skip = 1;
     if (!test_name)
         test_name = "forward translation";
-    pf_printf("Skipping %s: enable forward translation once file/record codegen is complete (set CTOC_ENABLE_FORWARD_TRANSLATION=1).\n",
+    pf_printf("Skipping %s: install 'cobc' to exercise forward translation (override with CTOC_ENABLE_FORWARD_TRANSLATION=1).\n",
         test_name);
 }
 

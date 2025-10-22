@@ -40,7 +40,7 @@ Refer to `docs/onboarding_checklist.md` for a full environment audit before comm
    ```
    The generated C pulls in lightweight helper routines (`cblc_string_assign_literal`, `cblc_display_*`, etc.) so you can build and execute the translation with any C toolchain while preserving the runtime semantics exercised by the COBOL backend.
 
-The `docs/cli_usage_examples.md` file contains additional flag combinations. Forward CBL-C→COBOL coverage is opt-in; run `make test FORWARD_TRANSLATION=1` (or export `CTOC_ENABLE_FORWARD_TRANSLATION=1`) to exercise the COBOL toolchain alongside the default suite. Leaving the flag unset keeps the faster C-only tests in place while the forward pipeline continues to evolve.
+The `docs/cli_usage_examples.md` file contains additional flag combinations. Forward CBL-C→COBOL coverage now runs automatically when the `cobc` binary is available on your PATH. Export `CTOC_ENABLE_FORWARD_TRANSLATION=0` (or pass `FORWARD_TRANSLATION=0` to `make test`) if you need to skip the COBOL-backed cases temporarily, or set the variable to `1` to force-enable them in environments without automatic detection.
 
 ### Standard Library Status Codes
 
