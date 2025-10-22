@@ -32,6 +32,9 @@ typedef struct s_transpiler_semantic_scope
     t_transpiler_semantic_data_item *items;
     size_t item_count;
     size_t item_capacity;
+    char (*expanded_copybooks)[TRANSPILE_IDENTIFIER_MAX];
+    size_t expanded_copybook_count;
+    size_t expanded_copybook_capacity;
 }   t_transpiler_semantic_scope;
 
 typedef int (*t_transpiler_semantics_value_classifier)(const t_ast_node *value,

@@ -1,3 +1,6 @@
+#include <filesystem>
+#include <string>
+
 #include "test_suites.hpp"
 
 FT_TEST(test_transpiler_context_scans_imports_and_orders_modules)
@@ -237,25 +240,33 @@ FT_TEST(test_transpiler_context_resolves_imports_by_file_name)
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    if (test_expect_int_equal(static_cast<int>(modules[main_index].import_count), 2,
-            "main module should record both imports") != FT_SUCCESS)
+    if (test_expect_int_equal(static_cast<int>(modules[main_index].import_count), 1,
+            "main module should record a single normalized import") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(modules[main_index].imports[0].resolved_index),
             static_cast<int>(worker_index),
-            "import by base file name should resolve to worker module") != FT_SUCCESS)
+            "normalized import should resolve to worker module") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    if (test_expect_int_equal(static_cast<int>(modules[main_index].imports[1].resolved_index),
-            static_cast<int>(worker_index),
-            "import by relative path should resolve to worker module") != FT_SUCCESS)
     {
-        transpiler_context_dispose(&context);
-        return (FT_FAILURE);
+        std::filesystem::path expected_path;
+        std::string expected_string;
+
+        expected_path = std::filesystem::path("samples/cblc/workers/metrics_worker.cblc");
+        expected_path = std::filesystem::absolute(expected_path);
+        expected_path = expected_path.lexically_normal();
+        expected_string = expected_path.string();
+        if (test_expect_cstring_equal(modules[main_index].imports[0].path, expected_string.c_str(),
+                "import path should normalize to worker module path") != FT_SUCCESS)
+        {
+            transpiler_context_dispose(&context);
+            return (FT_FAILURE);
+        }
     }
     order = transpiler_context_get_module_initialization_order(&context, &order_count);
     if (!order)
@@ -572,6 +583,21 @@ FT_TEST(test_transpiler_context_resolves_imports_by_path)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
+    }
+    {
+        std::filesystem::path expected_path;
+        std::string expected_string;
+
+        expected_path = std::filesystem::path("modules/worker_mod.cblc");
+        expected_path = std::filesystem::absolute(expected_path);
+        expected_path = expected_path.lexically_normal();
+        expected_string = expected_path.string();
+        if (test_expect_cstring_equal(modules[1].imports[0].path, expected_string.c_str(),
+                "path import should normalize to absolute worker path") != FT_SUCCESS)
+        {
+            transpiler_context_dispose(&context);
+            return (FT_FAILURE);
+        }
     }
     if (test_expect_success(transpiler_context_compute_module_initialization_order(&context),
             "module order computation should succeed") != FT_SUCCESS)

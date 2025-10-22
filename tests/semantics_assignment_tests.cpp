@@ -289,6 +289,72 @@ FT_TEST(test_semantics_detects_copybook_duplicate_data_item)
     return (status);
 }
 
+FT_TEST(test_semantics_skips_duplicate_copybook_expansion)
+{
+    t_transpiler_context context;
+    t_transpiler_copybook_item copy_items[1];
+    t_ast_node *program;
+    int status;
+
+    status = FT_FAILURE;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    ft_bzero(copy_items, sizeof(copy_items));
+    ft_strlcpy(copy_items[0].name, "CHAINED-FIELD", sizeof(copy_items[0].name));
+    copy_items[0].kind = TRANSPILE_DATA_ITEM_ALPHANUMERIC;
+    copy_items[0].declared_length = 8;
+    copy_items[0].is_read_only = 0;
+    if (transpiler_context_register_copybook(&context, "CHAINED-COPY", copy_items, 1) != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    program = semantics_build_program_with_storage("LOCAL-SOURCE", "PIC X(8)");
+    if (!program)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_copybook_include(program, "CHAINED-COPY") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_add_copybook_include(program, "CHAINED-COPY") != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (semantics_attach_procedure_with_move(program, "CHAINED-FIELD", "LOCAL-SOURCE", 0) != FT_SUCCESS)
+    {
+        semantics_destroy_program(program);
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_semantics_analyze_program(&context, program) == FT_SUCCESS
+        && transpiler_context_has_errors(&context) == 0)
+    {
+        size_t diagnostic_index;
+        int found_warning;
+
+        diagnostic_index = 0;
+        found_warning = 0;
+        while (diagnostic_index < context.diagnostics.count)
+        {
+            if (context.diagnostics.items[diagnostic_index].code == TRANSPILE_WARNING_SEMANTIC_DUPLICATE_COPYBOOK_INCLUDE)
+                found_warning = 1;
+            diagnostic_index += 1;
+        }
+        if (found_warning == 1)
+            status = FT_SUCCESS;
+    }
+    semantics_destroy_program(program);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
 FT_TEST(test_semantics_rejects_move_into_read_only_item)
 {
     t_transpiler_context context;
@@ -1314,6 +1380,7 @@ const t_test_case *get_semantics_assignment_tests(size_t *count)
         {"semantics_registers_copybook_items", test_semantics_registers_copybook_items},
         {"semantics_reports_unknown_copybook", test_semantics_reports_unknown_copybook},
         {"semantics_detects_copybook_duplicate_data_item", test_semantics_detects_copybook_duplicate_data_item},
+        {"semantics_skips_duplicate_copybook_expansion", test_semantics_skips_duplicate_copybook_expansion},
         {"semantics_rejects_move_into_read_only_item", test_semantics_rejects_move_into_read_only_item},
         {"semantics_rejects_assignment_into_read_only_item", test_semantics_rejects_assignment_into_read_only_item},
         {"semantics_allows_move_from_read_only_item", test_semantics_allows_move_from_read_only_item},

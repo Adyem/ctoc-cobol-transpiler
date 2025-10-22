@@ -13,6 +13,9 @@ void transpiler_semantics_scope_init(t_transpiler_semantic_scope *scope)
     scope->items = NULL;
     scope->item_count = 0;
     scope->item_capacity = 0;
+    scope->expanded_copybooks = NULL;
+    scope->expanded_copybook_count = 0;
+    scope->expanded_copybook_capacity = 0;
 }
 
 void transpiler_semantics_scope_dispose(t_transpiler_semantic_scope *scope)
@@ -24,6 +27,11 @@ void transpiler_semantics_scope_dispose(t_transpiler_semantic_scope *scope)
     scope->items = NULL;
     scope->item_count = 0;
     scope->item_capacity = 0;
+    if (scope->expanded_copybooks)
+        cma_free(scope->expanded_copybooks);
+    scope->expanded_copybooks = NULL;
+    scope->expanded_copybook_count = 0;
+    scope->expanded_copybook_capacity = 0;
 }
 
 static const char *g_transpiler_semantics_flag_suffixes[] = {
@@ -174,6 +182,73 @@ static int transpiler_semantics_scope_reserve(t_transpiler_semantic_scope *scope
         cma_free(scope->items);
     scope->items = new_items;
     scope->item_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
+static int transpiler_semantics_scope_copybooks_reserve(t_transpiler_semantic_scope *scope,
+    size_t desired_capacity)
+{
+    char (*copybooks)[TRANSPILE_IDENTIFIER_MAX];
+
+    if (!scope)
+        return (FT_FAILURE);
+    if (scope->expanded_copybook_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    copybooks = static_cast<char (*)[TRANSPILE_IDENTIFIER_MAX]>(cma_calloc(
+            desired_capacity, sizeof(*copybooks)));
+    if (!copybooks)
+        return (FT_FAILURE);
+    if (scope->expanded_copybooks)
+    {
+        ft_memcpy(copybooks, scope->expanded_copybooks,
+            scope->expanded_copybook_count * sizeof(*copybooks));
+        cma_free(scope->expanded_copybooks);
+    }
+    scope->expanded_copybooks = copybooks;
+    scope->expanded_copybook_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
+static int transpiler_semantics_scope_has_copybook(const t_transpiler_semantic_scope *scope,
+    const char *name)
+{
+    size_t index;
+
+    if (!scope)
+        return (0);
+    if (!name)
+        return (0);
+    index = 0;
+    while (index < scope->expanded_copybook_count)
+    {
+        if (ft_strncmp(scope->expanded_copybooks[index], name, TRANSPILE_IDENTIFIER_MAX) == 0)
+            return (1);
+        index += 1;
+    }
+    return (0);
+}
+
+static int transpiler_semantics_scope_remember_copybook(t_transpiler_semantic_scope *scope,
+    const char *name)
+{
+    if (!scope)
+        return (FT_FAILURE);
+    if (!name)
+        return (FT_FAILURE);
+    if (transpiler_semantics_scope_has_copybook(scope, name))
+        return (FT_SUCCESS);
+    if (scope->expanded_copybook_count >= scope->expanded_copybook_capacity)
+    {
+        if (transpiler_semantics_scope_copybooks_reserve(scope,
+                scope->expanded_copybook_capacity == 0 ? 4 : scope->expanded_copybook_capacity * 2)
+            != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    ft_strlcpy(scope->expanded_copybooks[scope->expanded_copybook_count], name,
+        TRANSPILE_IDENTIFIER_MAX);
+    scope->expanded_copybook_count += 1;
     return (FT_SUCCESS);
 }
 
@@ -372,6 +447,7 @@ static int transpiler_semantics_register_copybook(const t_ast_node *node,
 {
     const t_transpiler_copybook *copybook;
     const t_ast_node *name_node;
+    const char *copybook_name;
     char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
     size_t index;
     int status;
@@ -401,6 +477,19 @@ static int transpiler_semantics_register_copybook(const t_ast_node *node,
             TRANSPILE_ERROR_SEMANTIC_UNKNOWN_COPYBOOK, message);
         return (FT_FAILURE);
     }
+    copybook_name = copybook->name;
+    if (transpiler_semantics_scope_has_copybook(scope, copybook_name))
+    {
+        pf_snprintf(message, sizeof(message),
+            "copybook '%s' is included multiple times in this source file; duplicate COPY ignored",
+            copybook_name);
+        (void)transpiler_semantics_emit_warning_at(context, node,
+            TRANSPILE_WARNING_SEMANTIC_DUPLICATE_COPYBOOK_INCLUDE, message,
+            "Remove the redundant COPY directive to avoid repeated expansion.");
+        return (FT_SUCCESS);
+    }
+    if (transpiler_semantics_scope_remember_copybook(scope, copybook_name) != FT_SUCCESS)
+        return (FT_FAILURE);
     status = FT_SUCCESS;
     index = 0;
     while (index < copybook->item_count)
