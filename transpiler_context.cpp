@@ -1007,6 +1007,32 @@ static int transpiler_context_comments_reserve(t_transpiler_context *context, si
     return (FT_SUCCESS);
 }
 
+static int transpiler_context_use_after_error_reserve(t_transpiler_context *context,
+    size_t desired_capacity)
+{
+    t_transpiler_use_after_error_binding *bindings;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (context->use_after_error_binding_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    bindings = static_cast<t_transpiler_use_after_error_binding *>(cma_calloc(
+            desired_capacity, sizeof(t_transpiler_use_after_error_binding)));
+    if (!bindings)
+        return (FT_FAILURE);
+    if (context->use_after_error_bindings)
+    {
+        ft_memcpy(bindings, context->use_after_error_bindings,
+            context->use_after_error_binding_count * sizeof(*bindings));
+        cma_free(context->use_after_error_bindings);
+    }
+    context->use_after_error_bindings = bindings;
+    context->use_after_error_binding_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
 static int transpiler_context_copybooks_reserve(t_transpiler_context *context, size_t desired_capacity)
 {
     t_transpiler_copybook *copybooks;
@@ -1201,6 +1227,9 @@ int transpiler_context_init(t_transpiler_context *context)
     context->comment_emit_index = 0;
     context->semantic_snapshot_before = NULL;
     context->semantic_snapshot_after = NULL;
+    context->use_after_error_bindings = NULL;
+    context->use_after_error_binding_count = 0;
+    context->use_after_error_binding_capacity = 0;
     if (transpiler_diagnostics_init(&context->diagnostics) != FT_SUCCESS)
         return (FT_FAILURE);
     if (transpiler_context_functions_reserve(context, 4) != FT_SUCCESS)
@@ -1420,6 +1449,11 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->source_maps = NULL;
     context->source_map_count = 0;
     context->source_map_capacity = 0;
+    if (context->use_after_error_bindings)
+        cma_free(context->use_after_error_bindings);
+    context->use_after_error_bindings = NULL;
+    context->use_after_error_binding_count = 0;
+    context->use_after_error_binding_capacity = 0;
     if (context->comments)
         cma_free(context->comments);
     context->comments = NULL;
@@ -1670,6 +1704,7 @@ void transpiler_context_reset_unit_state(t_transpiler_context *context)
     }
     context->copybook_count = 0;
     context->source_map_count = 0;
+    context->use_after_error_binding_count = 0;
     context->last_error_code = FT_SUCCESS;
     transpiler_standard_library_reset_usage();
 }
@@ -2732,7 +2767,8 @@ int transpiler_context_configure_file_lock_mode(t_transpiler_context *context, c
 }
 
 int transpiler_context_register_data_item(t_transpiler_context *context, const char *name,
-    t_transpiler_data_item_kind kind, size_t declared_length, int is_read_only)
+    t_transpiler_data_item_kind kind, size_t declared_length, int is_read_only,
+    const t_transpiler_data_item_occurs *occurs)
 {
     t_transpiler_data_item *item;
     size_t index;
@@ -2754,6 +2790,8 @@ int transpiler_context_register_data_item(t_transpiler_context *context, const c
             context->data_items[index].kind = kind;
             if (is_read_only)
                 context->data_items[index].is_read_only = 1;
+            if (occurs)
+                context->data_items[index].occurs = *occurs;
             if (existing_kind == TRANSPILE_DATA_ITEM_ALPHANUMERIC
                 && kind == TRANSPILE_DATA_ITEM_ALPHANUMERIC
                 && existing_length > 0
@@ -2824,6 +2862,8 @@ int transpiler_context_register_data_item(t_transpiler_context *context, const c
     item->kind = kind;
     item->declared_length = declared_length;
     item->is_read_only = is_read_only ? 1 : 0;
+    if (occurs)
+        item->occurs = *occurs;
     context->data_item_count += 1;
     return (FT_SUCCESS);
 }
@@ -3267,4 +3307,55 @@ const char *transpiler_context_get_semantic_snapshot_after(const t_transpiler_co
     if (!context)
         return (NULL);
     return (context->semantic_snapshot_after);
+}
+
+int transpiler_context_register_use_after_error_binding(t_transpiler_context *context,
+    const char *section_name, const char *file_name)
+{
+    t_transpiler_use_after_error_binding *binding;
+    size_t index;
+    const char *safe_section;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (!file_name)
+        return (FT_FAILURE);
+    safe_section = section_name;
+    if (!safe_section)
+        safe_section = "";
+    index = 0;
+    while (index < context->use_after_error_binding_count)
+    {
+        binding = &context->use_after_error_bindings[index];
+        if (ft_strncmp(binding->section_name, safe_section, TRANSPILE_IDENTIFIER_MAX) == 0
+            && ft_strncmp(binding->file_name, file_name, TRANSPILE_IDENTIFIER_MAX) == 0)
+            return (FT_SUCCESS);
+        index += 1;
+    }
+    if (context->use_after_error_binding_count >= context->use_after_error_binding_capacity)
+    {
+        size_t desired_capacity;
+
+        desired_capacity = context->use_after_error_binding_capacity == 0 ? 4
+            : context->use_after_error_binding_capacity * 2;
+        if (transpiler_context_use_after_error_reserve(context, desired_capacity) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    binding = &context->use_after_error_bindings[context->use_after_error_binding_count];
+    ft_bzero(binding, sizeof(*binding));
+    ft_strlcpy(binding->section_name, safe_section, sizeof(binding->section_name));
+    ft_strlcpy(binding->file_name, file_name, sizeof(binding->file_name));
+    context->use_after_error_binding_count += 1;
+    return (FT_SUCCESS);
+}
+
+const t_transpiler_use_after_error_binding
+    *transpiler_context_get_use_after_error_bindings(const t_transpiler_context *context,
+        size_t *count)
+{
+    if (!context)
+        return (NULL);
+    if (count)
+        *count = context->use_after_error_binding_count;
+    return (context->use_after_error_bindings);
 }

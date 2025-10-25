@@ -9,28 +9,28 @@ FT_TEST(test_transpiler_context_preserves_caller_declared_length)
             "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_expect_success(transpiler_context_register_data_item(&context,
-                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 12, 0),
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 12, 0, NULL),
             "initial declared length registration should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     if (test_expect_success(transpiler_context_register_data_item(&context,
-                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 5, 0),
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 5, 0, NULL),
             "caller length should update binding") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     if (test_expect_success(transpiler_context_register_data_item(&context,
-                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 18, 0),
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 18, 0, NULL),
             "wider callee buffers should not override caller length") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     if (test_expect_success(transpiler_context_register_data_item(&context,
-                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 0, 0),
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 0, 0, NULL),
             "zero length updates should preserve prior metadata") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
@@ -62,14 +62,14 @@ FT_TEST(test_transpiler_context_promotes_caller_length_after_callee_metadata)
             "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_expect_success(transpiler_context_register_data_item(&context,
-                "SHARED-BUFFER", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 6, 0),
+                "SHARED-BUFFER", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 6, 0, NULL),
             "callee metadata should register") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     if (test_expect_success(transpiler_context_register_data_item(&context,
-                "SHARED-BUFFER", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 12, 0),
+                "SHARED-BUFFER", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 12, 0, NULL),
             "caller width should override callee metadata") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
@@ -95,14 +95,14 @@ FT_TEST(test_transpiler_context_promotes_caller_length_after_callee_metadata)
         return (FT_FAILURE);
     }
     if (test_expect_success(transpiler_context_register_data_item(&context,
-                "SHARED-BUFFER", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 12, 0),
+                "SHARED-BUFFER", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 12, 0, NULL),
             "re-registering caller width should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     if (transpiler_context_register_data_item(&context,
-            "SHARED-BUFFER", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 6, 0) != FT_FAILURE)
+            "SHARED-BUFFER", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 6, 0, NULL) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
         pf_printf("Assertion failed: narrower metadata should be rejected after caller registration\n");
@@ -125,21 +125,21 @@ FT_TEST(test_transpiler_context_rejects_narrower_callee_length)
     if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_expect_success(transpiler_context_register_data_item(&context,
-                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 12, 0),
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 12, 0, NULL),
             "initial registration should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     if (test_expect_success(transpiler_context_register_data_item(&context,
-                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 5, 0),
+                "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 5, 0, NULL),
             "caller registration should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     if (transpiler_context_register_data_item(&context,
-            "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 4, 0) != FT_FAILURE)
+            "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 4, 0, NULL) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
         pf_printf("Assertion failed: expected narrower callee length to be rejected\n");

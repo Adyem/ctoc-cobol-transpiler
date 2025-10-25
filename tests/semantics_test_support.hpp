@@ -33,6 +33,9 @@ int semantics_add_data_item_with_level(t_ast_node *program,
     const char *name, const char *picture_text, const char *level_text);
 int semantics_add_data_item(t_ast_node *program, const char *name,
     const char *picture_text);
+t_ast_node *semantics_find_data_item(t_ast_node *program, const char *name);
+int semantics_attach_occurs_clause(t_ast_node *data_item,
+    const char *minimum, const char *maximum, const char *depending_name);
 int semantics_add_copybook_include(t_ast_node *program,
     const char *copybook_name);
 int semantics_attach_procedure_with_assignment_like_node(

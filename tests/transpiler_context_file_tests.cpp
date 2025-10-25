@@ -8,14 +8,14 @@ FT_TEST(test_transpiler_context_records_read_only_flag)
     if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_expect_success(transpiler_context_register_data_item(&context,
-                "IMMUTABLE-ITEM", TRANSPILE_DATA_ITEM_NUMERIC, 0, 1),
+                "IMMUTABLE-ITEM", TRANSPILE_DATA_ITEM_NUMERIC, 0, 1, NULL),
             "read-only data item registration should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     if (test_expect_success(transpiler_context_register_data_item(&context,
-                "IMMUTABLE-ITEM", TRANSPILE_DATA_ITEM_NUMERIC, 0, 0),
+                "IMMUTABLE-ITEM", TRANSPILE_DATA_ITEM_NUMERIC, 0, 0, NULL),
             "additional registrations should preserve read-only flag") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);

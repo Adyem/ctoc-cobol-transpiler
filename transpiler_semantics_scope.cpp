@@ -252,6 +252,114 @@ static int transpiler_semantics_scope_remember_copybook(t_transpiler_semantic_sc
     return (FT_SUCCESS);
 }
 
+static int transpiler_semantics_parse_size_literal(const t_ast_node *literal, size_t *out_value)
+{
+    size_t index;
+    size_t length;
+    size_t value;
+    const char *text;
+
+    if (!literal || !out_value)
+        return (FT_FAILURE);
+    if (literal->kind != AST_NODE_LITERAL)
+        return (FT_FAILURE);
+    text = literal->token.lexeme;
+    length = literal->token.length;
+    if (!text)
+        return (FT_FAILURE);
+    if (length == 0)
+        length = ft_strlen(text);
+    if (length == 0)
+        return (FT_FAILURE);
+    value = 0;
+    index = 0;
+    while (index < length)
+    {
+        char digit;
+
+        digit = text[index];
+        if (!ft_isdigit(static_cast<unsigned char>(digit)))
+            return (FT_FAILURE);
+        if (value > (SIZE_MAX / 10))
+            return (FT_FAILURE);
+        value *= 10;
+        if (static_cast<size_t>(digit - '0') > (SIZE_MAX - value))
+            return (FT_FAILURE);
+        value += static_cast<size_t>(digit - '0');
+        index += 1;
+    }
+    *out_value = value;
+    return (FT_SUCCESS);
+}
+
+static int transpiler_semantics_extract_occurs_metadata(const t_ast_node *occurs_node,
+    t_transpiler_data_item_occurs *out_occurs)
+{
+    size_t index;
+    const t_ast_node *lower_literal;
+    const t_ast_node *upper_literal;
+    const t_ast_node *identifier_node;
+
+    if (!occurs_node || !out_occurs)
+        return (FT_FAILURE);
+    ft_bzero(out_occurs, sizeof(*out_occurs));
+    lower_literal = NULL;
+    upper_literal = NULL;
+    identifier_node = NULL;
+    index = 0;
+    while (index < ast_node_child_count(occurs_node))
+    {
+        const t_ast_node *child;
+
+        child = ast_node_get_child(occurs_node, index);
+        if (!child)
+            return (FT_FAILURE);
+        if (child->kind == AST_NODE_LITERAL)
+        {
+            if (!lower_literal)
+                lower_literal = child;
+            else if (!upper_literal)
+                upper_literal = child;
+            else
+                return (FT_FAILURE);
+        }
+        else if (child->kind == AST_NODE_IDENTIFIER)
+        {
+            if (identifier_node)
+                return (FT_FAILURE);
+            identifier_node = child;
+        }
+        else
+            return (FT_FAILURE);
+        index += 1;
+    }
+    if (!lower_literal)
+        return (FT_FAILURE);
+    if (transpiler_semantics_parse_size_literal(lower_literal,
+            &out_occurs->minimum) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (upper_literal)
+    {
+        if (transpiler_semantics_parse_size_literal(upper_literal,
+                &out_occurs->maximum) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    else
+        out_occurs->maximum = out_occurs->minimum;
+    if (out_occurs->maximum < out_occurs->minimum)
+        return (FT_FAILURE);
+    out_occurs->present = 1;
+    out_occurs->has_depending_on = 0;
+    ft_bzero(out_occurs->depending_on, sizeof(out_occurs->depending_on));
+    if (identifier_node && identifier_node->token.lexeme)
+    {
+        out_occurs->has_depending_on = 1;
+        ft_strlcpy(out_occurs->depending_on, identifier_node->token.lexeme,
+            sizeof(out_occurs->depending_on));
+    }
+    return (FT_SUCCESS);
+}
+
 const t_transpiler_semantic_data_item *transpiler_semantics_scope_lookup(
     const t_transpiler_semantic_scope *scope, const char *name)
 {
@@ -274,7 +382,8 @@ const t_transpiler_semantic_data_item *transpiler_semantics_scope_lookup(
 static int transpiler_semantics_register_data_item(t_transpiler_semantic_scope *scope,
     t_transpiler_context *context, const char *name,
     t_transpiler_semantic_data_kind kind, size_t declared_length,
-    size_t declared_scale, int has_declared_scale, int is_read_only)
+    size_t declared_scale, int has_declared_scale, int is_read_only,
+    const t_transpiler_data_item_occurs *occurs)
 {
     char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
     const t_transpiler_semantic_data_item *existing;
@@ -318,10 +427,14 @@ static int transpiler_semantics_register_data_item(t_transpiler_semantic_scope *
     item->read_count = 0;
     item->write_count = 0;
     item->has_initial_value = 0;
+    ft_bzero(&item->occurs, sizeof(item->occurs));
+    if (occurs)
+        item->occurs = *occurs;
     if (is_read_only)
         item->has_initial_value = 1;
     if (transpiler_context_register_data_item(context, name,
-            transpiler_semantics_convert_kind(kind), declared_length, is_read_only) != FT_SUCCESS)
+            transpiler_semantics_convert_kind(kind), declared_length, is_read_only,
+            occurs) != FT_SUCCESS)
     {
         item->name[0] = '\0';
         item->kind = TRANSPILE_SEMANTIC_DATA_UNKNOWN;
@@ -362,12 +475,16 @@ static int transpiler_semantics_collect_data_items(const t_ast_node *section,
             const t_ast_node *name_node;
             const t_ast_node *picture_node;
             const t_ast_node *level_node;
+            const t_ast_node *value_node;
+            const t_ast_node *occurs_node;
             size_t name_index;
 
             name_node = NULL;
             picture_node = NULL;
             level_node = NULL;
+            value_node = NULL;
             name_index = 0;
+            occurs_node = NULL;
             while (name_index < ast_node_child_count(child))
             {
                 const t_ast_node *candidate;
@@ -379,6 +496,10 @@ static int transpiler_semantics_collect_data_items(const t_ast_node *section,
                     picture_node = candidate;
                 else if (candidate && candidate->kind == AST_NODE_LITERAL)
                     level_node = candidate;
+                else if (candidate && candidate->kind == AST_NODE_VALUE_CLAUSE)
+                    value_node = candidate;
+                else if (candidate && candidate->kind == AST_NODE_OCCURS_CLAUSE)
+                    occurs_node = candidate;
                 name_index += 1;
             }
             if (!name_node)
@@ -398,12 +519,16 @@ static int transpiler_semantics_collect_data_items(const t_ast_node *section,
                 size_t declared_scale;
                 int has_declared_scale;
                 int is_read_only;
+                t_transpiler_data_item_occurs occurs_metadata;
+                const t_transpiler_data_item_occurs *occurs_pointer;
 
                 kind = TRANSPILE_SEMANTIC_DATA_UNKNOWN;
                 declared_length = 0;
                 declared_scale = 0;
                 has_declared_scale = 0;
                 is_read_only = 0;
+                ft_bzero(&occurs_metadata, sizeof(occurs_metadata));
+                occurs_pointer = NULL;
                 if (picture_node)
                 {
                     kind = transpiler_semantics_classify_picture(picture_node->token.lexeme);
@@ -426,10 +551,62 @@ static int transpiler_semantics_collect_data_items(const t_ast_node *section,
                     if (level_value == 78)
                         is_read_only = 1;
                 }
+                if (occurs_node)
+                {
+                    if (transpiler_semantics_extract_occurs_metadata(occurs_node,
+                            &occurs_metadata) != FT_SUCCESS)
+                    {
+                        char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+                        pf_snprintf(message, sizeof(message),
+                            "OCCURS clause on '%s' is invalid", name_node->token.lexeme);
+                        transpiler_semantics_emit_error(context,
+                            TRANSPILE_ERROR_SEMANTIC_INVALID_MOVE, message);
+                        status = FT_FAILURE;
+                    }
+                    else
+                    {
+                        occurs_pointer = &occurs_metadata;
+                        if (occurs_metadata.has_depending_on)
+                        {
+                            const t_transpiler_semantic_data_item *controller;
+
+                            controller = transpiler_semantics_scope_lookup(scope,
+                                    occurs_metadata.depending_on);
+                            if (!controller)
+                            {
+                                char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+                                pf_snprintf(message, sizeof(message),
+                                    "OCCURS DEPENDING ON references unknown data item '%s'",
+                                    occurs_metadata.depending_on);
+                                transpiler_semantics_emit_error(context,
+                                    TRANSPILE_ERROR_SEMANTIC_INVALID_MOVE, message);
+                                status = FT_FAILURE;
+                            }
+                        }
+                    }
+                }
                 if (transpiler_semantics_register_data_item(scope, context,
                         name_node->token.lexeme, kind, declared_length,
-                        declared_scale, has_declared_scale, is_read_only) != FT_SUCCESS)
+                        declared_scale, has_declared_scale, is_read_only,
+                        occurs_pointer) != FT_SUCCESS)
                     status = FT_FAILURE;
+                else if (value_node)
+                {
+                    const t_transpiler_semantic_data_item *registered;
+
+                    registered = transpiler_semantics_scope_lookup(scope,
+                            name_node->token.lexeme);
+                    if (registered)
+                    {
+                        t_transpiler_semantic_data_item *mutable_item;
+
+                        mutable_item = const_cast<t_transpiler_semantic_data_item *>(registered);
+                        if (mutable_item)
+                            mutable_item->has_initial_value = 1;
+                    }
+                }
             }
         }
         else if (child && child->kind == AST_NODE_COPYBOOK_INCLUDE)
@@ -500,7 +677,7 @@ static int transpiler_semantics_register_copybook(const t_ast_node *node,
         item = &copybook->items[index];
         kind = transpiler_semantics_kind_from_context(item->kind);
         if (transpiler_semantics_register_data_item(scope, context, item->name,
-                kind, item->declared_length, 0, 0, item->is_read_only) != FT_SUCCESS)
+                kind, item->declared_length, 0, 0, item->is_read_only, NULL) != FT_SUCCESS)
             status = FT_FAILURE;
         index += 1;
     }
@@ -547,6 +724,129 @@ int transpiler_semantics_collect_scope(const t_ast_node *program,
         {
             if (transpiler_semantics_collect_data_items(child, scope, context) != FT_SUCCESS)
                 status = FT_FAILURE;
+        }
+        index += 1;
+    }
+    return (status);
+}
+
+static int transpiler_semantics_file_declared(const t_transpiler_context *context,
+    const char *name)
+{
+    const t_transpiler_file_declaration *files;
+    size_t count;
+    size_t index;
+
+    files = transpiler_context_get_files(context, &count);
+    index = 0;
+    while (index < count)
+    {
+        if (ft_strncmp(files[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+            return (1);
+        index += 1;
+    }
+    return (0);
+}
+
+int transpiler_semantics_collect_use_after_error(const t_ast_node *program,
+    t_transpiler_context *context)
+{
+    const t_ast_node *procedure_division;
+    size_t index;
+    int status;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (!program)
+        return (FT_SUCCESS);
+    procedure_division = NULL;
+    index = 0;
+    while (index < ast_node_child_count(program))
+    {
+        const t_ast_node *candidate;
+
+        candidate = ast_node_get_child(program, index);
+        if (candidate && candidate->kind == AST_NODE_PROCEDURE_DIVISION)
+        {
+            procedure_division = candidate;
+            break ;
+        }
+        index += 1;
+    }
+    if (!procedure_division)
+        return (FT_SUCCESS);
+    status = FT_SUCCESS;
+    index = 0;
+    while (index < ast_node_child_count(procedure_division))
+    {
+        const t_ast_node *child;
+
+        child = ast_node_get_child(procedure_division, index);
+        if (child && child->kind == AST_NODE_DECLARATIVES)
+        {
+            size_t section_index;
+
+            section_index = 0;
+            while (section_index < ast_node_child_count(child))
+            {
+                const t_ast_node *section;
+
+                section = ast_node_get_child(child, section_index);
+                if (section && section->kind == AST_NODE_DECLARATIVE_SECTION)
+                {
+                    const char *section_name;
+                    size_t use_index;
+
+                    section_name = section->token.lexeme;
+                    if (!section_name)
+                        section_name = "";
+                    use_index = 0;
+                    while (use_index < ast_node_child_count(section))
+                    {
+                        const t_ast_node *use_node;
+
+                        use_node = ast_node_get_child(section, use_index);
+                        if (use_node && use_node->kind == AST_NODE_USE_AFTER_ERROR_PROCEDURE)
+                        {
+                            size_t target_index;
+
+                            target_index = 0;
+                            while (target_index < ast_node_child_count(use_node))
+                            {
+                                const t_ast_node *target;
+
+                                target = ast_node_get_child(use_node, target_index);
+                                if (target && target->kind == AST_NODE_IDENTIFIER
+                                    && target->token.lexeme)
+                                {
+                                    const char *file_name;
+
+                                    file_name = target->token.lexeme;
+                                    if (!transpiler_semantics_file_declared(context, file_name))
+                                    {
+                                        char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+                                        pf_snprintf(message, sizeof(message),
+                                            "file '%s' referenced by USE AFTER ERROR PROCEDURE is not declared",
+                                            file_name);
+                                        transpiler_semantics_emit_error(context,
+                                            TRANSPILE_ERROR_FILE_UNKNOWN, message);
+                                        status = FT_FAILURE;
+                                    }
+                                    else if (transpiler_context_register_use_after_error_binding(context,
+                                            section_name, file_name) != FT_SUCCESS)
+                                    {
+                                        status = FT_FAILURE;
+                                    }
+                                }
+                                target_index += 1;
+                            }
+                        }
+                        use_index += 1;
+                    }
+                }
+                section_index += 1;
+            }
         }
         index += 1;
     }

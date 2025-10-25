@@ -105,12 +105,12 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Const/immutability: track const bindings and read-only fields, emitting diagnostics on attempted writes.
 - [x] Copybook interop: support COPY includes, manage name collisions, and propagate declared lengths through the pipeline.
 - [x] Condition names (`LEVEL 88`): surface boolean enumerations when translating COBOL back to CBL-C so VALUE clauses and SET/IF checks round-trip without manual rewrites.
-- [ ] OCCURS DEPENDING ON: thread runtime upper bounds through layout analysis so both emitters size tables correctly and flag missing controlling values.
+- [x] OCCURS DEPENDING ON: thread runtime upper bounds through layout analysis so both emitters size tables correctly and flag missing controlling values.
 - [ ] RENAMES groups: retain alias relationships during semantic lowering so reverse translation can recover original DATA DIVISION overlays.
 
 ### Core Language Frontend
 - [ ] Parse COBOL `ALTER` and `ENTRY` statements and lower them into structured equivalents in the shared IR so legacy flow control can round-trip.
-- [ ] Accept `USE AFTER ERROR PROCEDURE` declaratives and plumb them into the semantic pipeline to unblock error-handling copybooks.
+- [x] Accept `USE AFTER ERROR PROCEDURE` declaratives and plumb them into the semantic pipeline to unblock error-handling copybooks.
 - [ ] Parse `INSPECT` (TALLYING/REPLACING) statements and lower them onto the existing helper library to keep string rewrites lossless.
 
 ### Numeric Operator Support
@@ -230,11 +230,11 @@ are completed; keep completed items grouped separately from the remaining work t
 These issues track regressions uncovered in recent round-trip suites.
 
 - [ ] COBOL files that declare OCCURS tables with nested REDEFINES crash the reverse translator during record normalization.
-- [ ] The forward emitter loses VALUE defaults on numeric group items when reordering fields for alignment.
+- [x] The forward emitter loses VALUE defaults on numeric group items when reordering fields for alignment.
 - [x] Incremental builds sometimes reuse stale generated COBOL when copybooks change but the owning translation unit does not.
 - [ ] Reverse translation mis-orders paragraphs when `ALTER` targets multiple entry points, leading to unreachable code in regenerated CBL-C.
-- [ ] Semantic analysis drops `USE AFTER ERROR PROCEDURE` declaratives, so exception handlers never bind during forward translation.
+- [x] Semantic analysis drops `USE AFTER ERROR PROCEDURE` declaratives, so exception handlers never bind during forward translation.
 - [x] Copybook DAG dumping crashes when circular includes appear because cycle detection only tracks relative paths and misses canonical duplicates.
 - [ ] Forward emission of nested REDEFINES omits required FILLER padding, shifting following fields and breaking copybook consumers.
-- [ ] Reverse translation of OCCURS DEPENDING ON tables always uses the maximum bound, ignoring dynamic limits recorded in the original program.
+- [x] Reverse translation of OCCURS DEPENDING ON tables always uses the maximum bound, ignoring dynamic limits recorded in the original program.
 - [ ] INSPECT TALLYING lowering orders counters incorrectly when multiple clauses touch the same receiver, producing wrong tallies at runtime.

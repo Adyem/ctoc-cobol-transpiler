@@ -11,6 +11,8 @@ int transpiler_semantics_analyze_program(t_transpiler_context *context, const t_
     status = FT_SUCCESS;
     if (transpiler_semantics_collect_scope(program, &scope, context) != FT_SUCCESS)
         status = FT_FAILURE;
+    if (transpiler_semantics_collect_use_after_error(program, context) != FT_SUCCESS)
+        status = FT_FAILURE;
     if (transpiler_context_capture_semantic_snapshot_before(context) != FT_SUCCESS)
         status = FT_FAILURE;
     if (transpiler_semantics_validate_statements(program, &scope, context) != FT_SUCCESS)

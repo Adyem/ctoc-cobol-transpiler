@@ -27,7 +27,7 @@ FT_TEST(test_transpiler_context_captures_semantic_ir_snapshots)
         return (FT_FAILURE);
     }
     if (transpiler_context_register_data_item(&context, "BUFFER",
-            TRANSPILE_DATA_ITEM_ALPHANUMERIC, 16, 0) != FT_SUCCESS)
+            TRANSPILE_DATA_ITEM_ALPHANUMERIC, 16, 0, NULL) != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);

@@ -192,8 +192,6 @@ static int transpiler_cobol_elementary_append_picture(t_transpiler_cobol_buffer 
             if (transpiler_cobol_buffer_append_string(buffer, ")") != FT_SUCCESS)
                 return (FT_FAILURE);
         }
-        if (transpiler_cobol_buffer_append_string(buffer, " VALUE 'N'") != FT_SUCCESS)
-            return (FT_FAILURE);
         return (FT_SUCCESS);
     }
     if (element->kind == TRANSPILE_COBOL_ELEMENTARY_NUMERIC_SIGNED
@@ -407,9 +405,11 @@ int transpiler_cobol_describe_fixed_point(size_t integral_digits, size_t fractio
 }
 
 int transpiler_cobol_format_elementary(const char *name, size_t level,
-    const t_transpiler_cobol_elementary *element, size_t indentation, char **out)
+    const t_transpiler_cobol_elementary *element, size_t indentation,
+    const char *value_text, char **out)
 {
     t_transpiler_cobol_buffer buffer;
+    int needs_boolean_default;
 
     if (out)
         *out = NULL;
@@ -440,6 +440,7 @@ int transpiler_cobol_format_elementary(const char *name, size_t level,
         transpiler_cobol_buffer_dispose(&buffer);
         return (FT_FAILURE);
     }
+    needs_boolean_default = 0;
     if (transpiler_cobol_buffer_append_string(&buffer, " ") != FT_SUCCESS)
     {
         transpiler_cobol_buffer_dispose(&buffer);
@@ -449,6 +450,32 @@ int transpiler_cobol_format_elementary(const char *name, size_t level,
     {
         transpiler_cobol_buffer_dispose(&buffer);
         return (FT_FAILURE);
+    }
+    if (element->kind == TRANSPILE_COBOL_ELEMENTARY_BOOLEAN)
+    {
+        if (!value_text || value_text[0] == '\0')
+            needs_boolean_default = 1;
+    }
+    if (value_text && value_text[0] != '\0')
+    {
+        if (transpiler_cobol_buffer_append_string(&buffer, " VALUE ") != FT_SUCCESS)
+        {
+            transpiler_cobol_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+        if (transpiler_cobol_buffer_append_string(&buffer, value_text) != FT_SUCCESS)
+        {
+            transpiler_cobol_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+    }
+    else if (needs_boolean_default)
+    {
+        if (transpiler_cobol_buffer_append_string(&buffer, " VALUE 'N'") != FT_SUCCESS)
+        {
+            transpiler_cobol_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
     }
     if (transpiler_cobol_buffer_append_string(&buffer, ".\n") != FT_SUCCESS)
     {
@@ -510,8 +537,9 @@ int transpiler_cobol_format_group(const t_transpiler_cobol_group *group,
 
         field = &group->fields[index];
         formatted = NULL;
-        if (transpiler_cobol_format_elementary(field->name, field->level, &field->element,
-                indentation + 1, &formatted) != FT_SUCCESS)
+        if (transpiler_cobol_format_elementary(field->name, field->level,
+                &field->element, indentation + 1, field->value_text,
+                &formatted) != FT_SUCCESS)
         {
             transpiler_cobol_buffer_dispose(&buffer);
             return (FT_FAILURE);
