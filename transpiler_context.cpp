@@ -6,6 +6,777 @@
 #include "libft/CMA/CMA.hpp"
 #include "libft/Printf/printf.hpp"
 #include "cblc_transpiler.hpp"
+#include "libft/Libft/libft.hpp"
+
+typedef struct s_transpiler_semantic_buffer
+{
+    char *data;
+    size_t length;
+    size_t capacity;
+}   t_transpiler_semantic_buffer;
+
+static void transpiler_context_semantic_buffer_init(t_transpiler_semantic_buffer *buffer)
+{
+    if (!buffer)
+        return ;
+    buffer->data = NULL;
+    buffer->length = 0;
+    buffer->capacity = 0;
+}
+
+static void transpiler_context_semantic_buffer_dispose(t_transpiler_semantic_buffer *buffer)
+{
+    if (!buffer)
+        return ;
+    if (buffer->data)
+        cma_free(buffer->data);
+    buffer->data = NULL;
+    buffer->length = 0;
+    buffer->capacity = 0;
+}
+
+static int transpiler_context_semantic_buffer_reserve(t_transpiler_semantic_buffer *buffer,
+    size_t desired_capacity)
+{
+    char *data;
+
+    if (!buffer)
+        return (FT_FAILURE);
+    if (buffer->capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 128)
+        desired_capacity = 128;
+    data = static_cast<char *>(cma_calloc(desired_capacity, sizeof(char)));
+    if (!data)
+        return (FT_FAILURE);
+    if (buffer->data && buffer->length > 0)
+        ft_memcpy(data, buffer->data, buffer->length);
+    if (buffer->data)
+        cma_free(buffer->data);
+    buffer->data = data;
+    buffer->capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
+static int transpiler_context_semantic_buffer_append_span(t_transpiler_semantic_buffer *buffer,
+    const char *text, size_t length)
+{
+    if (!buffer)
+        return (FT_FAILURE);
+    if (!text && length > 0)
+        return (FT_FAILURE);
+    if (length == 0)
+        return (FT_SUCCESS);
+    if (transpiler_context_semantic_buffer_reserve(buffer, buffer->length + length + 1) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (length > 0)
+        ft_memcpy(buffer->data + buffer->length, text, length);
+    buffer->length += length;
+    buffer->data[buffer->length] = '\0';
+    return (FT_SUCCESS);
+}
+
+static int transpiler_context_semantic_buffer_append_string(t_transpiler_semantic_buffer *buffer,
+    const char *text)
+{
+    if (!text)
+        return (FT_SUCCESS);
+    return (transpiler_context_semantic_buffer_append_span(buffer, text, ft_strlen(text)));
+}
+
+static int transpiler_context_semantic_buffer_append_indent(t_transpiler_semantic_buffer *buffer,
+    size_t indentation)
+{
+    size_t index;
+
+    if (!buffer)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < indentation)
+    {
+        if (transpiler_context_semantic_buffer_append_string(buffer, "    ") != FT_SUCCESS)
+            return (FT_FAILURE);
+        index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+static int transpiler_context_semantic_buffer_append_line(t_transpiler_semantic_buffer *buffer,
+    size_t indentation, const char *text)
+{
+    if (transpiler_context_semantic_buffer_append_indent(buffer, indentation) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (transpiler_context_semantic_buffer_append_string(buffer, text) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (transpiler_context_semantic_buffer_append_string(buffer, "\n") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static const char *transpiler_context_semantic_visibility_to_string(t_transpiler_symbol_visibility visibility)
+{
+    if (visibility == TRANSPILE_SYMBOL_PUBLIC)
+        return ("public");
+    return ("private");
+}
+
+static const char *transpiler_context_semantic_return_mode_to_string(t_transpiler_function_return_mode mode)
+{
+    if (mode == TRANSPILE_FUNCTION_RETURN_VALUE)
+        return ("value");
+    return ("void");
+}
+
+static const char *transpiler_context_semantic_data_kind_to_string(t_transpiler_data_item_kind kind)
+{
+    if (kind == TRANSPILE_DATA_ITEM_ALPHANUMERIC)
+        return ("alphanumeric");
+    if (kind == TRANSPILE_DATA_ITEM_NUMERIC)
+        return ("numeric");
+    if (kind == TRANSPILE_DATA_ITEM_FLOATING)
+        return ("floating");
+    return ("unknown");
+}
+
+static const char *transpiler_context_semantic_file_role_to_string(t_transpiler_file_role role)
+{
+    if (role == TRANSPILE_FILE_ROLE_INPUT)
+        return ("input");
+    if (role == TRANSPILE_FILE_ROLE_OUTPUT)
+        return ("output");
+    if (role == TRANSPILE_FILE_ROLE_DATA)
+        return ("data");
+    return ("unknown");
+}
+
+static const char *transpiler_context_semantic_file_organization_to_string(
+    t_transpiler_file_organization organization)
+{
+    if (organization == TRANSPILE_FILE_ORGANIZATION_LINE_SEQUENTIAL)
+        return ("line-sequential");
+    if (organization == TRANSPILE_FILE_ORGANIZATION_SEQUENTIAL)
+        return ("sequential");
+    if (organization == TRANSPILE_FILE_ORGANIZATION_INDEXED)
+        return ("indexed");
+    if (organization == TRANSPILE_FILE_ORGANIZATION_RELATIVE)
+        return ("relative");
+    return ("unknown");
+}
+
+static const char *transpiler_context_semantic_lock_mode_to_string(t_transpiler_file_lock_mode lock_mode)
+{
+    if (lock_mode == TRANSPILE_FILE_LOCK_MODE_MANUAL)
+        return ("manual");
+    if (lock_mode == TRANSPILE_FILE_LOCK_MODE_AUTOMATIC)
+        return ("automatic");
+    return ("none");
+}
+
+static int transpiler_context_render_semantic_snapshot(const t_transpiler_context *context, char **out_text)
+{
+    t_transpiler_semantic_buffer buffer;
+    size_t index;
+
+    if (!out_text)
+        return (FT_FAILURE);
+    *out_text = NULL;
+    if (!context)
+        return (FT_FAILURE);
+    transpiler_context_semantic_buffer_init(&buffer);
+    if (context->module_count == 0)
+    {
+        if (transpiler_context_semantic_buffer_append_line(&buffer, 0, "modules: []") != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+    }
+    else
+    {
+        if (transpiler_context_semantic_buffer_append_line(&buffer, 0, "modules:") != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+        index = 0;
+        while (index < context->module_count)
+        {
+            char line[256];
+            const t_transpiler_module *module;
+            size_t import_index;
+
+            module = &context->modules[index];
+            if (pf_snprintf(line, sizeof(line), "- name: %s", module->name) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  path: %s", module->path) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  initialization-rank: %lu", static_cast<unsigned long>(module->initialization_rank)) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (module->import_count == 0)
+            {
+                if (transpiler_context_semantic_buffer_append_line(&buffer, 1, "  imports: []") != FT_SUCCESS)
+                {
+                    transpiler_context_semantic_buffer_dispose(&buffer);
+                    return (FT_FAILURE);
+                }
+            }
+            else
+            {
+                if (transpiler_context_semantic_buffer_append_line(&buffer, 1, "  imports:") != FT_SUCCESS)
+                {
+                    transpiler_context_semantic_buffer_dispose(&buffer);
+                    return (FT_FAILURE);
+                }
+                import_index = 0;
+                while (import_index < module->import_count)
+                {
+                    if (pf_snprintf(line, sizeof(line), "  - path: %s", module->imports[import_index].path) < 0)
+                    {
+                        transpiler_context_semantic_buffer_dispose(&buffer);
+                        return (FT_FAILURE);
+                    }
+                    if (transpiler_context_semantic_buffer_append_line(&buffer, 2, line) != FT_SUCCESS)
+                    {
+                        transpiler_context_semantic_buffer_dispose(&buffer);
+                        return (FT_FAILURE);
+                    }
+                    if (pf_snprintf(line, sizeof(line), "    resolved-index: %lu",
+                            static_cast<unsigned long>(module->imports[import_index].resolved_index)) < 0)
+                    {
+                        transpiler_context_semantic_buffer_dispose(&buffer);
+                        return (FT_FAILURE);
+                    }
+                    if (transpiler_context_semantic_buffer_append_line(&buffer, 2, line) != FT_SUCCESS)
+                    {
+                        transpiler_context_semantic_buffer_dispose(&buffer);
+                        return (FT_FAILURE);
+                    }
+                    import_index += 1;
+                }
+            }
+            index += 1;
+        }
+    }
+    if (context->function_count == 0)
+    {
+        if (transpiler_context_semantic_buffer_append_line(&buffer, 0, "functions: []") != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+    }
+    else
+    {
+        if (transpiler_context_semantic_buffer_append_line(&buffer, 0, "functions:") != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+        index = 0;
+        while (index < context->function_count)
+        {
+            char line[256];
+            const t_transpiler_function_signature *signature;
+
+            signature = &context->functions[index];
+            if (pf_snprintf(line, sizeof(line), "- name: %s", signature->name) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  module: %s", signature->module) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  return: %s",
+                    transpiler_context_semantic_return_mode_to_string(signature->return_mode)) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  visibility: %s",
+                    transpiler_context_semantic_visibility_to_string(signature->visibility)) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            index += 1;
+        }
+    }
+    if (context->file_count == 0)
+    {
+        if (transpiler_context_semantic_buffer_append_line(&buffer, 0, "files: []") != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+    }
+    else
+    {
+        if (transpiler_context_semantic_buffer_append_line(&buffer, 0, "files:") != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+        index = 0;
+        while (index < context->file_count)
+        {
+            char line[256];
+            const t_transpiler_file_declaration *file;
+
+            file = &context->files[index];
+            if (pf_snprintf(line, sizeof(line), "- name: %s", file->name) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  role: %s",
+                    transpiler_context_semantic_file_role_to_string(file->role)) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  path: %s", file->path) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  explicit-record-length: %lu",
+                    static_cast<unsigned long>(file->explicit_record_length)) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  inferred-record-length: %lu",
+                    static_cast<unsigned long>(file->inferred_record_length)) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  organization: %s",
+                    transpiler_context_semantic_file_organization_to_string(file->organization)) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  record-key: %s", file->record_key) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  alternate-key: %s", file->alternate_key) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  lock-mode: %s",
+                    transpiler_context_semantic_lock_mode_to_string(file->lock_mode)) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            index += 1;
+        }
+    }
+    if (context->data_item_count == 0)
+    {
+        if (transpiler_context_semantic_buffer_append_line(&buffer, 0, "data-items: []") != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+    }
+    else
+    {
+        if (transpiler_context_semantic_buffer_append_line(&buffer, 0, "data-items:") != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+        index = 0;
+        while (index < context->data_item_count)
+        {
+            char line[256];
+            const t_transpiler_data_item *item;
+
+            item = &context->data_items[index];
+            if (pf_snprintf(line, sizeof(line), "- name: %s", item->name) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  kind: %s",
+                    transpiler_context_semantic_data_kind_to_string(item->kind)) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  declared-length: %lu",
+                    static_cast<unsigned long>(item->declared_length)) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  has-caller-length: %s",
+                    item->has_caller_length ? "yes" : "no") < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  read-only: %s",
+                    item->is_read_only ? "yes" : "no") < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            index += 1;
+        }
+    }
+    if (context->copybook_count == 0)
+    {
+        if (transpiler_context_semantic_buffer_append_line(&buffer, 0, "copybooks: []") != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+    }
+    else
+    {
+        if (transpiler_context_semantic_buffer_append_line(&buffer, 0, "copybooks:") != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+        index = 0;
+        while (index < context->copybook_count)
+        {
+            char line[256];
+            const t_transpiler_copybook *copybook;
+            size_t dependency_index;
+            size_t item_index;
+
+            copybook = &context->copybooks[index];
+            if (pf_snprintf(line, sizeof(line), "- name: %s", copybook->name) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (pf_snprintf(line, sizeof(line), "  canonical-name: %s", copybook->canonical_name) < 0)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+            {
+                transpiler_context_semantic_buffer_dispose(&buffer);
+                return (FT_FAILURE);
+            }
+            if (copybook->dependency_count == 0)
+            {
+                if (transpiler_context_semantic_buffer_append_line(&buffer, 1, "  dependencies: []") != FT_SUCCESS)
+                {
+                    transpiler_context_semantic_buffer_dispose(&buffer);
+                    return (FT_FAILURE);
+                }
+            }
+            else
+            {
+                if (transpiler_context_semantic_buffer_append_line(&buffer, 1, "  dependencies:") != FT_SUCCESS)
+                {
+                    transpiler_context_semantic_buffer_dispose(&buffer);
+                    return (FT_FAILURE);
+                }
+                dependency_index = 0;
+                while (dependency_index < copybook->dependency_count)
+                {
+                    if (pf_snprintf(line, sizeof(line), "  - %s", copybook->dependencies[dependency_index]) < 0)
+                    {
+                        transpiler_context_semantic_buffer_dispose(&buffer);
+                        return (FT_FAILURE);
+                    }
+                    if (transpiler_context_semantic_buffer_append_line(&buffer, 2, line) != FT_SUCCESS)
+                    {
+                        transpiler_context_semantic_buffer_dispose(&buffer);
+                        return (FT_FAILURE);
+                    }
+                    dependency_index += 1;
+                }
+            }
+            if (copybook->item_count == 0)
+            {
+                if (transpiler_context_semantic_buffer_append_line(&buffer, 1, "  items: []") != FT_SUCCESS)
+                {
+                    transpiler_context_semantic_buffer_dispose(&buffer);
+                    return (FT_FAILURE);
+                }
+            }
+            else
+            {
+                if (transpiler_context_semantic_buffer_append_line(&buffer, 1, "  items:") != FT_SUCCESS)
+                {
+                    transpiler_context_semantic_buffer_dispose(&buffer);
+                    return (FT_FAILURE);
+                }
+                item_index = 0;
+                while (item_index < copybook->item_count)
+                {
+                    const t_transpiler_copybook_item *item;
+
+                    item = &copybook->items[item_index];
+                    if (pf_snprintf(line, sizeof(line), "  - name: %s", item->name) < 0)
+                    {
+                        transpiler_context_semantic_buffer_dispose(&buffer);
+                        return (FT_FAILURE);
+                    }
+                    if (transpiler_context_semantic_buffer_append_line(&buffer, 2, line) != FT_SUCCESS)
+                    {
+                        transpiler_context_semantic_buffer_dispose(&buffer);
+                        return (FT_FAILURE);
+                    }
+                    if (pf_snprintf(line, sizeof(line), "    kind: %s",
+                            transpiler_context_semantic_data_kind_to_string(item->kind)) < 0)
+                    {
+                        transpiler_context_semantic_buffer_dispose(&buffer);
+                        return (FT_FAILURE);
+                    }
+                    if (transpiler_context_semantic_buffer_append_line(&buffer, 2, line) != FT_SUCCESS)
+                    {
+                        transpiler_context_semantic_buffer_dispose(&buffer);
+                        return (FT_FAILURE);
+                    }
+                    if (pf_snprintf(line, sizeof(line), "    declared-length: %lu",
+                            static_cast<unsigned long>(item->declared_length)) < 0)
+                    {
+                        transpiler_context_semantic_buffer_dispose(&buffer);
+                        return (FT_FAILURE);
+                    }
+                    if (transpiler_context_semantic_buffer_append_line(&buffer, 2, line) != FT_SUCCESS)
+                    {
+                        transpiler_context_semantic_buffer_dispose(&buffer);
+                        return (FT_FAILURE);
+                    }
+                    if (pf_snprintf(line, sizeof(line), "    read-only: %s",
+                            item->is_read_only ? "yes" : "no") < 0)
+                    {
+                        transpiler_context_semantic_buffer_dispose(&buffer);
+                        return (FT_FAILURE);
+                    }
+                    if (transpiler_context_semantic_buffer_append_line(&buffer, 2, line) != FT_SUCCESS)
+                    {
+                        transpiler_context_semantic_buffer_dispose(&buffer);
+                        return (FT_FAILURE);
+                    }
+                    item_index += 1;
+                }
+            }
+            index += 1;
+        }
+    }
+    if (context->entrypoint.present)
+    {
+        char line[256];
+
+        if (transpiler_context_semantic_buffer_append_line(&buffer, 0, "entrypoint:") != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+        if (pf_snprintf(line, sizeof(line), "  name: %s", context->entrypoint.name) < 0)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+        if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+        if (pf_snprintf(line, sizeof(line), "  has-argv: %s",
+                context->entrypoint.has_argument_vectors ? "yes" : "no") < 0)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+        if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+        if (pf_snprintf(line, sizeof(line), "  needs-argv-copy: %s",
+                context->entrypoint.needs_argument_copy ? "yes" : "no") < 0)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+        if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+        if (pf_snprintf(line, sizeof(line), "  argc-identifier: %s", context->entrypoint.argc_identifier) < 0)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+        if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+        if (pf_snprintf(line, sizeof(line), "  argv-identifier: %s", context->entrypoint.argv_identifier) < 0)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+        if (transpiler_context_semantic_buffer_append_line(&buffer, 1, line) != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+    }
+    else
+    {
+        if (transpiler_context_semantic_buffer_append_line(&buffer, 0, "entrypoint: none") != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+    }
+    if (buffer.length == 0)
+    {
+        if (transpiler_context_semantic_buffer_append_string(&buffer, "\n") != FT_SUCCESS)
+        {
+            transpiler_context_semantic_buffer_dispose(&buffer);
+            return (FT_FAILURE);
+        }
+    }
+    *out_text = buffer.data;
+    buffer.data = NULL;
+    buffer.length = 0;
+    buffer.capacity = 0;
+    transpiler_context_semantic_buffer_dispose(&buffer);
+    return (FT_SUCCESS);
+}
 
 static void transpiler_context_module_clear(t_transpiler_module *module)
 {
@@ -261,6 +1032,54 @@ static int transpiler_context_copybooks_reserve(t_transpiler_context *context, s
     return (FT_SUCCESS);
 }
 
+static unsigned long long transpiler_context_hash_seed(void)
+{
+    return (1469598103934665603ULL);
+}
+
+static void transpiler_context_hash_update_byte(unsigned long long *hash, unsigned char byte)
+{
+    if (!hash)
+        return ;
+    *hash ^= static_cast<unsigned long long>(byte);
+    *hash *= 1099511628211ULL;
+}
+
+static void transpiler_context_hash_update_bytes(unsigned long long *hash, const char *data, size_t length)
+{
+    size_t index;
+
+    if (!hash)
+        return ;
+    if (!data)
+        return ;
+    index = 0;
+    while (index < length)
+    {
+        transpiler_context_hash_update_byte(hash,
+            static_cast<unsigned char>(data[index]));
+        index += 1;
+    }
+}
+
+static void transpiler_context_hash_update_u64(unsigned long long *hash, unsigned long long value)
+{
+    size_t index;
+
+    if (!hash)
+        return ;
+    index = 0;
+    while (index < sizeof(unsigned long long))
+    {
+        unsigned char byte;
+
+        byte = static_cast<unsigned char>(value & 0xFFULL);
+        transpiler_context_hash_update_byte(hash, byte);
+        value >>= 8;
+        index += 1;
+    }
+}
+
 static int transpiler_context_span_is_valid(const t_transpiler_source_span *span)
 {
     if (!span)
@@ -338,6 +1157,8 @@ int transpiler_context_init(t_transpiler_context *context)
     context->target_capacity = 0;
     context->output_directory = NULL;
     context->ast_dump_directory = NULL;
+    context->copybook_graph_directory = NULL;
+    context->semantic_diff_directory = NULL;
     context->emit_standard_library = 0;
     context->format_mode = TRANSPILE_FORMAT_DEFAULT;
     context->layout_mode = TRANSPILE_LAYOUT_NORMALIZE;
@@ -349,6 +1170,8 @@ int transpiler_context_init(t_transpiler_context *context)
     context->warning_settings.shadow = 1;
     context->warning_settings.unused = 1;
     context->ast_dump_enabled = 0;
+    context->copybook_graph_enabled = 0;
+    context->semantic_diff_enabled = 0;
     context->last_error_code = FT_SUCCESS;
     context->functions = NULL;
     context->function_count = 0;
@@ -376,6 +1199,8 @@ int transpiler_context_init(t_transpiler_context *context)
     context->comment_count = 0;
     context->comment_capacity = 0;
     context->comment_emit_index = 0;
+    context->semantic_snapshot_before = NULL;
+    context->semantic_snapshot_after = NULL;
     if (transpiler_diagnostics_init(&context->diagnostics) != FT_SUCCESS)
         return (FT_FAILURE);
     if (transpiler_context_functions_reserve(context, 4) != FT_SUCCESS)
@@ -529,6 +1354,8 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->active_source_length = 0;
     context->output_directory = NULL;
     context->ast_dump_directory = NULL;
+    context->copybook_graph_directory = NULL;
+    context->semantic_diff_directory = NULL;
     context->format_mode = TRANSPILE_FORMAT_DEFAULT;
     context->layout_mode = TRANSPILE_LAYOUT_NORMALIZE;
     context->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
@@ -539,7 +1366,10 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->warning_settings.shadow = 1;
     context->warning_settings.unused = 1;
     context->ast_dump_enabled = 0;
+    context->copybook_graph_enabled = 0;
+    context->semantic_diff_enabled = 0;
     context->last_error_code = FT_SUCCESS;
+    transpiler_context_clear_semantic_snapshots(context);
     if (context->functions)
         cma_free(context->functions);
     context->functions = NULL;
@@ -607,6 +1437,10 @@ void transpiler_context_dispose(t_transpiler_context *context)
                 cma_free(context->copybooks[index].items);
             context->copybooks[index].items = NULL;
             context->copybooks[index].item_count = 0;
+            if (context->copybooks[index].dependencies)
+                cma_free(context->copybooks[index].dependencies);
+            context->copybooks[index].dependencies = NULL;
+            context->copybooks[index].dependency_count = 0;
             index += 1;
         }
         cma_free(context->copybooks);
@@ -685,6 +1519,40 @@ void transpiler_context_set_ast_dump_enabled(t_transpiler_context *context, int 
         context->ast_dump_enabled = 1;
     else
         context->ast_dump_enabled = 0;
+}
+
+void transpiler_context_set_copybook_graph_directory(t_transpiler_context *context, const char *directory)
+{
+    if (!context)
+        return ;
+    context->copybook_graph_directory = directory;
+}
+
+void transpiler_context_set_copybook_graph_enabled(t_transpiler_context *context, int enabled)
+{
+    if (!context)
+        return ;
+    if (enabled)
+        context->copybook_graph_enabled = 1;
+    else
+        context->copybook_graph_enabled = 0;
+}
+
+void transpiler_context_set_semantic_diff_directory(t_transpiler_context *context, const char *directory)
+{
+    if (!context)
+        return ;
+    context->semantic_diff_directory = directory;
+}
+
+void transpiler_context_set_semantic_diff_enabled(t_transpiler_context *context, int enabled)
+{
+    if (!context)
+        return ;
+    if (enabled)
+        context->semantic_diff_enabled = 1;
+    else
+        context->semantic_diff_enabled = 0;
 }
 
 void transpiler_context_set_format_mode(t_transpiler_context *context, t_transpiler_format_mode mode)
@@ -773,6 +1641,7 @@ void transpiler_context_reset_unit_state(t_transpiler_context *context)
 
     if (!context)
         return ;
+    transpiler_context_clear_semantic_snapshots(context);
     context->active_source_text = NULL;
     context->active_source_length = 0;
     context->function_count = 0;
@@ -788,8 +1657,15 @@ void transpiler_context_reset_unit_state(t_transpiler_context *context)
             cma_free(context->copybooks[index].items);
             context->copybooks[index].items = NULL;
         }
+        if (context->copybooks[index].dependencies)
+        {
+            cma_free(context->copybooks[index].dependencies);
+            context->copybooks[index].dependencies = NULL;
+        }
         context->copybooks[index].item_count = 0;
+        context->copybooks[index].dependency_count = 0;
         context->copybooks[index].name[0] = '\0';
+        context->copybooks[index].canonical_name[0] = '\0';
         index += 1;
     }
     context->copybook_count = 0;
@@ -2009,6 +2885,10 @@ int transpiler_context_register_copybook(t_transpiler_context *context, const ch
     copybook = &context->copybooks[context->copybook_count];
     ft_bzero(copybook, sizeof(*copybook));
     ft_strlcpy(copybook->name, name, sizeof(copybook->name));
+    copybook->canonical_name[0] = '\0';
+    transpiler_copybook_normalize_name(name, copybook->canonical_name, sizeof(copybook->canonical_name));
+    if (copybook->canonical_name[0] == '\0')
+        ft_strlcpy(copybook->canonical_name, copybook->name, sizeof(copybook->canonical_name));
     if (item_count > 0)
     {
         copybook->items = static_cast<t_transpiler_copybook_item *>(cma_calloc(item_count,
@@ -2030,6 +2910,58 @@ int transpiler_context_register_copybook(t_transpiler_context *context, const ch
     return (FT_SUCCESS);
 }
 
+int transpiler_context_register_copybook_dependencies(t_transpiler_context *context, const char *name, const char **dependencies, size_t dependency_count)
+{
+    t_transpiler_copybook *copybook;
+    size_t index;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (transpiler_context_string_is_blank(name))
+        return (FT_FAILURE);
+    copybook = NULL;
+    index = 0;
+    while (index < context->copybook_count)
+    {
+        if (ft_strncmp(context->copybooks[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        {
+            copybook = &context->copybooks[index];
+            break ;
+        }
+        index += 1;
+    }
+    if (!copybook)
+        return (FT_FAILURE);
+    if (copybook->dependencies)
+    {
+        cma_free(copybook->dependencies);
+        copybook->dependencies = NULL;
+    }
+    copybook->dependency_count = 0;
+    if (dependency_count == 0)
+        return (FT_SUCCESS);
+    if (!dependencies)
+        return (FT_FAILURE);
+    copybook->dependencies = static_cast<char (*)[TRANSPILE_FILE_PATH_MAX]>(cma_calloc(dependency_count, sizeof(*copybook->dependencies)));
+    if (!copybook->dependencies)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < dependency_count)
+    {
+        if (dependencies[index] && dependencies[index][0] != '\0')
+        {
+            transpiler_copybook_normalize_name(dependencies[index], copybook->dependencies[index], TRANSPILE_FILE_PATH_MAX);
+            if (copybook->dependencies[index][0] == '\0')
+                ft_strlcpy(copybook->dependencies[index], dependencies[index], TRANSPILE_FILE_PATH_MAX);
+        }
+        else
+            copybook->dependencies[index][0] = '\0';
+        index += 1;
+    }
+    copybook->dependency_count = dependency_count;
+    return (FT_SUCCESS);
+}
+
 const t_transpiler_copybook *transpiler_context_find_copybook(const t_transpiler_context *context, const char *name)
 {
     size_t index;
@@ -2046,6 +2978,66 @@ const t_transpiler_copybook *transpiler_context_find_copybook(const t_transpiler
         index += 1;
     }
     return (NULL);
+}
+
+unsigned long long transpiler_context_compute_copybook_signature(const t_transpiler_context *context)
+{
+    unsigned long long hash;
+    size_t index;
+
+    if (!context)
+        return (0);
+    hash = transpiler_context_hash_seed();
+    index = 0;
+    while (index < context->copybook_count)
+    {
+        const t_transpiler_copybook *copybook;
+        size_t item_index;
+
+        copybook = &context->copybooks[index];
+        if (copybook->canonical_name[0] != '\0')
+            transpiler_context_hash_update_bytes(&hash, copybook->canonical_name,
+                ft_strlen(copybook->canonical_name));
+        else if (copybook->name[0] != '\0')
+            transpiler_context_hash_update_bytes(&hash, copybook->name,
+                ft_strlen(copybook->name));
+        transpiler_context_hash_update_u64(&hash,
+            static_cast<unsigned long long>(copybook->item_count));
+        transpiler_context_hash_update_u64(&hash,
+            static_cast<unsigned long long>(copybook->dependency_count));
+        item_index = 0;
+        while (item_index < copybook->item_count)
+        {
+            const t_transpiler_copybook_item *item;
+
+            item = &copybook->items[item_index];
+            if (item->name[0] != '\0')
+                transpiler_context_hash_update_bytes(&hash, item->name,
+                    ft_strlen(item->name));
+            transpiler_context_hash_update_u64(&hash,
+                static_cast<unsigned long long>(item->kind));
+            transpiler_context_hash_update_u64(&hash,
+                static_cast<unsigned long long>(item->declared_length));
+            transpiler_context_hash_update_u64(&hash,
+                static_cast<unsigned long long>(item->is_read_only));
+            item_index += 1;
+        }
+        if (copybook->dependencies)
+        {
+            size_t dependency_index;
+
+            dependency_index = 0;
+            while (dependency_index < copybook->dependency_count)
+            {
+                transpiler_context_hash_update_bytes(&hash,
+                    copybook->dependencies[dependency_index],
+                    ft_strlen(copybook->dependencies[dependency_index]));
+                dependency_index += 1;
+            }
+        }
+        index += 1;
+    }
+    return (hash);
 }
 
 const t_transpiler_data_item *transpiler_context_get_data_items(const t_transpiler_context *context, size_t *count)
@@ -2187,4 +3179,92 @@ const char *transpiler_context_get_ast_dump_directory(const t_transpiler_context
     if (!context)
         return (NULL);
     return (context->ast_dump_directory);
+}
+
+int transpiler_context_get_copybook_graph_enabled(const t_transpiler_context *context)
+{
+    if (!context)
+        return (0);
+    return (context->copybook_graph_enabled);
+}
+
+const char *transpiler_context_get_copybook_graph_directory(const t_transpiler_context *context)
+{
+    if (!context)
+        return (NULL);
+    return (context->copybook_graph_directory);
+}
+
+int transpiler_context_get_semantic_diff_enabled(const t_transpiler_context *context)
+{
+    if (!context)
+        return (0);
+    return (context->semantic_diff_enabled);
+}
+
+const char *transpiler_context_get_semantic_diff_directory(const t_transpiler_context *context)
+{
+    if (!context)
+        return (NULL);
+    return (context->semantic_diff_directory);
+}
+
+void transpiler_context_clear_semantic_snapshots(t_transpiler_context *context)
+{
+    if (!context)
+        return ;
+    if (context->semantic_snapshot_before)
+        cma_free(context->semantic_snapshot_before);
+    if (context->semantic_snapshot_after)
+        cma_free(context->semantic_snapshot_after);
+    context->semantic_snapshot_before = NULL;
+    context->semantic_snapshot_after = NULL;
+}
+
+int transpiler_context_capture_semantic_snapshot_before(t_transpiler_context *context)
+{
+    char *text;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (!context->semantic_diff_enabled)
+        return (FT_SUCCESS);
+    text = NULL;
+    if (transpiler_context_render_semantic_snapshot(context, &text) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (context->semantic_snapshot_before)
+        cma_free(context->semantic_snapshot_before);
+    context->semantic_snapshot_before = text;
+    return (FT_SUCCESS);
+}
+
+int transpiler_context_capture_semantic_snapshot_after(t_transpiler_context *context)
+{
+    char *text;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (!context->semantic_diff_enabled)
+        return (FT_SUCCESS);
+    text = NULL;
+    if (transpiler_context_render_semantic_snapshot(context, &text) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (context->semantic_snapshot_after)
+        cma_free(context->semantic_snapshot_after);
+    context->semantic_snapshot_after = text;
+    return (FT_SUCCESS);
+}
+
+const char *transpiler_context_get_semantic_snapshot_before(const t_transpiler_context *context)
+{
+    if (!context)
+        return (NULL);
+    return (context->semantic_snapshot_before);
+}
+
+const char *transpiler_context_get_semantic_snapshot_after(const t_transpiler_context *context)
+{
+    if (!context)
+        return (NULL);
+    return (context->semantic_snapshot_after);
 }

@@ -283,6 +283,128 @@ FT_TEST(test_cli_optional_configuration)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_cli_dump_copybook_graph_option)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cobol-to-cblc",
+        "--input",
+        "input.cob",
+        "--output",
+        "output.cblc",
+        "--dump-copybook-graph",
+        "graphs"
+    };
+    t_transpiler_cli_options options;
+    t_transpiler_context context;
+
+    if (test_expect_success(transpiler_cli_parse(&options, 9, argv),
+            "transpiler_cli_parse should accept --dump-copybook-graph") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_int_equal(options.dump_copybook_graph, 1,
+            "--dump-copybook-graph should enable dumping") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(options.dump_copybook_graph_directory, "graphs",
+            "--dump-copybook-graph should record directory") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (transpiler_cli_apply(&options, &context) != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(transpiler_context_get_copybook_graph_enabled(&context), 1,
+            "context should receive copybook graph flag") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(transpiler_context_get_copybook_graph_directory(&context), "graphs",
+            "context should retain copybook graph directory") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    transpiler_cli_options_dispose(&options);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cli_dump_semantic_ir_option)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cobol-to-cblc",
+        "--input",
+        "input.cob",
+        "--output",
+        "output.cblc",
+        "--dump-semantic-ir",
+        "snapshots"
+    };
+    t_transpiler_cli_options options;
+    t_transpiler_context context;
+
+    if (test_expect_success(transpiler_cli_parse(&options, 9, argv),
+            "transpiler_cli_parse should accept --dump-semantic-ir") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_int_equal(options.dump_semantic_ir, 1,
+            "--dump-semantic-ir should enable dumping") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(options.dump_semantic_ir_directory, "snapshots",
+            "--dump-semantic-ir should record directory") != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (transpiler_cli_apply(&options, &context) != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(transpiler_context_get_semantic_diff_enabled(&context), 1,
+            "context should receive semantic diff flag") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(transpiler_context_get_semantic_diff_directory(&context), "snapshots",
+            "context should retain semantic diff directory") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    transpiler_cli_options_dispose(&options);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_cli_standard_library_direction)
 {
     const char *argv[] = {
@@ -658,7 +780,9 @@ const t_test_case *get_cli_parse_success_tests(size_t *count)
         {"cli_optional_configuration", test_cli_optional_configuration},
         {"cli_enables_warning_escalation", test_cli_enables_warning_escalation},
         {"cli_supports_multiple_inputs", test_cli_supports_multiple_inputs},
-        {"cli_apply_propagates_multi_file_context", test_cli_apply_propagates_multi_file_context}
+        {"cli_apply_propagates_multi_file_context", test_cli_apply_propagates_multi_file_context},
+        {"cli_dump_copybook_graph_option", test_cli_dump_copybook_graph_option},
+        {"cli_dump_semantic_ir_option", test_cli_dump_semantic_ir_option}
     };
 
     if (count)

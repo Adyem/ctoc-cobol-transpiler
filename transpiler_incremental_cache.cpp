@@ -21,6 +21,7 @@ static void incremental_cache_entry_reset(t_transpiler_incremental_cache_entry *
     entry->output_size = 0;
     entry->ast_timestamp = 0;
     entry->ast_size = 0;
+    entry->copybook_signature = 0;
 }
 
 static int incremental_cache_reserve_entries(t_transpiler_incremental_cache *cache, size_t desired_capacity)
@@ -115,7 +116,7 @@ static t_transpiler_incremental_cache_entry *incremental_cache_find_entry(t_tran
 
 static int incremental_cache_parse_line(const std::string &line, t_transpiler_incremental_cache_entry *entry)
 {
-    std::string fields[9];
+    std::string fields[10];
     size_t field_index;
     size_t cursor;
     size_t separator;
@@ -129,7 +130,7 @@ static int incremental_cache_parse_line(const std::string &line, t_transpiler_in
     incremental_cache_entry_reset(entry);
     field_index = 0;
     cursor = 0;
-    while (cursor <= line.size() && field_index < 9)
+    while (cursor <= line.size() && field_index < 10)
     {
         separator = line.find('|', cursor);
         if (separator == std::string::npos)
@@ -142,7 +143,7 @@ static int incremental_cache_parse_line(const std::string &line, t_transpiler_in
         field_index += 1;
         cursor = separator + 1;
     }
-    if (field_index != 9)
+    if (field_index != 10)
         return (FT_FAILURE);
     ft_strlcpy(entry->input_path, fields[0].c_str(), TRANSPILE_FILE_PATH_MAX);
     ft_strlcpy(entry->output_path, fields[1].c_str(), TRANSPILE_FILE_PATH_MAX);
@@ -153,6 +154,7 @@ static int incremental_cache_parse_line(const std::string &line, t_transpiler_in
     entry->output_size = std::strtoull(fields[6].c_str(), NULL, 10);
     entry->ast_timestamp = std::strtoll(fields[7].c_str(), NULL, 10);
     entry->ast_size = std::strtoull(fields[8].c_str(), NULL, 10);
+    entry->copybook_signature = std::strtoull(fields[9].c_str(), NULL, 10);
     return (FT_SUCCESS);
 }
 
@@ -277,7 +279,8 @@ int transpiler_incremental_cache_save(t_transpiler_incremental_cache *cache)
         entry = &cache->entries[index];
         stream << entry->input_path << '|' << entry->output_path << '|' << entry->ast_path << '|'
             << entry->input_timestamp << '|' << entry->input_size << '|' << entry->output_timestamp << '|'
-            << entry->output_size << '|' << entry->ast_timestamp << '|' << entry->ast_size << '\n';
+            << entry->output_size << '|' << entry->ast_timestamp << '|' << entry->ast_size << '|'
+            << entry->copybook_signature << '\n';
         index += 1;
     }
     stream.close();
@@ -286,7 +289,7 @@ int transpiler_incremental_cache_save(t_transpiler_incremental_cache *cache)
 }
 
 int transpiler_incremental_cache_should_skip(t_transpiler_incremental_cache *cache, const char *input_path,
-    const char *output_path, int *should_skip)
+    const char *output_path, unsigned long long copybook_signature, int *should_skip)
 {
     t_transpiler_incremental_cache_entry *entry;
     long long timestamp;
@@ -316,6 +319,8 @@ int transpiler_incremental_cache_should_skip(t_transpiler_incremental_cache *cac
         if (timestamp != entry->ast_timestamp || size != entry->ast_size)
             return (FT_SUCCESS);
     }
+    if (entry->copybook_signature != copybook_signature)
+        return (FT_SUCCESS);
     if (should_skip)
         *should_skip = 1;
     return (FT_SUCCESS);
@@ -333,7 +338,7 @@ static void incremental_cache_update_entry(t_transpiler_incremental_cache_entry 
 }
 
 int transpiler_incremental_cache_record(t_transpiler_incremental_cache *cache, const char *input_path,
-    const char *output_path, const char *ast_path)
+    const char *output_path, const char *ast_path, unsigned long long copybook_signature)
 {
     t_transpiler_incremental_cache_entry *entry;
     long long input_timestamp;
@@ -374,6 +379,7 @@ int transpiler_incremental_cache_record(t_transpiler_incremental_cache *cache, c
     entry->output_size = output_size;
     entry->ast_timestamp = ast_timestamp;
     entry->ast_size = ast_size;
+    entry->copybook_signature = copybook_signature;
     cache->dirty = 1;
     return (FT_SUCCESS);
 }

@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: clang-format
+        name: clang-format via make format
+        entry: make format
+        language: system
+        pass_filenames: false
+        always_run: true

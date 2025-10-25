@@ -403,8 +403,11 @@ typedef struct s_transpiler_copybook_item
 typedef struct s_transpiler_copybook
 {
     char name[TRANSPILE_IDENTIFIER_MAX];
+    char canonical_name[TRANSPILE_FILE_PATH_MAX];
     t_transpiler_copybook_item *items;
     size_t item_count;
+    char (*dependencies)[TRANSPILE_FILE_PATH_MAX];
+    size_t dependency_count;
 }   t_transpiler_copybook;
 
 typedef struct s_transpiler_incremental_cache_entry
@@ -418,6 +421,7 @@ typedef struct s_transpiler_incremental_cache_entry
     unsigned long long output_size;
     long long ast_timestamp;
     unsigned long long ast_size;
+    unsigned long long copybook_signature;
 }   t_transpiler_incremental_cache_entry;
 
 typedef struct s_transpiler_incremental_cache
@@ -452,6 +456,8 @@ typedef struct s_transpiler_context
     size_t target_capacity;
     const char *output_directory;
     const char *ast_dump_directory;
+    const char *copybook_graph_directory;
+    const char *semantic_diff_directory;
     int emit_standard_library;
     t_transpiler_format_mode format_mode;
     t_transpiler_layout_mode layout_mode;
@@ -459,6 +465,8 @@ typedef struct s_transpiler_context
     int warnings_as_errors;
     t_transpiler_warning_settings warning_settings;
     int ast_dump_enabled;
+    int copybook_graph_enabled;
+    int semantic_diff_enabled;
     t_transpiler_diagnostic_list diagnostics;
     int last_error_code;
     t_transpiler_function_signature *functions;
@@ -487,6 +495,8 @@ typedef struct s_transpiler_context
     size_t comment_count;
     size_t comment_capacity;
     size_t comment_emit_index;
+    char *semantic_snapshot_before;
+    char *semantic_snapshot_after;
 }   t_transpiler_context;
 
 int transpiler_context_init(t_transpiler_context *context);
@@ -499,6 +509,10 @@ void transpiler_context_set_output_directory(t_transpiler_context *context, cons
 void transpiler_context_set_emit_standard_library(t_transpiler_context *context, int emit);
 void transpiler_context_set_ast_dump_directory(t_transpiler_context *context, const char *directory);
 void transpiler_context_set_ast_dump_enabled(t_transpiler_context *context, int enabled);
+void transpiler_context_set_copybook_graph_directory(t_transpiler_context *context, const char *directory);
+void transpiler_context_set_copybook_graph_enabled(t_transpiler_context *context, int enabled);
+void transpiler_context_set_semantic_diff_directory(t_transpiler_context *context, const char *directory);
+void transpiler_context_set_semantic_diff_enabled(t_transpiler_context *context, int enabled);
 void transpiler_context_set_format_mode(t_transpiler_context *context, t_transpiler_format_mode mode);
 void transpiler_context_set_layout_mode(t_transpiler_context *context, t_transpiler_layout_mode mode);
 void transpiler_context_set_diagnostic_level(t_transpiler_context *context, t_transpiler_diagnostic_level level);
@@ -545,7 +559,9 @@ int transpiler_context_register_data_item(t_transpiler_context *context, const c
 const t_transpiler_data_item *transpiler_context_find_data_item(const t_transpiler_context *context, const char *name);
 int transpiler_context_register_copybook(t_transpiler_context *context, const char *name,
     const t_transpiler_copybook_item *items, size_t item_count);
+int transpiler_context_register_copybook_dependencies(t_transpiler_context *context, const char *name, const char **dependencies, size_t dependency_count);
 const t_transpiler_copybook *transpiler_context_find_copybook(const t_transpiler_context *context, const char *name);
+unsigned long long transpiler_context_compute_copybook_signature(const t_transpiler_context *context);
 const t_transpiler_data_item *transpiler_context_get_data_items(const t_transpiler_context *context, size_t *count);
 int transpiler_context_record_source_map_entry(t_transpiler_context *context,
     const t_transpiler_source_span *cblc_span, const t_transpiler_source_span *cobol_span);
@@ -561,6 +577,15 @@ int transpiler_context_record_comment(t_transpiler_context *context, size_t line
     const char *text, size_t length);
 int transpiler_context_get_ast_dump_enabled(const t_transpiler_context *context);
 const char *transpiler_context_get_ast_dump_directory(const t_transpiler_context *context);
+int transpiler_context_get_copybook_graph_enabled(const t_transpiler_context *context);
+const char *transpiler_context_get_copybook_graph_directory(const t_transpiler_context *context);
+int transpiler_context_get_semantic_diff_enabled(const t_transpiler_context *context);
+const char *transpiler_context_get_semantic_diff_directory(const t_transpiler_context *context);
+int transpiler_context_capture_semantic_snapshot_before(t_transpiler_context *context);
+int transpiler_context_capture_semantic_snapshot_after(t_transpiler_context *context);
+const char *transpiler_context_get_semantic_snapshot_before(const t_transpiler_context *context);
+const char *transpiler_context_get_semantic_snapshot_after(const t_transpiler_context *context);
+void transpiler_context_clear_semantic_snapshots(t_transpiler_context *context);
 
 int transpiler_incremental_cache_init(t_transpiler_incremental_cache *cache);
 void transpiler_incremental_cache_dispose(t_transpiler_incremental_cache *cache);
@@ -568,9 +593,9 @@ int transpiler_incremental_cache_set_manifest(t_transpiler_incremental_cache *ca
 int transpiler_incremental_cache_load(t_transpiler_incremental_cache *cache);
 int transpiler_incremental_cache_save(t_transpiler_incremental_cache *cache);
 int transpiler_incremental_cache_should_skip(t_transpiler_incremental_cache *cache, const char *input_path,
-    const char *output_path, int *should_skip);
+    const char *output_path, unsigned long long copybook_signature, int *should_skip);
 int transpiler_incremental_cache_record(t_transpiler_incremental_cache *cache, const char *input_path,
-    const char *output_path, const char *ast_path);
+    const char *output_path, const char *ast_path, unsigned long long copybook_signature);
 
 // ===============================
 // Lexing, parsing, and AST nodes
@@ -820,6 +845,8 @@ int transpiler_semantics_analyze_program(t_transpiler_context *context, const t_
 int transpiler_validate_generated_cblc(const char *text);
 int transpiler_validate_generated_cobol(const char *text);
 int transpiler_ast_visualize_program(const t_ast_node *program, const char *path);
+void transpiler_copybook_normalize_name(const char *source, char *destination, size_t destination_size);
+int transpiler_copybook_graph_emit(const t_transpiler_context *context, const t_ast_node *program, const char *root_label, const char *path);
 
 // ==================================
 // COBOL and CBLC transformation APIs
@@ -1247,6 +1274,10 @@ typedef struct s_transpiler_cli_options
     int emit_standard_library;
     int dump_ast;
     const char *dump_ast_directory;
+    int dump_copybook_graph;
+    const char *dump_copybook_graph_directory;
+    int dump_semantic_ir;
+    const char *dump_semantic_ir_directory;
 }   t_transpiler_cli_options;
 
 int transpiler_cli_options_init(t_transpiler_cli_options *options);

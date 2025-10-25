@@ -6,6 +6,7 @@
 #include "libft/CMA/CMA.hpp"
 #include "libft/Libft/libft.hpp"
 #include "libft/Printf/printf.hpp"
+#include "transpiler_semantic_dump.hpp"
 
 static t_transpiler_incremental_cache g_incremental_cache;
 static int g_incremental_cache_ready = 0;
@@ -301,6 +302,83 @@ static int pipeline_build_ast_output_path(const t_transpiler_context *context, c
     return (FT_SUCCESS);
 }
 
+static int pipeline_build_copybook_graph_output_path(const t_transpiler_context *context,
+    const char *input_path, const char *resolved_output_path, char *buffer, size_t buffer_size)
+{
+    const char *directory;
+    const char *filename;
+    const char *cursor;
+    size_t length;
+
+    if (!context || !buffer || buffer_size == 0)
+        return (FT_FAILURE);
+    buffer[0] = '\0';
+    directory = transpiler_context_get_copybook_graph_directory(context);
+    if (directory && directory[0] != '\0')
+    {
+        char base[TRANSPILE_FILE_PATH_MAX];
+
+        filename = input_path;
+        if (input_path)
+        {
+            cursor = input_path;
+            while (*cursor != '\0')
+            {
+                if (*cursor == '/' || *cursor == '\\')
+                    filename = cursor + 1;
+                cursor += 1;
+            }
+        }
+        if (!filename || filename[0] == '\0')
+            filename = "program";
+        ft_strlcpy(base, filename, sizeof(base));
+        length = ft_strlen(base);
+        while (length > 0)
+        {
+            if (base[length - 1] == '.')
+            {
+                base[length - 1] = '\0';
+                break ;
+            }
+            length -= 1;
+        }
+        if (base[0] == '\0')
+            ft_strlcpy(base, "program", sizeof(base));
+        if (pf_snprintf(buffer, buffer_size, "%s/%s.copybooks.dot", directory, base) < 0)
+            return (FT_FAILURE);
+        length = ft_strlen(buffer);
+        if (length + 1 > buffer_size)
+            return (FT_FAILURE);
+        return (FT_SUCCESS);
+    }
+    if (!resolved_output_path)
+        return (FT_FAILURE);
+    length = ft_strlen(resolved_output_path);
+    if (length + 15 > buffer_size)
+        return (FT_FAILURE);
+    ft_strlcpy(buffer, resolved_output_path, buffer_size);
+    while (length > 0)
+    {
+        if (buffer[length - 1] == '.')
+        {
+            buffer[length - 1] = '\0';
+            break ;
+        }
+        if (buffer[length - 1] == '/' || buffer[length - 1] == '\\')
+            break ;
+        length -= 1;
+    }
+    if (ft_strlcat(buffer, ".copybooks.dot", buffer_size) >= buffer_size)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int pipeline_emit_semantic_ir_snapshots(t_transpiler_context *context, const char *input_path,
+    const char *resolved_output_path)
+{
+    return (transpiler_semantic_dump_emit(context, input_path, resolved_output_path));
+}
+
 static int pipeline_apply_cblc_layout(const char *input, t_transpiler_layout_mode layout_mode,
     t_transpiler_format_mode format_mode, char **out_text)
 {
@@ -313,6 +391,7 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
 {
     char resolved_path[TRANSPILE_FILE_PATH_MAX];
     char ast_path[TRANSPILE_FILE_PATH_MAX];
+    char copybook_graph_path[TRANSPILE_FILE_PATH_MAX];
     char *source_text;
     char *cblc_text;
     char *formatted_text;
@@ -320,6 +399,7 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
     t_ast_node *program;
     int status;
     char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    unsigned long long copybook_signature;
 
     if (!context || !input_path || !output_path)
         return (FT_FAILURE);
@@ -329,6 +409,7 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
     program = NULL;
     status = FT_FAILURE;
     ast_path[0] = '\0';
+    copybook_graph_path[0] = '\0';
     context->source_path = input_path;
     context->target_path = output_path;
     context->active_source_text = NULL;
@@ -339,12 +420,14 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
             (void)pipeline_emit_error(context, message);
         goto cleanup;
     }
+    copybook_signature = transpiler_context_compute_copybook_signature(context);
     if (g_incremental_cache_ready)
     {
         int should_skip;
 
         should_skip = 0;
-        if (transpiler_incremental_cache_should_skip(&g_incremental_cache, input_path, resolved_path, &should_skip)
+        if (transpiler_incremental_cache_should_skip(&g_incremental_cache, input_path, resolved_path,
+                copybook_signature, &should_skip)
             != FT_SUCCESS)
         {
             if (pf_snprintf(message, sizeof(message), "Unable to query incremental cache for '%s'", input_path) >= 0)
@@ -384,6 +467,16 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
         if (pf_snprintf(message, sizeof(message), "Semantic analysis failed for '%s'", input_path) >= 0)
             (void)pipeline_emit_error(context, message);
         goto cleanup;
+    }
+    if (transpiler_context_get_semantic_diff_enabled(context))
+    {
+        if (pipeline_emit_semantic_ir_snapshots(context, input_path, resolved_path) != FT_SUCCESS)
+        {
+            if (pf_snprintf(message, sizeof(message),
+                    "Unable to emit semantic IR snapshots for '%s'", input_path) >= 0)
+                (void)pipeline_emit_error(context, message);
+            goto cleanup;
+        }
     }
     if (transpiler_cobol_program_to_cblc(context, program, &cblc_text) != FT_SUCCESS)
     {
@@ -429,6 +522,31 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
             goto cleanup;
         }
     }
+    if (transpiler_context_get_copybook_graph_enabled(context))
+    {
+        if (pipeline_build_copybook_graph_output_path(context, input_path, resolved_path,
+                copybook_graph_path, sizeof(copybook_graph_path)) != FT_SUCCESS)
+        {
+            if (pf_snprintf(message, sizeof(message),
+                    "Unable to select copybook graph path for '%s'", input_path) >= 0)
+                (void)pipeline_emit_error(context, message);
+            goto cleanup;
+        }
+        if (pipeline_prepare_output_directory(copybook_graph_path) != FT_SUCCESS)
+        {
+            if (pf_snprintf(message, sizeof(message),
+                    "Unable to prepare copybook graph path '%s'", copybook_graph_path) >= 0)
+                (void)pipeline_emit_error(context, message);
+            goto cleanup;
+        }
+        if (transpiler_copybook_graph_emit(context, program, input_path, copybook_graph_path) != FT_SUCCESS)
+        {
+            if (pf_snprintf(message, sizeof(message),
+                    "Unable to emit copybook graph for '%s'", input_path) >= 0)
+                (void)pipeline_emit_error(context, message);
+            goto cleanup;
+        }
+    }
     if (pipeline_write_file(resolved_path, formatted_text) != FT_SUCCESS)
     {
         if (pf_snprintf(message, sizeof(message), "Failed to write output file '%s'", resolved_path) >= 0)
@@ -442,7 +560,9 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
         record_ast_path = NULL;
         if (ast_path[0] != '\0')
             record_ast_path = ast_path;
-        if (transpiler_incremental_cache_record(&g_incremental_cache, input_path, resolved_path, record_ast_path)
+        copybook_signature = transpiler_context_compute_copybook_signature(context);
+        if (transpiler_incremental_cache_record(&g_incremental_cache, input_path, resolved_path, record_ast_path,
+                copybook_signature)
             != FT_SUCCESS)
         {
             if (pf_snprintf(message, sizeof(message), "Failed to update incremental cache for '%s'", input_path) >= 0)

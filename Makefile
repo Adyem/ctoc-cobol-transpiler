@@ -49,6 +49,8 @@ SRC         = \
     transpiler_runtime_helpers.cpp \
     transpiler_validation.cpp \
     transpiler_ast_visualizer.cpp \
+    transpiler_copybook_graph.cpp \
+    transpiler_semantic_dump.cpp \
     transpiler_semantics.cpp \
     transpiler_semantics_errors.cpp \
     transpiler_semantics_helpers.cpp \
@@ -211,6 +213,7 @@ TEST_SRC    = tests/test_main.cpp \
               tests/test_support.cpp \
               tests/ast_tests.cpp \
               tests/ast_visualizer_tests.cpp \
+              tests/copybook_graph_tests.cpp \
               tests/lexer_tests.cpp \
               tests/parser_tests.cpp \
              tests/parser_positive_program_tests.cpp \
@@ -287,6 +290,7 @@ TEST_SRC    = tests/test_main.cpp \
              tests/transpiler_context_source_map_tests.cpp \
              tests/transpiler_context_comment_basic_tests.cpp \
              tests/transpiler_context_comment_capacity_tests.cpp \
+             tests/transpiler_context_semantic_dump_tests.cpp \
               tests/sample_inventory_tests.cpp \
               tests/golden_file_tests.cpp \
               tests/grammar_doc_tests.cpp \

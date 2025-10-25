@@ -363,6 +363,10 @@ int transpiler_cli_options_init(t_transpiler_cli_options *options)
     options->emit_standard_library = 0;
     options->dump_ast = 0;
     options->dump_ast_directory = NULL;
+    options->dump_copybook_graph = 0;
+    options->dump_copybook_graph_directory = NULL;
+    options->dump_semantic_ir = 0;
+    options->dump_semantic_ir_directory = NULL;
     return (FT_SUCCESS);
 }
 
@@ -392,6 +396,10 @@ void transpiler_cli_options_dispose(t_transpiler_cli_options *options)
     options->emit_standard_library = 0;
     options->dump_ast = 0;
     options->dump_ast_directory = NULL;
+    options->dump_copybook_graph = 0;
+    options->dump_copybook_graph_directory = NULL;
+    options->dump_semantic_ir = 0;
+    options->dump_semantic_ir_directory = NULL;
 }
 
 static int transpiler_cli_parse_long_option(t_transpiler_cli_options *options, const char **argv, int argc, int *index)
@@ -510,6 +518,42 @@ static int transpiler_cli_parse_long_option(t_transpiler_cli_options *options, c
             options->dump_ast_directory = argv[*index];
         return (FT_SUCCESS);
     }
+    if (ft_strncmp(argument, "--dump-copybook-graph", 22) == 0 && ft_strlen(argument) == 21)
+    {
+        size_t auto_length;
+
+        *index += 1;
+        if (*index >= argc)
+        {
+            pf_printf("Missing value for --dump-copybook-graph option.\n");
+            return (FT_FAILURE);
+        }
+        options->dump_copybook_graph = 1;
+        auto_length = ft_strlen("auto");
+        if (ft_strncmp(argv[*index], "auto", auto_length + 1) == 0)
+            options->dump_copybook_graph_directory = NULL;
+        else
+            options->dump_copybook_graph_directory = argv[*index];
+        return (FT_SUCCESS);
+    }
+    if (ft_strncmp(argument, "--dump-semantic-ir", 20) == 0 && ft_strlen(argument) == 18)
+    {
+        size_t auto_length;
+
+        *index += 1;
+        if (*index >= argc)
+        {
+            pf_printf("Missing value for --dump-semantic-ir option.\n");
+            return (FT_FAILURE);
+        }
+        options->dump_semantic_ir = 1;
+        auto_length = ft_strlen("auto");
+        if (ft_strncmp(argv[*index], "auto", auto_length + 1) == 0)
+            options->dump_semantic_ir_directory = NULL;
+        else
+            options->dump_semantic_ir_directory = argv[*index];
+        return (FT_SUCCESS);
+    }
     pf_printf("Unknown option '%s'.\n", argument);
     return (FT_FAILURE);
 }
@@ -572,6 +616,10 @@ int transpiler_cli_apply(const t_transpiler_cli_options *options, t_transpiler_c
     transpiler_context_set_emit_standard_library(context, options->emit_standard_library);
     transpiler_context_set_ast_dump_enabled(context, options->dump_ast);
     transpiler_context_set_ast_dump_directory(context, options->dump_ast_directory);
+    transpiler_context_set_copybook_graph_enabled(context, options->dump_copybook_graph);
+    transpiler_context_set_copybook_graph_directory(context, options->dump_copybook_graph_directory);
+    transpiler_context_set_semantic_diff_enabled(context, options->dump_semantic_ir);
+    transpiler_context_set_semantic_diff_directory(context, options->dump_semantic_ir_directory);
     transpiler_context_set_format_mode(context, options->format_mode);
     transpiler_context_set_layout_mode(context, options->layout_mode);
     transpiler_context_set_diagnostic_level(context, options->diagnostic_level);
@@ -592,6 +640,8 @@ void transpiler_cli_print_usage(void)
     pf_printf("                 --layout <normalize|preserve> to control regenerated CBL-C layout.\n");
     pf_printf("                 --diagnostics <silent|normal|verbose> to tune logging.\n");
     pf_printf("                 --dump-ast <auto|directory> to emit Graphviz AST visualizations.\n");
+    pf_printf("                 --dump-copybook-graph <auto|directory> to emit copybook dependency graphs.\n");
+    pf_printf("                 --dump-semantic-ir <auto|directory> to record pre/post-normalization semantic IR.\n");
     pf_printf("                 --warnings-as-errors to treat warnings as build errors.\n");
     pf_printf("                 -Werror to escalate warnings.\n");
     pf_printf("                 -Wconversion / -Wno-conversion to toggle conversion warnings.\n");

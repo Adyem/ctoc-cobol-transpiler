@@ -11,7 +11,9 @@ FT_TEST(test_cobol_transpiled_reverse_control_flow_fixture_contains_expected_sec
     path = "samples/cobol/reverse_control_flow.cob";
     if (test_cobol_fixture_contains(path, "PROGRAM-ID. REVERSE-CONTROL-FLOW.") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_cobol_fixture_contains(path, "IF NOT CONTROL-FLAG = 'Y'") != FT_SUCCESS)
+    if (test_cobol_fixture_contains(path, "88 CONTROL-READY VALUE 'Y'.") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_cobol_fixture_contains(path, "IF NOT CONTROL-READY") != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_cobol_fixture_contains(path, "PERFORM UNTIL PROGRESS-METER > PROGRESS-LIMIT") != FT_SUCCESS)
         return (FT_FAILURE);
@@ -45,15 +47,17 @@ FT_TEST(test_cobol_transpiled_reverse_control_flow_matches_expected_text)
         "       DATA DIVISION.\n"
         "       WORKING-STORAGE SECTION.\n"
         "       01 CONTROL-FLAG PIC X VALUE 'N'.\n"
+        "       88 CONTROL-READY VALUE 'Y'.\n"
+        "       88 CONTROL-LOCKED VALUE 'N'.\n"
         "       01 PROGRESS-METER PIC 9(4) VALUE 0000.\n"
         "       01 PROGRESS-LIMIT PIC 9(4) VALUE 0010.\n"
         "       01 PROGRESS-INDEX PIC 9(4) VALUE 0000.\n"
         "       01 OUTPUT-VALUE PIC 9(4) VALUE 0000.\n"
         "       PROCEDURE DIVISION.\n"
         "MAIN.\n"
-        "       IF NOT CONTROL-FLAG = 'Y'\n"
-        "           PERFORM UNTIL PROGRESS-METER > PROGRESS-LIMIT\n"
-        "               MOVE 11 TO PROGRESS-METER\n"
+        "       IF NOT CONTROL-READY\n"
+        "            PERFORM UNTIL PROGRESS-METER > PROGRESS-LIMIT\n"
+        "                MOVE 11 TO PROGRESS-METER\n"
         "           END-PERFORM\n"
         "           MOVE PROGRESS-METER TO OUTPUT-VALUE\n"
         "       ELSE\n"

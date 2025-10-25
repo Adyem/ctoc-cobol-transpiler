@@ -1,0 +1,16 @@
+{
+    "owners": [
+        {
+            "pattern": "*",
+            "owners": ["@ctoc/maintainers"]
+        },
+        {
+            "pattern": "docs/*",
+            "owners": ["@ctoc/documentation"]
+        },
+        {
+            "pattern": "scripts/*",
+            "owners": ["@ctoc/tooling"]
+        }
+    ]
+}

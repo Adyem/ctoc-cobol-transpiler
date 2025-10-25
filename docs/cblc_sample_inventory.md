@@ -251,13 +251,19 @@ function void NORMALIZE_VALUES() {
 
 ```cblc
 bool CONTROL_FLAG = false;
+
+enum CONTROL_FLAG_CONDITIONS {
+    CONTROL_READY = 'Y',
+    CONTROL_LOCKED = 'N'
+};
+
 int PROGRESS_METER = 0;
 int PROGRESS_LIMIT = 10;
 int PROGRESS_INDEX = 0;
 int OUTPUT_VALUE = 0;
 
 function void MAIN() {
-    if (!(CONTROL_FLAG == true)) {
+    if (!(CONTROL_FLAG == CONTROL_READY)) {
         while (!(PROGRESS_METER > PROGRESS_LIMIT)) {
             PROGRESS_METER = 11;
         }

@@ -175,13 +175,17 @@ FT_TEST(test_cblc_reverse_normalization_matches_golden)
 FT_TEST(test_cblc_reverse_control_flow_matches_golden)
 {
     static const char expected[] =
-        "bool CONTROL_FLAG = false;\n"
+        "bool CONTROL_FLAG = false;\n\n"
+        "enum CONTROL_FLAG_CONDITIONS {\n"
+        "    CONTROL_READY = 'Y',\n"
+        "    CONTROL_LOCKED = 'N'\n"
+        "};\n\n"
         "int PROGRESS_METER = 0;\n"
         "int PROGRESS_LIMIT = 10;\n"
         "int PROGRESS_INDEX = 0;\n"
         "int OUTPUT_VALUE = 0;\n\n"
         "function void MAIN() {\n"
-        "    if (!(CONTROL_FLAG == true)) {\n"
+        "    if (!(CONTROL_FLAG == CONTROL_READY)) {\n"
         "        while (!(PROGRESS_METER > PROGRESS_LIMIT)) {\n"
         "            PROGRESS_METER = 11;\n"
         "        }\n"

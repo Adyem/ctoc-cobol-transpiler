@@ -60,6 +60,16 @@ ctoc_cobol_transpiler --direction cobol-to-cblc --input samples/cobol/copy_file.
 * `--dump-ast <auto|directory>` enables Graphviz `.dot` generation for each parsed translation unit. Pass a directory to collect the graphs in a dedicated folder or `auto` to place the visualization alongside the emitted source file with a `.dot` suffix.
 * Each node label includes the AST node kind plus the captured token lexeme (when available) so you can trace COBOL statements through parsing and semantic analysis when debugging pipeline changes.
 
+## Copybook dependency graphs
+
+```
+ctoc_cobol_transpiler --direction cobol-to-cblc --input samples/cobol/reverse_copybook.cob --output build/reverse_copybook.cblc --dump-copybook-graph build/copybook_graphs
+```
+
+* `--dump-copybook-graph <auto|directory>` emits Graphviz `.dot` graphs that highlight the copybooks each translation unit requires. Pass a directory to consolidate the graphs or `auto` to mirror the AST dump behavior and create a sibling `<name>.copybooks.dot` artifact next to the generated source file.
+* `--dump-semantic-ir <auto|directory>` records the semantic IR before and after normalization. Snapshots are written as `<name>.semantic.before.txt` and `<name>.semantic.after.txt` so you can diff how normalization rewrites the tree.
+* Nodes within the graph capture the translation unit name and every referenced copybook so teams can validate include ordering and diagnose missing registrations quickly.
+
 ## Diagnostics and help
 
 ```

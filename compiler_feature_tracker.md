@@ -97,13 +97,14 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] `double` conversion warnings: surface diagnostics when `double` or `PIC V9(18)` values flow into integral widths, `float`/`PIC V9(n)`, boolean, or alphanumeric targets, capturing precision or magnitude loss.
 - [x] Integral conversion warnings: report when `PIC 9`, `PIC 9(4)`, `PIC 9(9)`, `PIC 9(18)` (`long`), or `PIC 9(36)` (`long long`) values assign into floating (`float`, `double`, `PIC V9(n)`, `PIC V9(18)`), boolean, or alphanumeric items, highlighting sign/overflow risks.
 - [x] Dead-code detection: flag unreachable statements that follow terminating `STOP RUN` directives or reside in branches proven impossible by constant conditions.
+- [x] Build a dependency visualizer (`--dump-copybook-graph`) that emits the resolved copybook DAG for debugging include ordering issues.
 
 ## Pending Features
 
 ### Core Language / Semantics
 - [x] Const/immutability: track const bindings and read-only fields, emitting diagnostics on attempted writes.
 - [x] Copybook interop: support COPY includes, manage name collisions, and propagate declared lengths through the pipeline.
-- [ ] Condition names (`LEVEL 88`): surface boolean enumerations when translating COBOL back to CBL-C so VALUE clauses and SET/IF checks round-trip without manual rewrites.
+- [x] Condition names (`LEVEL 88`): surface boolean enumerations when translating COBOL back to CBL-C so VALUE clauses and SET/IF checks round-trip without manual rewrites.
 - [ ] OCCURS DEPENDING ON: thread runtime upper bounds through layout analysis so both emitters size tables correctly and flag missing controlling values.
 - [ ] RENAMES groups: retain alias relationships during semantic lowering so reverse translation can recover original DATA DIVISION overlays.
 
@@ -211,14 +212,14 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Stress suites: cover huge records, deep nesting, long lines, and wide numerics.
 - [x] Coverage in CI: enforce line and branch coverage thresholds as part of the release gates (`make coverage` guards 60% line / 65% branch coverage).
 - [x] Add integration tests verifying subprogram calls respect original string lengths across translations.
+- [x] Add integration tests verifying semantic IR dumps write before/after snapshots when enabled.
 
 ### Stretch / Future Enhancements
 - [ ] Extend the grammar to support advanced numeric picture clauses, OCCURS tables, and paragraph factoring.
 - [ ] Teach the COBOL emitter to recover in-line PERFORM THRU ranges and map them back to structured loops in CBL-C so reverse translations stay readable.
 - [ ] Model `COPY ... REPLACING` expansions inside the semantic pipeline to unblock copybook customization without pre-processing.
 - [ ] Introduce incremental recompilation for changed paragraphs by persisting AST fragments in the incremental cache and reusing unaffected sections.
-- [ ] Build a dependency visualizer (`--dump-copybook-graph`) that emits the resolved copybook DAG for debugging include ordering issues.
-- [ ] Add a differential IR inspection mode that dumps the semantic tree before and after normalization to help debug aggressive rewrites.
+- [x] Add a differential IR inspection mode that dumps the semantic tree before and after normalization to help debug aggressive rewrites.
 - [x] Offer alternate backends (e.g., direct C output) sharing the same AST and semantic pipeline.
 - [x] Explore performance optimizations (incremental recompilation, caching intermediate representations).
 - [x] Investigate IDE integration hooks (language server, syntax highlighting, code completion).
@@ -230,10 +231,10 @@ These issues track regressions uncovered in recent round-trip suites.
 
 - [ ] COBOL files that declare OCCURS tables with nested REDEFINES crash the reverse translator during record normalization.
 - [ ] The forward emitter loses VALUE defaults on numeric group items when reordering fields for alignment.
-- [ ] Incremental builds sometimes reuse stale generated COBOL when copybooks change but the owning translation unit does not.
+- [x] Incremental builds sometimes reuse stale generated COBOL when copybooks change but the owning translation unit does not.
 - [ ] Reverse translation mis-orders paragraphs when `ALTER` targets multiple entry points, leading to unreachable code in regenerated CBL-C.
 - [ ] Semantic analysis drops `USE AFTER ERROR PROCEDURE` declaratives, so exception handlers never bind during forward translation.
-- [ ] Copybook DAG dumping crashes when circular includes appear because cycle detection only tracks relative paths and misses canonical duplicates.
+- [x] Copybook DAG dumping crashes when circular includes appear because cycle detection only tracks relative paths and misses canonical duplicates.
 - [ ] Forward emission of nested REDEFINES omits required FILLER padding, shifting following fields and breaking copybook consumers.
 - [ ] Reverse translation of OCCURS DEPENDING ON tables always uses the maximum bound, ignoring dynamic limits recorded in the original program.
 - [ ] INSPECT TALLYING lowering orders counters incorrectly when multiple clauses touch the same receiver, producing wrong tallies at runtime.

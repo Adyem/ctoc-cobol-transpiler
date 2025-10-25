@@ -61,6 +61,9 @@ int test_transpiler_context_clear_comments_allows_reuse(void);
 int test_transpiler_context_record_comment_does_not_reallocate_within_capacity(void);
 int test_transpiler_context_record_comment_retains_append_order_with_decreasing_lines(void);
 int test_transpiler_context_record_comment_allows_duplicate_positions(void);
+int test_transpiler_context_captures_semantic_ir_snapshots(void);
+int test_transpiler_semantic_dump_emits_files_with_custom_directory(void);
+int test_transpiler_semantic_dump_uses_resolved_output_path(void);
 
 const t_test_case *get_transpiler_context_tests(size_t *count)
 {
@@ -125,7 +128,10 @@ const t_test_case *get_transpiler_context_tests(size_t *count)
         {"transpiler_context_clear_comments_allows_reuse", test_transpiler_context_clear_comments_allows_reuse},
         {"transpiler_context_record_comment_does_not_reallocate_within_capacity", test_transpiler_context_record_comment_does_not_reallocate_within_capacity},
         {"transpiler_context_record_comment_retains_append_order_with_decreasing_lines", test_transpiler_context_record_comment_retains_append_order_with_decreasing_lines},
-        {"transpiler_context_record_comment_allows_duplicate_positions", test_transpiler_context_record_comment_allows_duplicate_positions}
+        {"transpiler_context_record_comment_allows_duplicate_positions", test_transpiler_context_record_comment_allows_duplicate_positions},
+        {"transpiler_context_captures_semantic_ir_snapshots", test_transpiler_context_captures_semantic_ir_snapshots},
+        {"transpiler_semantic_dump_emits_files_with_custom_directory", test_transpiler_semantic_dump_emits_files_with_custom_directory},
+        {"transpiler_semantic_dump_uses_resolved_output_path", test_transpiler_semantic_dump_uses_resolved_output_path}
     };
 
     if (count)
