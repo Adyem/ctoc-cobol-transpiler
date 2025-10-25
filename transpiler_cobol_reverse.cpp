@@ -810,6 +810,7 @@ typedef struct s_cobol_reverse_data_item_info
     const t_ast_node *level_node;
     const t_ast_node *name_node;
     const t_ast_node *picture_node;
+    const t_ast_node *occurs_node;
     const t_ast_node *value_node;
 }   t_cobol_reverse_data_item_info;
 
@@ -820,6 +821,15 @@ typedef struct s_cobol_reverse_scalar_metadata
     size_t array_length;
     int is_boolean_type;
 }   t_cobol_reverse_scalar_metadata;
+
+typedef struct s_cobol_reverse_occurs_metadata
+{
+    int present;
+    size_t minimum;
+    size_t maximum;
+    int has_depending_on;
+    const t_ast_node *controller_node;
+}   t_cobol_reverse_occurs_metadata;
 
 static void cobol_reverse_skip_spaces(const char *text, size_t length, size_t *index)
 {
@@ -1143,6 +1153,8 @@ static int cobol_reverse_collect_data_item_info(const t_ast_node *item,
                 out_info->name_node = child;
             else if (child->kind == AST_NODE_PICTURE_CLAUSE && !out_info->picture_node)
                 out_info->picture_node = child;
+            else if (child->kind == AST_NODE_OCCURS_CLAUSE && !out_info->occurs_node)
+                out_info->occurs_node = child;
             else if (child->kind == AST_NODE_VALUE_CLAUSE && !out_info->value_node)
                 out_info->value_node = child;
         }
@@ -1288,6 +1300,107 @@ static int cobol_reverse_infer_scalar_metadata(t_transpiler_context *context,
     out_metadata->is_array = is_array;
     out_metadata->array_length = array_length;
     out_metadata->is_boolean_type = is_boolean_type;
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_parse_size_literal(const t_ast_node *literal, size_t *out_value)
+{
+    const char *text;
+    size_t index;
+    size_t value;
+
+    if (!literal || !out_value)
+        return (FT_FAILURE);
+    if (!literal->token.lexeme)
+        return (FT_FAILURE);
+    text = literal->token.lexeme;
+    value = 0;
+    index = 0;
+    while (index < literal->token.length)
+    {
+        char digit;
+
+        digit = text[index];
+        if (!ft_isdigit(static_cast<unsigned char>(digit)))
+            return (FT_FAILURE);
+        if (value > (SIZE_MAX / 10))
+            return (FT_FAILURE);
+        value *= 10;
+        if (static_cast<size_t>(digit - '0') > (SIZE_MAX - value))
+            return (FT_FAILURE);
+        value += static_cast<size_t>(digit - '0');
+        index += 1;
+    }
+    *out_value = value;
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_extract_occurs_metadata(const t_ast_node *occurs_node,
+    t_cobol_reverse_occurs_metadata *out_metadata)
+{
+    size_t index;
+    const t_ast_node *lower_literal;
+    const t_ast_node *upper_literal;
+    const t_ast_node *identifier_node;
+
+    if (!out_metadata)
+        return (FT_FAILURE);
+    ft_bzero(out_metadata, sizeof(*out_metadata));
+    if (!occurs_node)
+        return (FT_SUCCESS);
+    lower_literal = NULL;
+    upper_literal = NULL;
+    identifier_node = NULL;
+    index = 0;
+    while (index < ast_node_child_count(occurs_node))
+    {
+        const t_ast_node *child;
+
+        child = ast_node_get_child(occurs_node, index);
+        if (!child)
+            return (FT_FAILURE);
+        if (child->kind == AST_NODE_LITERAL)
+        {
+            if (!lower_literal)
+                lower_literal = child;
+            else if (!upper_literal)
+                upper_literal = child;
+            else
+                return (FT_FAILURE);
+        }
+        else if (child->kind == AST_NODE_IDENTIFIER)
+        {
+            if (identifier_node)
+                return (FT_FAILURE);
+            identifier_node = child;
+        }
+        else
+            return (FT_FAILURE);
+        index += 1;
+    }
+    if (!lower_literal)
+        return (FT_FAILURE);
+    if (cobol_reverse_parse_size_literal(lower_literal,
+            &out_metadata->minimum) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (upper_literal)
+    {
+        if (cobol_reverse_parse_size_literal(upper_literal,
+                &out_metadata->maximum) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    else
+        out_metadata->maximum = out_metadata->minimum;
+    if (out_metadata->maximum < out_metadata->minimum)
+        return (FT_FAILURE);
+    out_metadata->present = 1;
+    out_metadata->has_depending_on = 0;
+    out_metadata->controller_node = NULL;
+    if (identifier_node && identifier_node->token.lexeme)
+    {
+        out_metadata->has_depending_on = 1;
+        out_metadata->controller_node = identifier_node;
+    }
     return (FT_SUCCESS);
 }
 
@@ -2099,6 +2212,7 @@ static int cobol_reverse_emit_data_item(t_transpiler_context *context, t_cblc_bu
     long level_value;
     t_cobol_reverse_picture picture;
     t_cobol_reverse_scalar_metadata metadata;
+    t_cobol_reverse_occurs_metadata occurs;
     const t_ast_node *value_literal;
     size_t anchor_line;
     const t_ast_node *item;
@@ -2168,12 +2282,44 @@ static int cobol_reverse_emit_data_item(t_transpiler_context *context, t_cblc_bu
     if (cobol_reverse_infer_scalar_metadata(context, info.name_node, &picture,
             "Unsupported WORKING-STORAGE item", &metadata) != FT_SUCCESS)
         return (FT_FAILURE);
+    ft_bzero(&occurs, sizeof(occurs));
+    if (info.occurs_node)
+    {
+        if (cobol_reverse_extract_occurs_metadata(info.occurs_node,
+                &occurs) != FT_SUCCESS)
+        {
+            if (context)
+                cobol_reverse_emit_error(context,
+                    "Unsupported OCCURS clause in WORKING-STORAGE section");
+            return (FT_FAILURE);
+        }
+    }
     if (cblc_builder_append_string(builder, metadata.type_text) != FT_SUCCESS)
         return (FT_FAILURE);
     if (cblc_builder_append_string(builder, " ") != FT_SUCCESS)
         return (FT_FAILURE);
     if (cobol_reverse_append_identifier(builder, &info.name_node->token) != FT_SUCCESS)
         return (FT_FAILURE);
+    if (occurs.present)
+    {
+        if (cblc_builder_append_char(builder, '[') != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (occurs.has_depending_on && occurs.controller_node
+            && occurs.controller_node->token.lexeme)
+        {
+            if (cobol_reverse_append_identifier(builder,
+                    &occurs.controller_node->token) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        else
+        {
+            if (cblc_builder_append_unsigned(builder,
+                    static_cast<unsigned long long>(occurs.maximum)) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        if (cblc_builder_append_char(builder, ']') != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
     if (metadata.is_array)
     {
         if (cblc_builder_append_char(builder, '[') != FT_SUCCESS)
@@ -2461,6 +2607,7 @@ static int cobol_reverse_emit_group_item(t_transpiler_context *context, t_cblc_b
 {
     t_cobol_reverse_data_item_info group_info;
     long group_level;
+    t_cobol_reverse_occurs_metadata group_occurs;
     size_t child_index;
     size_t section_count;
     size_t field_count;
@@ -2506,6 +2653,18 @@ static int cobol_reverse_emit_group_item(t_transpiler_context *context, t_cblc_b
             cobol_reverse_emit_error(context, "Group items with VALUE clauses are not supported in reverse translation");
         return (FT_FAILURE);
     }
+    ft_bzero(&group_occurs, sizeof(group_occurs));
+    if (group_info.occurs_node)
+    {
+        if (cobol_reverse_extract_occurs_metadata(group_info.occurs_node,
+                &group_occurs) != FT_SUCCESS)
+        {
+            if (context)
+                cobol_reverse_emit_error(context,
+                    "Unsupported OCCURS clause on group item in WORKING-STORAGE section");
+            return (FT_FAILURE);
+        }
+    }
     if (cblc_builder_append_string(builder, "record ") != FT_SUCCESS)
         return (FT_FAILURE);
     if (cobol_reverse_append_identifier(builder, &group_info.name_node->token) != FT_SUCCESS)
@@ -2522,6 +2681,7 @@ static int cobol_reverse_emit_group_item(t_transpiler_context *context, t_cblc_b
         long field_level;
         t_cobol_reverse_picture picture;
         t_cobol_reverse_scalar_metadata metadata;
+        t_cobol_reverse_occurs_metadata field_occurs;
         size_t field_line;
 
         child = ast_node_get_child(section, child_index);
@@ -2572,6 +2732,18 @@ static int cobol_reverse_emit_group_item(t_transpiler_context *context, t_cblc_b
         if (cobol_reverse_infer_scalar_metadata(context, field_info.name_node, &picture,
                 "Unsupported group item member", &metadata) != FT_SUCCESS)
             return (FT_FAILURE);
+        ft_bzero(&field_occurs, sizeof(field_occurs));
+        if (field_info.occurs_node)
+        {
+            if (cobol_reverse_extract_occurs_metadata(field_info.occurs_node,
+                    &field_occurs) != FT_SUCCESS)
+            {
+                if (context)
+                    cobol_reverse_emit_error(context,
+                        "Unsupported OCCURS clause on group member in WORKING-STORAGE section");
+                return (FT_FAILURE);
+            }
+        }
         field_line = cobol_reverse_node_line(field_info.name_node);
         if (field_line == 0)
             field_line = cobol_reverse_node_line(child);
@@ -2588,6 +2760,26 @@ static int cobol_reverse_emit_group_item(t_transpiler_context *context, t_cblc_b
             return (FT_FAILURE);
         if (cobol_reverse_append_identifier(builder, &field_info.name_node->token) != FT_SUCCESS)
             return (FT_FAILURE);
+        if (field_occurs.present)
+        {
+            if (cblc_builder_append_char(builder, '[') != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (field_occurs.has_depending_on && field_occurs.controller_node
+                && field_occurs.controller_node->token.lexeme)
+            {
+                if (cobol_reverse_append_identifier(builder,
+                        &field_occurs.controller_node->token) != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            else
+            {
+                if (cblc_builder_append_unsigned(builder,
+                        static_cast<unsigned long long>(field_occurs.maximum)) != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            if (cblc_builder_append_char(builder, ']') != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
         if (metadata.is_array)
         {
             if (cblc_builder_append_char(builder, '[') != FT_SUCCESS)
@@ -2628,6 +2820,26 @@ static int cobol_reverse_emit_group_item(t_transpiler_context *context, t_cblc_b
         return (FT_FAILURE);
     if (cobol_reverse_append_identifier(builder, &group_info.name_node->token) != FT_SUCCESS)
         return (FT_FAILURE);
+    if (group_occurs.present)
+    {
+        if (cblc_builder_append_char(builder, '[') != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (group_occurs.has_depending_on && group_occurs.controller_node
+            && group_occurs.controller_node->token.lexeme)
+        {
+            if (cobol_reverse_append_identifier(builder,
+                    &group_occurs.controller_node->token) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        else
+        {
+            if (cblc_builder_append_unsigned(builder,
+                    static_cast<unsigned long long>(group_occurs.maximum)) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        if (cblc_builder_append_char(builder, ']') != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
     if (cblc_builder_append_string(builder, ";") != FT_SUCCESS)
         return (FT_FAILURE);
     if (cblc_builder_append_newline(builder) != FT_SUCCESS)
@@ -2884,7 +3096,7 @@ int transpiler_cobol_program_to_cblc(t_transpiler_context *context, const t_ast_
         const t_ast_node *paragraph;
 
         paragraph = ast_node_get_child(procedure_division, index);
-        if (paragraph)
+        if (paragraph && paragraph->kind == AST_NODE_PARAGRAPH)
         {
             if (cblc_builder_append_paragraph_separator(&builder) != FT_SUCCESS)
             {

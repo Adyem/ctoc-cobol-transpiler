@@ -25,6 +25,7 @@ typedef struct s_transpiler_semantic_data_item
     size_t read_count;
     size_t write_count;
     int has_initial_value;
+    t_transpiler_data_item_occurs occurs;
 }   t_transpiler_semantic_data_item;
 
 typedef struct s_transpiler_semantic_scope
@@ -49,6 +50,8 @@ const t_transpiler_semantic_data_item
             const char *name);
 int     transpiler_semantics_collect_scope(const t_ast_node *program,
             t_transpiler_semantic_scope *scope, t_transpiler_context *context);
+int     transpiler_semantics_collect_use_after_error(const t_ast_node *program,
+            t_transpiler_context *context);
 int     transpiler_semantics_validate_identifier_use(const t_transpiler_semantic_scope *scope,
             t_transpiler_context *context, const t_ast_node *identifier,
             int is_target, t_transpiler_semantic_data_kind *out_kind,

@@ -453,6 +453,124 @@ int semantics_add_data_item(t_ast_node *program, const char *name,
         NULL));
 }
 
+t_ast_node *semantics_find_data_item(t_ast_node *program, const char *name)
+{
+    t_ast_node *data_division;
+    t_ast_node *working_storage;
+    size_t index;
+
+    if (!program)
+        return (NULL);
+    if (!name)
+        return (NULL);
+    if (program->child_count < 1)
+        return (NULL);
+    data_division = program->children[0];
+    if (!data_division)
+        return (NULL);
+    if (data_division->child_count < 1)
+        return (NULL);
+    working_storage = data_division->children[0];
+    if (!working_storage)
+        return (NULL);
+    index = 0;
+    while (index < working_storage->child_count)
+    {
+        t_ast_node *candidate;
+
+        candidate = working_storage->children[index];
+        if (candidate && candidate->kind == AST_NODE_DATA_ITEM)
+        {
+            size_t child_index;
+
+            child_index = 0;
+            while (child_index < candidate->child_count)
+            {
+                t_ast_node *child;
+
+                child = candidate->children[child_index];
+                if (child && child->kind == AST_NODE_IDENTIFIER
+                    && child->token.lexeme
+                    && ft_strncmp(child->token.lexeme, name,
+                        TRANSPILE_IDENTIFIER_MAX) == 0)
+                    return (candidate);
+                child_index += 1;
+            }
+        }
+        index += 1;
+    }
+    return (NULL);
+}
+
+int semantics_attach_occurs_clause(t_ast_node *data_item,
+    const char *minimum, const char *maximum, const char *depending_name)
+{
+    t_ast_node *occurs_node;
+    t_ast_node *literal_node;
+
+    if (!data_item)
+        return (FT_FAILURE);
+    if (!minimum)
+        return (FT_FAILURE);
+    occurs_node = ast_node_create(AST_NODE_OCCURS_CLAUSE);
+    if (!occurs_node)
+        return (FT_FAILURE);
+    literal_node = semantics_create_literal_node(minimum,
+            LEXER_TOKEN_NUMERIC_LITERAL);
+    if (!literal_node)
+    {
+        ast_node_destroy(occurs_node);
+        return (FT_FAILURE);
+    }
+    if (ast_node_add_child(occurs_node, literal_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(literal_node);
+        ast_node_destroy(occurs_node);
+        return (FT_FAILURE);
+    }
+    if (maximum && maximum[0] != '\0')
+    {
+        t_ast_node *upper_literal;
+
+        upper_literal = semantics_create_literal_node(maximum,
+                LEXER_TOKEN_NUMERIC_LITERAL);
+        if (!upper_literal)
+        {
+            ast_node_destroy(occurs_node);
+            return (FT_FAILURE);
+        }
+        if (ast_node_add_child(occurs_node, upper_literal) != FT_SUCCESS)
+        {
+            ast_node_destroy(upper_literal);
+            ast_node_destroy(occurs_node);
+            return (FT_FAILURE);
+        }
+    }
+    if (depending_name && depending_name[0] != '\0')
+    {
+        t_ast_node *identifier_node;
+
+        identifier_node = semantics_create_identifier_node(depending_name);
+        if (!identifier_node)
+        {
+            ast_node_destroy(occurs_node);
+            return (FT_FAILURE);
+        }
+        if (ast_node_add_child(occurs_node, identifier_node) != FT_SUCCESS)
+        {
+            ast_node_destroy(identifier_node);
+            ast_node_destroy(occurs_node);
+            return (FT_FAILURE);
+        }
+    }
+    if (ast_node_add_child(data_item, occurs_node) != FT_SUCCESS)
+    {
+        ast_node_destroy(occurs_node);
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
 int semantics_add_copybook_include(t_ast_node *program,
     const char *copybook_name)
 {

@@ -383,6 +383,15 @@ typedef enum e_transpiler_data_item_kind
     TRANSPILE_DATA_ITEM_FLOATING
 }   t_transpiler_data_item_kind;
 
+typedef struct s_transpiler_data_item_occurs
+{
+    int present;
+    size_t minimum;
+    size_t maximum;
+    int has_depending_on;
+    char depending_on[TRANSPILE_IDENTIFIER_MAX];
+}   t_transpiler_data_item_occurs;
+
 typedef struct s_transpiler_data_item
 {
     char name[TRANSPILE_IDENTIFIER_MAX];
@@ -390,6 +399,7 @@ typedef struct s_transpiler_data_item
     size_t declared_length;
     int has_caller_length;
     int is_read_only;
+    t_transpiler_data_item_occurs occurs;
 }   t_transpiler_data_item;
 
 typedef struct s_transpiler_copybook_item
@@ -439,6 +449,8 @@ typedef struct s_transpiler_source_map_entry
     t_transpiler_source_span cblc_span;
     t_transpiler_source_span cobol_span;
 }   t_transpiler_source_map_entry;
+
+typedef struct s_transpiler_use_after_error_binding t_transpiler_use_after_error_binding;
 
 typedef struct s_transpiler_context
 {
@@ -497,6 +509,9 @@ typedef struct s_transpiler_context
     size_t comment_emit_index;
     char *semantic_snapshot_before;
     char *semantic_snapshot_after;
+    t_transpiler_use_after_error_binding *use_after_error_bindings;
+    size_t use_after_error_binding_count;
+    size_t use_after_error_binding_capacity;
 }   t_transpiler_context;
 
 int transpiler_context_init(t_transpiler_context *context);
@@ -555,7 +570,8 @@ int transpiler_context_configure_file_keys(t_transpiler_context *context, const 
 int transpiler_context_configure_file_lock_mode(t_transpiler_context *context, const char *name,
     t_transpiler_file_lock_mode lock_mode);
 int transpiler_context_register_data_item(t_transpiler_context *context, const char *name,
-    t_transpiler_data_item_kind kind, size_t declared_length, int is_read_only);
+    t_transpiler_data_item_kind kind, size_t declared_length, int is_read_only,
+    const t_transpiler_data_item_occurs *occurs);
 const t_transpiler_data_item *transpiler_context_find_data_item(const t_transpiler_context *context, const char *name);
 int transpiler_context_register_copybook(t_transpiler_context *context, const char *name,
     const t_transpiler_copybook_item *items, size_t item_count);
@@ -586,6 +602,11 @@ int transpiler_context_capture_semantic_snapshot_after(t_transpiler_context *con
 const char *transpiler_context_get_semantic_snapshot_before(const t_transpiler_context *context);
 const char *transpiler_context_get_semantic_snapshot_after(const t_transpiler_context *context);
 void transpiler_context_clear_semantic_snapshots(t_transpiler_context *context);
+int transpiler_context_register_use_after_error_binding(t_transpiler_context *context,
+    const char *section_name, const char *file_name);
+const t_transpiler_use_after_error_binding
+    *transpiler_context_get_use_after_error_bindings(const t_transpiler_context *context,
+        size_t *count);
 
 int transpiler_incremental_cache_init(t_transpiler_incremental_cache *cache);
 void transpiler_incremental_cache_dispose(t_transpiler_incremental_cache *cache);
@@ -651,6 +672,9 @@ typedef enum e_lexer_token_kind
     LEXER_TOKEN_KEYWORD_VARYING,
     LEXER_TOKEN_KEYWORD_FROM,
     LEXER_TOKEN_KEYWORD_BY,
+    LEXER_TOKEN_KEYWORD_OCCURS,
+    LEXER_TOKEN_KEYWORD_TIMES,
+    LEXER_TOKEN_KEYWORD_DEPENDING,
     LEXER_TOKEN_KEYWORD_USING,
     LEXER_TOKEN_KEYWORD_REFERENCE,
     LEXER_TOKEN_KEYWORD_CONTENT,
@@ -668,7 +692,12 @@ typedef enum e_lexer_token_kind
     LEXER_TOKEN_LESS_THAN,
     LEXER_TOKEN_LESS_OR_EQUAL,
     LEXER_TOKEN_GREATER_THAN,
-    LEXER_TOKEN_GREATER_OR_EQUAL
+    LEXER_TOKEN_GREATER_OR_EQUAL,
+    LEXER_TOKEN_KEYWORD_USE,
+    LEXER_TOKEN_KEYWORD_AFTER,
+    LEXER_TOKEN_KEYWORD_ERROR,
+    LEXER_TOKEN_KEYWORD_ON,
+    LEXER_TOKEN_KEYWORD_DECLARATIVES
 }   t_lexer_token_kind;
 
 typedef enum e_lexer_trivia_kind
@@ -718,6 +747,7 @@ typedef enum e_ast_node_kind
     AST_NODE_COPYBOOK_INCLUDE,
     AST_NODE_PICTURE_CLAUSE,
     AST_NODE_VALUE_CLAUSE,
+    AST_NODE_OCCURS_CLAUSE,
     AST_NODE_STATEMENT_SEQUENCE,
     AST_NODE_PARAGRAPH,
     AST_NODE_MOVE_STATEMENT,
@@ -739,7 +769,10 @@ typedef enum e_ast_node_kind
     AST_NODE_ARITHMETIC_OPERATOR,
     AST_NODE_COMPARISON_OPERATOR,
     AST_NODE_IDENTIFIER,
-    AST_NODE_LITERAL
+    AST_NODE_LITERAL,
+    AST_NODE_DECLARATIVES,
+    AST_NODE_DECLARATIVE_SECTION,
+    AST_NODE_USE_AFTER_ERROR_PROCEDURE
 }   t_ast_node_kind;
 
 typedef struct s_ast_node
@@ -979,6 +1012,7 @@ typedef struct s_transpiler_cobol_group_field
     const char *name;
     size_t level;
     t_transpiler_cobol_elementary element;
+    const char *value_text;
 }   t_transpiler_cobol_group_field;
 
 typedef struct s_transpiler_cobol_group
@@ -1001,7 +1035,8 @@ int transpiler_cobol_describe_numeric(size_t digits, int is_signed, t_transpiler
 int transpiler_cobol_describe_fixed_point(size_t integral_digits, size_t fractional_digits, int is_signed,
     t_transpiler_cobol_usage usage, t_transpiler_cobol_elementary *out);
 int transpiler_cobol_format_elementary(const char *name, size_t level,
-    const t_transpiler_cobol_elementary *element, size_t indentation, char **out);
+    const t_transpiler_cobol_elementary *element, size_t indentation,
+    const char *value_text, char **out);
 int transpiler_cobol_format_group(const t_transpiler_cobol_group *group,
     size_t indentation, char **out);
 
@@ -1143,6 +1178,12 @@ typedef struct s_transpiler_cobol_file_sections
     char *environment_division;
     char *data_division;
 }   t_transpiler_cobol_file_sections;
+
+typedef struct s_transpiler_use_after_error_binding
+{
+    char section_name[TRANSPILE_IDENTIFIER_MAX];
+    char file_name[TRANSPILE_IDENTIFIER_MAX];
+}   t_transpiler_use_after_error_binding;
 
 void transpiler_codegen_file_sections_init(t_transpiler_cobol_file_sections *sections);
 void transpiler_codegen_file_sections_dispose(t_transpiler_cobol_file_sections *sections);
