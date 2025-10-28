@@ -410,6 +410,37 @@ typedef struct s_transpiler_copybook_item
     int is_read_only;
 }   t_transpiler_copybook_item;
 
+typedef struct s_transpiler_copybook_replacing_text
+{
+    char *text;
+    size_t length;
+    unsigned int flags;
+    char qualifier[TRANSPILE_IDENTIFIER_MAX];
+}   t_transpiler_copybook_replacing_text;
+
+typedef struct s_transpiler_copybook_replacement
+{
+    t_transpiler_copybook_replacing_text source;
+    t_transpiler_copybook_replacing_text target;
+    unsigned int pair_flags;
+}   t_transpiler_copybook_replacement;
+
+typedef struct s_transpiler_copybook_replacing_text_view
+{
+    const char *text;
+    size_t length;
+    unsigned int flags;
+    const char *qualifier;
+    size_t qualifier_length;
+}   t_transpiler_copybook_replacing_text_view;
+
+typedef struct s_transpiler_copybook_replacement_view
+{
+    t_transpiler_copybook_replacing_text_view source;
+    t_transpiler_copybook_replacing_text_view target;
+    unsigned int pair_flags;
+}   t_transpiler_copybook_replacement_view;
+
 typedef struct s_transpiler_copybook
 {
     char name[TRANSPILE_IDENTIFIER_MAX];
@@ -418,6 +449,8 @@ typedef struct s_transpiler_copybook
     size_t item_count;
     char (*dependencies)[TRANSPILE_FILE_PATH_MAX];
     size_t dependency_count;
+    t_transpiler_copybook_replacement *replacements;
+    size_t replacement_count;
 }   t_transpiler_copybook;
 
 typedef struct s_transpiler_incremental_cache_entry
@@ -576,6 +609,8 @@ const t_transpiler_data_item *transpiler_context_find_data_item(const t_transpil
 int transpiler_context_register_copybook(t_transpiler_context *context, const char *name,
     const t_transpiler_copybook_item *items, size_t item_count);
 int transpiler_context_register_copybook_dependencies(t_transpiler_context *context, const char *name, const char **dependencies, size_t dependency_count);
+int transpiler_context_register_copybook_replacements(t_transpiler_context *context, const char *name,
+    const t_transpiler_copybook_replacement_view *replacements, size_t replacement_count);
 const t_transpiler_copybook *transpiler_context_find_copybook(const t_transpiler_context *context, const char *name);
 unsigned long long transpiler_context_compute_copybook_signature(const t_transpiler_context *context);
 const t_transpiler_data_item *transpiler_context_get_data_items(const t_transpiler_context *context, size_t *count);
@@ -662,6 +697,10 @@ typedef enum e_lexer_token_kind
     LEXER_TOKEN_KEYWORD_MOVE,
     LEXER_TOKEN_KEYWORD_COMPUTE,
     LEXER_TOKEN_KEYWORD_COPY,
+    LEXER_TOKEN_KEYWORD_REPLACING,
+    LEXER_TOKEN_KEYWORD_LEADING,
+    LEXER_TOKEN_KEYWORD_TRAILING,
+    LEXER_TOKEN_KEYWORD_WORD,
     LEXER_TOKEN_KEYWORD_ABS,
     LEXER_TOKEN_KEYWORD_OPEN,
     LEXER_TOKEN_KEYWORD_CLOSE,
@@ -745,6 +784,9 @@ typedef enum e_ast_node_kind
     AST_NODE_WORKING_STORAGE_SECTION,
     AST_NODE_DATA_ITEM,
     AST_NODE_COPYBOOK_INCLUDE,
+    AST_NODE_COPYBOOK_REPLACING,
+    AST_NODE_COPYBOOK_REPLACING_PAIR,
+    AST_NODE_COPYBOOK_REPLACING_TEXT,
     AST_NODE_PICTURE_CLAUSE,
     AST_NODE_VALUE_CLAUSE,
     AST_NODE_OCCURS_CLAUSE,
@@ -785,6 +827,12 @@ typedef struct s_ast_node
     size_t child_capacity;
     unsigned int flags;
 }   t_ast_node;
+
+#define AST_NODE_FLAG_COPYBOOK_TEXT_DELIMITED 0x00000001u
+#define AST_NODE_FLAG_COPYBOOK_TEXT_WORD 0x00000002u
+#define AST_NODE_FLAG_COPYBOOK_TEXT_HAS_OF 0x00000004u
+#define AST_NODE_FLAG_COPYBOOK_PAIR_LEADING 0x00000001u
+#define AST_NODE_FLAG_COPYBOOK_PAIR_TRAILING 0x00000002u
 
 int ast_node_init(t_ast_node *node, t_ast_node_kind kind);
 void ast_node_dispose(t_ast_node *node);

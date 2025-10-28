@@ -1,4 +1,16 @@
-copy "CUSTOMER-STATUS";
+copy "CUSTOMER-STATUS" replacing ==CUSTOMER-NAME== by ==CLIENT-NAME== word CUSTOMER-STATUS of CUSTOMER-RECORD by CLIENT-STATUS leading ==CUSTOMER-== by ==CLIENT-==;
+/* copybook replacements:
+ * - ==CUSTOMER-NAME== -> ==CLIENT-NAME==
+ * - word CUSTOMER-STATUS of CUSTOMER-RECORD -> CLIENT-STATUS
+ * - leading ==CUSTOMER-== -> ==CLIENT-==
+ */
+/* copybook exports:
+ * - CUSTOMER-FLAG (alphanumeric, len=1)
+ * - CUSTOMER-CODE (alphanumeric, len=1)
+ * - CUSTOMER-NAME (alphanumeric, len=32)
+ * - CUSTOMER-RATING (numeric, len=4)
+ * - CUSTOMER-BALANCE (floating, read-only)
+ */
 char STATE_CODE = "A";
 char BUFFER_NAME[8];
 

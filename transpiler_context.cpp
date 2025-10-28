@@ -1058,6 +1058,106 @@ static int transpiler_context_copybooks_reserve(t_transpiler_context *context, s
     return (FT_SUCCESS);
 }
 
+static void transpiler_context_copybook_dispose_replacements(t_transpiler_copybook_replacement *replacements, size_t count)
+{
+    size_t index;
+
+    if (!replacements)
+        return ;
+    index = 0;
+    while (index < count)
+    {
+        if (replacements[index].source.text)
+        {
+            cma_free(replacements[index].source.text);
+            replacements[index].source.text = NULL;
+        }
+        if (replacements[index].target.text)
+        {
+            cma_free(replacements[index].target.text);
+            replacements[index].target.text = NULL;
+        }
+        replacements[index].source.length = 0;
+        replacements[index].source.flags = 0;
+        replacements[index].source.qualifier[0] = '\0';
+        replacements[index].target.length = 0;
+        replacements[index].target.flags = 0;
+        replacements[index].target.qualifier[0] = '\0';
+        replacements[index].pair_flags = 0;
+        index += 1;
+    }
+    cma_free(replacements);
+}
+
+static void transpiler_context_copybook_clear_replacements(t_transpiler_copybook *copybook)
+{
+    if (!copybook)
+        return ;
+    if (copybook->replacements)
+        transpiler_context_copybook_dispose_replacements(copybook->replacements, copybook->replacement_count);
+    copybook->replacements = NULL;
+    copybook->replacement_count = 0;
+}
+
+static int transpiler_context_copybook_clone_text(t_transpiler_copybook_replacing_text *destination,
+    const t_transpiler_copybook_replacing_text_view *view)
+{
+    char *buffer;
+    size_t qualifier_length;
+
+    if (!destination)
+        return (FT_FAILURE);
+    if (!view)
+        return (FT_FAILURE);
+    destination->text = NULL;
+    destination->length = 0;
+    destination->flags = 0;
+    destination->qualifier[0] = '\0';
+    destination->flags = view->flags & (AST_NODE_FLAG_COPYBOOK_TEXT_DELIMITED
+        | AST_NODE_FLAG_COPYBOOK_TEXT_WORD | AST_NODE_FLAG_COPYBOOK_TEXT_HAS_OF);
+    if (view->length > 0 && view->text)
+    {
+        buffer = static_cast<char *>(cma_calloc(view->length + 1, sizeof(char)));
+        if (!buffer)
+            return (FT_FAILURE);
+        ft_memcpy(buffer, view->text, view->length);
+        buffer[view->length] = '\0';
+        destination->text = buffer;
+        destination->length = view->length;
+    }
+    else if ((destination->flags & AST_NODE_FLAG_COPYBOOK_TEXT_DELIMITED) != 0)
+    {
+        buffer = static_cast<char *>(cma_calloc(1, sizeof(char)));
+        if (!buffer)
+            return (FT_FAILURE);
+        buffer[0] = '\0';
+        destination->text = buffer;
+        destination->length = 0;
+    }
+    else
+        return (FT_FAILURE);
+    if ((destination->flags & AST_NODE_FLAG_COPYBOOK_TEXT_HAS_OF) != 0)
+    {
+        if (!view->qualifier || view->qualifier_length == 0)
+        {
+            if (destination->text)
+            {
+                cma_free(destination->text);
+                destination->text = NULL;
+            }
+            destination->length = 0;
+            destination->flags = 0;
+            return (FT_FAILURE);
+        }
+        qualifier_length = view->qualifier_length;
+        if (qualifier_length >= sizeof(destination->qualifier))
+            qualifier_length = sizeof(destination->qualifier) - 1;
+        ft_memcpy(destination->qualifier, view->qualifier, qualifier_length);
+        destination->qualifier[qualifier_length] = '\0';
+    }
+    return (FT_SUCCESS);
+}
+
 static unsigned long long transpiler_context_hash_seed(void)
 {
     return (1469598103934665603ULL);
@@ -1475,6 +1575,11 @@ void transpiler_context_dispose(t_transpiler_context *context)
                 cma_free(context->copybooks[index].dependencies);
             context->copybooks[index].dependencies = NULL;
             context->copybooks[index].dependency_count = 0;
+            if (context->copybooks[index].replacements)
+                transpiler_context_copybook_dispose_replacements(context->copybooks[index].replacements,
+                    context->copybooks[index].replacement_count);
+            context->copybooks[index].replacements = NULL;
+            context->copybooks[index].replacement_count = 0;
             index += 1;
         }
         cma_free(context->copybooks);
@@ -2946,6 +3051,8 @@ int transpiler_context_register_copybook(t_transpiler_context *context, const ch
         }
     }
     copybook->item_count = item_count;
+    copybook->replacements = NULL;
+    copybook->replacement_count = 0;
     context->copybook_count += 1;
     return (FT_SUCCESS);
 }
@@ -2999,6 +3106,66 @@ int transpiler_context_register_copybook_dependencies(t_transpiler_context *cont
         index += 1;
     }
     copybook->dependency_count = dependency_count;
+    return (FT_SUCCESS);
+}
+
+int transpiler_context_register_copybook_replacements(t_transpiler_context *context, const char *name,
+    const t_transpiler_copybook_replacement_view *replacements, size_t replacement_count)
+{
+    t_transpiler_copybook *copybook;
+    t_transpiler_copybook_replacement *cloned;
+    size_t index;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (transpiler_context_string_is_blank(name))
+        return (FT_FAILURE);
+    copybook = NULL;
+    index = 0;
+    while (index < context->copybook_count)
+    {
+        if (ft_strncmp(context->copybooks[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        {
+            copybook = &context->copybooks[index];
+            break ;
+        }
+        index += 1;
+    }
+    if (!copybook)
+        return (FT_FAILURE);
+    if (replacement_count == 0)
+    {
+        transpiler_context_copybook_clear_replacements(copybook);
+        return (FT_SUCCESS);
+    }
+    if (!replacements)
+        return (FT_FAILURE);
+    cloned = static_cast<t_transpiler_copybook_replacement *>(cma_calloc(replacement_count,
+        sizeof(t_transpiler_copybook_replacement)));
+    if (!cloned)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < replacement_count)
+    {
+        if (transpiler_context_copybook_clone_text(&cloned[index].source,
+                &replacements[index].source) != FT_SUCCESS)
+        {
+            transpiler_context_copybook_dispose_replacements(cloned, replacement_count);
+            return (FT_FAILURE);
+        }
+        if (transpiler_context_copybook_clone_text(&cloned[index].target,
+                &replacements[index].target) != FT_SUCCESS)
+        {
+            transpiler_context_copybook_dispose_replacements(cloned, replacement_count);
+            return (FT_FAILURE);
+        }
+        cloned[index].pair_flags = replacements[index].pair_flags
+            & (AST_NODE_FLAG_COPYBOOK_PAIR_LEADING | AST_NODE_FLAG_COPYBOOK_PAIR_TRAILING);
+        index += 1;
+    }
+    transpiler_context_copybook_clear_replacements(copybook);
+    copybook->replacements = cloned;
+    copybook->replacement_count = replacement_count;
     return (FT_SUCCESS);
 }
 
@@ -3073,6 +3240,41 @@ unsigned long long transpiler_context_compute_copybook_signature(const t_transpi
                     copybook->dependencies[dependency_index],
                     ft_strlen(copybook->dependencies[dependency_index]));
                 dependency_index += 1;
+            }
+        }
+        transpiler_context_hash_update_u64(&hash,
+            static_cast<unsigned long long>(copybook->replacement_count));
+        if (copybook->replacements)
+        {
+            size_t replacement_index;
+
+            replacement_index = 0;
+            while (replacement_index < copybook->replacement_count)
+            {
+                const t_transpiler_copybook_replacement *replacement;
+
+                replacement = &copybook->replacements[replacement_index];
+                transpiler_context_hash_update_u64(&hash,
+                    static_cast<unsigned long long>(replacement->pair_flags));
+                transpiler_context_hash_update_u64(&hash,
+                    static_cast<unsigned long long>(replacement->source.flags));
+                transpiler_context_hash_update_u64(&hash,
+                    static_cast<unsigned long long>(replacement->source.length));
+                if (replacement->source.text && replacement->source.length > 0)
+                    transpiler_context_hash_update_bytes(&hash, replacement->source.text,
+                        replacement->source.length);
+                transpiler_context_hash_update_bytes(&hash, replacement->source.qualifier,
+                    ft_strlen(replacement->source.qualifier));
+                transpiler_context_hash_update_u64(&hash,
+                    static_cast<unsigned long long>(replacement->target.flags));
+                transpiler_context_hash_update_u64(&hash,
+                    static_cast<unsigned long long>(replacement->target.length));
+                if (replacement->target.text && replacement->target.length > 0)
+                    transpiler_context_hash_update_bytes(&hash, replacement->target.text,
+                        replacement->target.length);
+                transpiler_context_hash_update_bytes(&hash, replacement->target.qualifier,
+                    ft_strlen(replacement->target.qualifier));
+                replacement_index += 1;
             }
         }
         index += 1;

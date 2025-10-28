@@ -90,3 +90,103 @@ FT_TEST(test_transpiler_context_rejects_duplicate_copybook)
     return (status);
 }
 
+FT_TEST(test_transpiler_context_records_copybook_replacements)
+{
+    t_transpiler_context context;
+    t_transpiler_copybook_replacement_view views[2];
+    const t_transpiler_copybook *copybook;
+
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (transpiler_context_register_copybook(&context, "SALES-BOOK", NULL, 0) != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    ft_bzero(views, sizeof(views));
+    views[0].pair_flags = AST_NODE_FLAG_COPYBOOK_PAIR_LEADING;
+    views[0].source.text = "CUSTOMER";
+    views[0].source.length = ft_strlen("CUSTOMER");
+    views[0].source.flags = AST_NODE_FLAG_COPYBOOK_TEXT_WORD | AST_NODE_FLAG_COPYBOOK_TEXT_HAS_OF;
+    views[0].source.qualifier = "TABLE";
+    views[0].source.qualifier_length = ft_strlen("TABLE");
+    views[0].target.text = "CLIENT";
+    views[0].target.length = ft_strlen("CLIENT");
+    views[0].target.flags = AST_NODE_FLAG_COPYBOOK_TEXT_DELIMITED;
+    views[1].pair_flags = AST_NODE_FLAG_COPYBOOK_PAIR_TRAILING;
+    views[1].source.text = "OLD";
+    views[1].source.length = ft_strlen("OLD");
+    views[1].source.flags = 0;
+    views[1].target.text = "NEW";
+    views[1].target.length = ft_strlen("NEW");
+    views[1].target.flags = AST_NODE_FLAG_COPYBOOK_TEXT_WORD;
+    if (transpiler_context_register_copybook_replacements(&context, "SALES-BOOK",
+            views, 2) != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    copybook = transpiler_context_find_copybook(&context, "SALES-BOOK");
+    if (!copybook)
+    {
+        transpiler_context_dispose(&context);
+        pf_printf("Assertion failed: expected registered copybook\n");
+        return (FT_FAILURE);
+    }
+    if (test_expect_size_t_equal(copybook->replacement_count, 2,
+            "copybook should retain replacement count") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(copybook->replacements[0].pair_flags,
+            AST_NODE_FLAG_COPYBOOK_PAIR_LEADING, "first replacement should record leading flag") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(copybook->replacements[0].source.text, "CUSTOMER",
+            "first replacement should preserve source text") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_cstring_equal(copybook->replacements[0].source.qualifier, "TABLE",
+            "first replacement should copy qualifier") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(copybook->replacements[0].target.flags,
+            AST_NODE_FLAG_COPYBOOK_TEXT_DELIMITED, "first replacement target should mark delimited text") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(copybook->replacements[1].pair_flags,
+            AST_NODE_FLAG_COPYBOOK_PAIR_TRAILING, "second replacement should record trailing flag") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_int_equal(copybook->replacements[1].target.flags,
+            AST_NODE_FLAG_COPYBOOK_TEXT_WORD, "second replacement target should mark word flag") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_register_copybook_replacements(&context, "SALES-BOOK", NULL, 0) != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (test_expect_size_t_equal(copybook->replacement_count, 0,
+            "copybook replacements should clear when no views are provided") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+

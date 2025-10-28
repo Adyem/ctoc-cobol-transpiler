@@ -345,9 +345,17 @@ TEST_OBJS   = $(TEST_SRC:%.cpp=$(OBJ_DIR_TEST)/%.o)
 
 TOTAL_TEST_OBJS     := $(words $(TEST_OBJS))
 
-all: ensure_libft dirs $(TARGET)
+REQUESTED_GOALS := $(if $(MAKECMDGOALS),$(MAKECMDGOALS),all)
+SKIP_ENV_GOALS := clean fclean cleanup initialize ensure_libft ensure_cobc ensure_environment install_cobc
+BUILD_GOALS := $(filter-out $(SKIP_ENV_GOALS),$(REQUESTED_GOALS))
+ifneq ($(strip $(BUILD_GOALS)),)
+    PRE_BUILD_HOOK := ensure_environment
+    ORDER_ONLY_PRE := | $(PRE_BUILD_HOOK)
+endif
 
-tests: ensure_libft dirs $(TEST_NAME)
+all: $(PRE_BUILD_HOOK) dirs $(TARGET)
+
+tests: $(PRE_BUILD_HOOK) dirs $(TEST_NAME)
 
 dirs:
 	@-$(MKDIR) $(OBJ_DIR)
@@ -373,10 +381,12 @@ tests_with_cobc: install_cobc
 debug:
 	$(MAKE) all DEBUG=1
 
+$(TARGET): $(ORDER_ONLY_PRE)
 $(TARGET): $(LIBFT) $(OBJS)
 	@printf '\033[1;36m[CTOC BUILD] Linking %s\033[0m\n' "$@"
 	@$(CC) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
 
+$(TEST_NAME): $(ORDER_ONLY_PRE)
 $(TEST_NAME): $(LIBFT) $(TEST_OBJS) $(OBJS_NO_MAIN) $(TARGET)
 	@printf '\033[1;36m[CTOC BUILD] Linking %s\033[0m\n' "$@"
 	@$(CC) $(CFLAGS) $(TEST_OBJS) $(OBJS_NO_MAIN) -o $@ $(LDFLAGS)
@@ -421,6 +431,22 @@ ensure_libft:
 			exit 1; \
 		fi; \
 	fi
+
+ensure_cobc:
+	@if ! command -v cobc >/dev/null 2>&1; then \
+		printf '\033[1;36m[COBOL SETUP] Installing cobc compiler\033[0m\n'; \
+		if command -v apt-get >/dev/null 2>&1; then \
+			$(MAKE) install_cobc; \
+		else \
+			printf 'Automatic cobc installation is not supported on this system.\n'; \
+			exit 1; \
+		fi; \
+	else \
+		printf '\033[1;36m[COBOL CHECK] cobc compiler is available\033[0m\n'; \
+	fi
+
+ensure_environment: ensure_libft ensure_cobc
+	@:
 
 $(OBJ_DIR)/%.o: %.cpp
 	@-$(MKDIR) $(dir $@)
@@ -501,4 +527,4 @@ ci:
 	$(MAKE) ci-lint
 	$(MAKE) ci-coverage
 
-.PHONY: all dirs clean fclean re debug both re_both tests test initialize ensure_libft lint fuzz coverage ci-build ci-test ci-lint ci-coverage ci
+.PHONY: all dirs clean fclean re debug both re_both tests test initialize ensure_libft ensure_cobc ensure_environment install_cobc lint fuzz coverage ci-build ci-test ci-lint ci-coverage ci

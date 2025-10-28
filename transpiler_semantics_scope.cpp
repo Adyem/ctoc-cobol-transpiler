@@ -452,6 +452,135 @@ static int transpiler_semantics_register_data_item(t_transpiler_semantic_scope *
 static int transpiler_semantics_register_copybook(const t_ast_node *node,
     t_transpiler_semantic_scope *scope, t_transpiler_context *context);
 
+static const t_ast_node *transpiler_semantics_copybook_find_replacing_clause(const t_ast_node *include)
+{
+    size_t child_count;
+    size_t index;
+
+    if (!include)
+        return (NULL);
+    child_count = ast_node_child_count(include);
+    index = 1;
+    while (index < child_count)
+    {
+        const t_ast_node *candidate;
+
+        candidate = ast_node_get_child(include, index);
+        if (candidate && candidate->kind == AST_NODE_COPYBOOK_REPLACING)
+            return (candidate);
+        index += 1;
+    }
+    return (NULL);
+}
+
+static int transpiler_semantics_fill_replacing_text_view(const t_ast_node *text,
+    t_transpiler_copybook_replacing_text_view *view)
+{
+    const t_ast_node *qualifier;
+
+    if (!text)
+        return (FT_FAILURE);
+    if (!view)
+        return (FT_FAILURE);
+    if (text->kind != AST_NODE_COPYBOOK_REPLACING_TEXT)
+        return (FT_FAILURE);
+    view->text = text->token.lexeme;
+    view->length = text->token.length;
+    view->flags = text->flags & (AST_NODE_FLAG_COPYBOOK_TEXT_DELIMITED
+        | AST_NODE_FLAG_COPYBOOK_TEXT_WORD | AST_NODE_FLAG_COPYBOOK_TEXT_HAS_OF);
+    view->qualifier = NULL;
+    view->qualifier_length = 0;
+    qualifier = NULL;
+    if ((view->flags & AST_NODE_FLAG_COPYBOOK_TEXT_HAS_OF) != 0)
+    {
+        qualifier = ast_node_get_child(text, 0);
+        if (!qualifier || qualifier->kind != AST_NODE_IDENTIFIER)
+            return (FT_FAILURE);
+        if (!qualifier->token.lexeme)
+            return (FT_FAILURE);
+        view->qualifier = qualifier->token.lexeme;
+        view->qualifier_length = qualifier->token.length;
+    }
+    return (FT_SUCCESS);
+}
+
+static int transpiler_semantics_collect_copybook_replacement_views(const t_ast_node *include,
+    t_transpiler_copybook_replacement_view **out_views, size_t *out_count)
+{
+    const t_ast_node *clause;
+    size_t pair_count;
+    size_t index;
+    t_transpiler_copybook_replacement_view *views;
+
+    if (!out_views)
+        return (FT_FAILURE);
+    if (!out_count)
+        return (FT_FAILURE);
+    *out_views = NULL;
+    *out_count = 0;
+    clause = transpiler_semantics_copybook_find_replacing_clause(include);
+    if (!clause)
+        return (FT_SUCCESS);
+    pair_count = 0;
+    index = 0;
+    while (index < ast_node_child_count(clause))
+    {
+        const t_ast_node *candidate;
+
+        candidate = ast_node_get_child(clause, index);
+        if (candidate && candidate->kind == AST_NODE_COPYBOOK_REPLACING_PAIR)
+            pair_count += 1;
+        index += 1;
+    }
+    if (pair_count == 0)
+        return (FT_SUCCESS);
+    views = static_cast<t_transpiler_copybook_replacement_view *>(cma_calloc(pair_count,
+        sizeof(t_transpiler_copybook_replacement_view)));
+    if (!views)
+        return (FT_FAILURE);
+    index = 0;
+    pair_count = 0;
+    while (index < ast_node_child_count(clause))
+    {
+        const t_ast_node *pair;
+        const t_ast_node *source_text;
+        const t_ast_node *target_text;
+
+        pair = ast_node_get_child(clause, index);
+        if (!pair || pair->kind != AST_NODE_COPYBOOK_REPLACING_PAIR)
+        {
+            index += 1;
+            continue ;
+        }
+        source_text = ast_node_get_child(pair, 0);
+        target_text = ast_node_get_child(pair, 1);
+        if (!source_text || !target_text)
+        {
+            cma_free(views);
+            return (FT_FAILURE);
+        }
+        if (transpiler_semantics_fill_replacing_text_view(source_text,
+                &views[pair_count].source) != FT_SUCCESS)
+        {
+            cma_free(views);
+            return (FT_FAILURE);
+        }
+        if (transpiler_semantics_fill_replacing_text_view(target_text,
+                &views[pair_count].target) != FT_SUCCESS)
+        {
+            cma_free(views);
+            return (FT_FAILURE);
+        }
+        views[pair_count].pair_flags = pair->flags
+            & (AST_NODE_FLAG_COPYBOOK_PAIR_LEADING | AST_NODE_FLAG_COPYBOOK_PAIR_TRAILING);
+        pair_count += 1;
+        index += 1;
+    }
+    *out_views = views;
+    *out_count = pair_count;
+    return (FT_SUCCESS);
+}
+
 static int transpiler_semantics_collect_data_items(const t_ast_node *section,
     t_transpiler_semantic_scope *scope, t_transpiler_context *context)
 {
@@ -680,6 +809,28 @@ static int transpiler_semantics_register_copybook(const t_ast_node *node,
                 kind, item->declared_length, 0, 0, item->is_read_only, NULL) != FT_SUCCESS)
             status = FT_FAILURE;
         index += 1;
+    }
+    {
+        t_transpiler_copybook_replacement_view *views;
+        size_t view_count;
+
+        views = NULL;
+        view_count = 0;
+        if (transpiler_semantics_collect_copybook_replacement_views(node, &views,
+                &view_count) != FT_SUCCESS)
+        {
+            if (views)
+                cma_free(views);
+            status = FT_FAILURE;
+        }
+        else
+        {
+            if (transpiler_context_register_copybook_replacements(context, copybook_name,
+                    views, view_count) != FT_SUCCESS)
+                status = FT_FAILURE;
+            if (views)
+                cma_free(views);
+        }
     }
     return (status);
 }

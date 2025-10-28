@@ -596,6 +596,18 @@ static int c_backend_emit_assignment(const t_cblc_translation_unit *unit, const 
             return (FT_SUCCESS);
         }
     }
+    if (item->kind == CBLC_DATA_KIND_INT)
+    {
+        char expression[TRANSPILE_STATEMENT_TEXT_MAX];
+
+        if (c_backend_translate_expression(unit, statement->source, expression,
+                sizeof(expression)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (c_backend_buffer_append_format_line(buffer,
+                "    %s = %s;", item->source_name, expression) != FT_SUCCESS)
+            return (FT_FAILURE);
+        return (FT_SUCCESS);
+    }
     return (FT_FAILURE);
 }
 

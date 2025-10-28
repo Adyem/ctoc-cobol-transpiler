@@ -2854,11 +2854,528 @@ static int cobol_reverse_emit_group_item(t_transpiler_context *context, t_cblc_b
     return (FT_SUCCESS);
 }
 
+static const char *cobol_reverse_copybook_item_kind_label(t_transpiler_data_item_kind kind)
+{
+    if (kind == TRANSPILE_DATA_ITEM_ALPHANUMERIC)
+        return ("alphanumeric");
+    if (kind == TRANSPILE_DATA_ITEM_NUMERIC)
+        return ("numeric");
+    if (kind == TRANSPILE_DATA_ITEM_FLOATING)
+        return ("floating");
+    return ("unknown");
+}
+
+static int cobol_reverse_emit_copybook_replacing_text(t_cblc_builder *builder,
+    const t_ast_node *text)
+{
+    int is_delimited;
+    int is_word;
+    int has_of;
+    const t_ast_node *qualifier;
+
+    if (!builder)
+        return (FT_FAILURE);
+    if (!text)
+        return (FT_FAILURE);
+    if (text->kind != AST_NODE_COPYBOOK_REPLACING_TEXT)
+        return (FT_FAILURE);
+    is_delimited = (text->flags & AST_NODE_FLAG_COPYBOOK_TEXT_DELIMITED) != 0;
+    is_word = (text->flags & AST_NODE_FLAG_COPYBOOK_TEXT_WORD) != 0;
+    has_of = (text->flags & AST_NODE_FLAG_COPYBOOK_TEXT_HAS_OF) != 0;
+    qualifier = NULL;
+    if (has_of)
+    {
+        qualifier = ast_node_get_child(text, 0);
+        if (!qualifier || qualifier->kind != AST_NODE_IDENTIFIER)
+            return (FT_FAILURE);
+        if (!qualifier->token.lexeme)
+            return (FT_FAILURE);
+    }
+    if (is_word)
+    {
+        if (cblc_builder_append_string(builder, "word ") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (is_delimited)
+    {
+        if (cblc_builder_append_string(builder, "==") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (text->token.lexeme && text->token.length > 0)
+    {
+        if (cblc_builder_append_span(builder, text->token.lexeme, text->token.length) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    else if (!is_delimited)
+        return (FT_FAILURE);
+    if (is_delimited)
+    {
+        if (cblc_builder_append_string(builder, "==") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (has_of)
+    {
+        if (cblc_builder_append_string(builder, " of ") != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_builder_append_span(builder, qualifier->token.lexeme,
+                qualifier->token.length) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_emit_copybook_replacing_text_metadata(t_cblc_builder *builder,
+    const t_transpiler_copybook_replacing_text *text)
+{
+    int is_delimited;
+
+    if (!builder)
+        return (FT_FAILURE);
+    if (!text)
+        return (FT_FAILURE);
+    if ((text->flags & AST_NODE_FLAG_COPYBOOK_TEXT_WORD) != 0)
+    {
+        if (cblc_builder_append_string(builder, "word ") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    is_delimited = (text->flags & AST_NODE_FLAG_COPYBOOK_TEXT_DELIMITED) != 0;
+    if (is_delimited)
+    {
+        if (cblc_builder_append_string(builder, "==") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (text->text && text->length > 0)
+    {
+        if (cblc_builder_append_span(builder, text->text, text->length) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    else if (!is_delimited)
+        return (FT_FAILURE);
+    if (is_delimited)
+    {
+        if (cblc_builder_append_string(builder, "==") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if ((text->flags & AST_NODE_FLAG_COPYBOOK_TEXT_HAS_OF) != 0)
+    {
+        if (cblc_builder_append_string(builder, " of ") != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_builder_append_string(builder, text->qualifier) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_emit_copybook_replacing_pair(t_cblc_builder *builder,
+    const t_ast_node *pair)
+{
+    const t_ast_node *source_text;
+    const t_ast_node *target_text;
+
+    if (!builder)
+        return (FT_FAILURE);
+    if (!pair)
+        return (FT_FAILURE);
+    if (pair->kind != AST_NODE_COPYBOOK_REPLACING_PAIR)
+        return (FT_FAILURE);
+    if ((pair->flags & AST_NODE_FLAG_COPYBOOK_PAIR_LEADING)
+        && (pair->flags & AST_NODE_FLAG_COPYBOOK_PAIR_TRAILING))
+        return (FT_FAILURE);
+    source_text = ast_node_get_child(pair, 0);
+    target_text = ast_node_get_child(pair, 1);
+    if (!source_text || source_text->kind != AST_NODE_COPYBOOK_REPLACING_TEXT)
+        return (FT_FAILURE);
+    if (!target_text || target_text->kind != AST_NODE_COPYBOOK_REPLACING_TEXT)
+        return (FT_FAILURE);
+    if (pair->flags & AST_NODE_FLAG_COPYBOOK_PAIR_LEADING)
+    {
+        if (cblc_builder_append_string(builder, "leading ") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    else if (pair->flags & AST_NODE_FLAG_COPYBOOK_PAIR_TRAILING)
+    {
+        if (cblc_builder_append_string(builder, "trailing ") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (cobol_reverse_emit_copybook_replacing_text(builder, source_text) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_builder_append_string(builder, " by ") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cobol_reverse_emit_copybook_replacing_text(builder, target_text) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_emit_copybook_replacing_clause(t_cblc_builder *builder,
+    const t_ast_node *include, const t_ast_node *clause)
+{
+    size_t index;
+    size_t count;
+    size_t valid_pairs;
+
+    (void)include;
+    if (!builder)
+        return (FT_FAILURE);
+    if (!clause)
+        return (FT_FAILURE);
+    if (clause->kind != AST_NODE_COPYBOOK_REPLACING)
+        return (FT_FAILURE);
+    count = ast_node_child_count(clause);
+    valid_pairs = 0;
+    index = 0;
+    while (index < count)
+    {
+        const t_ast_node *candidate;
+
+        candidate = ast_node_get_child(clause, index);
+        if (candidate && candidate->kind == AST_NODE_COPYBOOK_REPLACING_PAIR)
+            valid_pairs += 1;
+        index += 1;
+    }
+    if (valid_pairs == 0)
+        return (FT_SUCCESS);
+    if (cblc_builder_append_string(builder, " replacing") != FT_SUCCESS)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < count)
+    {
+        const t_ast_node *pair;
+
+        pair = ast_node_get_child(clause, index);
+        if (!pair || pair->kind != AST_NODE_COPYBOOK_REPLACING_PAIR)
+        {
+            index += 1;
+            continue ;
+        }
+        if (cblc_builder_append_char(builder, ' ') != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cobol_reverse_emit_copybook_replacing_pair(builder, pair) != FT_SUCCESS)
+            return (FT_FAILURE);
+        index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+static const t_ast_node *cobol_reverse_copybook_find_replacing_clause(
+    const t_ast_node *include)
+{
+    size_t child_count;
+    size_t child_index;
+
+    if (!include)
+        return (NULL);
+    child_count = ast_node_child_count(include);
+    child_index = 1;
+    while (child_index < child_count)
+    {
+        const t_ast_node *candidate;
+
+        candidate = ast_node_get_child(include, child_index);
+        if (candidate && candidate->kind == AST_NODE_COPYBOOK_REPLACING)
+            return (candidate);
+        child_index += 1;
+    }
+    return (NULL);
+}
+
+static int cobol_reverse_emit_copybook_replacements_comment(t_cblc_builder *builder,
+    const t_transpiler_copybook *copybook, const t_ast_node *include, int *out_emitted)
+{
+    if (!builder)
+        return (FT_FAILURE);
+    if (copybook && copybook->replacements && copybook->replacement_count > 0)
+    {
+        size_t index;
+
+        if (cblc_builder_append_string(builder, "/* copybook replacements:\n") != FT_SUCCESS)
+            return (FT_FAILURE);
+        index = 0;
+        while (index < copybook->replacement_count)
+        {
+            const t_transpiler_copybook_replacement *replacement;
+
+            replacement = &copybook->replacements[index];
+            if (cblc_builder_append_string(builder, " * - ") != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (replacement->pair_flags & AST_NODE_FLAG_COPYBOOK_PAIR_LEADING)
+            {
+                if (cblc_builder_append_string(builder, "leading ") != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            else if (replacement->pair_flags & AST_NODE_FLAG_COPYBOOK_PAIR_TRAILING)
+            {
+                if (cblc_builder_append_string(builder, "trailing ") != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            if (cobol_reverse_emit_copybook_replacing_text_metadata(builder,
+                    &replacement->source) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (cblc_builder_append_string(builder, " -> ") != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (cobol_reverse_emit_copybook_replacing_text_metadata(builder,
+                    &replacement->target) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (cblc_builder_append_string(builder, "\n") != FT_SUCCESS)
+                return (FT_FAILURE);
+            index += 1;
+        }
+        if (cblc_builder_append_string(builder, " */\n") != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (out_emitted)
+            *out_emitted = 1;
+        return (FT_SUCCESS);
+    }
+    if (!include)
+    {
+        if (out_emitted)
+            *out_emitted = 0;
+        return (FT_SUCCESS);
+    }
+    {
+        const t_ast_node *clause;
+        size_t index;
+        size_t count;
+        int has_pairs;
+
+        clause = cobol_reverse_copybook_find_replacing_clause(include);
+        if (!clause)
+        {
+            if (out_emitted)
+                *out_emitted = 0;
+            return (FT_SUCCESS);
+        }
+        count = ast_node_child_count(clause);
+        has_pairs = 0;
+        index = 0;
+        while (index < count)
+        {
+            const t_ast_node *candidate;
+
+            candidate = ast_node_get_child(clause, index);
+            if (candidate && candidate->kind == AST_NODE_COPYBOOK_REPLACING_PAIR)
+            {
+                has_pairs = 1;
+                break ;
+            }
+            index += 1;
+        }
+        if (!has_pairs)
+        {
+            if (out_emitted)
+                *out_emitted = 0;
+            return (FT_SUCCESS);
+        }
+        if (cblc_builder_append_string(builder, "/* copybook replacements:\n") != FT_SUCCESS)
+            return (FT_FAILURE);
+        index = 0;
+        while (index < count)
+        {
+            const t_ast_node *pair;
+            const t_ast_node *source;
+            const t_ast_node *target;
+
+            pair = ast_node_get_child(clause, index);
+            if (!pair || pair->kind != AST_NODE_COPYBOOK_REPLACING_PAIR)
+            {
+                index += 1;
+                continue ;
+            }
+            source = ast_node_get_child(pair, 0);
+            target = ast_node_get_child(pair, 1);
+            if (!source || source->kind != AST_NODE_COPYBOOK_REPLACING_TEXT)
+                return (FT_FAILURE);
+            if (!target || target->kind != AST_NODE_COPYBOOK_REPLACING_TEXT)
+                return (FT_FAILURE);
+            if (cblc_builder_append_string(builder, " * - ") != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (pair->flags & AST_NODE_FLAG_COPYBOOK_PAIR_LEADING)
+            {
+                if (cblc_builder_append_string(builder, "leading ") != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            else if (pair->flags & AST_NODE_FLAG_COPYBOOK_PAIR_TRAILING)
+            {
+                if (cblc_builder_append_string(builder, "trailing ") != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            if (cobol_reverse_emit_copybook_replacing_text(builder, source) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (cblc_builder_append_string(builder, " -> ") != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (cobol_reverse_emit_copybook_replacing_text(builder, target) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (cblc_builder_append_string(builder, "\n") != FT_SUCCESS)
+                return (FT_FAILURE);
+            index += 1;
+        }
+        if (cblc_builder_append_string(builder, " */\n") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (out_emitted)
+        *out_emitted = 1;
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_emit_copybook_items_comment(t_cblc_builder *builder,
+    const t_transpiler_copybook *copybook, int *out_emitted)
+{
+    size_t index;
+    int wrote_any;
+
+    if (!builder)
+        return (FT_FAILURE);
+    if (!copybook)
+        return (FT_FAILURE);
+    if (!copybook->items || copybook->item_count == 0)
+    {
+        if (out_emitted)
+            *out_emitted = 0;
+        return (FT_SUCCESS);
+    }
+    index = 0;
+    wrote_any = 0;
+    while (index < copybook->item_count)
+    {
+        const t_transpiler_copybook_item *item;
+
+        item = &copybook->items[index];
+        if (item->name[0] != '\0' || item->declared_length > 0 || item->kind != TRANSPILE_DATA_ITEM_UNKNOWN
+            || item->is_read_only)
+        {
+            wrote_any = 1;
+            break ;
+        }
+        index += 1;
+    }
+    if (!wrote_any)
+    {
+        if (out_emitted)
+            *out_emitted = 0;
+        return (FT_SUCCESS);
+    }
+    if (cblc_builder_append_string(builder, "/* copybook exports:\n") != FT_SUCCESS)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < copybook->item_count)
+    {
+        const t_transpiler_copybook_item *item;
+
+        item = &copybook->items[index];
+        if (item->name[0] == '\0' && item->declared_length == 0
+            && item->kind == TRANSPILE_DATA_ITEM_UNKNOWN && !item->is_read_only)
+        {
+            index += 1;
+            continue ;
+        }
+        if (cblc_builder_append_string(builder, " * - ") != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (item->name[0] != '\0')
+        {
+            if (cblc_builder_append_string(builder, item->name) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        else
+        {
+            if (cblc_builder_append_string(builder, "<unnamed>") != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        if (cblc_builder_append_string(builder, " (") != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_builder_append_string(builder,
+                cobol_reverse_copybook_item_kind_label(item->kind)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (item->declared_length > 0)
+        {
+            if (cblc_builder_append_string(builder, ", len=") != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (cblc_builder_append_unsigned(builder,
+                    static_cast<unsigned long long>(item->declared_length)) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        if (item->is_read_only)
+        {
+            if (cblc_builder_append_string(builder, ", read-only") != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        if (cblc_builder_append_string(builder, ")\n") != FT_SUCCESS)
+            return (FT_FAILURE);
+        index += 1;
+    }
+    if (cblc_builder_append_string(builder, " */\n") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (out_emitted)
+        *out_emitted = 1;
+    return (FT_SUCCESS);
+}
+
+static int cobol_reverse_emit_copybook_dependencies_comment(t_cblc_builder *builder,
+    const t_transpiler_copybook *copybook, int *out_emitted)
+{
+    size_t index;
+    int has_dependencies;
+
+    if (!builder)
+        return (FT_FAILURE);
+    if (!copybook)
+        return (FT_FAILURE);
+    if (!copybook->dependencies || copybook->dependency_count == 0)
+    {
+        if (out_emitted)
+            *out_emitted = 0;
+        return (FT_SUCCESS);
+    }
+    has_dependencies = 0;
+    index = 0;
+    while (index < copybook->dependency_count)
+    {
+        if (copybook->dependencies[index][0] != '\0')
+        {
+            has_dependencies = 1;
+            break ;
+        }
+        index += 1;
+    }
+    if (!has_dependencies)
+    {
+        if (out_emitted)
+            *out_emitted = 0;
+        return (FT_SUCCESS);
+    }
+    if (cblc_builder_append_string(builder, "/* copybook dependencies:\n") != FT_SUCCESS)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < copybook->dependency_count)
+    {
+        if (copybook->dependencies[index][0] == '\0')
+        {
+            index += 1;
+            continue ;
+        }
+        if (cblc_builder_append_string(builder, " * - ") != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_builder_append_string(builder, copybook->dependencies[index]) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_builder_append_string(builder, "\n") != FT_SUCCESS)
+            return (FT_FAILURE);
+        index += 1;
+    }
+    if (cblc_builder_append_string(builder, " */\n") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (out_emitted)
+        *out_emitted = 1;
+    return (FT_SUCCESS);
+}
+
 static int cobol_reverse_emit_copybook_include(t_transpiler_context *context, t_cblc_builder *builder,
     const t_ast_node *include)
 {
     const t_ast_node *name_node;
     const t_transpiler_copybook *copybook;
+    const char *display_name;
+    const t_ast_node *replacing_node;
+    int items_emitted;
+    int dependencies_emitted;
+    int replacements_emitted;
 
     if (!builder)
         return (FT_FAILURE);
@@ -2880,16 +3397,42 @@ static int cobol_reverse_emit_copybook_include(t_transpiler_context *context, t_
             cobol_reverse_emit_error(context, "COPY statement refers to unknown copybook");
         return (FT_FAILURE);
     }
+    display_name = NULL;
+    if (copybook->canonical_name[0] != '\0')
+        display_name = copybook->canonical_name;
+    else if (copybook->name[0] != '\0')
+        display_name = copybook->name;
+    else if (name_node->token.lexeme)
+        display_name = name_node->token.lexeme;
+    if (!display_name)
+        return (FT_FAILURE);
     if (cblc_builder_append_string(builder, "copy \"") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (cblc_builder_append_span(builder, name_node->token.lexeme,
-            name_node->token.length) != FT_SUCCESS)
+    if (cblc_builder_append_string(builder, display_name) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (cblc_builder_append_string(builder, "\";") != FT_SUCCESS)
+    if (cblc_builder_append_string(builder, "\"") != FT_SUCCESS)
+        return (FT_FAILURE);
+    replacing_node = cobol_reverse_copybook_find_replacing_clause(include);
+    if (replacing_node)
+    {
+        if (cobol_reverse_emit_copybook_replacing_clause(builder, include, replacing_node) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (cblc_builder_append_string(builder, ";") != FT_SUCCESS)
         return (FT_FAILURE);
     if (cblc_builder_append_newline(builder) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (copybook->item_count == 0)
+    replacements_emitted = 0;
+    if (cobol_reverse_emit_copybook_replacements_comment(builder, copybook, include,
+            &replacements_emitted) != FT_SUCCESS)
+        return (FT_FAILURE);
+    items_emitted = 0;
+    if (cobol_reverse_emit_copybook_items_comment(builder, copybook, &items_emitted) != FT_SUCCESS)
+        return (FT_FAILURE);
+    dependencies_emitted = 0;
+    if (cobol_reverse_emit_copybook_dependencies_comment(builder, copybook, &dependencies_emitted) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (!replacements_emitted && !items_emitted && !dependencies_emitted)
     {
         if (cblc_builder_append_string(builder, "/* copybook had no registered items */\n") != FT_SUCCESS)
             return (FT_FAILURE);
