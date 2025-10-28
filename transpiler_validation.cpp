@@ -24,7 +24,8 @@ int transpiler_validate_generated_cblc(const char *text)
         entry_index = unit.entry_function_index;
         if (entry_index == static_cast<size_t>(-1) || entry_index >= unit.function_count)
             entry_index = 0;
-        if (!unit.functions[entry_index].saw_return)
+        if (unit.functions[entry_index].return_kind != CBLC_FUNCTION_RETURN_VOID
+            && !unit.functions[entry_index].saw_return)
         {
             cblc_translation_unit_dispose(&unit);
             return (FT_FAILURE);

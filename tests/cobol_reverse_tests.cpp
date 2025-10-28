@@ -314,10 +314,11 @@ FT_TEST(test_cobol_reverse_respects_occurs_depending_on_bounds)
 
     source = "IDENTIFICATION DIVISION.\n"
         "PROGRAM-ID. OCCURS-DEMO.\n"
+        "ENVIRONMENT DIVISION.\n"
         "DATA DIVISION.\n"
         "WORKING-STORAGE SECTION.\n"
         "01 ENTRY-COUNT PIC 9(4).\n"
-        "01 TABLE-ITEM OCCURS 1 TO 5 TIMES DEPENDING ON ENTRY-COUNT PIC X(8).\n"
+        "01 TABLE-ITEM PIC X(8) OCCURS 1 TO 5 TIMES DEPENDING ON ENTRY-COUNT.\n"
         "PROCEDURE DIVISION.\n"
         "MAIN.\n"
         "    STOP RUN.\n";

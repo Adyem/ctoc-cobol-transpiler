@@ -21,7 +21,7 @@ FT_TEST(test_transpiler_validation_rejects_cblc_without_return)
 {
     const char *source;
 
-    source = "function void main()\n"
+    source = "function int main()\n"
         "{\n"
         "    display(\"HELLO\");\n"
         "}\n";

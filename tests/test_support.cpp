@@ -12,7 +12,6 @@ static int g_checked_cobc = 0;
 static int g_has_cobc = 0;
 static int g_checked_forward_translation = 0;
 static int g_forward_translation_supported = 0;
-static int g_reported_forward_translation_skip = 0;
 
 static int test_parse_truthy_env(const char *value)
 {
@@ -198,15 +197,24 @@ int test_forward_translation_available(void)
     return (g_forward_translation_supported);
 }
 
-void test_report_forward_translation_skip(const char *test_name)
+int test_require_cobc_dependency(const char *test_name)
 {
-    if (g_reported_forward_translation_skip)
-        return ;
-    g_reported_forward_translation_skip = 1;
-    if (!test_name)
-        test_name = "forward translation";
-    pf_printf("Skipping %s: install 'cobc' to exercise forward translation (override with CTOC_ENABLE_FORWARD_TRANSLATION=1).\n",
-        test_name);
+    if (test_cobc_available())
+        return (FT_SUCCESS);
+    if (!test_name || test_name[0] == '\0')
+        test_name = "COBOL compiler dependent test";
+    pf_printf("Missing dependency: install 'cobc' to run %s.\n", test_name);
+    return (FT_FAILURE);
+}
+
+int test_require_forward_translation_dependency(const char *test_name)
+{
+    if (test_forward_translation_available())
+        return (FT_SUCCESS);
+    if (!test_name || test_name[0] == '\0')
+        test_name = "forward translation test";
+    pf_printf("Missing dependency: install 'cobc' or set CTOC_ENABLE_FORWARD_TRANSLATION=1 to run %s.\n", test_name);
+    return (FT_FAILURE);
 }
 
 static void test_format_index(size_t value, char *buffer, size_t buffer_size)

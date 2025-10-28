@@ -21,6 +21,92 @@ static int pipeline_emit_error(t_transpiler_context *context, const char *messag
     return (FT_FAILURE);
 }
 
+static std::filesystem::path pipeline_normalize_path(const char *path)
+{
+    std::error_code error;
+    std::filesystem::path fs_path;
+    std::filesystem::path absolute_path;
+
+    if (!path)
+        return (std::filesystem::path());
+    fs_path = std::filesystem::path(path);
+    absolute_path = std::filesystem::absolute(fs_path, error);
+    if (!error)
+        return (absolute_path.lexically_normal());
+    return (fs_path.lexically_normal());
+}
+
+static int pipeline_paths_equal(const char *lhs, const char *rhs)
+{
+    std::filesystem::path lhs_path;
+    std::filesystem::path rhs_path;
+
+    if (!lhs || !rhs)
+        return (0);
+    lhs_path = pipeline_normalize_path(lhs);
+    rhs_path = pipeline_normalize_path(rhs);
+    if (lhs_path == rhs_path)
+        return (1);
+    return (0);
+}
+
+static int pipeline_detect_source_conflict(const t_transpiler_context *context, const char *resolved_path,
+    size_t *conflict_index)
+{
+    size_t index;
+
+    if (conflict_index)
+        *conflict_index = static_cast<size_t>(-1);
+    if (!context || !resolved_path)
+        return (0);
+    index = 0;
+    while (index < context->source_count)
+    {
+        if (pipeline_paths_equal(resolved_path, context->source_paths[index]))
+        {
+            if (conflict_index)
+                *conflict_index = index;
+            return (1);
+        }
+        index += 1;
+    }
+    return (0);
+}
+
+static const t_transpiler_standard_library_entry *pipeline_detect_standard_library_conflict(const char *resolved_path)
+{
+    const t_transpiler_standard_library_entry *entries;
+    const char *filename;
+    const char *cursor;
+    size_t entry_count;
+    size_t index;
+    char candidate[TRANSPILE_FILE_PATH_MAX];
+
+    if (!resolved_path)
+        return (NULL);
+    filename = resolved_path;
+    cursor = resolved_path;
+    while (*cursor != '\0')
+    {
+        if (*cursor == '/' || *cursor == '\\')
+            filename = cursor + 1;
+        cursor += 1;
+    }
+    if (filename[0] == '\0')
+        return (NULL);
+    entries = transpiler_standard_library_get_entries(&entry_count);
+    index = 0;
+    while (index < entry_count)
+    {
+        if (pf_snprintf(candidate, sizeof(candidate), "%s.cob", entries[index].program_name) < 0)
+            return (NULL);
+        if (ft_strncmp(filename, candidate, ft_strlen(candidate) + 1) == 0)
+            return (&entries[index]);
+        index += 1;
+    }
+    return (NULL);
+}
+
 static int pipeline_select_cache_manifest(const t_transpiler_context *context, char *buffer, size_t buffer_size)
 {
     const char *directory;
@@ -400,6 +486,7 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
     int status;
     char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
     unsigned long long copybook_signature;
+    const t_transpiler_standard_library_entry *stdlib_entry;
 
     if (!context || !input_path || !output_path)
         return (FT_FAILURE);
@@ -417,6 +504,26 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
     if (pipeline_resolve_output_path(context, output_path, resolved_path, sizeof(resolved_path)) != FT_SUCCESS)
     {
         if (pf_snprintf(message, sizeof(message), "Unable to resolve output path for '%s'", output_path) >= 0)
+            (void)pipeline_emit_error(context, message);
+        goto cleanup;
+    }
+    size_t conflict_index;
+
+    conflict_index = static_cast<size_t>(-1);
+    if (pipeline_detect_source_conflict(context, resolved_path, &conflict_index))
+    {
+        if (conflict_index != static_cast<size_t>(-1)
+            && conflict_index < context->source_count)
+        {
+            if (pf_snprintf(message, sizeof(message),
+                    "Output path '%s' for source '%s' matches input source '%s'; refusing to overwrite",
+                    resolved_path, input_path, context->source_paths[conflict_index]) >= 0)
+                (void)pipeline_emit_error(context, message);
+        }
+        else if (pf_snprintf(message, sizeof(message),
+                     "Output path '%s' for source '%s' matches an input source; refusing to overwrite",
+                     resolved_path, input_path)
+            >= 0)
             (void)pipeline_emit_error(context, message);
         goto cleanup;
     }
@@ -546,6 +653,15 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
                 (void)pipeline_emit_error(context, message);
             goto cleanup;
         }
+    }
+    stdlib_entry = pipeline_detect_standard_library_conflict(resolved_path);
+    if (stdlib_entry)
+    {
+        if (pf_snprintf(message, sizeof(message),
+                "Output file '%s' for source '%s' matches standard library program '%s'; refusing to emit",
+                resolved_path, input_path, stdlib_entry->program_name) >= 0)
+            (void)pipeline_emit_error(context, message);
+        goto cleanup;
     }
     if (pipeline_write_file(resolved_path, formatted_text) != FT_SUCCESS)
     {
@@ -850,7 +966,8 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
             entry_index = unit->entry_function_index;
             if (entry_index == static_cast<size_t>(-1) || entry_index >= unit->function_count)
                 entry_index = 0;
-            if (!unit->functions[entry_index].saw_return)
+            if (unit->functions[entry_index].return_kind != CBLC_FUNCTION_RETURN_VOID
+                && !unit->functions[entry_index].saw_return)
             {
                 if (pf_snprintf(message, sizeof(message),
                         "CBL-C source '%s' is missing a terminating return;", context->source_paths[index]) >= 0)
@@ -985,6 +1102,29 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
         {
             if (pf_snprintf(message, sizeof(message), "Unable to resolve output path for '%s'",
                     context->target_paths[source_index]) >= 0)
+                (void)pipeline_emit_error(context, message);
+            if (generated_text)
+                cma_free(generated_text);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        size_t conflict_index;
+
+        conflict_index = static_cast<size_t>(-1);
+        if (pipeline_detect_source_conflict(context, resolved_path, &conflict_index))
+        {
+            if (conflict_index != static_cast<size_t>(-1)
+                && conflict_index < context->source_count)
+            {
+                if (pf_snprintf(message, sizeof(message),
+                        "Output path '%s' for source '%s' matches input source '%s'; refusing to overwrite",
+                        resolved_path, ordered_source_paths[index], context->source_paths[conflict_index]) >= 0)
+                    (void)pipeline_emit_error(context, message);
+            }
+            else if (pf_snprintf(message, sizeof(message),
+                         "Output path '%s' for source '%s' matches an input source; refusing to overwrite",
+                         resolved_path, ordered_source_paths[index])
+                >= 0)
                 (void)pipeline_emit_error(context, message);
             if (generated_text)
                 cma_free(generated_text);
@@ -1128,7 +1268,8 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
             entry_index = unit->entry_function_index;
             if (entry_index == static_cast<size_t>(-1) || entry_index >= unit->function_count)
                 entry_index = 0;
-            if (!unit->functions[entry_index].saw_return)
+            if (unit->functions[entry_index].return_kind != CBLC_FUNCTION_RETURN_VOID
+                && !unit->functions[entry_index].saw_return)
             {
                 if (pf_snprintf(message, sizeof(message),
                         "CBL-C source '%s' is missing a terminating return;", context->source_paths[index]) >= 0)
@@ -1269,6 +1410,38 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
         {
             if (pf_snprintf(message, sizeof(message), "Unable to resolve output path for '%s'",
                     context->target_paths[source_index]) >= 0)
+                (void)pipeline_emit_error(context, message);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        size_t conflict_index;
+        const t_transpiler_standard_library_entry *stdlib_entry;
+
+        conflict_index = static_cast<size_t>(-1);
+        if (pipeline_detect_source_conflict(context, resolved_path, &conflict_index))
+        {
+            if (conflict_index != static_cast<size_t>(-1)
+                && conflict_index < context->source_count)
+            {
+                if (pf_snprintf(message, sizeof(message),
+                        "Output path '%s' for source '%s' matches input source '%s'; refusing to overwrite",
+                        resolved_path, ordered_source_paths[index], context->source_paths[conflict_index]) >= 0)
+                    (void)pipeline_emit_error(context, message);
+            }
+            else if (pf_snprintf(message, sizeof(message),
+                         "Output path '%s' for source '%s' matches an input source; refusing to overwrite",
+                         resolved_path, ordered_source_paths[index])
+                >= 0)
+                (void)pipeline_emit_error(context, message);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        stdlib_entry = pipeline_detect_standard_library_conflict(resolved_path);
+        if (stdlib_entry)
+        {
+            if (pf_snprintf(message, sizeof(message),
+                    "Output file '%s' for source '%s' matches standard library program '%s'; refusing to emit",
+                    resolved_path, ordered_source_paths[index], stdlib_entry->program_name) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
             goto cleanup;

@@ -95,7 +95,8 @@ static int parser_parse_picture_clause(t_parser *parser, t_ast_node **out_node)
     while (parser->has_current)
     {
         if (parser->current.kind == LEXER_TOKEN_PERIOD
-            || parser->current.kind == LEXER_TOKEN_KEYWORD_VALUE)
+            || parser->current.kind == LEXER_TOKEN_KEYWORD_VALUE
+            || parser->current.kind == LEXER_TOKEN_KEYWORD_OCCURS)
             break ;
         if (!parser->current.lexeme || parser->current.length == 0)
         {

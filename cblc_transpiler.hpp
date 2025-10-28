@@ -891,6 +891,12 @@ typedef enum e_cblc_data_kind
     CBLC_DATA_KIND_STRING
 }   t_cblc_data_kind;
 
+typedef enum e_cblc_function_return_kind
+{
+    CBLC_FUNCTION_RETURN_VOID = 0,
+    CBLC_FUNCTION_RETURN_INT
+}   t_cblc_function_return_kind;
+
 #define TRANSPILE_STATEMENT_TEXT_MAX 256
 
 typedef struct s_cblc_data_item
@@ -916,7 +922,9 @@ typedef enum e_cblc_statement_type
     CBLC_STATEMENT_ASSIGNMENT,
     CBLC_STATEMENT_DISPLAY,
     CBLC_STATEMENT_COMPUTE,
-    CBLC_STATEMENT_CALL
+    CBLC_STATEMENT_CALL,
+    CBLC_STATEMENT_CALL_ASSIGN,
+    CBLC_STATEMENT_RETURN
 }   t_cblc_statement_type;
 
 typedef struct s_cblc_statement
@@ -937,6 +945,10 @@ typedef struct s_cblc_function
     size_t statement_count;
     size_t statement_capacity;
     int saw_return;
+    t_cblc_function_return_kind return_kind;
+    int return_item_index;
+    char return_cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    char return_source_name[TRANSPILE_IDENTIFIER_MAX];
 }   t_cblc_function;
 
 typedef struct s_cblc_translation_unit

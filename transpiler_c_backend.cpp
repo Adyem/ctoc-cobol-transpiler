@@ -719,6 +719,53 @@ static int c_backend_emit_call(const t_cblc_statement *statement, t_c_backend_bu
     return (FT_SUCCESS);
 }
 
+static int c_backend_emit_call_assignment(const t_cblc_translation_unit *unit,
+    const t_cblc_statement *statement, t_c_backend_buffer *buffer)
+{
+    char target[TRANSPILE_IDENTIFIER_MAX];
+
+    if (!unit || !statement || !buffer)
+        return (FT_FAILURE);
+    if (statement->call_identifier[0] == '\0')
+        return (FT_FAILURE);
+    if (c_backend_map_identifier_to_c(unit, statement->target, target,
+            sizeof(target)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (c_backend_buffer_append_format_line(buffer, "    %s = %s();", target,
+            statement->call_identifier) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int c_backend_emit_return(const t_cblc_translation_unit *unit,
+    const t_cblc_function *function, const t_cblc_statement *statement,
+    t_c_backend_buffer *buffer)
+{
+    if (!function || !statement || !buffer)
+        return (FT_FAILURE);
+    if (function->return_kind == CBLC_FUNCTION_RETURN_VOID)
+    {
+        if (c_backend_buffer_append_line(buffer, "    return ;") != FT_SUCCESS)
+            return (FT_FAILURE);
+        return (FT_SUCCESS);
+    }
+    if (!unit)
+        return (FT_FAILURE);
+    if (statement->source[0] == '\0')
+        return (FT_FAILURE);
+    {
+        char expression[TRANSPILE_STATEMENT_TEXT_MAX];
+
+        if (c_backend_translate_expression(unit, statement->source, expression,
+                sizeof(expression)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (c_backend_buffer_append_format_line(buffer, "    return (%s);",
+                expression) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
 static int c_backend_emit_helper_functions(t_c_backend_buffer *buffer)
 {
     const t_transpiler_runtime_helper_entry *entries;
@@ -741,6 +788,15 @@ static int c_backend_emit_helper_functions(t_c_backend_buffer *buffer)
         index += 1;
     }
     return (FT_SUCCESS);
+}
+
+static const char *c_backend_function_return_type(const t_cblc_function *function)
+{
+    if (!function)
+        return ("void");
+    if (function->return_kind == CBLC_FUNCTION_RETURN_INT)
+        return ("int");
+    return ("void");
 }
 int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
 {
@@ -868,15 +924,19 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
         const t_cblc_function *function;
 
         function = &unit->functions[index];
+        const char *return_type;
+
+        return_type = c_backend_function_return_type(function);
         if (generate_main && index == entry_index)
         {
-            if (c_backend_buffer_append_line(&buffer, "static void cblc_entry_main(void);") != FT_SUCCESS)
+            if (c_backend_buffer_append_format_line(&buffer,
+                    "static %s cblc_entry_main(void);", return_type) != FT_SUCCESS)
                 goto cleanup;
         }
         else
         {
             if (c_backend_buffer_append_format_line(&buffer,
-                    "void %s(void);", function->source_name) != FT_SUCCESS)
+                    "%s %s(void);", return_type, function->source_name) != FT_SUCCESS)
                 goto cleanup;
         }
         index += 1;
@@ -892,10 +952,23 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
             goto cleanup;
         if (c_backend_buffer_append_line(&buffer, "{") != FT_SUCCESS)
             goto cleanup;
-        if (c_backend_buffer_append_line(&buffer, "    cblc_entry_main();") != FT_SUCCESS)
-            goto cleanup;
-        if (c_backend_buffer_append_line(&buffer, "    return (0);") != FT_SUCCESS)
-            goto cleanup;
+        if (entry_function && entry_function->return_kind != CBLC_FUNCTION_RETURN_VOID)
+        {
+            if (c_backend_buffer_append_line(&buffer, "    int result;") != FT_SUCCESS)
+                goto cleanup;
+            if (c_backend_buffer_append_line(&buffer,
+                    "    result = cblc_entry_main();") != FT_SUCCESS)
+                goto cleanup;
+            if (c_backend_buffer_append_line(&buffer, "    return (result);") != FT_SUCCESS)
+                goto cleanup;
+        }
+        else
+        {
+            if (c_backend_buffer_append_line(&buffer, "    cblc_entry_main();") != FT_SUCCESS)
+                goto cleanup;
+            if (c_backend_buffer_append_line(&buffer, "    return (0);") != FT_SUCCESS)
+                goto cleanup;
+        }
         if (c_backend_buffer_append_line(&buffer, "}") != FT_SUCCESS)
             goto cleanup;
         if (c_backend_buffer_append_line(&buffer, "") != FT_SUCCESS)
@@ -913,13 +986,20 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
         is_entry = generate_main && index == entry_index;
         if (is_entry)
         {
-            if (c_backend_buffer_append_line(&buffer, "static void cblc_entry_main(void)") != FT_SUCCESS)
+            const char *return_type;
+
+            return_type = c_backend_function_return_type(function);
+            if (c_backend_buffer_append_format_line(&buffer,
+                    "static %s cblc_entry_main(void)", return_type) != FT_SUCCESS)
                 goto cleanup;
         }
         else
         {
+            const char *return_type;
+
+            return_type = c_backend_function_return_type(function);
             if (c_backend_buffer_append_format_line(&buffer,
-                    "void %s(void)", function->source_name) != FT_SUCCESS)
+                    "%s %s(void)", return_type, function->source_name) != FT_SUCCESS)
                 goto cleanup;
         }
         if (c_backend_buffer_append_line(&buffer, "{") != FT_SUCCESS)
@@ -953,6 +1033,18 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
             else if (statement->type == CBLC_STATEMENT_CALL)
             {
                 if (c_backend_emit_call(statement, &buffer) != FT_SUCCESS)
+                    goto cleanup;
+            }
+            else if (statement->type == CBLC_STATEMENT_CALL_ASSIGN)
+            {
+                if (c_backend_emit_call_assignment(unit, statement, &buffer)
+                    != FT_SUCCESS)
+                    goto cleanup;
+            }
+            else if (statement->type == CBLC_STATEMENT_RETURN)
+            {
+                if (c_backend_emit_return(unit, function, statement, &buffer)
+                    != FT_SUCCESS)
                     goto cleanup;
             }
             else

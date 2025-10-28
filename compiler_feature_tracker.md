@@ -33,15 +33,15 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Provide semantic analysis for type checking, scope resolution, and file/record validation.
 - [x] Surface semantic diagnostics through the existing diagnostics subsystem.
 - [x] Package CLI usage examples and documentation for the design doc.
-- [x] Map file declarations to ENVIRONMENT/DATA DIVISION blocks with inferred record sizes.
+- [ ] Map file declarations to ENVIRONMENT/DATA DIVISION blocks with inferred record sizes.
 - [x] Encode data type mappings and formatting helpers for elementary items and groups.
-- [x] Emit procedural COBOL for control flow (IF, PERFORM UNTIL, PERFORM VARYING) matching CBL-C semantics.
+- [ ] Emit procedural COBOL for control flow (IF, PERFORM UNTIL, PERFORM VARYING) matching CBL-C semantics.
 - [x] Generate COBOL paragraphs for user-defined functions or reusable blocks.
 - [x] Support arithmetic, comparisons, and string operations using libft helpers where necessary.
 - [x] Implement formatting and indentation rules for generated COBOL source.
 - [x] Establish golden-file tests for representative snippets covering both translation directions.
 - [x] Add round-trip tests to ensure COBOL emitted from CBL-C re-parses to the original program.
-- [x] Forward CBL-C samples translate successfully when the COBOL toolchain is available; parser and generator coverage keeps
+- [ ] Forward CBL-C samples translate successfully when the COBOL toolchain is available; parser and generator coverage keeps
       the round-trip suites under `tests/compiler/cobol/` passing by default.
 - [x] Parse the ANSI-85 subset of COBOL targeted by the forward compiler.
 - [x] Audit existing runtime helpers for compatibility with libft memory allocation patterns.
@@ -107,6 +107,7 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Condition names (`LEVEL 88`): surface boolean enumerations when translating COBOL back to CBL-C so VALUE clauses and SET/IF checks round-trip without manual rewrites.
 - [x] OCCURS DEPENDING ON: thread runtime upper bounds through layout analysis so both emitters size tables correctly and flag missing controlling values.
 - [ ] RENAMES groups: retain alias relationships during semantic lowering so reverse translation can recover original DATA DIVISION overlays.
+- [ ] Forward file I/O: parse CBL-C `file` declarations and `open`/`read`/`write` statements, emit COBOL file-control and data-division structures, and translate loop/end-of-file handling so samples like `copy_file.cblc` execute.
 
 ### Core Language Frontend
 - [ ] Parse COBOL `ALTER` and `ENTRY` statements and lower them into structured equivalents in the shared IR so legacy flow control can round-trip.
