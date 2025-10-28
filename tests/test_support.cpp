@@ -12,6 +12,8 @@ static int g_checked_cobc = 0;
 static int g_has_cobc = 0;
 static int g_checked_forward_translation = 0;
 static int g_forward_translation_supported = 0;
+static int g_forward_translation_requested = 0;
+static int g_forward_translation_notice_emitted = 0;
 
 static int test_parse_truthy_env(const char *value)
 {
@@ -27,6 +29,22 @@ static int test_parse_truthy_env(const char *value)
         && value[2] == '\0')
         return (1);
     return (0);
+}
+
+static void test_forward_translation_probe(void)
+{
+    const char *env;
+
+    if (g_checked_forward_translation)
+        return ;
+    g_checked_forward_translation = 1;
+    g_forward_translation_supported = 0;
+    g_forward_translation_requested = 0;
+    env = getenv("CTOC_ENABLE_FORWARD_TRANSLATION");
+    if (env && test_parse_truthy_env(env))
+        g_forward_translation_requested = 1;
+    if (g_forward_translation_requested && test_cobc_available())
+        g_forward_translation_supported = 1;
 }
 
 static int test_capture_stream_begin(t_test_output_capture *capture, int fd)
@@ -177,24 +195,16 @@ int test_cobc_available(void)
 
 int test_forward_translation_available(void)
 {
-    const char *env;
-
-    if (g_checked_forward_translation)
-        return (g_forward_translation_supported);
-    g_checked_forward_translation = 1;
-    env = getenv("CTOC_ENABLE_FORWARD_TRANSLATION");
-    if (env)
-    {
-        g_forward_translation_supported = test_parse_truthy_env(env);
-        return (g_forward_translation_supported);
-    }
-    if (test_cobc_available())
-    {
-        g_forward_translation_supported = 1;
-        return (g_forward_translation_supported);
-    }
-    g_forward_translation_supported = 0;
+    if (!g_checked_forward_translation)
+        test_forward_translation_probe();
     return (g_forward_translation_supported);
+}
+
+int test_forward_translation_requested(void)
+{
+    if (!g_checked_forward_translation)
+        test_forward_translation_probe();
+    return (g_forward_translation_requested);
 }
 
 int test_require_cobc_dependency(const char *test_name)
@@ -209,11 +219,20 @@ int test_require_cobc_dependency(const char *test_name)
 
 int test_require_forward_translation_dependency(const char *test_name)
 {
-    if (test_forward_translation_available())
+    if (!test_forward_translation_requested())
+    {
+        if (!g_forward_translation_notice_emitted)
+        {
+            pf_printf("Skipping forward translation tests; set CTOC_ENABLE_FORWARD_TRANSLATION=1 to enable.\n");
+            g_forward_translation_notice_emitted = 1;
+        }
+        return (FT_SKIP);
+    }
+    if (test_cobc_available())
         return (FT_SUCCESS);
     if (!test_name || test_name[0] == '\0')
         test_name = "forward translation test";
-    pf_printf("Missing dependency: install 'cobc' or set CTOC_ENABLE_FORWARD_TRANSLATION=1 to run %s.\n", test_name);
+    pf_printf("Missing dependency: install 'cobc' to run %s.\n", test_name);
     return (FT_FAILURE);
 }
 

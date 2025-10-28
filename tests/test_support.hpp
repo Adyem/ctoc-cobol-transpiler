@@ -9,6 +9,8 @@
 #include "libft/Printf/printf.hpp"
 #include "cblc_transpiler.hpp"
 
+#define FT_SKIP 2
+
 typedef struct s_test_case
 {
     const char *name;
@@ -67,6 +69,7 @@ int test_write_text_file(const char *path, const char *contents);
 int test_read_text_file(const char *path, char *buffer, size_t buffer_size);
 int test_cobc_available(void);
 int test_forward_translation_available(void);
+int test_forward_translation_requested(void);
 int test_require_cobc_dependency(const char *test_name);
 int test_require_forward_translation_dependency(const char *test_name);
 int test_run_command(const char *command);
@@ -87,7 +90,15 @@ int test_capture_stderr_end(t_test_output_capture *capture, char *buffer, size_t
         return (FT_FAILURE);
 
 #define FT_REQUIRE_FORWARD_TRANSLATION() \
-    if (test_require_forward_translation_dependency(__func__) != FT_SUCCESS) \
-        return (FT_FAILURE);
+    do \
+    { \
+        int _ft_status; \
+ \
+        _ft_status = test_require_forward_translation_dependency(__func__); \
+        if (_ft_status == FT_FAILURE) \
+            return (FT_FAILURE); \
+        if (_ft_status == FT_SKIP) \
+            return (FT_SUCCESS); \
+    } while (0)
 
 #endif
