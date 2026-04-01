@@ -1,5 +1,7 @@
 build_logs/
-automated_tests/
+automated_tests
+ctoc_cobol_transpiler
+imported_test_failures.log
 objs/
 objs_tests/
 samples/example_project/build/
