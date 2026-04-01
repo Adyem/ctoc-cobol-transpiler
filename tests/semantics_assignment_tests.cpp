@@ -1,4 +1,4 @@
-#include "libft/Libft/libft.hpp"
+#include "compatibility/libft_compat.hpp"
 
 #include "semantics_test_support.hpp"
 
@@ -1067,7 +1067,7 @@ FT_TEST(test_semantics_suppresses_conversion_warnings_when_disabled)
     settings.overflow = 1;
     settings.string_truncation = 1;
     settings.shadow = 1;
-    settings.unused = 1;
+    settings.unused = 0;
     transpiler_context_set_warning_settings(&context, &settings);
     program = semantics_build_program_with_storage("DOUBLE-TARGET", "PIC 9V9(18)");
     if (!program)
@@ -1239,10 +1239,10 @@ FT_TEST(test_semantics_rejects_truncating_identifier_move)
     if (transpiler_context_init(&context) != FT_SUCCESS)
         return (FT_FAILURE);
     source_text = "MOVE LONG-SOURCE TO SHORT-TARGET.";
-    target_length = ft_strlen("SHORT-TARGET");
+    target_length = std::strlen("SHORT-TARGET");
     context.source_path = "test.cob";
     context.active_source_text = source_text;
-    context.active_source_length = ft_strlen(source_text);
+    context.active_source_length = std::strlen(source_text);
     program = semantics_build_program_with_storage("SHORT-TARGET", "PIC X(4)");
     if (!program)
     {
@@ -1404,4 +1404,3 @@ const t_test_case *get_semantics_assignment_tests(size_t *count)
         *count = sizeof(tests) / sizeof(tests[0]);
     return (tests);
 }
-

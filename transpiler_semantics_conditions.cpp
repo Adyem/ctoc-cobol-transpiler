@@ -1,4 +1,4 @@
-#include "libft/Printf/printf.hpp"
+#include "compatibility/printf_compat.hpp"
 
 #include "transpiler_semantics_internal.hpp"
 
@@ -32,7 +32,7 @@ static int transpiler_semantics_classify_condition_identifier(const t_ast_node *
     item = transpiler_semantics_scope_lookup(scope, identifier->token.lexeme);
     if (!item)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "condition %s identifier '%s' is not declared in WORKING-STORAGE",
             role, identifier && identifier->token.lexeme ? identifier->token.lexeme : "<unknown>");
         if (transpiler_semantics_emit_invalid_condition(context, message) != FT_SUCCESS)
@@ -78,7 +78,7 @@ static int transpiler_semantics_classify_condition_value(const t_ast_node *value
     {
         char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "condition %s is missing", role);
         return (transpiler_semantics_emit_invalid_condition(context, message));
     }
@@ -126,7 +126,7 @@ static int transpiler_semantics_classify_condition_value(const t_ast_node *value
     {
         char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "condition %s must be an identifier, literal, unary expression, or arithmetic expression",
             role);
         if (transpiler_semantics_emit_invalid_condition(context, message) != FT_SUCCESS)
@@ -187,7 +187,7 @@ int transpiler_semantics_validate_condition(const t_ast_node *condition,
         right = ast_node_get_child(condition, 2);
     if (!left || !operator_node || !right)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "condition is missing left operand, operator, or right operand");
         return (transpiler_semantics_emit_invalid_condition(context, message));
     }
@@ -223,7 +223,7 @@ int transpiler_semantics_validate_condition(const t_ast_node *condition,
             }
             if (!kinds_match)
             {
-                pf_snprintf(message, sizeof(message),
+                std::snprintf(message, sizeof(message),
                     "operands '%s' (%s) and '%s' (%s) are not compatible for comparison",
                     left_name, transpiler_semantics_kind_to_string(left_kind),
                     right_name, transpiler_semantics_kind_to_string(right_kind));
@@ -241,7 +241,7 @@ int transpiler_semantics_validate_condition(const t_ast_node *condition,
             && !transpiler_semantics_is_floating_kind(left_kind)
             && !transpiler_semantics_is_floating_kind(right_kind))
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "numeric comparison requires matching kinds but left operand is %s and right operand is %s",
                 transpiler_semantics_kind_to_string(left_kind),
                 transpiler_semantics_kind_to_string(right_kind));
@@ -259,7 +259,7 @@ int transpiler_semantics_validate_condition(const t_ast_node *condition,
         operator_text = operator_node->token.lexeme ? operator_node->token.lexeme : "<operator>";
         if (!transpiler_semantics_is_numeric_kind(left_kind))
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "relational operator '%s' requires numeric or floating operands but left operand is %s",
                 operator_text, transpiler_semantics_kind_to_string(left_kind));
             if (transpiler_semantics_emit_invalid_condition(context, message) != FT_SUCCESS)
@@ -269,7 +269,7 @@ int transpiler_semantics_validate_condition(const t_ast_node *condition,
         }
         if (!transpiler_semantics_is_numeric_kind(right_kind))
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "relational operator '%s' requires numeric or floating operands but right operand is %s",
                 operator_text, transpiler_semantics_kind_to_string(right_kind));
             if (transpiler_semantics_emit_invalid_condition(context, message) != FT_SUCCESS)
@@ -283,7 +283,7 @@ int transpiler_semantics_validate_condition(const t_ast_node *condition,
             if (!(transpiler_semantics_is_numeric_kind(left_kind)
                     && transpiler_semantics_is_numeric_kind(right_kind)))
             {
-                pf_snprintf(message, sizeof(message),
+                std::snprintf(message, sizeof(message),
                     "relational operator '%s' requires compatible kinds but left operand is %s and right operand is %s",
                     operator_text, transpiler_semantics_kind_to_string(left_kind),
                     transpiler_semantics_kind_to_string(right_kind));
@@ -302,7 +302,7 @@ int transpiler_semantics_validate_condition(const t_ast_node *condition,
         if (left_scale > left_length
             || right_scale > right_length)
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "operands have invalid decimal scale for comparison");
             if (transpiler_semantics_emit_invalid_condition(context, message) != FT_SUCCESS)
                 status = FT_FAILURE;

@@ -23,7 +23,7 @@ FT_TEST(test_runtime_char_from_string_rejects_empty_input)
     runtime_char_set(&character, 'X');
     if (runtime_char_from_string(&character, "") != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_char_from_string should reject empty text\n");
+        std::printf("Assertion failed: runtime_char_from_string should reject empty text\n");
         return (FT_FAILURE);
     }
     if (test_expect_char_equal(character.value, 'X', "runtime_char_from_string should preserve previous value") != FT_SUCCESS)
@@ -38,7 +38,7 @@ FT_TEST(test_runtime_char_from_string_rejects_multi_character_input)
     runtime_char_set(&character, 'Q');
     if (runtime_char_from_string(&character, "YZ") != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_char_from_string should reject multi-character text\n");
+        std::printf("Assertion failed: runtime_char_from_string should reject multi-character text\n");
         return (FT_FAILURE);
     }
     if (test_expect_char_equal(character.value, 'Q',
@@ -57,9 +57,9 @@ FT_TEST(test_runtime_char_to_string_and_compare)
     runtime_char_set(&right, 'Z');
     if (test_expect_success(runtime_char_to_string(left, buffer, sizeof(buffer)), "runtime_char_to_string should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (ft_strncmp(buffer, "X", 2) != 0)
+    if (std::strncmp(buffer, "X", 2) != 0)
     {
-        pf_printf("Assertion failed: runtime_char_to_string should copy character to buffer\n");
+        std::printf("Assertion failed: runtime_char_to_string should copy character to buffer\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(runtime_char_compare(left, right), -1, "runtime_char_compare should order characters") != FT_SUCCESS)

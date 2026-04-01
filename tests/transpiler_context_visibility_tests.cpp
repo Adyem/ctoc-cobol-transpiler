@@ -77,7 +77,7 @@ FT_TEST(test_transpiler_context_rejects_public_duplicate_exports)
             TRANSPILE_FUNCTION_RETURN_VOID, TRANSPILE_SYMBOL_PUBLIC) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected duplicate public export to be rejected\n");
+        std::printf("Assertion failed: expected duplicate public export to be rejected\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 1,
@@ -121,7 +121,7 @@ FT_TEST(test_transpiler_context_allows_private_access_within_module)
     if (!signature)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: private helper should be accessible inside its module\n");
+        std::printf("Assertion failed: private helper should be accessible inside its module\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 0,
@@ -182,7 +182,7 @@ FT_TEST(test_transpiler_context_rejects_private_access_across_modules)
     if (signature)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: cross-module private access should be rejected\n");
+        std::printf("Assertion failed: cross-module private access should be rejected\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 1,
@@ -250,7 +250,7 @@ FT_TEST(test_transpiler_context_allows_public_access_across_modules)
     if (!signature)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: cross-module public access should be permitted\n");
+        std::printf("Assertion failed: cross-module public access should be permitted\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 0,
@@ -299,7 +299,7 @@ FT_TEST(test_transpiler_context_requires_import_for_cross_module_access)
     if (signature)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: cross-module access should require imports\n");
+        std::printf("Assertion failed: cross-module access should require imports\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 1,

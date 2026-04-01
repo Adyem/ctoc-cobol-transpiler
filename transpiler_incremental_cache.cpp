@@ -5,7 +5,7 @@
 #include <string>
 #include <system_error>
 
-#include "libft/CMA/CMA.hpp"
+#include "compatibility/memory_compat.hpp"
 #include "cblc_transpiler.hpp"
 
 static void incremental_cache_entry_reset(t_transpiler_incremental_cache_entry *entry)
@@ -106,8 +106,8 @@ static t_transpiler_incremental_cache_entry *incremental_cache_find_entry(t_tran
     index = 0;
     while (index < cache->entry_count)
     {
-        if (ft_strncmp(cache->entries[index].input_path, input_path, TRANSPILE_FILE_PATH_MAX) == 0
-            && ft_strncmp(cache->entries[index].output_path, output_path, TRANSPILE_FILE_PATH_MAX) == 0)
+        if (std::strncmp(cache->entries[index].input_path, input_path, TRANSPILE_FILE_PATH_MAX) == 0
+            && std::strncmp(cache->entries[index].output_path, output_path, TRANSPILE_FILE_PATH_MAX) == 0)
             return (&cache->entries[index]);
         index += 1;
     }

@@ -52,56 +52,56 @@ FT_TEST(test_cli_standard_library_emits_all_programs)
     created_directory = 1;
     if (cli_standard_library_set_environment("CTOC_SKIP_STANDARD_LIBRARY_VALIDATION", "1") != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: unable to skip standard library validation for CLI run\n");
+        std::printf("Assertion failed: unable to skip standard library validation for CLI run\n");
         goto cleanup;
     }
     validation_env_set = 1;
     status = FT_FAILURE;
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "./ctoc_cobol_transpiler --direction standard-library --output-dir %s",
         directory_template);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
         goto cleanup;
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: standard-library emission command should succeed\n");
+        std::printf("Assertion failed: standard-library emission command should succeed\n");
         goto cleanup;
     }
     index = 0;
     while (index < entry_count)
     {
-        if (pf_snprintf(program_path, sizeof(program_path), "%s/%s.cob", directory_template,
+        if (std::snprintf(program_path, sizeof(program_path), "%s/%s.cob", directory_template,
                 entries[index].program_name) < 0)
             goto cleanup;
         if (test_read_text_file(program_path, file_buffer, sizeof(file_buffer)) != FT_SUCCESS)
         {
-            pf_printf("Assertion failed: standard library program '%s' should be emitted\n",
+            std::printf("Assertion failed: standard library program '%s' should be emitted\n",
                 entries[index].program_name);
             goto cleanup;
         }
-        if (pf_snprintf(identifier, sizeof(identifier), "PROGRAM-ID. %s.",
+        if (std::snprintf(identifier, sizeof(identifier), "PROGRAM-ID. %s.",
                 entries[index].program_name) < 0)
             goto cleanup;
-        if (!ft_strnstr(file_buffer, identifier, ft_strlen(file_buffer)))
+        if (!ft_strnstr(file_buffer, identifier, std::strlen(file_buffer)))
         {
-            pf_printf("Assertion failed: standard library program '%s' should declare PROGRAM-ID\n",
+            std::printf("Assertion failed: standard library program '%s' should declare PROGRAM-ID\n",
                 entries[index].program_name);
             goto cleanup;
         }
         test_remove_file(program_path);
         index += 1;
     }
-    if (pf_snprintf(helper_path, sizeof(helper_path), "%s/cblc_runtime_helpers.c",
+    if (std::snprintf(helper_path, sizeof(helper_path), "%s/cblc_runtime_helpers.c",
             directory_template) < 0)
         goto cleanup;
     if (test_read_text_file(helper_path, file_buffer, sizeof(file_buffer)) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: runtime helper source should be emitted\n");
+        std::printf("Assertion failed: runtime helper source should be emitted\n");
         goto cleanup;
     }
-    if (!ft_strnstr(file_buffer, "#include <stddef.h>", ft_strlen(file_buffer)))
+    if (!ft_strnstr(file_buffer, "#include <stddef.h>", std::strlen(file_buffer)))
     {
-        pf_printf("Assertion failed: runtime helper source should include required headers\n");
+        std::printf("Assertion failed: runtime helper source should include required headers\n");
         goto cleanup;
     }
     test_remove_file(helper_path);
@@ -114,12 +114,12 @@ cleanup:
         index = 0;
         while (index < entry_count)
         {
-            if (pf_snprintf(cleanup_path, sizeof(cleanup_path), "%s/%s.cob", directory_template,
+            if (std::snprintf(cleanup_path, sizeof(cleanup_path), "%s/%s.cob", directory_template,
                     entries[index].program_name) >= 0)
                 test_remove_file(cleanup_path);
             index += 1;
         }
-        if (pf_snprintf(helper_path, sizeof(helper_path), "%s/cblc_runtime_helpers.c",
+        if (std::snprintf(helper_path, sizeof(helper_path), "%s/cblc_runtime_helpers.c",
                 directory_template) >= 0)
             test_remove_file(helper_path);
         rmdir(directory_template);

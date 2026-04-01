@@ -2,7 +2,7 @@
 
 #include "../compiler_test_support.hpp"
 
-#include "libft/CMA/CMA.hpp"
+#include "compatibility/memory_compat.hpp"
 
 #include "round_trip_pipeline_helpers.hpp"
 
@@ -199,10 +199,10 @@ FT_TEST(test_cblc_message_showcase_translates_to_cobol_and_executes)
     if (test_expect_success(transpiler_validate_generated_cobol(generated_cobol),
             "generated COBOL should validate") != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(generated_cobol, expected_cobol,
-            ft_strlen(expected_cobol) + 1) != 0)
+    if (std::strncmp(generated_cobol, expected_cobol,
+            std::strlen(expected_cobol) + 1) != 0)
     {
-        pf_printf("Assertion failed: translated message_showcase COBOL should match expected text\n");
+        std::printf("Assertion failed: translated message_showcase COBOL should match expected text\n");
         goto cleanup;
     }
     if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
@@ -234,7 +234,7 @@ FT_TEST(test_cblc_message_showcase_translates_to_cobol_and_executes)
         goto cleanup;
     if (test_expect_transcript_equal(output_buffer, expected_output) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: translated message_showcase binary should emit expected output\\n");
+        std::printf("Assertion failed: translated message_showcase binary should emit expected output\\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -269,12 +269,12 @@ FT_TEST(test_message_showcase_sample_make_pipeline)
     command_status = 0;
     if (test_run_command_capture_status(clean_command, &command_status) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: expected to invoke sample clean pipeline\\n");
+        std::printf("Assertion failed: expected to invoke sample clean pipeline\\n");
         goto cleanup;
     }
     if (command_status != 0)
     {
-        pf_printf("Assertion failed: sample clean pipeline exited with status %d\\n",
+        std::printf("Assertion failed: sample clean pipeline exited with status %d\\n",
             command_status);
         goto cleanup;
     }
@@ -287,12 +287,12 @@ FT_TEST(test_message_showcase_sample_make_pipeline)
     if (test_run_command_capture_status("cd samples/feature_showcase && make", &command_status)
         != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: expected to invoke sample make pipeline\\n");
+        std::printf("Assertion failed: expected to invoke sample make pipeline\\n");
         goto cleanup;
     }
     if (command_status != 0)
     {
-        pf_printf("Assertion failed: sample make pipeline exited with status %d\\n",
+        std::printf("Assertion failed: sample make pipeline exited with status %d\\n",
             command_status);
         goto cleanup;
     }
@@ -301,12 +301,12 @@ FT_TEST(test_message_showcase_sample_make_pipeline)
             &command_status)
         != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: expected to execute sample showcase binary\\n");
+        std::printf("Assertion failed: expected to execute sample showcase binary\\n");
         goto cleanup;
     }
     if (command_status != 0)
     {
-        pf_printf("Assertion failed: sample showcase binary exited with status %d\\n",
+        std::printf("Assertion failed: sample showcase binary exited with status %d\\n",
             command_status);
         goto cleanup;
     }
@@ -315,7 +315,7 @@ FT_TEST(test_message_showcase_sample_make_pipeline)
         goto cleanup;
     if (test_expect_transcript_equal(transcript, expected_output) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: sample showcase transcript should match expected output\\n");
+        std::printf("Assertion failed: sample showcase transcript should match expected output\\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -323,12 +323,12 @@ cleanup:
     test_remove_file("samples/feature_showcase/message_output.txt");
     if (test_run_command_capture_status(clean_command, &cleanup_status) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: expected to clean sample showcase artifacts\\n");
+        std::printf("Assertion failed: expected to clean sample showcase artifacts\\n");
         status = FT_FAILURE;
     }
     else if (cleanup_status != 0)
     {
-        pf_printf("Assertion failed: sample showcase clean exited with status %d\\n",
+        std::printf("Assertion failed: sample showcase clean exited with status %d\\n",
             cleanup_status);
         status = FT_FAILURE;
     }

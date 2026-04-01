@@ -16,13 +16,13 @@ FT_TEST(test_runtime_record_init_sets_defaults)
     if (record.data == NULL)
     {
         runtime_record_dispose(&record);
-        pf_printf("Assertion failed: runtime_record_init should allocate data\n");
+        std::printf("Assertion failed: runtime_record_init should allocate data\n");
         return (FT_FAILURE);
     }
     if (record.capacity < 1)
     {
         runtime_record_dispose(&record);
-        pf_printf("Assertion failed: runtime_record_init should provide capacity\n");
+        std::printf("Assertion failed: runtime_record_init should provide capacity\n");
         return (FT_FAILURE);
     }
     runtime_record_dispose(&record);
@@ -147,7 +147,7 @@ FT_TEST(test_runtime_record_copy_rejects_overflow)
     if (runtime_record_copy_from_buffer(&record, "TOO-LONG", 8) != FT_FAILURE)
     {
         runtime_record_dispose(&record);
-        pf_printf("Assertion failed: runtime_record_copy_from_buffer should reject oversized input\n");
+        std::printf("Assertion failed: runtime_record_copy_from_buffer should reject oversized input\n");
         return (FT_FAILURE);
     }
     if (test_expect_cstring_equal(record.data, "    ", "runtime_record_copy_from_buffer should leave existing padding on failure") != FT_SUCCESS)

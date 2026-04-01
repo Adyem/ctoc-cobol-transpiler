@@ -1,7 +1,7 @@
 #include "test_suites.hpp"
 
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 
 static int grammar_document_load(char *buffer, size_t buffer_size)
 {
@@ -11,7 +11,7 @@ static int grammar_document_load(char *buffer, size_t buffer_size)
         return (FT_FAILURE);
     if (test_read_text_file("docs/cblc_grammar.md", buffer, buffer_size) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: expected docs/cblc_grammar.md to be readable\n");
+        std::printf("Assertion failed: expected docs/cblc_grammar.md to be readable\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -23,14 +23,14 @@ FT_TEST(test_grammar_document_exists)
 
     if (grammar_document_load(buffer, sizeof(buffer)) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (ft_strlen(buffer) == 0)
+    if (std::strlen(buffer) == 0)
     {
-        pf_printf("Assertion failed: docs/cblc_grammar.md should not be empty\n");
+        std::printf("Assertion failed: docs/cblc_grammar.md should not be empty\n");
         return (FT_FAILURE);
     }
-    if (!ft_strnstr(buffer, "program             ::=", ft_strlen(buffer)))
+    if (!ft_strnstr(buffer, "program             ::=", std::strlen(buffer)))
     {
-        pf_printf("Assertion failed: grammar should define the program production\n");
+        std::printf("Assertion failed: grammar should define the program production\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -44,12 +44,12 @@ static int grammar_document_expect_rule(const char *buffer, const char *rule)
         return (FT_FAILURE);
     if (!rule)
         return (FT_FAILURE);
-    length = ft_strlen(buffer);
+    length = std::strlen(buffer);
     if (length == 0)
         return (FT_FAILURE);
     if (!ft_strnstr(buffer, rule, length))
     {
-        pf_printf("Assertion failed: grammar should include production '%s'\n", rule);
+        std::printf("Assertion failed: grammar should include production '%s'\n", rule);
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -93,22 +93,22 @@ FT_TEST(test_design_doc_mentions_grammar)
     char line[1024];
     FILE *file;
 
-    file = ft_fopen("design_doc.txt", "r");
+    file = std::fopen("design_doc.txt", "r");
     if (!file)
     {
-        pf_printf("Assertion failed: design_doc.txt should be readable\n");
+        std::printf("Assertion failed: design_doc.txt should be readable\n");
         return (FT_FAILURE);
     }
-    while (ft_fgets(line, sizeof(line), file))
+    while (std::fgets(line, sizeof(line), file))
     {
-        if (ft_strnstr(line, "docs/cblc_grammar.md", ft_strlen(line)))
+        if (ft_strnstr(line, "docs/cblc_grammar.md", std::strlen(line)))
         {
-            ft_fclose(file);
+            std::fclose(file);
             return (FT_SUCCESS);
         }
     }
-    ft_fclose(file);
-    pf_printf("Assertion failed: design_doc.txt should reference docs/cblc_grammar.md\n");
+    std::fclose(file);
+    std::printf("Assertion failed: design_doc.txt should reference docs/cblc_grammar.md\n");
     return (FT_FAILURE);
 }
 

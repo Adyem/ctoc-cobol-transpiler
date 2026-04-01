@@ -80,20 +80,20 @@ FT_TEST(test_compiler_c_backend_multi_module_generates_and_runs)
         goto cleanup;
     if (test_compiler_c_backend_write_source(worker_source_path, worker_source) != FT_SUCCESS)
         goto cleanup;
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "./ctoc_cobol_transpiler --direction cblc-to-c --input %s --output %s --input %s --output %s",
         main_source_path, main_output_path, worker_source_path, worker_output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
         goto cleanup;
     if (test_run_command(command) != FT_SUCCESS)
         goto cleanup;
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cc %s %s -o %s", main_output_path, worker_output_path, binary_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
         goto cleanup;
     if (test_run_command(command) != FT_SUCCESS)
         goto cleanup;
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "%s > %s", binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
         goto cleanup;
@@ -102,8 +102,8 @@ FT_TEST(test_compiler_c_backend_multi_module_generates_and_runs)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -176,7 +176,7 @@ FT_TEST(test_compiler_c_backend_multi_module_call_order_stable)
         goto cleanup;
     if (test_compiler_c_backend_write_source(worker_source_path, worker_source) != FT_SUCCESS)
         goto cleanup;
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "./ctoc_cobol_transpiler --direction cblc-to-c --input %s --output %s --input %s --output %s",
         main_source_path, main_output_path, worker_source_path, worker_output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -192,10 +192,10 @@ FT_TEST(test_compiler_c_backend_multi_module_call_order_stable)
     while (generated_main[index] != '\0')
     {
         if (announce_position == static_cast<size_t>(-1)
-            && ft_strncmp(&generated_main[index], "announce();", 11) == 0)
+            && std::strncmp(&generated_main[index], "announce();", 11) == 0)
             announce_position = index;
         if (increment_position == static_cast<size_t>(-1)
-            && ft_strncmp(&generated_main[index], "increment();", 12) == 0)
+            && std::strncmp(&generated_main[index], "increment();", 12) == 0)
             increment_position = index;
         index += 1;
     }

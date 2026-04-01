@@ -144,14 +144,14 @@ FT_TEST(test_standard_library_date_duration_executes_for_forward_range)
         goto cleanup;
     if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
         goto cleanup;
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s %s %s %s", binary_path, driver_path,
         duration_library_path, parse_library_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
         goto cleanup;
     if (test_run_command(command) != FT_SUCCESS)
         goto cleanup;
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "./%s > %s", binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
         goto cleanup;
@@ -279,14 +279,14 @@ FT_TEST(test_standard_library_date_duration_handles_reverse_range)
         goto cleanup;
     if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
         goto cleanup;
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s %s %s %s", binary_path, driver_path,
         duration_library_path, parse_library_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
         goto cleanup;
     if (test_run_command(command) != FT_SUCCESS)
         goto cleanup;
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "./%s > %s", binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
         goto cleanup;

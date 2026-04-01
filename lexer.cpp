@@ -1,6 +1,6 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/Libft/libft.hpp"
+#include "compatibility/libft_compat.hpp"
 
 static const char g_lexer_single_quote = '\'';
 
@@ -24,7 +24,7 @@ void lexer_init(t_lexer *lexer, const char *text)
     if (!text)
         return ;
     lexer->text = text;
-    lexer->length = ft_strlen(text);
+    lexer->length = std::strlen(text);
 }
 
 void lexer_set_context(t_lexer *lexer, t_transpiler_context *context)
@@ -165,7 +165,7 @@ static void lexer_skip_trivia(t_lexer *lexer)
 
 static int lexer_is_identifier_start(char value)
 {
-    if (ft_isalpha(static_cast<unsigned char>(value)))
+    if (std::isalpha(static_cast<unsigned char>(value)))
         return (1);
     return (0);
 }
@@ -174,7 +174,7 @@ static int lexer_is_identifier_continue(char value)
 {
     if (lexer_is_identifier_start(value))
         return (1);
-    if (ft_isdigit(static_cast<unsigned char>(value)))
+    if (std::isdigit(static_cast<unsigned char>(value)))
         return (1);
     if (value == '-')
         return (1);
@@ -185,7 +185,7 @@ static int lexer_is_identifier_continue(char value)
 
 static int lexer_is_digit(char value)
 {
-    if (ft_isdigit(static_cast<unsigned char>(value)))
+    if (std::isdigit(static_cast<unsigned char>(value)))
         return (1);
     return (0);
 }

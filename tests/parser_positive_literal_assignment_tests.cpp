@@ -1,6 +1,6 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/Libft/libft.hpp"
+#include "compatibility/libft_compat.hpp"
 #include "test_suites.hpp"
 
 FT_TEST(test_parser_accepts_assignment_statement)
@@ -97,7 +97,7 @@ FT_TEST(test_parser_accepts_assignment_statement)
         ast_node_destroy(program);
         return (FT_FAILURE);
     }
-    if (!target->token.lexeme || ft_strncmp(target->token.lexeme, "TOTAL", target->token.length) != 0)
+    if (!target->token.lexeme || std::strncmp(target->token.lexeme, "TOTAL", target->token.length) != 0)
     {
         ast_node_destroy(program);
         return (FT_FAILURE);

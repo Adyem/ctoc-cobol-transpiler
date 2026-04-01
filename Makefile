@@ -153,10 +153,7 @@ else
     RM      = rm -f
 endif
 
-LIBFT_DIR   = ./libft
-SUBMODULE_SENTINEL = $(LIBFT_DIR)/Makefile
 BUILD_LOG_DIR = ./build_logs
-LIBFT_BUILD_LOG = $(BUILD_LOG_DIR)/libft_build.log
 
 OBJ_DIR         = ./objs
 OBJ_DIR_DEBUG   = ./objs_debug
@@ -187,18 +184,16 @@ ifeq ($(DEBUG),1)
     CFLAGS    += -DDEBUG=1
     OBJ_DIR    = $(OBJ_DIR_DEBUG)
     TARGET     = $(NAME_DEBUG)
-    LIBFT      = $(LIBFT_DIR)/Full_Libft_debug.a
 else
     TARGET     = $(NAME)
-    LIBFT      = $(LIBFT_DIR)/Full_Libft.a
 endif
 
 export COMPILE_FLAGS
 
 ifeq ($(OS),Windows_NT)
-    LDFLAGS     = $(LIBFT)
+    LDFLAGS     =
 else
-    LDFLAGS     = $(LIBFT) -lreadline
+    LDFLAGS     = -lreadline
 endif
 
 OBJS        = $(SRC:%.cpp=$(OBJ_DIR)/%.o)
@@ -209,7 +204,8 @@ OBJS_NO_MAIN = $(filter-out $(OBJ_DIR)/main.o,$(OBJS))
 
 TOTAL_OBJS          := $(words $(OBJS))
 
-TEST_SRC    = tests/test_main.cpp \
+TEST_SRC    = imported/libft_test_runner.cpp \
+              tests/test_main.cpp \
               tests/test_support.cpp \
               tests/ast_tests.cpp \
               tests/ast_visualizer_tests.cpp \
@@ -345,17 +341,9 @@ TEST_OBJS   = $(TEST_SRC:%.cpp=$(OBJ_DIR_TEST)/%.o)
 
 TOTAL_TEST_OBJS     := $(words $(TEST_OBJS))
 
-REQUESTED_GOALS := $(if $(MAKECMDGOALS),$(MAKECMDGOALS),all)
-SKIP_ENV_GOALS := clean fclean cleanup initialize ensure_libft ensure_cobc ensure_environment install_cobc
-BUILD_GOALS := $(filter-out $(SKIP_ENV_GOALS),$(REQUESTED_GOALS))
-ifneq ($(strip $(BUILD_GOALS)),)
-    PRE_BUILD_HOOK := ensure_environment
-    ORDER_ONLY_PRE := | $(PRE_BUILD_HOOK)
-endif
+all: dirs $(TARGET)
 
-all: $(PRE_BUILD_HOOK) dirs $(TARGET)
-
-tests: $(PRE_BUILD_HOOK) dirs $(TEST_NAME)
+tests: dirs $(TEST_NAME)
 
 dirs:
 	@-$(MKDIR) $(OBJ_DIR)
@@ -374,80 +362,19 @@ install_cobc:
 
 
 tests_with_cobc: install_cobc
-	$(MAKE) initialize
 	$(MAKE) tests
 	$(MAKE) test
 
 debug:
 	$(MAKE) all DEBUG=1
 
-$(TARGET): $(ORDER_ONLY_PRE)
-$(TARGET): $(LIBFT) $(OBJS)
+$(TARGET): $(OBJS)
 	@printf '\033[1;36m[CTOC BUILD] Linking %s\033[0m\n' "$@"
 	@$(CC) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
 
-$(TEST_NAME): $(ORDER_ONLY_PRE)
-$(TEST_NAME): $(LIBFT) $(TEST_OBJS) $(OBJS_NO_MAIN) $(TARGET)
+$(TEST_NAME): $(TEST_OBJS) $(OBJS_NO_MAIN) $(TARGET)
 	@printf '\033[1;36m[CTOC BUILD] Linking %s\033[0m\n' "$@"
 	@$(CC) $(CFLAGS) $(TEST_OBJS) $(OBJS_NO_MAIN) -o $@ $(LDFLAGS)
-
-
-LIBFT_BUILD_GOAL := $(if $(DEBUG),debug,all)
-
-$(LIBFT): ensure_libft | $(BUILD_LOG_DIR)
-	@need_build=0; \
-	if $(MAKE) -C $(LIBFT_DIR) -q $(LIBFT_BUILD_GOAL); then \
-	:; \
-	else \
-	status=$$?; \
-	if [ $$status -eq 1 ]; then \
-	need_build=1; \
-	else \
-	exit $$status; \
-	fi; \
-	fi; \
-        if [ $$need_build -eq 1 ] || [ ! -f $@ ]; then \
-        printf '\033[1;36m[LIBFT BUILD] Updating %s (log: %s)\033[0m\n' "$@" "$(LIBFT_BUILD_LOG)"; \
-        { $(MAKE) -C $(LIBFT_DIR) $(LIBFT_BUILD_GOAL); } 2>&1 | tee $(LIBFT_BUILD_LOG); \
-        status=$${PIPESTATUS[0]}; \
-        if [ $$status -ne 0 ]; then \
-        printf 'libft build failed. Showing log:\n'; \
-        cat $(LIBFT_BUILD_LOG); \
-        exit $$status; \
-        fi; \
-        else \
-        printf '\033[1;36m[LIBFT CHECK] %s is up to date\033[0m\n' "$@"; \
-        fi
-
-initialize:
-	git submodule update --init --recursive --force
-
-ensure_libft:
-	@if [ ! -f $(SUBMODULE_SENTINEL) ]; then \
-		printf '\033[1;36m[LIBFT SETUP] Initializing git submodule\033[0m\n'; \
-		$(MAKE) initialize; \
-		if [ ! -f $(SUBMODULE_SENTINEL) ]; then \
-			printf 'Failed to initialize libft submodule. Please check git submodule configuration.\n'; \
-			exit 1; \
-		fi; \
-	fi
-
-ensure_cobc:
-	@if ! command -v cobc >/dev/null 2>&1; then \
-		printf '\033[1;36m[COBOL SETUP] Installing cobc compiler\033[0m\n'; \
-		if command -v apt-get >/dev/null 2>&1; then \
-			$(MAKE) install_cobc; \
-		else \
-			printf 'Automatic cobc installation is not supported on this system.\n'; \
-			exit 1; \
-		fi; \
-	else \
-		printf '\033[1;36m[COBOL CHECK] cobc compiler is available\033[0m\n'; \
-	fi
-
-ensure_environment: ensure_libft ensure_cobc
-	@:
-
 $(OBJ_DIR)/%.o: %.cpp
 	@-$(MKDIR) $(dir $@)
 	@$(CC) $(CFLAGS) -c $< -o $@
@@ -470,13 +397,7 @@ clean:
 	-$(RM) test_example_compiler.c test_example_compiler.bin test_example_compiler.txt
 	-$(RM) test_example_invalid_compiler.c test_example_invalid_compiler.bin test_example_invalid_compiler.log
 	-$(RM) test_runtime_file.txt
-	-$(RM) $(LIBFT_BUILD_LOG)
 	-$(RMDIR) $(BUILD_LOG_DIR)
-	@if [ -f $(SUBMODULE_SENTINEL) ]; then \
-		$(MAKE) -C $(LIBFT_DIR) fclean; \
-	else \
-		printf 'Skipping libft clean because the submodule is not initialized. Run "make initialize" to set it up.\n'; \
-	fi
 
 fclean: clean
 	-$(RM) $(NAME) $(NAME_DEBUG) $(TEST_NAME)
@@ -527,4 +448,4 @@ ci:
 	$(MAKE) ci-lint
 	$(MAKE) ci-coverage
 
-.PHONY: all dirs clean fclean re debug both re_both tests test initialize ensure_libft ensure_cobc ensure_environment install_cobc lint fuzz coverage ci-build ci-test ci-lint ci-coverage ci
+.PHONY: all dirs clean fclean re debug both re_both tests test lint fuzz coverage ci-build ci-test ci-lint ci-coverage ci

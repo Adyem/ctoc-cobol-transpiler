@@ -31,7 +31,7 @@ FT_TEST(test_cblc_register_translation_unit_exports_records_entrypoint_and_helpe
     entrypoint = transpiler_context_get_entrypoint(&context);
     if (!entrypoint)
     {
-        pf_printf("Assertion failed: expected entrypoint to be registered\n");
+        std::printf("Assertion failed: expected entrypoint to be registered\n");
         goto cleanup;
     }
     if (test_expect_cstring_equal(entrypoint->name, "main",
@@ -40,7 +40,7 @@ FT_TEST(test_cblc_register_translation_unit_exports_records_entrypoint_and_helpe
     signature = transpiler_context_find_function(&context, "alpha_mod", "main");
     if (!signature)
     {
-        pf_printf("Assertion failed: expected main function to be registered\n");
+        std::printf("Assertion failed: expected main function to be registered\n");
         goto cleanup;
     }
     if (test_expect_int_equal(static_cast<int>(signature->visibility), TRANSPILE_SYMBOL_PUBLIC,
@@ -49,7 +49,7 @@ FT_TEST(test_cblc_register_translation_unit_exports_records_entrypoint_and_helpe
     signature = transpiler_context_find_function(&context, "alpha_mod", "helper");
     if (!signature)
     {
-        pf_printf("Assertion failed: expected helper function to be registered\n");
+        std::printf("Assertion failed: expected helper function to be registered\n");
         goto cleanup;
     }
     if (test_expect_int_equal(static_cast<int>(signature->visibility), TRANSPILE_SYMBOL_PUBLIC,
@@ -93,13 +93,13 @@ FT_TEST(test_cblc_register_translation_unit_exports_skips_entrypoint_without_mai
     entrypoint = transpiler_context_get_entrypoint(&context);
     if (entrypoint)
     {
-        pf_printf("Assertion failed: modules without main should not register entrypoints\n");
+        std::printf("Assertion failed: modules without main should not register entrypoints\n");
         goto cleanup;
     }
     signature = transpiler_context_find_function(&context, "worker_mod", "show_banner");
     if (!signature)
     {
-        pf_printf("Assertion failed: expected worker function to be registered\n");
+        std::printf("Assertion failed: expected worker function to be registered\n");
         goto cleanup;
     }
     if (test_expect_int_equal(static_cast<int>(signature->visibility), TRANSPILE_SYMBOL_PUBLIC,
@@ -152,7 +152,7 @@ FT_TEST(test_cblc_register_translation_unit_exports_reports_duplicate_entrypoint
         goto cleanup;
     if (cblc_register_translation_unit_exports(&context, "alternate_mod", &second_unit) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: duplicate entrypoint should fail to register\n");
+        std::printf("Assertion failed: duplicate entrypoint should fail to register\n");
         goto cleanup;
     }
     if (test_expect_int_equal(static_cast<int>(context.diagnostics.count), 1,

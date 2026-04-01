@@ -1,7 +1,7 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
 
 #define CBLC_FORMATTER_KEYWORD_COUNT 14
 
@@ -116,7 +116,7 @@ static int cblc_formatter_buffer_append_string(t_cblc_formatter_buffer *buffer, 
 
 static int cblc_formatter_is_identifier_start(char ch)
 {
-    if (ft_isalpha(ch))
+    if (std::isalpha(ch))
         return (1);
     if (ch == '_')
         return (1);
@@ -125,7 +125,7 @@ static int cblc_formatter_is_identifier_start(char ch)
 
 static int cblc_formatter_is_identifier_part(char ch)
 {
-    if (ft_isalnum(ch))
+    if (std::isalnum(ch))
         return (1);
     if (ch == '_')
         return (1);
@@ -142,10 +142,10 @@ static int cblc_formatter_is_keyword(const char *text, size_t length)
     index = 0;
     while (index < CBLC_FORMATTER_KEYWORD_COUNT)
     {
-        keyword_length = ft_strlen(g_cblc_keywords[index]);
+        keyword_length = std::strlen(g_cblc_keywords[index]);
         if (keyword_length == length)
         {
-            if (ft_strncmp(text, g_cblc_keywords[index], length) == 0)
+            if (std::strncmp(text, g_cblc_keywords[index], length) == 0)
                 return (1);
         }
         index += 1;
@@ -157,11 +157,11 @@ static int cblc_formatter_keyword_needs_paren_space(const char *text, size_t len
 {
     if (!text)
         return (0);
-    if (length == 2 && ft_strncmp(text, "if", 2) == 0)
+    if (length == 2 && std::strncmp(text, "if", 2) == 0)
         return (1);
-    if (length == 5 && ft_strncmp(text, "while", 5) == 0)
+    if (length == 5 && std::strncmp(text, "while", 5) == 0)
         return (1);
-    if (length == 2 && ft_strncmp(text, "do", 2) == 0)
+    if (length == 2 && std::strncmp(text, "do", 2) == 0)
         return (1);
     return (0);
 }
@@ -431,7 +431,7 @@ static int cblc_formatter_process_token(const char *input, size_t *index,
     size_t start_index;
 
     ch = input[*index];
-    if (ft_isspace(ch))
+    if (std::isspace(ch))
     {
         if (ch == '\n')
             *newline_pending = 1;
@@ -451,16 +451,16 @@ static int cblc_formatter_process_token(const char *input, size_t *index,
             *index - start_index, last_token, last_keyword_needs_paren_space,
             space_pending, newline_pending, *indent_level, at_line_start));
     }
-    if (ft_isdigit(ch))
+    if (std::isdigit(ch))
     {
         start_index = *index;
         *index += 1;
-        while (ft_isdigit(input[*index]))
+        while (std::isdigit(input[*index]))
             *index += 1;
-        if (input[*index] == '.' && ft_isdigit(input[*index + 1]))
+        if (input[*index] == '.' && std::isdigit(input[*index + 1]))
         {
             *index += 1;
-            while (ft_isdigit(input[*index]))
+            while (std::isdigit(input[*index]))
                 *index += 1;
         }
         return (cblc_formatter_append_number(buffer, input + start_index,
@@ -701,7 +701,7 @@ static int cblc_formatter_format_passthrough(const char *input, char **output)
 
     if (!input || !output)
         return (FT_FAILURE);
-    length = ft_strlen(input);
+    length = std::strlen(input);
     result = static_cast<char *>(cma_calloc(length + 1, sizeof(char)));
     if (!result)
         return (FT_FAILURE);

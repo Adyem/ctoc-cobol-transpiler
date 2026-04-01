@@ -93,7 +93,7 @@ FT_TEST(test_cobol_transpiled_record_writer_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -o %s samples/cobol/record_writer.cob > %s 2>&1", binary_path,
         compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -104,7 +104,7 @@ FT_TEST(test_cobol_transpiled_record_writer_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile record_writer sample\n");
+        std::printf("Assertion failed: cobc should compile record_writer sample\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, report_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -115,7 +115,7 @@ FT_TEST(test_cobol_transpiled_record_writer_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./record_writer.bin", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -125,7 +125,7 @@ FT_TEST(test_cobol_transpiled_record_writer_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: record_writer binary should execute successfully\n");
+        std::printf("Assertion failed: record_writer binary should execute successfully\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, report_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -143,9 +143,9 @@ FT_TEST(test_cobol_transpiled_record_writer_executes)
         return (FT_FAILURE);
     }
     expected_output = "0001INITIAL ENTRY           ";
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: record_writer sample should emit formatted record\n");
+        std::printf("Assertion failed: record_writer sample should emit formatted record\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, report_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -187,7 +187,7 @@ FT_TEST(test_cobol_transpiled_record_writer_exit_status)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -o %s samples/cobol/record_writer.cob > %s 2>&1", binary_path,
         compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -198,7 +198,7 @@ FT_TEST(test_cobol_transpiled_record_writer_exit_status)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile record_writer sample for status capture\n");
+        std::printf("Assertion failed: cobc should compile record_writer sample for status capture\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, report_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -209,7 +209,7 @@ FT_TEST(test_cobol_transpiled_record_writer_exit_status)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./record_writer_status.bin", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -219,14 +219,14 @@ FT_TEST(test_cobol_transpiled_record_writer_exit_status)
     }
     if (test_run_command_capture_status(command, &exit_status) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: test harness should capture record_writer exit status\n");
+        std::printf("Assertion failed: test harness should capture record_writer exit status\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, report_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
     if (exit_status != 0)
     {
-        pf_printf("Assertion failed: record_writer program should exit with status 0\n");
+        std::printf("Assertion failed: record_writer program should exit with status 0\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, report_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);

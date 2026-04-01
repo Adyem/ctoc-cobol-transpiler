@@ -1,7 +1,7 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
 
 static int parser_parse_statement(t_parser *parser, t_ast_node *sequence);
 static int parser_parse_assignment_statement(t_parser *parser, t_ast_node *sequence);
@@ -445,7 +445,7 @@ static int parser_token_equals(const t_lexer_token *token, const char *text)
     if (!token->lexeme)
         return (0);
     length = token->length;
-    expected_length = ft_strlen(text);
+    expected_length = std::strlen(text);
     if (length != expected_length)
         return (0);
     index = 0;
@@ -891,6 +891,13 @@ static int parser_is_sequence_terminator(t_parser *parser,
     {
         t_lexer_token_kind next_kind;
 
+        if (parser_token_equals(&parser->current, "END"))
+        {
+            if (parser_peek_kind(parser, &next_kind) != FT_SUCCESS)
+                return (1);
+            if (next_kind != LEXER_TOKEN_ASSIGN)
+                return (1);
+        }
         if (parser_peek_kind(parser, &next_kind) != FT_SUCCESS)
             return (1);
         if (next_kind == LEXER_TOKEN_PERIOD)
@@ -1023,7 +1030,7 @@ static int parser_parse_condition(t_parser *parser, t_ast_node **out_node)
         }
         operator_node->token.kind = LEXER_TOKEN_EQUALS;
         operator_node->token.lexeme = g_parser_condition_equals;
-        operator_node->token.length = ft_strlen(g_parser_condition_equals);
+        operator_node->token.length = std::strlen(g_parser_condition_equals);
         operator_node->token.line = left->token.line;
         operator_node->token.column = left->token.column;
         if (parser_add_child(parser, condition, operator_node) != FT_SUCCESS)
@@ -1039,7 +1046,7 @@ static int parser_parse_condition(t_parser *parser, t_ast_node **out_node)
         }
         right->token.kind = LEXER_TOKEN_KEYWORD_TRUE;
         right->token.lexeme = g_parser_condition_true;
-        right->token.length = ft_strlen(g_parser_condition_true);
+        right->token.length = std::strlen(g_parser_condition_true);
         right->token.line = left->token.line;
         right->token.column = left->token.column;
         if (parser_add_child(parser, condition, right) != FT_SUCCESS)
@@ -1086,6 +1093,13 @@ static int parser_synchronize_statement_sequence(t_parser *parser,
         {
             t_lexer_token_kind next_kind;
 
+            if (parser_token_equals(&parser->current, "END"))
+            {
+                if (parser_peek_kind(parser, &next_kind) != FT_SUCCESS)
+                    return (FT_SUCCESS);
+                if (next_kind != LEXER_TOKEN_ASSIGN)
+                    return (FT_SUCCESS);
+            }
             if (parser_peek_kind(parser, &next_kind) != FT_SUCCESS)
                 return (FT_SUCCESS);
             if (next_kind == LEXER_TOKEN_PERIOD)

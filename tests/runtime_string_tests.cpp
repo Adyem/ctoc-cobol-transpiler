@@ -120,7 +120,7 @@ FT_TEST(test_runtime_string_to_int_parses_numbers)
     if (runtime_string_to_int(&text, &value) != FT_FAILURE)
     {
         runtime_string_dispose(&text);
-        pf_printf("Assertion failed: runtime_string_to_int should reject invalid numbers\n");
+        std::printf("Assertion failed: runtime_string_to_int should reject invalid numbers\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(value.value, 73, "runtime_string_to_int should leave destination unchanged on failure") != FT_SUCCESS)

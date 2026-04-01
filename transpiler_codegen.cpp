@@ -2,9 +2,9 @@
 
 #include <cstdarg>
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 
 typedef struct s_transpiler_codegen_buffer
 {
@@ -47,7 +47,7 @@ static int transpiler_codegen_buffer_reserve(t_transpiler_codegen_buffer *buffer
     if (!new_data)
         return (FT_FAILURE);
     if (buffer->data && buffer->length > 0)
-        ft_memcpy(new_data, buffer->data, buffer->length);
+        std::memcpy(new_data, buffer->data, buffer->length);
     if (buffer->data)
         cma_free(buffer->data);
     buffer->data = new_data;
@@ -65,7 +65,7 @@ static int transpiler_codegen_buffer_append_span(t_transpiler_codegen_buffer *bu
         return (FT_SUCCESS);
     if (transpiler_codegen_buffer_reserve(buffer, buffer->length + length + 1) != FT_SUCCESS)
         return (FT_FAILURE);
-    ft_memcpy(buffer->data + buffer->length, text, length);
+    std::memcpy(buffer->data + buffer->length, text, length);
     buffer->length += length;
     buffer->data[buffer->length] = '\0';
     return (FT_SUCCESS);
@@ -75,7 +75,7 @@ static int transpiler_codegen_buffer_append_string(t_transpiler_codegen_buffer *
 {
     if (!text)
         return (FT_SUCCESS);
-    return (transpiler_codegen_buffer_append_span(buffer, text, ft_strlen(text)));
+    return (transpiler_codegen_buffer_append_span(buffer, text, std::strlen(text)));
 }
 
 static int transpiler_codegen_buffer_append_format(t_transpiler_codegen_buffer *buffer, const char *format, ...)
@@ -93,7 +93,7 @@ static int transpiler_codegen_buffer_append_format(t_transpiler_codegen_buffer *
         return (FT_FAILURE);
     va_start(args, format);
     va_copy(copy, args);
-    required_length = pf_vsnprintf(stack_buffer, sizeof(stack_buffer), format, copy);
+    required_length = std::vsnprintf(stack_buffer, sizeof(stack_buffer), format, copy);
     va_end(copy);
     if (required_length < 0)
     {
@@ -113,7 +113,7 @@ static int transpiler_codegen_buffer_append_format(t_transpiler_codegen_buffer *
         va_end(args);
         return (FT_FAILURE);
     }
-    if (pf_vsnprintf(heap_buffer, static_cast<size_t>(required_length) + 1, format, args) < 0)
+    if (std::vsnprintf(heap_buffer, static_cast<size_t>(required_length) + 1, format, args) < 0)
     {
         va_end(args);
         cma_free(heap_buffer);
@@ -512,7 +512,7 @@ static int transpiler_codegen_copy_buffer(const t_transpiler_codegen_buffer *buf
     if (!copy)
         return (FT_FAILURE);
     if (buffer->length > 0)
-        ft_memcpy(copy, buffer->data, buffer->length);
+        std::memcpy(copy, buffer->data, buffer->length);
     copy[buffer->length] = '\0';
     *out = copy;
     return (FT_SUCCESS);

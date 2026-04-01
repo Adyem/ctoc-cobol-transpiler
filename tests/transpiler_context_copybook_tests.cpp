@@ -24,7 +24,7 @@ FT_TEST(test_transpiler_context_registers_copybook_metadata)
     if (!copybook)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected to locate registered copybook metadata\n");
+        std::printf("Assertion failed: expected to locate registered copybook metadata\n");
         return (FT_FAILURE);
     }
     if (test_expect_size_t_equal(copybook->item_count, 2,

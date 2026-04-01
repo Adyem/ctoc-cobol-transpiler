@@ -1,6 +1,6 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/CMA/CMA.hpp"
+#include "compatibility/memory_compat.hpp"
 
 int transpiler_standard_library_generate_exp(char **out_text)
 {
@@ -30,11 +30,11 @@ int transpiler_standard_library_generate_exp(char **out_text)
         "           END-COMPUTE.\n"
         "           GOBACK.\n"
         "       END PROGRAM CBLC-EXP.\n";
-    length = ft_strlen(template_text);
+    length = std::strlen(template_text);
     buffer = static_cast<char *>(cma_calloc(length + 1, sizeof(char)));
     if (!buffer)
         return (FT_FAILURE);
-    ft_memcpy(buffer, template_text, length);
+    std::memcpy(buffer, template_text, length);
     buffer[length] = '\0';
     *out_text = buffer;
     return (FT_SUCCESS);

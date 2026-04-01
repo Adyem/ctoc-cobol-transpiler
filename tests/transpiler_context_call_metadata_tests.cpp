@@ -40,7 +40,7 @@ FT_TEST(test_transpiler_context_preserves_caller_declared_length)
     if (!item)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected shared argument metadata to be registered\n");
+        std::printf("Assertion failed: expected shared argument metadata to be registered\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(item->declared_length), 5,
@@ -79,7 +79,7 @@ FT_TEST(test_transpiler_context_promotes_caller_length_after_callee_metadata)
     if (!item)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected shared buffer metadata to be registered\n");
+        std::printf("Assertion failed: expected shared buffer metadata to be registered\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(item->declared_length), 12,
@@ -105,7 +105,7 @@ FT_TEST(test_transpiler_context_promotes_caller_length_after_callee_metadata)
             "SHARED-BUFFER", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 6, 0, NULL) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: narrower metadata should be rejected after caller registration\n");
+        std::printf("Assertion failed: narrower metadata should be rejected after caller registration\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(transpiler_context_has_errors(&context), 1,
@@ -142,7 +142,7 @@ FT_TEST(test_transpiler_context_rejects_narrower_callee_length)
             "SHARED-ARG", TRANSPILE_DATA_ITEM_ALPHANUMERIC, 4, 0, NULL) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected narrower callee length to be rejected\n");
+        std::printf("Assertion failed: expected narrower callee length to be rejected\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(transpiler_context_has_errors(&context), 1,
@@ -160,7 +160,7 @@ FT_TEST(test_transpiler_context_rejects_narrower_callee_length)
     if (context.diagnostics.items[0].code != TRANSPILE_ERROR_DATA_ITEM_PARAMETER_TRUNCATION)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected parameter truncation diagnostic\n");
+        std::printf("Assertion failed: expected parameter truncation diagnostic\n");
         return (FT_FAILURE);
     }
     transpiler_context_dispose(&context);

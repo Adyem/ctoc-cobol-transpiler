@@ -121,7 +121,7 @@ FT_TEST(test_cobol_transpiled_record_summary_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -o %s samples/cobol/record_summary.cob > %s 2>&1", binary_path,
         compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -132,7 +132,7 @@ FT_TEST(test_cobol_transpiled_record_summary_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile record_summary sample\n");
+        std::printf("Assertion failed: cobc should compile record_summary sample\n");
         test_cleanup_example_artifacts_with_log(data_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -143,7 +143,7 @@ FT_TEST(test_cobol_transpiled_record_summary_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./record_summary.bin > record_summary_output.txt", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -153,7 +153,7 @@ FT_TEST(test_cobol_transpiled_record_summary_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: record_summary binary should execute successfully\n");
+        std::printf("Assertion failed: record_summary binary should execute successfully\n");
         test_cleanup_example_artifacts_with_log(data_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -166,7 +166,7 @@ FT_TEST(test_cobol_transpiled_record_summary_executes)
     }
     if (output_buffer[0] != '\0')
     {
-        pf_printf("Assertion failed: record_summary sample should not emit unexpected output\n");
+        std::printf("Assertion failed: record_summary sample should not emit unexpected output\n");
         test_cleanup_example_artifacts_with_log(data_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -229,7 +229,7 @@ FT_TEST(test_cobol_transpiled_record_summary_exit_status)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -o %s samples/cobol/record_summary.cob > %s 2>&1", binary_path,
         compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -240,7 +240,7 @@ FT_TEST(test_cobol_transpiled_record_summary_exit_status)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile record_summary sample\n");
+        std::printf("Assertion failed: cobc should compile record_summary sample\n");
         test_cleanup_example_artifacts_with_log(data_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -251,7 +251,7 @@ FT_TEST(test_cobol_transpiled_record_summary_exit_status)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./record_summary_status.bin > record_summary_status_output.txt", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -261,14 +261,14 @@ FT_TEST(test_cobol_transpiled_record_summary_exit_status)
     }
     if (test_run_command_capture_status(command, &exit_status) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: test harness should capture record_summary exit status\n");
+        std::printf("Assertion failed: test harness should capture record_summary exit status\n");
         test_cleanup_example_artifacts_with_log(data_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
     if (exit_status != 0)
     {
-        pf_printf("Assertion failed: record_summary sample should exit successfully\n");
+        std::printf("Assertion failed: record_summary sample should exit successfully\n");
         test_cleanup_example_artifacts_with_log(data_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);

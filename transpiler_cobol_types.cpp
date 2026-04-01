@@ -1,6 +1,6 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/CMA/CMA.hpp"
+#include "compatibility/memory_compat.hpp"
 
 typedef struct s_transpiler_cobol_buffer
 {
@@ -43,7 +43,7 @@ static int transpiler_cobol_buffer_reserve(t_transpiler_cobol_buffer *buffer, si
     if (!new_data)
         return (FT_FAILURE);
     if (buffer->data && buffer->length > 0)
-        ft_memcpy(new_data, buffer->data, buffer->length);
+        std::memcpy(new_data, buffer->data, buffer->length);
     if (buffer->data)
         cma_free(buffer->data);
     buffer->data = new_data;
@@ -61,7 +61,7 @@ static int transpiler_cobol_buffer_append_span(t_transpiler_cobol_buffer *buffer
         return (FT_SUCCESS);
     if (transpiler_cobol_buffer_reserve(buffer, buffer->length + length + 1) != FT_SUCCESS)
         return (FT_FAILURE);
-    ft_memcpy(buffer->data + buffer->length, text, length);
+    std::memcpy(buffer->data + buffer->length, text, length);
     buffer->length += length;
     buffer->data[buffer->length] = '\0';
     return (FT_SUCCESS);
@@ -71,7 +71,7 @@ static int transpiler_cobol_buffer_append_string(t_transpiler_cobol_buffer *buff
 {
     if (!text)
         return (FT_SUCCESS);
-    return (transpiler_cobol_buffer_append_span(buffer, text, ft_strlen(text)));
+    return (transpiler_cobol_buffer_append_span(buffer, text, std::strlen(text)));
 }
 
 static int transpiler_cobol_buffer_append_number_with_min_digits(t_transpiler_cobol_buffer *buffer,
@@ -294,7 +294,7 @@ static int transpiler_cobol_copy_buffer(const t_transpiler_cobol_buffer *buffer,
     if (!copy)
         return (FT_FAILURE);
     if (buffer->length > 0)
-        ft_memcpy(copy, buffer->data, buffer->length);
+        std::memcpy(copy, buffer->data, buffer->length);
     copy[buffer->length] = '\0';
     *out = copy;
     return (FT_SUCCESS);

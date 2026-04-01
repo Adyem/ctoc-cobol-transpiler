@@ -100,7 +100,7 @@ int test_join_path(const char *directory, const char *name, char *buffer, size_t
 
     if (!directory || !name || !buffer)
         return (FT_FAILURE);
-    length = pf_snprintf(buffer, buffer_size, "%s/%s", directory, name);
+    length = std::snprintf(buffer, buffer_size, "%s/%s", directory, name);
     if (length < 0)
         return (FT_FAILURE);
     if (static_cast<size_t>(length) >= buffer_size)
@@ -196,12 +196,12 @@ int test_cobol_fixture_contains(const char *path, const char *snippet)
         return (FT_FAILURE);
     if (test_read_text_file(path, buffer, sizeof(buffer)) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: expected to read COBOL fixture %s\n", path);
+        std::printf("Assertion failed: expected to read COBOL fixture %s\n", path);
         return (FT_FAILURE);
     }
-    if (!ft_strnstr(buffer, snippet, ft_strlen(buffer)))
+    if (!ft_strnstr(buffer, snippet, std::strlen(buffer)))
     {
-        pf_printf("Assertion failed: COBOL fixture %s should contain snippet:\n%s\n", path, snippet);
+        std::printf("Assertion failed: COBOL fixture %s should contain snippet:\n%s\n", path, snippet);
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -215,12 +215,12 @@ int test_expect_file_equals(const char *path, const char *expected)
         return (FT_FAILURE);
     if (test_read_text_file(path, buffer, sizeof(buffer)) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: expected to read file %s\n", path);
+        std::printf("Assertion failed: expected to read file %s\n", path);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(buffer, expected, ft_strlen(expected) + 1) != 0)
+    if (std::strncmp(buffer, expected, std::strlen(expected) + 1) != 0)
     {
-        pf_printf("Assertion failed: file %s did not match expected content\n", path);
+        std::printf("Assertion failed: file %s did not match expected content\n", path);
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -234,12 +234,12 @@ int test_expect_transcript_equal(const char *actual, const char *expected)
         return (FT_FAILURE);
     if (test_trim_transcript_lines(actual, normalized, sizeof(normalized)) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: unable to normalize transcript before comparison\n");
+        std::printf("Assertion failed: unable to normalize transcript before comparison\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(normalized, expected, ft_strlen(expected) + 1) != 0)
+    if (std::strncmp(normalized, expected, std::strlen(expected) + 1) != 0)
     {
-        pf_printf("Assertion failed: transcript did not match expected text\n");
+        std::printf("Assertion failed: transcript did not match expected text\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -255,24 +255,24 @@ int test_expect_compiler_output_allowed(const char *path)
         return (FT_FAILURE);
     if (test_read_text_file(path, buffer, sizeof(buffer)) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: expected to read compiler output from %s\n", path);
+        std::printf("Assertion failed: expected to read compiler output from %s\n", path);
         return (FT_FAILURE);
     }
-    length = ft_strlen(buffer);
+    length = std::strlen(buffer);
     warning = "<command-line>: warning: \"_FORTIFY_SOURCE\" redefined";
     if (length > 0 && !ft_strnstr(buffer, warning, length))
     {
-        pf_printf("Assertion failed: compiler output should include expected warning message\n");
+        std::printf("Assertion failed: compiler output should include expected warning message\n");
         return (FT_FAILURE);
     }
     if (ft_strnstr(buffer, "error:", length))
     {
-        pf_printf("Assertion failed: compiler output should not report errors\n");
+        std::printf("Assertion failed: compiler output should not report errors\n");
         return (FT_FAILURE);
     }
     if (ft_strnstr(buffer, "Error", length))
     {
-        pf_printf("Assertion failed: compiler output should not contain fatal errors\n");
+        std::printf("Assertion failed: compiler output should not contain fatal errors\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);

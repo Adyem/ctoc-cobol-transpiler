@@ -1,4 +1,4 @@
-#include "libft/Libft/libft.hpp"
+#include "compatibility/libft_compat.hpp"
 
 #include "semantics_test_support.hpp"
 

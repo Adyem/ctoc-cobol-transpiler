@@ -1,7 +1,7 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 
 #define CBLC_STRLEN_STRING_TEMPLATE \
     "       IDENTIFICATION DIVISION.\n" \
@@ -46,13 +46,13 @@ int transpiler_standard_library_generate_strlen_string(char **out_text)
         return (FT_FAILURE);
     *out_text = NULL;
     limit = transpiler_standard_library_get_strlen_string_limit();
-    template_length = ft_strlen(CBLC_STRLEN_STRING_TEMPLATE);
+    template_length = std::strlen(CBLC_STRLEN_STRING_TEMPLATE);
     digits = transpiler_standard_library_count_digits(limit);
     buffer_length = template_length - 3 + digits;
     buffer = static_cast<char *>(cma_calloc(buffer_length + 1, sizeof(char)));
     if (!buffer)
         return (FT_FAILURE);
-    written = pf_snprintf(buffer, buffer_length + 1, CBLC_STRLEN_STRING_TEMPLATE, limit);
+    written = std::snprintf(buffer, buffer_length + 1, CBLC_STRLEN_STRING_TEMPLATE, limit);
     if (written < 0 || static_cast<size_t>(written) != buffer_length)
     {
         cma_free(buffer);

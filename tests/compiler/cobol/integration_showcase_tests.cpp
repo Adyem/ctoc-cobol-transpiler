@@ -201,7 +201,7 @@ FT_TEST(test_cobol_transpiled_integration_showcase_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -o %s samples/cobol/integration_showcase.cob > %s 2>&1",
         binary_path, compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -213,7 +213,7 @@ FT_TEST(test_cobol_transpiled_integration_showcase_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile integration_showcase sample\n");
+        std::printf("Assertion failed: cobc should compile integration_showcase sample\n");
         test_cleanup_example_artifacts_with_log(data_path, binary_path, output_path, log_path);
         test_remove_file(accepted_path);
         test_remove_file(rejected_path);
@@ -228,7 +228,7 @@ FT_TEST(test_cobol_transpiled_integration_showcase_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./integration_showcase.bin > integration_showcase_output.txt",
         directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -241,7 +241,7 @@ FT_TEST(test_cobol_transpiled_integration_showcase_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: integration_showcase binary should execute successfully\n");
+        std::printf("Assertion failed: integration_showcase binary should execute successfully\n");
         test_cleanup_example_artifacts_with_log(data_path, binary_path, output_path, log_path);
         test_remove_file(accepted_path);
         test_remove_file(rejected_path);
@@ -256,9 +256,9 @@ FT_TEST(test_cobol_transpiled_integration_showcase_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: integration_showcase output should include banner and totals\n");
+        std::printf("Assertion failed: integration_showcase output should include banner and totals\n");
         test_cleanup_example_artifacts_with_log(data_path, binary_path, output_path, log_path);
         test_remove_file(accepted_path);
         test_remove_file(rejected_path);
@@ -274,10 +274,10 @@ FT_TEST(test_cobol_transpiled_integration_showcase_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(accepted_buffer, expected_accepted,
-            ft_strlen(expected_accepted) + 1) != 0)
+    if (std::strncmp(accepted_buffer, expected_accepted,
+            std::strlen(expected_accepted) + 1) != 0)
     {
-        pf_printf("Assertion failed: accepted log should record expected entries\n");
+        std::printf("Assertion failed: accepted log should record expected entries\n");
         test_cleanup_example_artifacts_with_log(data_path, binary_path, output_path, log_path);
         test_remove_file(accepted_path);
         test_remove_file(rejected_path);
@@ -293,10 +293,10 @@ FT_TEST(test_cobol_transpiled_integration_showcase_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(rejected_buffer, expected_rejected,
-            ft_strlen(expected_rejected) + 1) != 0)
+    if (std::strncmp(rejected_buffer, expected_rejected,
+            std::strlen(expected_rejected) + 1) != 0)
     {
-        pf_printf("Assertion failed: rejected log should record expected entries\n");
+        std::printf("Assertion failed: rejected log should record expected entries\n");
         test_cleanup_example_artifacts_with_log(data_path, binary_path, output_path, log_path);
         test_remove_file(accepted_path);
         test_remove_file(rejected_path);
@@ -367,7 +367,7 @@ FT_TEST(test_cobol_transpiled_integration_showcase_exit_status)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -o %s samples/cobol/integration_showcase.cob > %s 2>&1",
         binary_path, compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -378,7 +378,7 @@ FT_TEST(test_cobol_transpiled_integration_showcase_exit_status)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile integration_showcase sample\n");
+        std::printf("Assertion failed: cobc should compile integration_showcase sample\n");
         test_cleanup_example_artifacts_with_log(data_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -389,7 +389,7 @@ FT_TEST(test_cobol_transpiled_integration_showcase_exit_status)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./integration_showcase_status.bin > integration_showcase_status.txt",
         directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -400,14 +400,14 @@ FT_TEST(test_cobol_transpiled_integration_showcase_exit_status)
     }
     if (test_run_command_capture_status(command, &exit_status) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: test harness should capture integration_showcase exit status\n");
+        std::printf("Assertion failed: test harness should capture integration_showcase exit status\n");
         test_cleanup_example_artifacts_with_log(data_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
     if (exit_status != 0)
     {
-        pf_printf("Assertion failed: integration_showcase binary should exit successfully\n");
+        std::printf("Assertion failed: integration_showcase binary should exit successfully\n");
         test_cleanup_example_artifacts_with_log(data_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -473,7 +473,7 @@ FT_TEST(test_cobol_transpiled_integration_showcase_compile_logs_clean)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -o %s samples/cobol/integration_showcase.cob > %s 2>&1",
         binary_path, compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -484,7 +484,7 @@ FT_TEST(test_cobol_transpiled_integration_showcase_compile_logs_clean)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile integration_showcase sample\n");
+        std::printf("Assertion failed: cobc should compile integration_showcase sample\n");
         test_cleanup_example_artifacts_with_log(data_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -495,7 +495,7 @@ FT_TEST(test_cobol_transpiled_integration_showcase_compile_logs_clean)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./integration_showcase_logs.bin > integration_showcase_logs.txt",
         directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -506,7 +506,7 @@ FT_TEST(test_cobol_transpiled_integration_showcase_compile_logs_clean)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: integration_showcase binary should execute successfully\n");
+        std::printf("Assertion failed: integration_showcase binary should execute successfully\n");
         test_cleanup_example_artifacts_with_log(data_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);

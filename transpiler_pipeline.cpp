@@ -1,6 +1,6 @@
 #include <cstdlib>
 
-#include "libft/CMA/CMA.hpp"
+#include "compatibility/memory_compat.hpp"
 #include "cblc_transpiler.hpp"
 
 static int transpiler_pipeline_reserve(t_transpiler_pipeline *pipeline, size_t desired_capacity)
@@ -16,7 +16,7 @@ static int transpiler_pipeline_reserve(t_transpiler_pipeline *pipeline, size_t d
         return (FT_FAILURE);
     if (pipeline->stages)
     {
-        ft_memcpy(new_stages, pipeline->stages, pipeline->stage_count * sizeof(t_transpiler_stage));
+        std::memcpy(new_stages, pipeline->stages, pipeline->stage_count * sizeof(t_transpiler_stage));
         cma_free(pipeline->stages);
     }
     pipeline->stages = new_stages;

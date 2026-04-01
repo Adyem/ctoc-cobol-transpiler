@@ -7,7 +7,7 @@ static int test_expect_long_equal(long actual, long expected, const char *messag
 {
     if (actual != expected)
     {
-        pf_printf("Assertion failed: %s (expected %ld, actual %ld)\n", message, expected, actual);
+        std::printf("Assertion failed: %s (expected %ld, actual %ld)\n", message, expected, actual);
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -21,7 +21,7 @@ static int test_expect_long_long_equal(long long actual, long long expected, con
 {
     if (actual != expected)
     {
-        pf_printf("Assertion failed: %s (expected %lld, actual %lld)\n", message, expected, actual);
+        std::printf("Assertion failed: %s (expected %lld, actual %lld)\n", message, expected, actual);
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -93,7 +93,7 @@ FT_TEST(test_runtime_int_multiply_detects_overflow)
     runtime_int_set(&result, 31);
     if (runtime_int_multiply(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_int_multiply should detect overflow\n");
+        std::printf("Assertion failed: runtime_int_multiply should detect overflow\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_INT_EQUAL(result.value, 31, "runtime_int_multiply should preserve destination on overflow");
@@ -131,7 +131,7 @@ FT_TEST(test_runtime_int_divide_rejects_zero)
     runtime_int_set(&result, 41);
     if (runtime_int_divide(dividend, divisor, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_int_divide should reject division by zero\n");
+        std::printf("Assertion failed: runtime_int_divide should reject division by zero\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_INT_EQUAL(result.value, 41, "runtime_int_divide should preserve destination on failure");
@@ -149,7 +149,7 @@ FT_TEST(test_runtime_int_divide_detects_overflow)
     runtime_int_set(&result, 17);
     if (runtime_int_divide(dividend, divisor, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_int_divide should detect overflow\n");
+        std::printf("Assertion failed: runtime_int_divide should detect overflow\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_INT_EQUAL(result.value, 17, "runtime_int_divide should preserve destination on overflow");
@@ -221,7 +221,7 @@ FT_TEST(test_runtime_int_unary_minus_negates_values)
     runtime_int_set(&result, 77);
     if (runtime_int_unary_minus(value, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_int_unary_minus should detect overflow for minimum value\n");
+        std::printf("Assertion failed: runtime_int_unary_minus should detect overflow for minimum value\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_INT_EQUAL(result.value, 77,
@@ -254,7 +254,7 @@ FT_TEST(test_runtime_int_absolute_returns_magnitude)
     runtime_int_set(&result, 32);
     if (runtime_int_absolute(value, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_int_absolute should detect overflow for minimum value\n");
+        std::printf("Assertion failed: runtime_int_absolute should detect overflow for minimum value\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_INT_EQUAL(result.value, 32,
@@ -273,7 +273,7 @@ FT_TEST(test_runtime_int_add_detects_overflow)
     runtime_int_set(&result, 73);
     if (runtime_int_add(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_int_add should detect overflow\n");
+        std::printf("Assertion failed: runtime_int_add should detect overflow\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_INT_EQUAL(result.value, 73, "runtime_int_add should not update on overflow");
@@ -291,7 +291,7 @@ FT_TEST(test_runtime_int_subtract_detects_underflow)
     runtime_int_set(&result, -51);
     if (runtime_int_subtract(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_int_subtract should detect underflow\n");
+        std::printf("Assertion failed: runtime_int_subtract should detect underflow\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_INT_EQUAL(result.value, -51,
@@ -327,9 +327,9 @@ FT_TEST(test_runtime_int_to_string)
 
     runtime_int_set(&value, 512);
     FT_ASSERT_SUCCESS(runtime_int_to_string(value, buffer, sizeof(buffer)), "runtime_int_to_string should succeed");
-    if (ft_strncmp(buffer, "512", 4) != 0)
+    if (std::strncmp(buffer, "512", 4) != 0)
     {
-        pf_printf("Assertion failed: runtime_int_to_string should write textual representation\n");
+        std::printf("Assertion failed: runtime_int_to_string should write textual representation\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -343,7 +343,7 @@ FT_TEST(test_runtime_int_to_string_rejects_small_buffer)
     runtime_int_set(&value, 1024);
     if (runtime_int_to_string(value, buffer, sizeof(buffer)) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_int_to_string should reject insufficient buffer\n");
+        std::printf("Assertion failed: runtime_int_to_string should reject insufficient buffer\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -358,7 +358,7 @@ FT_TEST(test_runtime_int_from_string)
     FT_ASSERT_INT_EQUAL(value.value, -96, "runtime_int_from_string should update value");
     if (runtime_int_from_string(&value, "12a") != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_int_from_string should reject invalid input\n");
+        std::printf("Assertion failed: runtime_int_from_string should reject invalid input\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_INT_EQUAL(value.value, -96, "runtime_int_from_string should preserve previous value on failure");
@@ -412,14 +412,14 @@ FT_TEST(test_runtime_long_unary_operations)
     runtime_long_set(&result, 314L);
     if (runtime_long_unary_minus(value, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_unary_minus should detect overflow for minimum value\n");
+        std::printf("Assertion failed: runtime_long_unary_minus should detect overflow for minimum value\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LONG_EQUAL(result.value, 314L,
         "runtime_long_unary_minus should preserve destination on overflow");
     if (runtime_long_absolute(value, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_absolute should detect overflow for minimum value\n");
+        std::printf("Assertion failed: runtime_long_absolute should detect overflow for minimum value\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LONG_EQUAL(result.value, 314L,
@@ -470,7 +470,7 @@ FT_TEST(test_runtime_long_arithmetic_detects_overflow)
     runtime_long_set(&result, -9L);
     if (runtime_long_add(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_add should detect overflow\n");
+        std::printf("Assertion failed: runtime_long_add should detect overflow\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LONG_EQUAL(result.value, -9L,
@@ -480,7 +480,7 @@ FT_TEST(test_runtime_long_arithmetic_detects_overflow)
     runtime_long_set(&result, 103L);
     if (runtime_long_add(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_add should detect underflow\n");
+        std::printf("Assertion failed: runtime_long_add should detect underflow\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LONG_EQUAL(result.value, 103L,
@@ -490,7 +490,7 @@ FT_TEST(test_runtime_long_arithmetic_detects_overflow)
     runtime_long_set(&result, 27L);
     if (runtime_long_subtract(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_subtract should detect underflow\n");
+        std::printf("Assertion failed: runtime_long_subtract should detect underflow\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LONG_EQUAL(result.value, 27L,
@@ -500,7 +500,7 @@ FT_TEST(test_runtime_long_arithmetic_detects_overflow)
     runtime_long_set(&result, -63L);
     if (runtime_long_subtract(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_subtract should detect overflow\n");
+        std::printf("Assertion failed: runtime_long_subtract should detect overflow\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LONG_EQUAL(result.value, -63L,
@@ -510,7 +510,7 @@ FT_TEST(test_runtime_long_arithmetic_detects_overflow)
     runtime_long_set(&result, 19L);
     if (runtime_long_multiply(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_multiply should detect overflow\n");
+        std::printf("Assertion failed: runtime_long_multiply should detect overflow\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LONG_EQUAL(result.value, 19L,
@@ -520,7 +520,7 @@ FT_TEST(test_runtime_long_arithmetic_detects_overflow)
     runtime_long_set(&result, 45L);
     if (runtime_long_divide(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_divide should detect overflow\n");
+        std::printf("Assertion failed: runtime_long_divide should detect overflow\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LONG_EQUAL(result.value, 45L,
@@ -530,7 +530,7 @@ FT_TEST(test_runtime_long_arithmetic_detects_overflow)
     runtime_long_set(&result, -73L);
     if (runtime_long_divide(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_divide should reject division by zero\n");
+        std::printf("Assertion failed: runtime_long_divide should reject division by zero\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LONG_EQUAL(result.value, -73L,
@@ -567,14 +567,14 @@ FT_TEST(test_runtime_long_long_unary_operations)
     runtime_long_long_set(&result, -21LL);
     if (runtime_long_long_unary_minus(value, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_long_unary_minus should detect overflow for minimum value\n");
+        std::printf("Assertion failed: runtime_long_long_unary_minus should detect overflow for minimum value\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LLONG_EQUAL(result.value, -21LL,
         "runtime_long_long_unary_minus should preserve destination on overflow");
     if (runtime_long_long_absolute(value, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_long_absolute should detect overflow for minimum value\n");
+        std::printf("Assertion failed: runtime_long_long_absolute should detect overflow for minimum value\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LLONG_EQUAL(result.value, -21LL,
@@ -625,7 +625,7 @@ FT_TEST(test_runtime_long_long_arithmetic_detects_overflow)
     runtime_long_long_set(&result, -41LL);
     if (runtime_long_long_add(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_long_add should detect overflow\n");
+        std::printf("Assertion failed: runtime_long_long_add should detect overflow\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LLONG_EQUAL(result.value, -41LL,
@@ -635,7 +635,7 @@ FT_TEST(test_runtime_long_long_arithmetic_detects_overflow)
     runtime_long_long_set(&result, 207LL);
     if (runtime_long_long_add(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_long_add should detect underflow\n");
+        std::printf("Assertion failed: runtime_long_long_add should detect underflow\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LLONG_EQUAL(result.value, 207LL,
@@ -645,7 +645,7 @@ FT_TEST(test_runtime_long_long_arithmetic_detects_overflow)
     runtime_long_long_set(&result, 93LL);
     if (runtime_long_long_subtract(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_long_subtract should detect underflow\n");
+        std::printf("Assertion failed: runtime_long_long_subtract should detect underflow\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LLONG_EQUAL(result.value, 93LL,
@@ -655,7 +655,7 @@ FT_TEST(test_runtime_long_long_arithmetic_detects_overflow)
     runtime_long_long_set(&result, -187LL);
     if (runtime_long_long_subtract(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_long_subtract should detect overflow\n");
+        std::printf("Assertion failed: runtime_long_long_subtract should detect overflow\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LLONG_EQUAL(result.value, -187LL,
@@ -665,7 +665,7 @@ FT_TEST(test_runtime_long_long_arithmetic_detects_overflow)
     runtime_long_long_set(&result, -57LL);
     if (runtime_long_long_multiply(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_long_multiply should detect overflow\n");
+        std::printf("Assertion failed: runtime_long_long_multiply should detect overflow\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LLONG_EQUAL(result.value, -57LL,
@@ -675,7 +675,7 @@ FT_TEST(test_runtime_long_long_arithmetic_detects_overflow)
     runtime_long_long_set(&result, 121LL);
     if (runtime_long_long_divide(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_long_divide should detect overflow\n");
+        std::printf("Assertion failed: runtime_long_long_divide should detect overflow\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LLONG_EQUAL(result.value, 121LL,
@@ -685,7 +685,7 @@ FT_TEST(test_runtime_long_long_arithmetic_detects_overflow)
     runtime_long_long_set(&result, 512LL);
     if (runtime_long_long_divide(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_long_long_divide should reject division by zero\n");
+        std::printf("Assertion failed: runtime_long_long_divide should reject division by zero\n");
         return (FT_FAILURE);
     }
     FT_ASSERT_LLONG_EQUAL(result.value, 512LL,

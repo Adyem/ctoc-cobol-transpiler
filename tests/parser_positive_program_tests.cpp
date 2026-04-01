@@ -1,6 +1,6 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/Libft/libft.hpp"
+#include "compatibility/libft_compat.hpp"
 #include "test_suites.hpp"
 
 FT_TEST(test_parser_parses_minimal_program)
@@ -33,6 +33,7 @@ FT_TEST(test_parser_parses_minimal_program)
     program = NULL;
     if (parser_parse_program(&parser, &program) != FT_SUCCESS)
     {
+        std::fprintf(stderr, "Debug: parser_parse_program failed in declaratives test\n");
         parser_dispose(&parser);
         return (FT_FAILURE);
     }
@@ -67,7 +68,7 @@ FT_TEST(test_parser_parses_minimal_program)
         ast_node_destroy(program);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(program_id->token.lexeme, "SAMPLE", program_id->token.length) != 0)
+    if (std::strncmp(program_id->token.lexeme, "SAMPLE", program_id->token.length) != 0)
     {
         ast_node_destroy(program);
         return (FT_FAILURE);
@@ -117,7 +118,7 @@ FT_TEST(test_parser_parses_minimal_program)
         ast_node_destroy(program);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(paragraph->token.lexeme, "MAIN", paragraph->token.length) != 0)
+    if (std::strncmp(paragraph->token.lexeme, "MAIN", paragraph->token.length) != 0)
     {
         ast_node_destroy(program);
         return (FT_FAILURE);
@@ -160,7 +161,7 @@ FT_TEST(test_parser_parses_minimal_program)
         ast_node_destroy(program);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(value_node->token.lexeme, "\"42\"", value_node->token.length) != 0)
+    if (std::strncmp(value_node->token.lexeme, "\"42\"", value_node->token.length) != 0)
     {
         ast_node_destroy(program);
         return (FT_FAILURE);
@@ -300,12 +301,12 @@ FT_TEST(test_parser_parses_declaratives_with_use_after_error)
         ast_node_destroy(program);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(section->token.lexeme, "ERR-SECTION", section->token.length) != 0)
+    if (std::strncmp(section->token.lexeme, "ERR-SECTION", section->token.length) != 0)
     {
         ast_node_destroy(program);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(use_node->token.lexeme, "USE", use_node->token.length) != 0)
+    if (std::strncmp(use_node->token.lexeme, "USE", use_node->token.length) != 0)
     {
         ast_node_destroy(program);
         return (FT_FAILURE);
@@ -317,7 +318,7 @@ FT_TEST(test_parser_parses_declaratives_with_use_after_error)
         return (FT_FAILURE);
     }
     if (!paragraph->token.lexeme
-        || ft_strncmp(paragraph->token.lexeme, "INPUT-FILE",
+        || std::strncmp(paragraph->token.lexeme, "INPUT-FILE",
             paragraph->token.length) != 0)
     {
         ast_node_destroy(program);
@@ -330,7 +331,7 @@ FT_TEST(test_parser_parses_declaratives_with_use_after_error)
         return (FT_FAILURE);
     }
     if (!paragraph->token.lexeme
-        || ft_strncmp(paragraph->token.lexeme, "MAIN", paragraph->token.length) != 0)
+        || std::strncmp(paragraph->token.lexeme, "MAIN", paragraph->token.length) != 0)
     {
         ast_node_destroy(program);
         return (FT_FAILURE);

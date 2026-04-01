@@ -1,6 +1,6 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/Libft/libft.hpp"
+#include "compatibility/libft_compat.hpp"
 #include "test_suites.hpp"
 
 FT_TEST(test_parser_parses_control_flow_statements)
@@ -65,7 +65,7 @@ FT_TEST(test_parser_parses_control_flow_statements)
         ast_node_destroy(program);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(paragraph->token.lexeme, "MAIN", paragraph->token.length) != 0)
+    if (std::strncmp(paragraph->token.lexeme, "MAIN", paragraph->token.length) != 0)
     {
         ast_node_destroy(program);
         return (FT_FAILURE);
@@ -223,7 +223,7 @@ FT_TEST(test_parser_parses_control_flow_statements)
         ast_node_destroy(program);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(next_paragraph->token.lexeme, "NEXT", next_paragraph->token.length) != 0)
+    if (std::strncmp(next_paragraph->token.lexeme, "NEXT", next_paragraph->token.length) != 0)
     {
         ast_node_destroy(program);
         return (FT_FAILURE);

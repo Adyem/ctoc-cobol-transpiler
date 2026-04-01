@@ -1,4 +1,4 @@
-#include "libft/Printf/printf.hpp"
+#include "compatibility/printf_compat.hpp"
 
 #include "transpiler_semantics_internal.hpp"
 
@@ -264,7 +264,7 @@ static void transpiler_semantics_emit_unreachable_warning(t_transpiler_context *
         return ;
     if (!reason)
         return ;
-    pf_snprintf(message, sizeof(message),
+    std::snprintf(message, sizeof(message),
         "%s is unreachable because %s",
         transpiler_semantics_statement_name(statement), reason);
     transpiler_semantics_emit_warning(context,

@@ -1,4 +1,4 @@
-#include "libft/Printf/printf.hpp"
+#include "compatibility/printf_compat.hpp"
 
 #include "transpiler_semantics_internal.hpp"
 
@@ -56,7 +56,7 @@ static void transpiler_semantics_note_conversion_warnings(t_transpiler_context *
         target_is_double = transpiler_semantics_is_double_precision(target_length);
         if (!source_is_double && target_is_double)
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "%s '%s' (float precision) coerces into %s '%s' (double precision)",
                 source_role, source_name, target_role, target_name);
             (void)transpiler_semantics_emit_warning_at(context, source,
@@ -65,7 +65,7 @@ static void transpiler_semantics_note_conversion_warnings(t_transpiler_context *
         }
         else if (source_is_double && !target_is_double)
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "%s '%s' (double precision) coerces into %s '%s' (float precision)",
                 source_role, source_name, target_role, target_name);
             (void)transpiler_semantics_emit_warning_at(context, target,
@@ -76,7 +76,7 @@ static void transpiler_semantics_note_conversion_warnings(t_transpiler_context *
     if (source_kind == TRANSPILE_SEMANTIC_DATA_NUMERIC
         && target_kind == TRANSPILE_SEMANTIC_DATA_FLOATING)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s '%s' (integral) coerces into %s '%s' (floating precision)",
             source_role, source_name, target_role, target_name);
         (void)transpiler_semantics_emit_warning_at(context, target,
@@ -86,7 +86,7 @@ static void transpiler_semantics_note_conversion_warnings(t_transpiler_context *
     if (source_kind == TRANSPILE_SEMANTIC_DATA_NUMERIC
         && target_kind == TRANSPILE_SEMANTIC_DATA_ALPHANUMERIC)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s '%s' (integral) coerces into %s '%s' (alphanumeric or boolean storage)",
             source_role, source_name, target_role, target_name);
         (void)transpiler_semantics_emit_warning_at(context, target,
@@ -96,7 +96,7 @@ static void transpiler_semantics_note_conversion_warnings(t_transpiler_context *
     if (source_kind == TRANSPILE_SEMANTIC_DATA_BOOLEAN
         && transpiler_semantics_is_numeric_kind(target_kind))
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s '%s' (boolean) coerces into %s '%s' (%s storage)",
             source_role, source_name, target_role, target_name,
             transpiler_semantics_kind_to_string(target_kind));
@@ -107,7 +107,7 @@ static void transpiler_semantics_note_conversion_warnings(t_transpiler_context *
     if (transpiler_semantics_is_numeric_kind(source_kind)
         && target_kind == TRANSPILE_SEMANTIC_DATA_BOOLEAN)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s '%s' (%s) coerces into %s '%s' (boolean storage)",
             source_role, source_name,
             transpiler_semantics_kind_to_string(source_kind),
@@ -119,7 +119,7 @@ static void transpiler_semantics_note_conversion_warnings(t_transpiler_context *
     if (source_kind == TRANSPILE_SEMANTIC_DATA_BOOLEAN
         && target_kind == TRANSPILE_SEMANTIC_DATA_ALPHANUMERIC)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s '%s' (boolean) coerces into %s '%s' (alphanumeric storage)",
             source_role, source_name, target_role, target_name);
         (void)transpiler_semantics_emit_warning_at(context, target,
@@ -129,7 +129,7 @@ static void transpiler_semantics_note_conversion_warnings(t_transpiler_context *
     if (source_kind == TRANSPILE_SEMANTIC_DATA_ALPHANUMERIC
         && target_kind == TRANSPILE_SEMANTIC_DATA_BOOLEAN)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s '%s' (alphanumeric) coerces into %s '%s' (boolean storage)",
             source_role, source_name, target_role, target_name);
         (void)transpiler_semantics_emit_warning_at(context, target,
@@ -166,7 +166,7 @@ static int transpiler_semantics_classify_move_value(const t_ast_node *value,
     {
         char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s is missing", move_role);
         return (transpiler_semantics_emit_invalid_expression(context, message));
     }
@@ -214,7 +214,7 @@ static int transpiler_semantics_classify_move_value(const t_ast_node *value,
     {
         char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s must be an identifier, literal, unary expression, or arithmetic expression",
             move_role);
         transpiler_semantics_emit_invalid_expression(context, message);
@@ -273,8 +273,8 @@ static int transpiler_semantics_validate_assignment_like_statement(const t_ast_n
     status = FT_SUCCESS;
     if (role_prefix && role_prefix[0] != '\0')
     {
-        pf_snprintf(source_role, sizeof(source_role), "%s source", role_prefix);
-        pf_snprintf(target_role, sizeof(target_role), "%s target", role_prefix);
+        std::snprintf(source_role, sizeof(source_role), "%s source", role_prefix);
+        std::snprintf(target_role, sizeof(target_role), "%s target", role_prefix);
     }
     else
     {
@@ -286,7 +286,7 @@ static int transpiler_semantics_validate_assignment_like_statement(const t_ast_n
     {
         char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s statement is missing a valid target identifier", label);
         transpiler_semantics_emit_error(context, invalid_code, message);
         status = FT_FAILURE;
@@ -315,7 +315,7 @@ static int transpiler_semantics_validate_assignment_like_statement(const t_ast_n
         const char *target_name;
 
         target_name = (target && target->token.lexeme) ? target->token.lexeme : "<target>";
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s '%s' is read-only and cannot be modified",
             target_role, target_name);
         transpiler_semantics_emit_error(context,
@@ -335,7 +335,7 @@ static int transpiler_semantics_validate_assignment_like_statement(const t_ast_n
             source_name = source->token.lexeme;
         else
             source_name = "<source>";
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s '%s' (%s) is incompatible with %s '%s' (%s)",
             source_role, source_name, transpiler_semantics_kind_to_string(source_kind),
             target_role, target_name, transpiler_semantics_kind_to_string(target_kind));
@@ -352,7 +352,7 @@ static int transpiler_semantics_validate_assignment_like_statement(const t_ast_n
         {
             char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "%s is floating but %s is numeric",
                 source_role, target_role);
             transpiler_semantics_emit_error(context,
@@ -365,7 +365,7 @@ static int transpiler_semantics_validate_assignment_like_statement(const t_ast_n
         {
             char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "%s has more fractional digits (%zu) than %s (%zu)",
                 source_role, source_scale, target_role, target_scale);
             if (target)
@@ -381,12 +381,14 @@ static int transpiler_semantics_validate_assignment_like_statement(const t_ast_n
             }
             status = FT_FAILURE;
         }
-        if (status == FT_SUCCESS && source_length > target_length)
+        if (status == FT_SUCCESS && source_length > target_length
+            && !(source_kind == TRANSPILE_SEMANTIC_DATA_NUMERIC
+                && target_kind == TRANSPILE_SEMANTIC_DATA_FLOATING))
         {
             char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
             const char *suggestion;
 
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "%s has more digits (%zu) than %s (%zu)",
                 source_role, source_length, target_role, target_length);
             suggestion = "Increase the target precision or adjust the source expression.";
@@ -432,7 +434,7 @@ static int transpiler_semantics_validate_assignment_like_statement(const t_ast_n
                 source_name = source->token.lexeme;
             else
                 source_name = "<source>";
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "%s '%s' (%zu characters) truncates into %s '%s' (%zu characters)",
                 source_role, source_name, required_length, target_role,
                 target_name, target_length);

@@ -2,7 +2,7 @@
 
 #include "../compiler_test_support.hpp"
 
-#include "libft/CMA/CMA.hpp"
+#include "compatibility/memory_compat.hpp"
 
 #include "round_trip_pipeline_helpers.hpp"
 
@@ -84,10 +84,10 @@ FT_TEST(test_cblc_copy_file_translates_to_cobol_and_executes)
     if (test_read_text_file(copied_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: translated copy_file binary should copy input contents\n");
+        std::printf("Assertion failed: translated copy_file binary should copy input contents\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -187,10 +187,10 @@ FT_TEST(test_cblc_filter_prefix_translates_to_cobol_and_executes)
     if (test_read_text_file(filtered_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: translated filter_prefix binary should only copy matching lines\n");
+        std::printf("Assertion failed: translated filter_prefix binary should only copy matching lines\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -282,10 +282,10 @@ FT_TEST(test_cblc_reverse_control_flow_translates_to_cobol_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: translated reverse_control_flow binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: translated reverse_control_flow binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -399,28 +399,28 @@ FT_TEST(test_cblc_integration_showcase_translates_to_cobol_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: translated integration_showcase binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: translated integration_showcase binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     if (test_read_text_file(accepted_path, accepted_buffer,
             sizeof(accepted_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(accepted_buffer, expected_accepted,
-            ft_strlen(expected_accepted) + 1) != 0)
+    if (std::strncmp(accepted_buffer, expected_accepted,
+            std::strlen(expected_accepted) + 1) != 0)
     {
-        pf_printf("Assertion failed: translated integration_showcase binary should record accepted entries\n");
+        std::printf("Assertion failed: translated integration_showcase binary should record accepted entries\n");
         goto cleanup;
     }
     if (test_read_text_file(rejected_path, rejected_buffer,
             sizeof(rejected_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(rejected_buffer, expected_rejected,
-            ft_strlen(expected_rejected) + 1) != 0)
+    if (std::strncmp(rejected_buffer, expected_rejected,
+            std::strlen(expected_rejected) + 1) != 0)
     {
-        pf_printf("Assertion failed: translated integration_showcase binary should record rejected entries\n");
+        std::printf("Assertion failed: translated integration_showcase binary should record rejected entries\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -541,10 +541,10 @@ FT_TEST(test_cblc_multi_module_translates_to_cobol_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: translated multi_module binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: translated multi_module binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -641,10 +641,10 @@ FT_TEST(test_cblc_numeric_precision_translates_to_cobol_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: translated numeric_precision binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: translated numeric_precision binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -735,10 +735,10 @@ FT_TEST(test_cblc_floating_point_mix_translates_to_cobol_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: translated floating_point_mix binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: translated floating_point_mix binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -829,10 +829,10 @@ FT_TEST(test_cblc_mixed_numeric_types_translates_to_cobol_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: translated mixed_numeric_types binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: translated mixed_numeric_types binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -923,10 +923,10 @@ FT_TEST(test_cblc_textual_priority_mix_translates_to_cobol_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: translated textual_priority_mix binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: translated textual_priority_mix binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -1014,10 +1014,10 @@ FT_TEST(test_cblc_return_boolean_translates_to_cobol_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: translated return_boolean binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: translated return_boolean binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -1105,10 +1105,10 @@ FT_TEST(test_cblc_return_character_translates_to_cobol_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: translated return_character binary should emit fetched grade\n");
+        std::printf("Assertion failed: translated return_character binary should emit fetched grade\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -1196,10 +1196,10 @@ FT_TEST(test_cblc_return_numeric_translates_to_cobol_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: translated return_numeric binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: translated return_numeric binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -1287,7 +1287,7 @@ FT_TEST(test_cblc_reverse_group_items_translates_to_cobol_and_executes)
         goto cleanup;
     if (output_buffer[0] != '\0')
     {
-        pf_printf("Assertion failed: translated reverse_group_items binary should not emit output\n");
+        std::printf("Assertion failed: translated reverse_group_items binary should not emit output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;

@@ -1,6 +1,6 @@
 #include "test_suites.hpp"
 
-#include "libft/CMA/CMA.hpp"
+#include "compatibility/memory_compat.hpp"
 
 FT_TEST(test_transpiler_validation_accepts_valid_cblc)
 {
@@ -27,7 +27,7 @@ FT_TEST(test_transpiler_validation_rejects_cblc_without_return)
         "}\n";
     if (transpiler_validate_generated_cblc(source) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: validator should reject CBL-C without return\n");
+        std::printf("Assertion failed: validator should reject CBL-C without return\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -73,6 +73,151 @@ FT_TEST(test_transpiler_validation_accepts_string_assignment_and_length_usage)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_transpiler_validation_accepts_const_declarations)
+{
+    const char *source;
+
+    source = "const int answer = 42;\n"
+        "const char marker = 'A';\n"
+        "const string greeting[12] = \"HELLO\";\n"
+        "function void main()\n"
+        "{\n"
+        "    display(answer);\n"
+        "    display(marker);\n"
+        "    display(greeting);\n"
+        "    return;\n"
+        "}\n";
+    if (test_expect_success(transpiler_validate_generated_cblc(source),
+            "validator should accept const declarations") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_validation_rejects_const_without_initializer)
+{
+    const char *source;
+
+    source = "const int answer;\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    if (transpiler_validate_generated_cblc(source) != FT_FAILURE)
+    {
+        std::printf("Assertion failed: validator should reject const declarations without initializer\n");
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_validation_rejects_const_reassignment)
+{
+    const char *source;
+
+    source = "const int answer = 42;\n"
+        "function void main()\n"
+        "{\n"
+        "    answer = 7;\n"
+        "    return;\n"
+        "}\n";
+    if (transpiler_validate_generated_cblc(source) != FT_FAILURE)
+    {
+        std::printf("Assertion failed: validator should reject reassignment to const declarations\n");
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_validation_accepts_const_char_buffer_declaration)
+{
+    const char *source;
+
+    source = "const char label[8] = \"HELLO\";\n"
+        "function void main()\n"
+        "{\n"
+        "    display(label);\n"
+        "    return;\n"
+        "}\n";
+    if (test_expect_success(transpiler_validate_generated_cblc(source),
+            "validator should accept const char buffer declarations")
+        != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_validation_accepts_const_string_length_usage)
+{
+    const char *source;
+
+    source = "const string greeting[12] = \"HELLO\";\n"
+        "int total;\n"
+        "function void main()\n"
+        "{\n"
+        "    total = greeting.len;\n"
+        "    display(total);\n"
+        "    return;\n"
+        "}\n";
+    if (test_expect_success(transpiler_validate_generated_cblc(source),
+            "validator should accept reading const string length")
+        != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_validation_rejects_const_char_scalar_reassignment)
+{
+    const char *source;
+
+    source = "const char marker = 'A';\n"
+        "function void main()\n"
+        "{\n"
+        "    marker = 'B';\n"
+        "    return;\n"
+        "}\n";
+    if (transpiler_validate_generated_cblc(source) != FT_FAILURE)
+    {
+        std::printf("Assertion failed: validator should reject reassignment to const char declarations\n");
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_validation_rejects_const_string_reassignment)
+{
+    const char *source;
+
+    source = "const string greeting[12] = \"HELLO\";\n"
+        "function void main()\n"
+        "{\n"
+        "    greeting = \"BYE\";\n"
+        "    return;\n"
+        "}\n";
+    if (transpiler_validate_generated_cblc(source) != FT_FAILURE)
+    {
+        std::printf("Assertion failed: validator should reject reassignment to const string declarations\n");
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_validation_rejects_strcpy_into_const_char_buffer)
+{
+    const char *source;
+
+    source = "const char label[8] = \"HELLO\";\n"
+        "function void main()\n"
+        "{\n"
+        "    std::strcpy(label, \"BYE\");\n"
+        "    return;\n"
+        "}\n";
+    if (transpiler_validate_generated_cblc(source) != FT_FAILURE)
+    {
+        std::printf("Assertion failed: validator should reject strcpy into const char buffers\n");
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_cblc_parse_translation_unit_records_imports)
 {
     const char *source;
@@ -91,12 +236,12 @@ FT_TEST(test_cblc_parse_translation_unit_records_imports)
         goto cleanup;
     if (unit.import_count != 1)
     {
-        pf_printf("Assertion failed: expected exactly one import\n");
+        std::printf("Assertion failed: expected exactly one import\n");
         goto cleanup;
     }
-    if (ft_strncmp(unit.imports[0].path, "helper.cblc", TRANSPILE_FILE_PATH_MAX) != 0)
+    if (std::strncmp(unit.imports[0].path, "helper.cblc", TRANSPILE_FILE_PATH_MAX) != 0)
     {
-        pf_printf("Assertion failed: import path should be recorded\n");
+        std::printf("Assertion failed: import path should be recorded\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -123,13 +268,13 @@ FT_TEST(test_cblc_parse_translation_unit_records_copy_includes)
         goto cleanup;
     if (unit.copy_include_count != 1)
     {
-        pf_printf("Assertion failed: expected exactly one copy include\\n");
+        std::printf("Assertion failed: expected exactly one copy include\\n");
         goto cleanup;
     }
-    if (ft_strncmp(unit.copy_includes[0].name, "shared-status",
+    if (std::strncmp(unit.copy_includes[0].name, "shared-status",
             TRANSPILE_IDENTIFIER_MAX) != 0)
     {
-        pf_printf("Assertion failed: copy include should record source name\\n");
+        std::printf("Assertion failed: copy include should record source name\\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -161,37 +306,37 @@ FT_TEST(test_cblc_parse_translation_unit_tracks_multiple_functions)
         goto cleanup;
     if (unit.function_count != 2)
     {
-        pf_printf("Assertion failed: expected two functions in translation unit\n");
+        std::printf("Assertion failed: expected two functions in translation unit\n");
         goto cleanup;
     }
-    if (ft_strncmp(unit.functions[0].source_name, "helper", TRANSPILE_IDENTIFIER_MAX) != 0)
+    if (std::strncmp(unit.functions[0].source_name, "helper", TRANSPILE_IDENTIFIER_MAX) != 0)
     {
-        pf_printf("Assertion failed: first function should be named 'helper'\n");
+        std::printf("Assertion failed: first function should be named 'helper'\n");
         goto cleanup;
     }
-    if (ft_strncmp(unit.functions[1].source_name, "main", TRANSPILE_IDENTIFIER_MAX) != 0)
+    if (std::strncmp(unit.functions[1].source_name, "main", TRANSPILE_IDENTIFIER_MAX) != 0)
     {
-        pf_printf("Assertion failed: second function should be named 'main'\n");
+        std::printf("Assertion failed: second function should be named 'main'\n");
         goto cleanup;
     }
     if (unit.functions[0].statement_count != 1)
     {
-        pf_printf("Assertion failed: helper function should retain its statements\n");
+        std::printf("Assertion failed: helper function should retain its statements\n");
         goto cleanup;
     }
     if (unit.functions[1].statement_count != 1)
     {
-        pf_printf("Assertion failed: main function should retain its statements\n");
+        std::printf("Assertion failed: main function should retain its statements\n");
         goto cleanup;
     }
     if (unit.entry_function_index != 1)
     {
-        pf_printf("Assertion failed: entry function should resolve to 'main'\n");
+        std::printf("Assertion failed: entry function should resolve to 'main'\n");
         goto cleanup;
     }
-    if (ft_strncmp(unit.program_name, "MAIN", TRANSPILE_IDENTIFIER_MAX) != 0)
+    if (std::strncmp(unit.program_name, "MAIN", TRANSPILE_IDENTIFIER_MAX) != 0)
     {
-        pf_printf("Assertion failed: program name should match entry function\n");
+        std::printf("Assertion failed: program name should match entry function\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -225,27 +370,27 @@ FT_TEST(test_cblc_generate_cobol_emits_string_group)
         goto cleanup;
     if (!generated_cobol)
         goto cleanup;
-    if (!ft_strnstr(generated_cobol, "01 GREETING.", ft_strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "01 GREETING.", std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: generated COBOL should declare GREETING group\n");
+        std::printf("Assertion failed: generated COBOL should declare GREETING group\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_cobol, "05 GREETING-LEN PIC 9(4) COMP VALUE 8.",
-            ft_strlen(generated_cobol)))
+            std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: generated COBOL should declare GREETING length field\n");
+        std::printf("Assertion failed: generated COBOL should declare GREETING length field\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_cobol, "05 GREETING-BUF PIC X(8).",
-            ft_strlen(generated_cobol)))
+            std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: generated COBOL should declare GREETING buffer\n");
+        std::printf("Assertion failed: generated COBOL should declare GREETING buffer\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_cobol, "DISPLAY GREETING-BUF(1:GREETING-LEN)",
-            ft_strlen(generated_cobol)))
+            std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: generated COBOL should display buffer slice using length\n");
+        std::printf("Assertion failed: generated COBOL should display buffer slice using length\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -279,12 +424,12 @@ FT_TEST(test_cblc_generate_cobol_emits_copy_includes)
         goto cleanup;
     if (!generated_cobol)
     {
-        pf_printf("Assertion failed: expected COBOL generation to produce text\\n");
+        std::printf("Assertion failed: expected COBOL generation to produce text\\n");
         goto cleanup;
     }
-    if (!ft_strstr(generated_cobol, "       COPY SHARED-STATUS."))
+    if (!std::strstr(generated_cobol, "       COPY SHARED-STATUS."))
     {
-        pf_printf("Assertion failed: COBOL should include COPY directive for shared-status\\n");
+        std::printf("Assertion failed: COBOL should include COPY directive for shared-status\\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -323,24 +468,24 @@ FT_TEST(test_cblc_generate_cobol_emits_multiple_paragraphs)
         goto cleanup;
     if (!generated_cobol)
         goto cleanup;
-    if (!ft_strnstr(generated_cobol, "HELPER.", ft_strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "HELPER.", std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: helper paragraph should be emitted\n");
+        std::printf("Assertion failed: helper paragraph should be emitted\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "MAIN.", ft_strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "MAIN.", std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: main paragraph should be emitted\n");
+        std::printf("Assertion failed: main paragraph should be emitted\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "DISPLAY \"FIRST\"", ft_strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "DISPLAY \"FIRST\"", std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: helper statements should be scoped to helper paragraph\n");
+        std::printf("Assertion failed: helper statements should be scoped to helper paragraph\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "DISPLAY \"SECOND\"", ft_strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "DISPLAY \"SECOND\"", std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: main statements should be scoped to main paragraph\n");
+        std::printf("Assertion failed: main statements should be scoped to main paragraph\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -408,14 +553,14 @@ FT_TEST(test_cblc_generate_cobol_emits_perform_and_call_statements)
     if (test_expect_success(cblc_generate_cobol(&main_unit, &generated_cobol),
             "main module should convert to COBOL") != FT_SUCCESS)
         goto cleanup;
-    if (!ft_strnstr(generated_cobol, "PERFORM HELPER", ft_strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "PERFORM HELPER", std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: local call should emit PERFORM statement\n");
+        std::printf("Assertion failed: local call should emit PERFORM statement\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "CALL 'WORKER'", ft_strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "CALL 'WORKER'", std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: external call should emit CALL statement\n");
+        std::printf("Assertion failed: external call should emit CALL statement\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -460,40 +605,40 @@ FT_TEST(test_cblc_generate_cobol_handles_string_assignments_and_length_computati
     if (!generated_cobol)
         goto cleanup;
     if (!ft_strnstr(generated_cobol, "MOVE \"HELLO\" TO GREETING-BUF",
-            ft_strlen(generated_cobol)))
+            std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: literal assignment should target GREETING-BUF\n");
+        std::printf("Assertion failed: literal assignment should target GREETING-BUF\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_cobol, "MOVE 5 TO GREETING-LEN",
-            ft_strlen(generated_cobol)))
+            std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: literal assignment should update GREETING-LEN\n");
+        std::printf("Assertion failed: literal assignment should update GREETING-LEN\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_cobol, "MOVE GREETING TO TARGET",
-            ft_strlen(generated_cobol)))
+            std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: string to string assignment should move groups\n");
+        std::printf("Assertion failed: string to string assignment should move groups\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_cobol,
             "COMPUTE TOTAL = GREETING-LEN + TARGET-LEN",
-            ft_strlen(generated_cobol)))
+            std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: length expressions should translate into COMPUTE\n");
+        std::printf("Assertion failed: length expressions should translate into COMPUTE\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_cobol, "DISPLAY TARGET-BUF(1:TARGET-LEN)",
-            ft_strlen(generated_cobol)))
+            std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: DISPLAY of string should use buffer slice\n");
+        std::printf("Assertion failed: DISPLAY of string should use buffer slice\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_cobol, "DISPLAY TOTAL",
-            ft_strlen(generated_cobol)))
+            std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: DISPLAY of int should emit standard form\n");
+        std::printf("Assertion failed: DISPLAY of int should emit standard form\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -532,12 +677,12 @@ FT_TEST(test_cblc_resolve_calls_reports_missing_function)
         goto cleanup;
     if (cblc_resolve_translation_unit_calls(&context, "main_mod", &unit) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: unresolved function should trigger failure\n");
+        std::printf("Assertion failed: unresolved function should trigger failure\n");
         goto cleanup;
     }
     if (!transpiler_context_has_errors(&context))
     {
-        pf_printf("Assertion failed: unresolved function should record diagnostics\n");
+        std::printf("Assertion failed: unresolved function should record diagnostics\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -576,14 +721,14 @@ FT_TEST(test_cblc_generate_cobol_handles_multiplication_and_division)
         goto cleanup;
     if (!generated_cobol)
         goto cleanup;
-    if (!ft_strnstr(generated_cobol, "COMPUTE PRODUCT = LEFT * RIGHT", ft_strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "COMPUTE PRODUCT = LEFT * RIGHT", std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: multiplication should translate into COMPUTE statement\n");
+        std::printf("Assertion failed: multiplication should translate into COMPUTE statement\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "COMPUTE QUOTIENT = PRODUCT / RIGHT", ft_strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "COMPUTE QUOTIENT = PRODUCT / RIGHT", std::strlen(generated_cobol)))
     {
-        pf_printf("Assertion failed: division should translate into COMPUTE statement\n");
+        std::printf("Assertion failed: division should translate into COMPUTE statement\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -627,41 +772,41 @@ FT_TEST(test_cblc_generate_c_emits_main_and_helpers)
         goto cleanup;
     if (!generated_c)
         goto cleanup;
-    if (!ft_strnstr(generated_c, "#include <stddef.h>", ft_strlen(generated_c)))
+    if (!ft_strnstr(generated_c, "#include <stddef.h>", std::strlen(generated_c)))
     {
-        pf_printf("Assertion failed: generated C should include stddef header\n");
+        std::printf("Assertion failed: generated C should include stddef header\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_c, "static size_t greeting_len = 0;", ft_strlen(generated_c)))
+    if (!ft_strnstr(generated_c, "static size_t greeting_len = 0;", std::strlen(generated_c)))
     {
-        pf_printf("Assertion failed: generated C should declare greeting length variable\n");
+        std::printf("Assertion failed: generated C should declare greeting length variable\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_c, "static char greeting_buf[8] = {0};", ft_strlen(generated_c)))
+    if (!ft_strnstr(generated_c, "static char greeting_buf[8] = {0};", std::strlen(generated_c)))
     {
-        pf_printf("Assertion failed: generated C should declare greeting buffer\n");
+        std::printf("Assertion failed: generated C should declare greeting buffer\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_c, "void helper(void);", ft_strlen(generated_c)))
+    if (!ft_strnstr(generated_c, "void helper(void);", std::strlen(generated_c)))
     {
-        pf_printf("Assertion failed: generated C should prototype helper function\n");
+        std::printf("Assertion failed: generated C should prototype helper function\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_c, "int main(void)", ft_strlen(generated_c)))
+    if (!ft_strnstr(generated_c, "int main(void)", std::strlen(generated_c)))
     {
-        pf_printf("Assertion failed: generated C should define an int main wrapper\n");
+        std::printf("Assertion failed: generated C should define an int main wrapper\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_c, "cblc_string_assign_literal(greeting_buf, 8, &greeting_len, \"HELLO\");",
-            ft_strlen(generated_c)))
+            std::strlen(generated_c)))
     {
-        pf_printf("Assertion failed: generated C should assign greeting literal via helper\n");
+        std::printf("Assertion failed: generated C should assign greeting literal via helper\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_c, "cblc_display_string(greeting_buf, greeting_len);",
-            ft_strlen(generated_c)))
+            std::strlen(generated_c)))
     {
-        pf_printf("Assertion failed: generated C should display greeting using helper\n");
+        std::printf("Assertion failed: generated C should display greeting using helper\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -694,19 +839,19 @@ FT_TEST(test_cblc_generate_c_omits_main_for_library)
         goto cleanup;
     if (!generated_c)
         goto cleanup;
-    if (ft_strnstr(generated_c, "int main(void)", ft_strlen(generated_c)))
+    if (ft_strnstr(generated_c, "int main(void)", std::strlen(generated_c)))
     {
-        pf_printf("Assertion failed: library output should not define main\n");
+        std::printf("Assertion failed: library output should not define main\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_c, "void helper(void);", ft_strlen(generated_c)))
+    if (!ft_strnstr(generated_c, "void helper(void);", std::strlen(generated_c)))
     {
-        pf_printf("Assertion failed: library output should declare helper prototype\n");
+        std::printf("Assertion failed: library output should declare helper prototype\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_c, "void helper(void)", ft_strlen(generated_c)))
+    if (!ft_strnstr(generated_c, "void helper(void)", std::strlen(generated_c)))
     {
-        pf_printf("Assertion failed: library output should define helper function\n");
+        std::printf("Assertion failed: library output should define helper function\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -763,7 +908,7 @@ FT_TEST(test_transpiler_validation_rejects_invalid_cobol)
     source = "invalid cobol text";
     if (transpiler_validate_generated_cobol(source) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: validator should reject invalid COBOL text\n");
+        std::printf("Assertion failed: validator should reject invalid COBOL text\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);

@@ -2,8 +2,8 @@
 
 #include "../compiler_test_support.hpp"
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
 
 #include "round_trip_pipeline_helpers.hpp"
 
@@ -39,7 +39,7 @@ static int round_trip_cobol_fixture(const char *fixture_path,
     transpiler_context_set_languages(&context, TRANSPILE_LANGUAGE_COBOL,
         TRANSPILE_LANGUAGE_CBL_C);
     context.active_source_text = cobol_buffer;
-    context.active_source_length = ft_strlen(cobol_buffer);
+    context.active_source_length = std::strlen(cobol_buffer);
     transpiler_context_clear_comments(&context);
     parser_init_with_context(&parser, cobol_buffer, &context);
     if (test_expect_success(parser_parse_program(&parser, &program),
@@ -54,7 +54,7 @@ static int round_trip_cobol_fixture(const char *fixture_path,
         goto cleanup;
     transpiler_context_reset_unit_state(&context);
     context.active_source_text = cobol_buffer;
-    context.active_source_length = ft_strlen(cobol_buffer);
+    context.active_source_length = std::strlen(cobol_buffer);
     if (test_expect_success(transpiler_semantics_analyze_program(&context,
                 program), "semantic analysis should succeed") != FT_SUCCESS)
         goto cleanup;
@@ -159,10 +159,10 @@ FT_TEST(test_cobol_reverse_control_flow_round_trips_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: round-tripped binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: round-tripped binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -244,10 +244,10 @@ FT_TEST(test_cobol_copy_file_round_trips_and_executes)
     if (test_read_text_file(copied_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: round-tripped copy_file binary should copy input contents\n");
+        std::printf("Assertion failed: round-tripped copy_file binary should copy input contents\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -334,10 +334,10 @@ FT_TEST(test_cobol_filter_prefix_round_trips_and_executes)
     if (test_read_text_file(filtered_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: round-tripped filter_prefix binary should only copy allowed lines\n");
+        std::printf("Assertion failed: round-tripped filter_prefix binary should only copy allowed lines\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -443,28 +443,28 @@ FT_TEST(test_cobol_integration_showcase_round_trips_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: round-tripped integration_showcase binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: round-tripped integration_showcase binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     if (test_read_text_file(accepted_path, accepted_buffer,
             sizeof(accepted_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(accepted_buffer, expected_accepted,
-            ft_strlen(expected_accepted) + 1) != 0)
+    if (std::strncmp(accepted_buffer, expected_accepted,
+            std::strlen(expected_accepted) + 1) != 0)
     {
-        pf_printf("Assertion failed: round-tripped integration_showcase binary should record accepted entries\n");
+        std::printf("Assertion failed: round-tripped integration_showcase binary should record accepted entries\n");
         goto cleanup;
     }
     if (test_read_text_file(rejected_path, rejected_buffer,
             sizeof(rejected_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(rejected_buffer, expected_rejected,
-            ft_strlen(expected_rejected) + 1) != 0)
+    if (std::strncmp(rejected_buffer, expected_rejected,
+            std::strlen(expected_rejected) + 1) != 0)
     {
-        pf_printf("Assertion failed: round-tripped integration_showcase binary should record rejected entries\n");
+        std::printf("Assertion failed: round-tripped integration_showcase binary should record rejected entries\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -561,10 +561,10 @@ FT_TEST(test_cobol_multi_module_round_trips_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: round-tripped multi_module binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: round-tripped multi_module binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -648,10 +648,10 @@ FT_TEST(test_cobol_numeric_precision_round_trips_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: round-tripped numeric_precision binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: round-tripped numeric_precision binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -730,10 +730,10 @@ FT_TEST(test_cobol_floating_point_mix_round_trips_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: round-tripped floating_point_mix binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: round-tripped floating_point_mix binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -812,10 +812,10 @@ FT_TEST(test_cobol_mixed_numeric_types_round_trips_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: round-tripped mixed_numeric_types binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: round-tripped mixed_numeric_types binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -894,10 +894,10 @@ FT_TEST(test_cobol_textual_priority_mix_round_trips_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: round-tripped textual_priority_mix binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: round-tripped textual_priority_mix binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -972,10 +972,10 @@ FT_TEST(test_cobol_return_boolean_round_trips_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: round-tripped return_boolean binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: round-tripped return_boolean binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -1050,10 +1050,10 @@ FT_TEST(test_cobol_return_character_round_trips_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: round-tripped return_character binary should emit fetched grade\n");
+        std::printf("Assertion failed: round-tripped return_character binary should emit fetched grade\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -1128,10 +1128,10 @@ FT_TEST(test_cobol_return_numeric_round_trips_and_executes)
     if (test_read_text_file(output_path, output_buffer,
             sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strncmp(output_buffer, expected_output,
-            ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: round-tripped return_numeric binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: round-tripped return_numeric binary should emit expected DISPLAY output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -1206,7 +1206,7 @@ FT_TEST(test_cobol_reverse_group_items_round_trips_and_executes)
         goto cleanup;
     if (output_buffer[0] != '\0')
     {
-        pf_printf("Assertion failed: round-tripped reverse_group_items binary should not emit output\n");
+        std::printf("Assertion failed: round-tripped reverse_group_items binary should not emit output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;

@@ -6,28 +6,28 @@ FT_TEST(test_lexer_keyword_lookup_identifies_keywords)
 {
     t_lexer_token_kind kind;
 
-    kind = lexer_token_lookup_keyword("division", ft_strlen("division"));
+    kind = lexer_token_lookup_keyword("division", std::strlen("division"));
     if (kind != LEXER_TOKEN_KEYWORD_DIVISION)
     {
-        pf_printf("Assertion failed: lexer should classify DIVISION keyword\n");
+        std::printf("Assertion failed: lexer should classify DIVISION keyword\n");
         return (FT_FAILURE);
     }
-    kind = lexer_token_lookup_keyword("Program-Id", ft_strlen("Program-Id"));
+    kind = lexer_token_lookup_keyword("Program-Id", std::strlen("Program-Id"));
     if (kind != LEXER_TOKEN_KEYWORD_PROGRAM_ID)
     {
-        pf_printf("Assertion failed: lexer should classify PROGRAM-ID keyword\n");
+        std::printf("Assertion failed: lexer should classify PROGRAM-ID keyword\n");
         return (FT_FAILURE);
     }
-    kind = lexer_token_lookup_keyword("working-storage", ft_strlen("working-storage"));
+    kind = lexer_token_lookup_keyword("working-storage", std::strlen("working-storage"));
     if (kind != LEXER_TOKEN_KEYWORD_WORKING_STORAGE)
     {
-        pf_printf("Assertion failed: lexer should classify WORKING-STORAGE keyword\n");
+        std::printf("Assertion failed: lexer should classify WORKING-STORAGE keyword\n");
         return (FT_FAILURE);
     }
-    kind = lexer_token_lookup_keyword("mod", ft_strlen("mod"));
+    kind = lexer_token_lookup_keyword("mod", std::strlen("mod"));
     if (kind != LEXER_TOKEN_KEYWORD_MOD)
     {
-        pf_printf("Assertion failed: lexer should classify MOD keyword\n");
+        std::printf("Assertion failed: lexer should classify MOD keyword\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -37,10 +37,10 @@ FT_TEST(test_lexer_keyword_lookup_defaults_to_identifier)
 {
     t_lexer_token_kind kind;
 
-    kind = lexer_token_lookup_keyword("custom-name", ft_strlen("custom-name"));
+    kind = lexer_token_lookup_keyword("custom-name", std::strlen("custom-name"));
     if (kind != LEXER_TOKEN_IDENTIFIER)
     {
-        pf_printf("Assertion failed: lexer should treat unknown words as identifiers\n");
+        std::printf("Assertion failed: lexer should treat unknown words as identifiers\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -52,10 +52,10 @@ FT_TEST(test_lexer_trivia_detects_whitespace)
     t_lexer_trivia_kind trivia;
 
     text = " \t\n\r";
-    trivia = lexer_classify_trivia(text, ft_strlen(text));
+    trivia = lexer_classify_trivia(text, std::strlen(text));
     if (trivia != LEXER_TRIVIA_WHITESPACE)
     {
-        pf_printf("Assertion failed: lexer should treat whitespace as trivia\n");
+        std::printf("Assertion failed: lexer should treat whitespace as trivia\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -68,17 +68,17 @@ FT_TEST(test_lexer_trivia_detects_comments)
     t_lexer_trivia_kind trivia;
 
     comment = "*> comment line";
-    trivia = lexer_classify_trivia(comment, ft_strlen(comment));
+    trivia = lexer_classify_trivia(comment, std::strlen(comment));
     if (trivia != LEXER_TRIVIA_COMMENT)
     {
-        pf_printf("Assertion failed: lexer should classify *> lines as comments\n");
+        std::printf("Assertion failed: lexer should classify *> lines as comments\n");
         return (FT_FAILURE);
     }
     not_comment = "* missing arrow";
-    trivia = lexer_classify_trivia(not_comment, ft_strlen(not_comment));
+    trivia = lexer_classify_trivia(not_comment, std::strlen(not_comment));
     if (trivia != LEXER_TRIVIA_NONE)
     {
-        pf_printf("Assertion failed: lexer should ignore asterisk without > as comment start\n");
+        std::printf("Assertion failed: lexer should ignore asterisk without > as comment start\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -248,17 +248,17 @@ FT_TEST(test_lexer_reports_unterminated_string)
         return (FT_FAILURE);
     if (lexer_next_token(&lexer, &token) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: lexer should fail for unterminated string literal\n");
+        std::printf("Assertion failed: lexer should fail for unterminated string literal\n");
         return (FT_FAILURE);
     }
     if (token.kind != LEXER_TOKEN_UNKNOWN)
     {
-        pf_printf("Assertion failed: unterminated string should produce unknown token\n");
+        std::printf("Assertion failed: unterminated string should produce unknown token\n");
         return (FT_FAILURE);
     }
     if (token.line != 1 || token.column != 6)
     {
-        pf_printf("Assertion failed: unterminated string should report start location\n");
+        std::printf("Assertion failed: unterminated string should report start location\n");
         return (FT_FAILURE);
     }
     if (lexer_next_token(&lexer, &token) != FT_SUCCESS)

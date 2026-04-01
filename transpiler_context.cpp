@@ -3,10 +3,10 @@
 #include <string>
 #include <system_error>
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 #include "cblc_transpiler.hpp"
-#include "libft/Libft/libft.hpp"
+#include "compatibility/libft_compat.hpp"
 
 typedef struct s_transpiler_semantic_buffer
 {
@@ -50,7 +50,7 @@ static int transpiler_context_semantic_buffer_reserve(t_transpiler_semantic_buff
     if (!data)
         return (FT_FAILURE);
     if (buffer->data && buffer->length > 0)
-        ft_memcpy(data, buffer->data, buffer->length);
+        std::memcpy(data, buffer->data, buffer->length);
     if (buffer->data)
         cma_free(buffer->data);
     buffer->data = data;
@@ -70,7 +70,7 @@ static int transpiler_context_semantic_buffer_append_span(t_transpiler_semantic_
     if (transpiler_context_semantic_buffer_reserve(buffer, buffer->length + length + 1) != FT_SUCCESS)
         return (FT_FAILURE);
     if (length > 0)
-        ft_memcpy(buffer->data + buffer->length, text, length);
+        std::memcpy(buffer->data + buffer->length, text, length);
     buffer->length += length;
     buffer->data[buffer->length] = '\0';
     return (FT_SUCCESS);
@@ -81,7 +81,7 @@ static int transpiler_context_semantic_buffer_append_string(t_transpiler_semanti
 {
     if (!text)
         return (FT_SUCCESS);
-    return (transpiler_context_semantic_buffer_append_span(buffer, text, ft_strlen(text)));
+    return (transpiler_context_semantic_buffer_append_span(buffer, text, std::strlen(text)));
 }
 
 static int transpiler_context_semantic_buffer_append_indent(t_transpiler_semantic_buffer *buffer,
@@ -206,7 +206,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
             size_t import_index;
 
             module = &context->modules[index];
-            if (pf_snprintf(line, sizeof(line), "- name: %s", module->name) < 0)
+            if (std::snprintf(line, sizeof(line), "- name: %s", module->name) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
@@ -216,7 +216,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  path: %s", module->path) < 0)
+            if (std::snprintf(line, sizeof(line), "  path: %s", module->path) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
@@ -226,7 +226,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  initialization-rank: %lu", static_cast<unsigned long>(module->initialization_rank)) < 0)
+            if (std::snprintf(line, sizeof(line), "  initialization-rank: %lu", static_cast<unsigned long>(module->initialization_rank)) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
@@ -254,7 +254,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 import_index = 0;
                 while (import_index < module->import_count)
                 {
-                    if (pf_snprintf(line, sizeof(line), "  - path: %s", module->imports[import_index].path) < 0)
+                    if (std::snprintf(line, sizeof(line), "  - path: %s", module->imports[import_index].path) < 0)
                     {
                         transpiler_context_semantic_buffer_dispose(&buffer);
                         return (FT_FAILURE);
@@ -264,7 +264,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                         transpiler_context_semantic_buffer_dispose(&buffer);
                         return (FT_FAILURE);
                     }
-                    if (pf_snprintf(line, sizeof(line), "    resolved-index: %lu",
+                    if (std::snprintf(line, sizeof(line), "    resolved-index: %lu",
                             static_cast<unsigned long>(module->imports[import_index].resolved_index)) < 0)
                     {
                         transpiler_context_semantic_buffer_dispose(&buffer);
@@ -303,7 +303,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
             const t_transpiler_function_signature *signature;
 
             signature = &context->functions[index];
-            if (pf_snprintf(line, sizeof(line), "- name: %s", signature->name) < 0)
+            if (std::snprintf(line, sizeof(line), "- name: %s", signature->name) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
@@ -313,7 +313,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  module: %s", signature->module) < 0)
+            if (std::snprintf(line, sizeof(line), "  module: %s", signature->module) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
@@ -323,7 +323,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  return: %s",
+            if (std::snprintf(line, sizeof(line), "  return: %s",
                     transpiler_context_semantic_return_mode_to_string(signature->return_mode)) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
@@ -334,7 +334,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  visibility: %s",
+            if (std::snprintf(line, sizeof(line), "  visibility: %s",
                     transpiler_context_semantic_visibility_to_string(signature->visibility)) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
@@ -370,7 +370,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
             const t_transpiler_file_declaration *file;
 
             file = &context->files[index];
-            if (pf_snprintf(line, sizeof(line), "- name: %s", file->name) < 0)
+            if (std::snprintf(line, sizeof(line), "- name: %s", file->name) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
@@ -380,7 +380,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  role: %s",
+            if (std::snprintf(line, sizeof(line), "  role: %s",
                     transpiler_context_semantic_file_role_to_string(file->role)) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
@@ -391,7 +391,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  path: %s", file->path) < 0)
+            if (std::snprintf(line, sizeof(line), "  path: %s", file->path) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
@@ -401,7 +401,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  explicit-record-length: %lu",
+            if (std::snprintf(line, sizeof(line), "  explicit-record-length: %lu",
                     static_cast<unsigned long>(file->explicit_record_length)) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
@@ -412,7 +412,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  inferred-record-length: %lu",
+            if (std::snprintf(line, sizeof(line), "  inferred-record-length: %lu",
                     static_cast<unsigned long>(file->inferred_record_length)) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
@@ -423,7 +423,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  organization: %s",
+            if (std::snprintf(line, sizeof(line), "  organization: %s",
                     transpiler_context_semantic_file_organization_to_string(file->organization)) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
@@ -434,7 +434,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  record-key: %s", file->record_key) < 0)
+            if (std::snprintf(line, sizeof(line), "  record-key: %s", file->record_key) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
@@ -444,7 +444,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  alternate-key: %s", file->alternate_key) < 0)
+            if (std::snprintf(line, sizeof(line), "  alternate-key: %s", file->alternate_key) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
@@ -454,7 +454,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  lock-mode: %s",
+            if (std::snprintf(line, sizeof(line), "  lock-mode: %s",
                     transpiler_context_semantic_lock_mode_to_string(file->lock_mode)) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
@@ -490,7 +490,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
             const t_transpiler_data_item *item;
 
             item = &context->data_items[index];
-            if (pf_snprintf(line, sizeof(line), "- name: %s", item->name) < 0)
+            if (std::snprintf(line, sizeof(line), "- name: %s", item->name) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
@@ -500,7 +500,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  kind: %s",
+            if (std::snprintf(line, sizeof(line), "  kind: %s",
                     transpiler_context_semantic_data_kind_to_string(item->kind)) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
@@ -511,7 +511,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  declared-length: %lu",
+            if (std::snprintf(line, sizeof(line), "  declared-length: %lu",
                     static_cast<unsigned long>(item->declared_length)) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
@@ -522,7 +522,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  has-caller-length: %s",
+            if (std::snprintf(line, sizeof(line), "  has-caller-length: %s",
                     item->has_caller_length ? "yes" : "no") < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
@@ -533,7 +533,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  read-only: %s",
+            if (std::snprintf(line, sizeof(line), "  read-only: %s",
                     item->is_read_only ? "yes" : "no") < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
@@ -571,7 +571,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
             size_t item_index;
 
             copybook = &context->copybooks[index];
-            if (pf_snprintf(line, sizeof(line), "- name: %s", copybook->name) < 0)
+            if (std::snprintf(line, sizeof(line), "- name: %s", copybook->name) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
@@ -581,7 +581,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
             }
-            if (pf_snprintf(line, sizeof(line), "  canonical-name: %s", copybook->canonical_name) < 0)
+            if (std::snprintf(line, sizeof(line), "  canonical-name: %s", copybook->canonical_name) < 0)
             {
                 transpiler_context_semantic_buffer_dispose(&buffer);
                 return (FT_FAILURE);
@@ -609,7 +609,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                 dependency_index = 0;
                 while (dependency_index < copybook->dependency_count)
                 {
-                    if (pf_snprintf(line, sizeof(line), "  - %s", copybook->dependencies[dependency_index]) < 0)
+                    if (std::snprintf(line, sizeof(line), "  - %s", copybook->dependencies[dependency_index]) < 0)
                     {
                         transpiler_context_semantic_buffer_dispose(&buffer);
                         return (FT_FAILURE);
@@ -643,7 +643,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                     const t_transpiler_copybook_item *item;
 
                     item = &copybook->items[item_index];
-                    if (pf_snprintf(line, sizeof(line), "  - name: %s", item->name) < 0)
+                    if (std::snprintf(line, sizeof(line), "  - name: %s", item->name) < 0)
                     {
                         transpiler_context_semantic_buffer_dispose(&buffer);
                         return (FT_FAILURE);
@@ -653,7 +653,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                         transpiler_context_semantic_buffer_dispose(&buffer);
                         return (FT_FAILURE);
                     }
-                    if (pf_snprintf(line, sizeof(line), "    kind: %s",
+                    if (std::snprintf(line, sizeof(line), "    kind: %s",
                             transpiler_context_semantic_data_kind_to_string(item->kind)) < 0)
                     {
                         transpiler_context_semantic_buffer_dispose(&buffer);
@@ -664,7 +664,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                         transpiler_context_semantic_buffer_dispose(&buffer);
                         return (FT_FAILURE);
                     }
-                    if (pf_snprintf(line, sizeof(line), "    declared-length: %lu",
+                    if (std::snprintf(line, sizeof(line), "    declared-length: %lu",
                             static_cast<unsigned long>(item->declared_length)) < 0)
                     {
                         transpiler_context_semantic_buffer_dispose(&buffer);
@@ -675,7 +675,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                         transpiler_context_semantic_buffer_dispose(&buffer);
                         return (FT_FAILURE);
                     }
-                    if (pf_snprintf(line, sizeof(line), "    read-only: %s",
+                    if (std::snprintf(line, sizeof(line), "    read-only: %s",
                             item->is_read_only ? "yes" : "no") < 0)
                     {
                         transpiler_context_semantic_buffer_dispose(&buffer);
@@ -701,7 +701,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
             transpiler_context_semantic_buffer_dispose(&buffer);
             return (FT_FAILURE);
         }
-        if (pf_snprintf(line, sizeof(line), "  name: %s", context->entrypoint.name) < 0)
+        if (std::snprintf(line, sizeof(line), "  name: %s", context->entrypoint.name) < 0)
         {
             transpiler_context_semantic_buffer_dispose(&buffer);
             return (FT_FAILURE);
@@ -711,7 +711,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
             transpiler_context_semantic_buffer_dispose(&buffer);
             return (FT_FAILURE);
         }
-        if (pf_snprintf(line, sizeof(line), "  has-argv: %s",
+        if (std::snprintf(line, sizeof(line), "  has-argv: %s",
                 context->entrypoint.has_argument_vectors ? "yes" : "no") < 0)
         {
             transpiler_context_semantic_buffer_dispose(&buffer);
@@ -722,7 +722,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
             transpiler_context_semantic_buffer_dispose(&buffer);
             return (FT_FAILURE);
         }
-        if (pf_snprintf(line, sizeof(line), "  needs-argv-copy: %s",
+        if (std::snprintf(line, sizeof(line), "  needs-argv-copy: %s",
                 context->entrypoint.needs_argument_copy ? "yes" : "no") < 0)
         {
             transpiler_context_semantic_buffer_dispose(&buffer);
@@ -733,7 +733,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
             transpiler_context_semantic_buffer_dispose(&buffer);
             return (FT_FAILURE);
         }
-        if (pf_snprintf(line, sizeof(line), "  argc-identifier: %s", context->entrypoint.argc_identifier) < 0)
+        if (std::snprintf(line, sizeof(line), "  argc-identifier: %s", context->entrypoint.argc_identifier) < 0)
         {
             transpiler_context_semantic_buffer_dispose(&buffer);
             return (FT_FAILURE);
@@ -743,7 +743,7 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
             transpiler_context_semantic_buffer_dispose(&buffer);
             return (FT_FAILURE);
         }
-        if (pf_snprintf(line, sizeof(line), "  argv-identifier: %s", context->entrypoint.argv_identifier) < 0)
+        if (std::snprintf(line, sizeof(line), "  argv-identifier: %s", context->entrypoint.argv_identifier) < 0)
         {
             transpiler_context_semantic_buffer_dispose(&buffer);
             return (FT_FAILURE);
@@ -798,7 +798,7 @@ static int transpiler_context_string_is_blank(const char *value)
         return (1);
     while (*value != '\0')
     {
-        if (!ft_isspace(*value))
+        if (!std::isspace(*value))
             return (0);
         value += 1;
     }
@@ -821,7 +821,7 @@ static int transpiler_context_module_imports_reserve(t_transpiler_module *module
         return (FT_FAILURE);
     if (module->imports)
     {
-        ft_memcpy(imports, module->imports,
+        std::memcpy(imports, module->imports,
             module->import_count * sizeof(t_transpiler_module_import));
         cma_free(module->imports);
     }
@@ -844,7 +844,7 @@ static int transpiler_context_functions_reserve(t_transpiler_context *context, s
         return (FT_FAILURE);
     if (context->functions)
     {
-        ft_memcpy(new_functions, context->functions,
+        std::memcpy(new_functions, context->functions,
             context->function_count * sizeof(t_transpiler_function_signature));
         cma_free(context->functions);
     }
@@ -898,7 +898,7 @@ static int transpiler_context_module_order_reserve(t_transpiler_context *context
         return (FT_FAILURE);
     if (context->module_order)
     {
-        ft_memcpy(order, context->module_order,
+        std::memcpy(order, context->module_order,
             context->module_order_count * sizeof(size_t));
         cma_free(context->module_order);
     }
@@ -923,7 +923,7 @@ static int transpiler_context_files_reserve(t_transpiler_context *context, size_
         return (FT_FAILURE);
     if (context->files)
     {
-        ft_memcpy(new_files, context->files,
+        std::memcpy(new_files, context->files,
             context->file_count * sizeof(t_transpiler_file_declaration));
         cma_free(context->files);
     }
@@ -948,7 +948,7 @@ static int transpiler_context_data_items_reserve(t_transpiler_context *context, 
         return (FT_FAILURE);
     if (context->data_items)
     {
-        ft_memcpy(items, context->data_items,
+        std::memcpy(items, context->data_items,
             context->data_item_count * sizeof(t_transpiler_data_item));
         cma_free(context->data_items);
     }
@@ -973,7 +973,7 @@ static int transpiler_context_source_maps_reserve(t_transpiler_context *context,
         return (FT_FAILURE);
     if (context->source_maps)
     {
-        ft_memcpy(maps, context->source_maps,
+        std::memcpy(maps, context->source_maps,
             context->source_map_count * sizeof(t_transpiler_source_map_entry));
         cma_free(context->source_maps);
     }
@@ -985,25 +985,33 @@ static int transpiler_context_source_maps_reserve(t_transpiler_context *context,
 static int transpiler_context_comments_reserve(t_transpiler_context *context, size_t desired_capacity)
 {
     t_transpiler_comment *comments;
+    size_t target_capacity;
 
     if (!context)
         return (FT_FAILURE);
     if (context->comment_capacity >= desired_capacity)
         return (FT_SUCCESS);
-    if (desired_capacity < 4)
-        desired_capacity = 4;
-    comments = static_cast<t_transpiler_comment *>(cma_calloc(desired_capacity,
+    target_capacity = context->comment_capacity;
+    if (target_capacity < 8)
+        target_capacity = 8;
+    while (target_capacity < desired_capacity)
+    {
+        if (target_capacity > (SIZE_MAX / 2))
+            return (FT_FAILURE);
+        target_capacity *= 2;
+    }
+    comments = static_cast<t_transpiler_comment *>(cma_calloc(target_capacity,
         sizeof(t_transpiler_comment)));
     if (!comments)
         return (FT_FAILURE);
     if (context->comments)
     {
-        ft_memcpy(comments, context->comments,
+        std::memcpy(comments, context->comments,
             context->comment_count * sizeof(t_transpiler_comment));
         cma_free(context->comments);
     }
     context->comments = comments;
-    context->comment_capacity = desired_capacity;
+    context->comment_capacity = target_capacity;
     return (FT_SUCCESS);
 }
 
@@ -1024,7 +1032,7 @@ static int transpiler_context_use_after_error_reserve(t_transpiler_context *cont
         return (FT_FAILURE);
     if (context->use_after_error_bindings)
     {
-        ft_memcpy(bindings, context->use_after_error_bindings,
+        std::memcpy(bindings, context->use_after_error_bindings,
             context->use_after_error_binding_count * sizeof(*bindings));
         cma_free(context->use_after_error_bindings);
     }
@@ -1049,7 +1057,7 @@ static int transpiler_context_copybooks_reserve(t_transpiler_context *context, s
         return (FT_FAILURE);
     if (context->copybooks)
     {
-        ft_memcpy(copybooks, context->copybooks,
+        std::memcpy(copybooks, context->copybooks,
             context->copybook_count * sizeof(t_transpiler_copybook));
         cma_free(context->copybooks);
     }
@@ -1260,7 +1268,7 @@ static int transpiler_context_assign_paths(const char ***storage, size_t *count,
         *storage = new_paths;
         *capacity = path_count;
     }
-    ft_memcpy(*storage, paths, path_count * sizeof(const char *));
+    std::memcpy(*storage, paths, path_count * sizeof(const char *));
     *count = path_count;
     return (FT_SUCCESS);
 }
@@ -1921,7 +1929,7 @@ static int transpiler_context_find_module_index_by_name(const t_transpiler_conte
     index = 0;
     while (index < context->module_count)
     {
-        if (ft_strncmp(context->modules[index].name, name, TRANSPILE_MODULE_NAME_MAX) == 0)
+        if (std::strncmp(context->modules[index].name, name, TRANSPILE_MODULE_NAME_MAX) == 0)
             return (static_cast<int>(index));
         index += 1;
     }
@@ -1939,7 +1947,7 @@ static int transpiler_context_find_module_index_by_path(const t_transpiler_conte
     index = 0;
     while (index < context->module_count)
     {
-        if (ft_strncmp(context->modules[index].path, path, TRANSPILE_FILE_PATH_MAX) == 0)
+        if (std::strncmp(context->modules[index].path, path, TRANSPILE_FILE_PATH_MAX) == 0)
             return (static_cast<int>(index));
         index += 1;
     }
@@ -2122,11 +2130,11 @@ static int transpiler_context_module_has_import(const t_transpiler_context *cont
     {
         if (requester->imports[import_index].resolved_index == target_index)
             return (1);
-        if (ft_strncmp(requester->imports[import_index].path,
+        if (std::strncmp(requester->imports[import_index].path,
                 context->modules[target_index].name, TRANSPILE_FILE_PATH_MAX) == 0)
             return (1);
         if (context->modules[target_index].path[0] != '\0'
-            && ft_strncmp(requester->imports[import_index].path,
+            && std::strncmp(requester->imports[import_index].path,
                 context->modules[target_index].path, TRANSPILE_FILE_PATH_MAX) == 0)
             return (1);
         import_index += 1;
@@ -2137,7 +2145,7 @@ static int transpiler_context_module_has_import(const t_transpiler_context *cont
 int transpiler_context_register_module(t_transpiler_context *context, const char *name, const char *path)
 {
     t_transpiler_module *module;
-    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX * 2];
     size_t index;
     char normalized_path[TRANSPILE_FILE_PATH_MAX];
 
@@ -2152,9 +2160,9 @@ int transpiler_context_register_module(t_transpiler_context *context, const char
     index = 0;
     while (index < context->module_count)
     {
-        if (ft_strncmp(context->modules[index].name, name, TRANSPILE_MODULE_NAME_MAX) == 0)
+        if (std::strncmp(context->modules[index].name, name, TRANSPILE_MODULE_NAME_MAX) == 0)
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "module '%s' already registered", name);
             transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
                 TRANSPILE_ERROR_MODULE_DUPLICATE_NAME, message);
@@ -2162,9 +2170,9 @@ int transpiler_context_register_module(t_transpiler_context *context, const char
             return (FT_FAILURE);
         }
         if (normalized_path[0] != '\0'
-            && ft_strncmp(context->modules[index].path, normalized_path, TRANSPILE_FILE_PATH_MAX) == 0)
+            && std::strncmp(context->modules[index].path, normalized_path, TRANSPILE_FILE_PATH_MAX) == 0)
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "module path '%s' already registered", normalized_path);
             transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
                 TRANSPILE_ERROR_MODULE_DUPLICATE_NAME, message);
@@ -2214,7 +2222,7 @@ int transpiler_context_register_module_import(t_transpiler_context *context, con
     const char *import_path)
 {
     t_transpiler_module *module;
-    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX * 2];
     int module_index;
     size_t index;
     size_t insert_index;
@@ -2228,7 +2236,7 @@ int transpiler_context_register_module_import(t_transpiler_context *context, con
     module_index = transpiler_context_find_module_index_by_name(context, module_name);
     if (module_index < 0)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "module '%s' not registered", module_name);
         transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
             TRANSPILE_ERROR_MODULE_UNKNOWN, message);
@@ -2242,7 +2250,7 @@ int transpiler_context_register_module_import(t_transpiler_context *context, con
     index = 0;
     while (index < module->import_count)
     {
-        if (ft_strncmp(module->imports[index].path, normalized_path, TRANSPILE_FILE_PATH_MAX) == 0)
+        if (std::strncmp(module->imports[index].path, normalized_path, TRANSPILE_FILE_PATH_MAX) == 0)
             return (FT_SUCCESS);
         index += 1;
     }
@@ -2258,7 +2266,7 @@ int transpiler_context_register_module_import(t_transpiler_context *context, con
     }
     insert_index = module->import_count;
     while (insert_index > 0
-        && ft_strncmp(module->imports[insert_index - 1].path, normalized_path, TRANSPILE_FILE_PATH_MAX) > 0)
+        && std::strncmp(module->imports[insert_index - 1].path, normalized_path, TRANSPILE_FILE_PATH_MAX) > 0)
     {
         module->imports[insert_index] = module->imports[insert_index - 1];
         insert_index -= 1;
@@ -2294,17 +2302,17 @@ int transpiler_context_scan_imports_for_module(t_transpiler_context *context, co
                 cursor += 1;
             continue ;
         }
-        if (ft_isspace(*cursor))
+        if (std::isspace(*cursor))
         {
             cursor += 1;
             continue ;
         }
-        if (ft_strncmp(cursor, "import", 6) == 0 && !transpiler_context_is_identifier_char(*(cursor + 6)))
+        if (std::strncmp(cursor, "import", 6) == 0 && !transpiler_context_is_identifier_char(*(cursor + 6)))
         {
             const char *scan;
 
             scan = cursor + 6;
-            while (*scan != '\0' && ft_isspace(*scan))
+            while (*scan != '\0' && std::isspace(*scan))
                 scan += 1;
             if (*scan == '"')
             {
@@ -2321,7 +2329,7 @@ int transpiler_context_scan_imports_for_module(t_transpiler_context *context, co
                 {
                     path[length] = '\0';
                     scan += length + 1;
-                    while (*scan != '\0' && ft_isspace(*scan))
+                    while (*scan != '\0' && std::isspace(*scan))
                         scan += 1;
                     if (*scan == ';')
                         scan += 1;
@@ -2344,7 +2352,7 @@ static int transpiler_context_module_visit(t_transpiler_context *context, size_t
     int *states, size_t *order_position)
 {
     t_transpiler_module *module;
-    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX * 2];
     size_t import_index;
     int dependency_index;
 
@@ -2353,7 +2361,7 @@ static int transpiler_context_module_visit(t_transpiler_context *context, size_t
     if (states[module_index] == 1)
     {
         module = &context->modules[module_index];
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "module '%s' has an import cycle", module->name);
         transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
             TRANSPILE_ERROR_MODULE_IMPORT_CYCLE, message);
@@ -2370,7 +2378,7 @@ static int transpiler_context_module_visit(t_transpiler_context *context, size_t
         dependency_index = transpiler_context_find_module_index(context, module->imports[import_index].path);
         if (dependency_index < 0)
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "module '%s' imports unknown module '%s'", module->name,
                 module->imports[import_index].path);
             transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
@@ -2441,7 +2449,7 @@ int transpiler_context_compute_module_initialization_order(t_transpiler_context 
 
             current_index = sorted[inner];
             previous_index = sorted[inner - 1];
-            compare = ft_strncmp(context->modules[current_index].name,
+            compare = std::strncmp(context->modules[current_index].name,
                 context->modules[previous_index].name, TRANSPILE_MODULE_NAME_MAX);
             if (compare >= 0)
                 break ;
@@ -2494,7 +2502,7 @@ int transpiler_context_register_function(t_transpiler_context *context, const ch
     module_index = transpiler_context_find_module_index_by_name(context, module_name);
     if (module_index < 0)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "module '%s' not registered", module_name);
         transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
             TRANSPILE_ERROR_MODULE_UNKNOWN, message);
@@ -2504,10 +2512,10 @@ int transpiler_context_register_function(t_transpiler_context *context, const ch
     index = 0;
     while (index < context->function_count)
     {
-        if (ft_strncmp(context->functions[index].module, module_name, TRANSPILE_MODULE_NAME_MAX) == 0
-            && ft_strncmp(context->functions[index].name, name, TRANSPILE_FUNCTION_NAME_MAX) == 0)
+        if (std::strncmp(context->functions[index].module, module_name, TRANSPILE_MODULE_NAME_MAX) == 0
+            && std::strncmp(context->functions[index].name, name, TRANSPILE_FUNCTION_NAME_MAX) == 0)
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "function '%s' already declared in module '%s'", name, module_name);
             transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
                 TRANSPILE_ERROR_FUNCTION_DUPLICATE_NAME, message);
@@ -2516,10 +2524,10 @@ int transpiler_context_register_function(t_transpiler_context *context, const ch
         }
         if (visibility == TRANSPILE_SYMBOL_PUBLIC
             && context->functions[index].visibility == TRANSPILE_SYMBOL_PUBLIC
-            && ft_strncmp(context->functions[index].name, name, TRANSPILE_FUNCTION_NAME_MAX) == 0
-            && ft_strncmp(context->functions[index].module, module_name, TRANSPILE_MODULE_NAME_MAX) != 0)
+            && std::strncmp(context->functions[index].name, name, TRANSPILE_FUNCTION_NAME_MAX) == 0
+            && std::strncmp(context->functions[index].module, module_name, TRANSPILE_MODULE_NAME_MAX) != 0)
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "public function '%s' in module '%s' conflicts with export from module '%s'",
                 name, module_name, context->functions[index].module);
             transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
@@ -2556,8 +2564,8 @@ const t_transpiler_function_signature *transpiler_context_find_function(const t_
     index = 0;
     while (index < context->function_count)
     {
-        if (ft_strncmp(context->functions[index].module, module_name, TRANSPILE_MODULE_NAME_MAX) == 0
-            && ft_strncmp(context->functions[index].name, name, TRANSPILE_FUNCTION_NAME_MAX) == 0)
+        if (std::strncmp(context->functions[index].module, module_name, TRANSPILE_MODULE_NAME_MAX) == 0
+            && std::strncmp(context->functions[index].name, name, TRANSPILE_FUNCTION_NAME_MAX) == 0)
             return (&context->functions[index]);
         index += 1;
     }
@@ -2583,7 +2591,7 @@ const t_transpiler_function_signature *transpiler_context_resolve_function_acces
         return (NULL);
     if (transpiler_context_string_is_blank(requesting_module))
         return (signature);
-    if (ft_strncmp(requesting_module, module_name, TRANSPILE_MODULE_NAME_MAX) == 0)
+    if (std::strncmp(requesting_module, module_name, TRANSPILE_MODULE_NAME_MAX) == 0)
         return (signature);
     requester_index = transpiler_context_find_module_index(context, requesting_module);
     target_index = transpiler_context_find_module_index(context, module_name);
@@ -2592,7 +2600,7 @@ const t_transpiler_function_signature *transpiler_context_resolve_function_acces
             static_cast<size_t>(requester_index), static_cast<size_t>(target_index)))
     {
         requester_label = requesting_module;
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "module '%s' must import module '%s' before accessing function '%s'",
             requester_label, module_name, name);
         transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
@@ -2603,7 +2611,7 @@ const t_transpiler_function_signature *transpiler_context_resolve_function_acces
     if (signature->visibility == TRANSPILE_SYMBOL_PUBLIC)
         return (signature);
     requester_label = requesting_module;
-    pf_snprintf(message, sizeof(message),
+    std::snprintf(message, sizeof(message),
         "module '%s' cannot access private function '%s' exported by module '%s'",
         requester_label, name, module_name);
     transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
@@ -2624,16 +2632,16 @@ int transpiler_context_register_entrypoint(t_transpiler_context *context, const 
         return (FT_FAILURE);
     if (context->entrypoint.present)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "entrypoint '%s' already registered", context->entrypoint.name);
         transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
             TRANSPILE_ERROR_ENTRYPOINT_DUPLICATE, message);
         transpiler_context_record_error(context, TRANSPILE_ERROR_ENTRYPOINT_DUPLICATE);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(name, "main", TRANSPILE_FUNCTION_NAME_MAX) != 0)
+    if (std::strncmp(name, "main", TRANSPILE_FUNCTION_NAME_MAX) != 0)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "entrypoint '%s' must be declared as 'main'", name);
         transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
             TRANSPILE_ERROR_ENTRYPOINT_INVALID_NAME, message);
@@ -2642,7 +2650,7 @@ int transpiler_context_register_entrypoint(t_transpiler_context *context, const 
     }
     if (return_mode != TRANSPILE_FUNCTION_RETURN_VOID)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "entrypoint '%s' must use void return semantics; pass outputs by reference", name);
         transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
             TRANSPILE_ERROR_FUNCTION_RETURNS_VALUE, message);
@@ -2651,7 +2659,7 @@ int transpiler_context_register_entrypoint(t_transpiler_context *context, const 
     }
     if ((argc_identifier && !argv_identifier) || (!argc_identifier && argv_identifier))
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "entrypoint 'main' must provide both argc and argv when supplying arguments");
         transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
             TRANSPILE_ERROR_ENTRYPOINT_ARGUMENT_MISMATCH, message);
@@ -2699,7 +2707,7 @@ static t_transpiler_file_declaration *transpiler_context_find_file_mutable(t_tra
     index = 0;
     while (index < context->file_count)
     {
-        if (ft_strncmp(context->files[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        if (std::strncmp(context->files[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
             return (&context->files[index]);
         index += 1;
     }
@@ -2720,9 +2728,9 @@ int transpiler_context_register_file(t_transpiler_context *context, const char *
     index = 0;
     while (index < context->file_count)
     {
-        if (ft_strncmp(context->files[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        if (std::strncmp(context->files[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "file '%s' already declared; choose a unique identifier", name);
             transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
                 TRANSPILE_ERROR_FILE_DUPLICATE_NAME, message);
@@ -2768,13 +2776,13 @@ int transpiler_context_record_file_length_hint(t_transpiler_context *context, co
     index = 0;
     while (index < context->file_count)
     {
-        if (ft_strncmp(context->files[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        if (std::strncmp(context->files[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
             break ;
         index += 1;
     }
     if (index >= context->file_count)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "file '%s' not declared before recording record length", name);
         transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
             TRANSPILE_ERROR_FILE_UNKNOWN, message);
@@ -2809,7 +2817,7 @@ int transpiler_context_configure_file_organization(t_transpiler_context *context
     file = transpiler_context_find_file_mutable(context, name);
     if (!file)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "file '%s' not declared before configuring organization", name ? name : "");
         transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
             TRANSPILE_ERROR_FILE_UNKNOWN, message);
@@ -2831,7 +2839,7 @@ int transpiler_context_configure_file_keys(t_transpiler_context *context, const 
     file = transpiler_context_find_file_mutable(context, name);
     if (!file)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "file '%s' not declared before configuring keys", name ? name : "");
         transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
             TRANSPILE_ERROR_FILE_UNKNOWN, message);
@@ -2860,7 +2868,7 @@ int transpiler_context_configure_file_lock_mode(t_transpiler_context *context, c
     file = transpiler_context_find_file_mutable(context, name);
     if (!file)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "file '%s' not declared before configuring lock mode", name ? name : "");
         transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
             TRANSPILE_ERROR_FILE_UNKNOWN, message);
@@ -2885,7 +2893,7 @@ int transpiler_context_register_data_item(t_transpiler_context *context, const c
     index = 0;
     while (index < context->data_item_count)
     {
-        if (ft_strncmp(context->data_items[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        if (std::strncmp(context->data_items[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
         {
             size_t existing_length;
             t_transpiler_data_item_kind existing_kind;
@@ -2920,7 +2928,7 @@ int transpiler_context_register_data_item(t_transpiler_context *context, const c
                 {
                     char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 
-                    pf_snprintf(message, sizeof(message),
+                    std::snprintf(message, sizeof(message),
                         "subprogram data item '%s' (%lu characters) is smaller than caller buffer (%lu characters)",
                         name,
                         static_cast<unsigned long>(declared_length),
@@ -2984,7 +2992,7 @@ const t_transpiler_data_item *transpiler_context_find_data_item(const t_transpil
     index = 0;
     while (index < context->data_item_count)
     {
-        if (ft_strncmp(context->data_items[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        if (std::strncmp(context->data_items[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
             return (&context->data_items[index]);
         index += 1;
     }
@@ -3006,11 +3014,11 @@ int transpiler_context_register_copybook(t_transpiler_context *context, const ch
     index = 0;
     while (index < context->copybook_count)
     {
-        if (ft_strncmp(context->copybooks[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        if (std::strncmp(context->copybooks[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
         {
             char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "copybook '%s' registered multiple times", name);
             transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
                 TRANSPILE_ERROR_COPYBOOK_DUPLICATE, message);
@@ -3070,7 +3078,7 @@ int transpiler_context_register_copybook_dependencies(t_transpiler_context *cont
     index = 0;
     while (index < context->copybook_count)
     {
-        if (ft_strncmp(context->copybooks[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        if (std::strncmp(context->copybooks[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
         {
             copybook = &context->copybooks[index];
             break ;
@@ -3180,7 +3188,7 @@ const t_transpiler_copybook *transpiler_context_find_copybook(const t_transpiler
     index = 0;
     while (index < context->copybook_count)
     {
-        if (ft_strncmp(context->copybooks[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        if (std::strncmp(context->copybooks[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
             return (&context->copybooks[index]);
         index += 1;
     }
@@ -3204,10 +3212,10 @@ unsigned long long transpiler_context_compute_copybook_signature(const t_transpi
         copybook = &context->copybooks[index];
         if (copybook->canonical_name[0] != '\0')
             transpiler_context_hash_update_bytes(&hash, copybook->canonical_name,
-                ft_strlen(copybook->canonical_name));
+                std::strlen(copybook->canonical_name));
         else if (copybook->name[0] != '\0')
             transpiler_context_hash_update_bytes(&hash, copybook->name,
-                ft_strlen(copybook->name));
+                std::strlen(copybook->name));
         transpiler_context_hash_update_u64(&hash,
             static_cast<unsigned long long>(copybook->item_count));
         transpiler_context_hash_update_u64(&hash,
@@ -3220,7 +3228,7 @@ unsigned long long transpiler_context_compute_copybook_signature(const t_transpi
             item = &copybook->items[item_index];
             if (item->name[0] != '\0')
                 transpiler_context_hash_update_bytes(&hash, item->name,
-                    ft_strlen(item->name));
+                    std::strlen(item->name));
             transpiler_context_hash_update_u64(&hash,
                 static_cast<unsigned long long>(item->kind));
             transpiler_context_hash_update_u64(&hash,
@@ -3238,7 +3246,7 @@ unsigned long long transpiler_context_compute_copybook_signature(const t_transpi
             {
                 transpiler_context_hash_update_bytes(&hash,
                     copybook->dependencies[dependency_index],
-                    ft_strlen(copybook->dependencies[dependency_index]));
+                    std::strlen(copybook->dependencies[dependency_index]));
                 dependency_index += 1;
             }
         }
@@ -3342,7 +3350,7 @@ const t_transpiler_source_map_entry *transpiler_context_map_cblc_to_cobol(const 
     index = 0;
     while (index < context->source_map_count)
     {
-        if (ft_strncmp(context->source_maps[index].cblc_span.path, path, TRANSPILE_FILE_PATH_MAX) == 0
+        if (std::strncmp(context->source_maps[index].cblc_span.path, path, TRANSPILE_FILE_PATH_MAX) == 0
             && transpiler_context_span_contains(&context->source_maps[index].cblc_span, line, column))
         {
             return (&context->source_maps[index]);
@@ -3364,7 +3372,7 @@ const t_transpiler_source_map_entry *transpiler_context_map_cobol_to_cblc(const 
     index = 0;
     while (index < context->source_map_count)
     {
-        if (ft_strncmp(context->source_maps[index].cobol_span.path, path, TRANSPILE_FILE_PATH_MAX) == 0
+        if (std::strncmp(context->source_maps[index].cobol_span.path, path, TRANSPILE_FILE_PATH_MAX) == 0
             && transpiler_context_span_contains(&context->source_maps[index].cobol_span, line, column))
         {
             return (&context->source_maps[index]);
@@ -3529,8 +3537,8 @@ int transpiler_context_register_use_after_error_binding(t_transpiler_context *co
     while (index < context->use_after_error_binding_count)
     {
         binding = &context->use_after_error_bindings[index];
-        if (ft_strncmp(binding->section_name, safe_section, TRANSPILE_IDENTIFIER_MAX) == 0
-            && ft_strncmp(binding->file_name, file_name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        if (std::strncmp(binding->section_name, safe_section, TRANSPILE_IDENTIFIER_MAX) == 0
+            && std::strncmp(binding->file_name, file_name, TRANSPILE_IDENTIFIER_MAX) == 0)
             return (FT_SUCCESS);
         index += 1;
     }

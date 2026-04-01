@@ -28,7 +28,7 @@ FT_TEST(test_compiler_builds_example_c_file)
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "cc %s -o %s", source_path, binary_path);
+    command_length = std::snprintf(command, sizeof(command), "cc %s -o %s", source_path, binary_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
@@ -36,11 +36,11 @@ FT_TEST(test_compiler_builds_example_c_file)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: compiler should build sample source\n");
+        std::printf("Assertion failed: compiler should build sample source\n");
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    command_length = std::snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
@@ -48,7 +48,7 @@ FT_TEST(test_compiler_builds_example_c_file)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: compiled program should run successfully\n");
+        std::printf("Assertion failed: compiled program should run successfully\n");
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
@@ -57,9 +57,9 @@ FT_TEST(test_compiler_builds_example_c_file)
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(output_buffer, "example-ok\n", 12) != 0)
+    if (std::strncmp(output_buffer, "example-ok\n", 12) != 0)
     {
-        pf_printf("Assertion failed: compiled program should emit expected output\n");
+        std::printf("Assertion failed: compiled program should emit expected output\n");
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
@@ -88,7 +88,7 @@ FT_TEST(test_compiler_rejects_invalid_c_file)
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "cc %s -o %s 2> %s", source_path, binary_path, output_path);
+    command_length = std::snprintf(command, sizeof(command), "cc %s -o %s 2> %s", source_path, binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
@@ -96,7 +96,7 @@ FT_TEST(test_compiler_rejects_invalid_c_file)
     }
     if (test_run_command(command) == FT_SUCCESS)
     {
-        pf_printf("Assertion failed: compiler should reject invalid source\n");
+        std::printf("Assertion failed: compiler should reject invalid source\n");
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
@@ -105,9 +105,9 @@ FT_TEST(test_compiler_rejects_invalid_c_file)
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
-    if (!ft_strnstr(output_buffer, expected_fragment, ft_strlen(output_buffer)))
+    if (!ft_strnstr(output_buffer, expected_fragment, std::strlen(output_buffer)))
     {
-        pf_printf("Assertion failed: compiler output should include error fragment\n");
+        std::printf("Assertion failed: compiler output should include error fragment\n");
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
@@ -154,7 +154,7 @@ FT_TEST(test_compiler_builds_multi_file_project)
         test_remove_file(helper_source_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "cc %s %s -o %s", main_source_path, helper_source_path, binary_path);
+    command_length = std::snprintf(command, sizeof(command), "cc %s %s -o %s", main_source_path, helper_source_path, binary_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
@@ -163,12 +163,12 @@ FT_TEST(test_compiler_builds_multi_file_project)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: compiler should build multi-file project\n");
+        std::printf("Assertion failed: compiler should build multi-file project\n");
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
         test_remove_file(helper_source_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    command_length = std::snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
@@ -177,7 +177,7 @@ FT_TEST(test_compiler_builds_multi_file_project)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: compiled multi-file program should run successfully\n");
+        std::printf("Assertion failed: compiled multi-file program should run successfully\n");
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
         test_remove_file(helper_source_path);
         return (FT_FAILURE);
@@ -188,9 +188,9 @@ FT_TEST(test_compiler_builds_multi_file_project)
         test_remove_file(helper_source_path);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(output_buffer, "multi-file:42\n", 14) != 0)
+    if (std::strncmp(output_buffer, "multi-file:42\n", 14) != 0)
     {
-        pf_printf("Assertion failed: multi-file program should emit expected output\n");
+        std::printf("Assertion failed: multi-file program should emit expected output\n");
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
         test_remove_file(helper_source_path);
         return (FT_FAILURE);
@@ -247,7 +247,7 @@ FT_TEST(test_compiler_builds_multi_file_project_from_objects)
         test_remove_file(helper_object_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "cc -c %s -o %s", main_source_path, main_object_path);
+    command_length = std::snprintf(command, sizeof(command), "cc -c %s -o %s", main_source_path, main_object_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
@@ -258,14 +258,14 @@ FT_TEST(test_compiler_builds_multi_file_project_from_objects)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: compiler should build main object\n");
+        std::printf("Assertion failed: compiler should build main object\n");
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
         test_remove_file(helper_source_path);
         test_remove_file(main_object_path);
         test_remove_file(helper_object_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "cc -c %s -o %s", helper_source_path, helper_object_path);
+    command_length = std::snprintf(command, sizeof(command), "cc -c %s -o %s", helper_source_path, helper_object_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
@@ -276,14 +276,14 @@ FT_TEST(test_compiler_builds_multi_file_project_from_objects)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: compiler should build helper object\n");
+        std::printf("Assertion failed: compiler should build helper object\n");
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
         test_remove_file(helper_source_path);
         test_remove_file(main_object_path);
         test_remove_file(helper_object_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "cc %s %s -o %s", main_object_path, helper_object_path, binary_path);
+    command_length = std::snprintf(command, sizeof(command), "cc %s %s -o %s", main_object_path, helper_object_path, binary_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
@@ -294,14 +294,14 @@ FT_TEST(test_compiler_builds_multi_file_project_from_objects)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: linker should build binary from objects\n");
+        std::printf("Assertion failed: linker should build binary from objects\n");
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
         test_remove_file(helper_source_path);
         test_remove_file(main_object_path);
         test_remove_file(helper_object_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    command_length = std::snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
@@ -312,7 +312,7 @@ FT_TEST(test_compiler_builds_multi_file_project_from_objects)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: binary should run successfully\n");
+        std::printf("Assertion failed: binary should run successfully\n");
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
         test_remove_file(helper_source_path);
         test_remove_file(main_object_path);
@@ -327,9 +327,9 @@ FT_TEST(test_compiler_builds_multi_file_project_from_objects)
         test_remove_file(helper_object_path);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(output_buffer, "multi-obj:24\n", 13) != 0)
+    if (std::strncmp(output_buffer, "multi-obj:24\n", 13) != 0)
     {
-        pf_printf("Assertion failed: binary should emit expected output\n");
+        std::printf("Assertion failed: binary should emit expected output\n");
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
         test_remove_file(helper_source_path);
         test_remove_file(main_object_path);
@@ -396,7 +396,7 @@ FT_TEST(test_compiler_builds_multi_file_project_with_header)
         test_remove_file(header_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "cc %s %s -o %s", main_source_path, helper_source_path, binary_path);
+    command_length = std::snprintf(command, sizeof(command), "cc %s %s -o %s", main_source_path, helper_source_path, binary_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
@@ -406,13 +406,13 @@ FT_TEST(test_compiler_builds_multi_file_project_with_header)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: compiler should build header-based project\n");
+        std::printf("Assertion failed: compiler should build header-based project\n");
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
         test_remove_file(helper_source_path);
         test_remove_file(header_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    command_length = std::snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
@@ -422,7 +422,7 @@ FT_TEST(test_compiler_builds_multi_file_project_with_header)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: header project should run successfully\n");
+        std::printf("Assertion failed: header project should run successfully\n");
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
         test_remove_file(helper_source_path);
         test_remove_file(header_path);
@@ -435,9 +435,9 @@ FT_TEST(test_compiler_builds_multi_file_project_with_header)
         test_remove_file(header_path);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(output_buffer, "multi-header:33\n", 17) != 0)
+    if (std::strncmp(output_buffer, "multi-header:33\n", 17) != 0)
     {
-        pf_printf("Assertion failed: header project should emit expected output\n");
+        std::printf("Assertion failed: header project should emit expected output\n");
         test_cleanup_example_artifacts(main_source_path, binary_path, output_path);
         test_remove_file(helper_source_path);
         test_remove_file(header_path);

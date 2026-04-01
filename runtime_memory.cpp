@@ -53,6 +53,6 @@ int runtime_memory_copy_checked(void *destination, size_t destination_length, co
         runtime_memory_move(destination_bytes, source_bytes, source_length);
         return (FT_SUCCESS);
     }
-    ft_memcpy(destination_bytes, source_bytes, source_length);
+    std::memcpy(destination_bytes, source_bytes, source_length);
     return (FT_SUCCESS);
 }

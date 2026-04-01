@@ -82,13 +82,13 @@ FT_TEST(test_cli_direction_from_environment)
 
     if (test_set_environment("CTOC_DEFAULT_DIRECTION", "cobol-to-cblc") != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: test_set_environment should succeed\n");
+        std::printf("Assertion failed: test_set_environment should succeed\n");
         return (FT_FAILURE);
     }
     if (transpiler_cli_parse(&options, 5, argv) != FT_SUCCESS)
     {
         test_unset_environment("CTOC_DEFAULT_DIRECTION");
-        pf_printf("Assertion failed: transpiler_cli_parse should use CTOC_DEFAULT_DIRECTION\n");
+        std::printf("Assertion failed: transpiler_cli_parse should use CTOC_DEFAULT_DIRECTION\n");
         transpiler_cli_options_dispose(&options);
         return (FT_FAILURE);
     }

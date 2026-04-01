@@ -1,6 +1,6 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/Libft/libft.hpp"
+#include "compatibility/libft_compat.hpp"
 
 #include "test_suites.hpp"
 
@@ -17,7 +17,7 @@ static int runtime_sort_init_record(t_runtime_record *record, size_t length, con
     }
     if (!text)
         text = "";
-    content_length = ft_strlen(text);
+    content_length = std::strlen(text);
     if (content_length > length)
         content_length = length;
     if (runtime_record_copy_from_buffer(record, text, content_length) != FT_SUCCESS)

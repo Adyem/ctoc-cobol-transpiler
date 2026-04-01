@@ -1,4 +1,4 @@
-#include "libft/CMA/CMA.hpp"
+#include "compatibility/memory_compat.hpp"
 #include "test_suites.hpp"
 
 FT_TEST(test_transpiler_codegen_emits_text_file_sections)

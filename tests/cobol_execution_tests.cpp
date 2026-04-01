@@ -3,8 +3,8 @@
 #include <cstdlib>
 #include <unistd.h>
 
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 
 static int cobol_create_temp_directory(char *buffer, size_t buffer_size)
 {
@@ -32,7 +32,7 @@ static int cobol_join_path(const char *directory, const char *name, char *buffer
 
     if (!directory || !name || !buffer)
         return (FT_FAILURE);
-    length = pf_snprintf(buffer, buffer_size, "%s/%s", directory, name);
+    length = std::snprintf(buffer, buffer_size, "%s/%s", directory, name);
     if (length < 0)
         return (FT_FAILURE);
     if (static_cast<size_t>(length) >= buffer_size)
@@ -76,7 +76,7 @@ FT_TEST(test_cobol_sample_copy_file_executes)
         cobol_cleanup_artifacts(directory, binary_path, input_path, output_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "cobc -x -o %s samples/cobol/copy_file.cob", binary_path);
+    command_length = std::snprintf(command, sizeof(command), "cobc -x -o %s samples/cobol/copy_file.cob", binary_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         cobol_cleanup_artifacts(directory, binary_path, input_path, output_path);
@@ -84,7 +84,7 @@ FT_TEST(test_cobol_sample_copy_file_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile copy_file fixture\n");
+        std::printf("Assertion failed: cobc should compile copy_file fixture\n");
         cobol_cleanup_artifacts(directory, binary_path, input_path, output_path);
         return (FT_FAILURE);
     }
@@ -104,7 +104,7 @@ FT_TEST(test_cobol_sample_copy_file_executes)
         cobol_cleanup_artifacts(directory, binary_path, input_path, output_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "cd %s && ./copy_file.bin", directory);
+    command_length = std::snprintf(command, sizeof(command), "cd %s && ./copy_file.bin", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         cobol_cleanup_artifacts(directory, binary_path, input_path, output_path);
@@ -112,7 +112,7 @@ FT_TEST(test_cobol_sample_copy_file_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: compiled copy_file fixture should execute successfully\n");
+        std::printf("Assertion failed: compiled copy_file fixture should execute successfully\n");
         cobol_cleanup_artifacts(directory, binary_path, input_path, output_path);
         return (FT_FAILURE);
     }
@@ -122,9 +122,9 @@ FT_TEST(test_cobol_sample_copy_file_executes)
         return (FT_FAILURE);
     }
     expected_output = "ALPHA\nBRAVO\n";
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: copy_file fixture should copy input contents\n");
+        std::printf("Assertion failed: copy_file fixture should copy input contents\n");
         cobol_cleanup_artifacts(directory, binary_path, input_path, output_path);
         return (FT_FAILURE);
     }
@@ -153,7 +153,7 @@ FT_TEST(test_cobol_sample_record_writer_executes)
         cobol_cleanup_artifacts(directory, binary_path, report_path, NULL);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "cobc -x -o %s samples/cobol/record_writer.cob", binary_path);
+    command_length = std::snprintf(command, sizeof(command), "cobc -x -o %s samples/cobol/record_writer.cob", binary_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         cobol_cleanup_artifacts(directory, binary_path, report_path, NULL);
@@ -161,11 +161,11 @@ FT_TEST(test_cobol_sample_record_writer_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile record_writer fixture\n");
+        std::printf("Assertion failed: cobc should compile record_writer fixture\n");
         cobol_cleanup_artifacts(directory, binary_path, report_path, NULL);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "cd %s && ./record_writer.bin", directory);
+    command_length = std::snprintf(command, sizeof(command), "cd %s && ./record_writer.bin", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         cobol_cleanup_artifacts(directory, binary_path, report_path, NULL);
@@ -173,7 +173,7 @@ FT_TEST(test_cobol_sample_record_writer_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: record_writer fixture should execute successfully\n");
+        std::printf("Assertion failed: record_writer fixture should execute successfully\n");
         cobol_cleanup_artifacts(directory, binary_path, report_path, NULL);
         return (FT_FAILURE);
     }
@@ -188,9 +188,9 @@ FT_TEST(test_cobol_sample_record_writer_executes)
         return (FT_FAILURE);
     }
     expected_output = "0001INITIAL ENTRY           ";
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: record_writer fixture should emit expected report record\n");
+        std::printf("Assertion failed: record_writer fixture should emit expected report record\n");
         cobol_cleanup_artifacts(directory, binary_path, report_path, NULL);
         return (FT_FAILURE);
     }
@@ -219,7 +219,7 @@ FT_TEST(test_cobol_sample_return_numeric_executes)
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s samples/cobol/return_numeric.cob", binary_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -228,7 +228,7 @@ FT_TEST(test_cobol_sample_return_numeric_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile return_numeric fixture\n");
+        std::printf("Assertion failed: cobc should compile return_numeric fixture\n");
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
@@ -237,7 +237,7 @@ FT_TEST(test_cobol_sample_return_numeric_executes)
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./return_numeric.bin > return_numeric.out", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -246,7 +246,7 @@ FT_TEST(test_cobol_sample_return_numeric_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: return_numeric fixture should execute successfully\n");
+        std::printf("Assertion failed: return_numeric fixture should execute successfully\n");
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
@@ -256,9 +256,9 @@ FT_TEST(test_cobol_sample_return_numeric_executes)
         return (FT_FAILURE);
     }
     expected_output = "   42\n";
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: return_numeric fixture should emit computed sum\n");
+        std::printf("Assertion failed: return_numeric fixture should emit computed sum\n");
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
@@ -287,7 +287,7 @@ FT_TEST(test_cobol_sample_return_boolean_executes)
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s samples/cobol/return_boolean.cob", binary_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -296,7 +296,7 @@ FT_TEST(test_cobol_sample_return_boolean_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile return_boolean fixture\n");
+        std::printf("Assertion failed: cobc should compile return_boolean fixture\n");
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
@@ -305,7 +305,7 @@ FT_TEST(test_cobol_sample_return_boolean_executes)
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./return_boolean.bin > return_boolean.out", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -314,7 +314,7 @@ FT_TEST(test_cobol_sample_return_boolean_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: return_boolean fixture should execute successfully\n");
+        std::printf("Assertion failed: return_boolean fixture should execute successfully\n");
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
@@ -324,9 +324,9 @@ FT_TEST(test_cobol_sample_return_boolean_executes)
         return (FT_FAILURE);
     }
     expected_output = "ODD\n";
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: return_boolean fixture should identify odd values\n");
+        std::printf("Assertion failed: return_boolean fixture should identify odd values\n");
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
@@ -355,7 +355,7 @@ FT_TEST(test_cobol_sample_return_character_executes)
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s samples/cobol/return_character.cob", binary_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -364,7 +364,7 @@ FT_TEST(test_cobol_sample_return_character_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile return_character fixture\n");
+        std::printf("Assertion failed: cobc should compile return_character fixture\n");
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
@@ -373,7 +373,7 @@ FT_TEST(test_cobol_sample_return_character_executes)
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./return_character.bin > return_character.out", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -382,7 +382,7 @@ FT_TEST(test_cobol_sample_return_character_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: return_character fixture should execute successfully\n");
+        std::printf("Assertion failed: return_character fixture should execute successfully\n");
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
@@ -392,9 +392,9 @@ FT_TEST(test_cobol_sample_return_character_executes)
         return (FT_FAILURE);
     }
     expected_output = "A\n";
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: return_character fixture should emit fetched grade\n");
+        std::printf("Assertion failed: return_character fixture should emit fetched grade\n");
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
@@ -423,7 +423,7 @@ FT_TEST(test_cobol_sample_multi_module_executes)
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s samples/cobol/multi_module_main.cob samples/cobol/multi_module_worker.cob", binary_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -432,7 +432,7 @@ FT_TEST(test_cobol_sample_multi_module_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile multi-module fixtures\n");
+        std::printf("Assertion failed: cobc should compile multi-module fixtures\n");
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
@@ -441,7 +441,7 @@ FT_TEST(test_cobol_sample_multi_module_executes)
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./multi_module.bin > multi_module.out", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -450,7 +450,7 @@ FT_TEST(test_cobol_sample_multi_module_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: multi-module fixtures should execute successfully\n");
+        std::printf("Assertion failed: multi-module fixtures should execute successfully\n");
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }
@@ -460,9 +460,9 @@ FT_TEST(test_cobol_sample_multi_module_executes)
         return (FT_FAILURE);
     }
     expected_output = "WORKER READY\n   1\n";
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: multi-module program should emit banner and accumulator\n");
+        std::printf("Assertion failed: multi-module program should emit banner and accumulator\n");
         cobol_cleanup_artifacts(directory, binary_path, output_path, NULL);
         return (FT_FAILURE);
     }

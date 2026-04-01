@@ -90,7 +90,7 @@ FT_TEST(test_cobol_transpiled_reverse_normalization_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s samples/cobol/reverse_normalization.cob > %s 2>&1",
         binary_path, compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -101,7 +101,7 @@ FT_TEST(test_cobol_transpiled_reverse_normalization_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile reverse_normalization sample\n");
+        std::printf("Assertion failed: cobc should compile reverse_normalization sample\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -112,7 +112,7 @@ FT_TEST(test_cobol_transpiled_reverse_normalization_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./reverse_normalization.bin > reverse_normalization.txt", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -122,7 +122,7 @@ FT_TEST(test_cobol_transpiled_reverse_normalization_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: reverse_normalization binary should execute successfully\n");
+        std::printf("Assertion failed: reverse_normalization binary should execute successfully\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -133,9 +133,9 @@ FT_TEST(test_cobol_transpiled_reverse_normalization_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    if (ft_strlen(output_buffer) != 0)
+    if (std::strlen(output_buffer) != 0)
     {
-        pf_printf("Assertion failed: reverse_normalization sample should not emit output\n");
+        std::printf("Assertion failed: reverse_normalization sample should not emit output\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -186,7 +186,7 @@ FT_TEST(test_cobol_transpiled_reverse_normalization_exit_status)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s samples/cobol/reverse_normalization.cob > %s 2>&1",
         binary_path, compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -197,7 +197,7 @@ FT_TEST(test_cobol_transpiled_reverse_normalization_exit_status)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile reverse_normalization sample\n");
+        std::printf("Assertion failed: cobc should compile reverse_normalization sample\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -208,7 +208,7 @@ FT_TEST(test_cobol_transpiled_reverse_normalization_exit_status)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./reverse_normalization_status.bin > reverse_normalization_status.txt",
         directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -219,14 +219,14 @@ FT_TEST(test_cobol_transpiled_reverse_normalization_exit_status)
     }
     if (test_run_command_capture_status(command, &exit_status) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: test harness should capture reverse_normalization exit status\n");
+        std::printf("Assertion failed: test harness should capture reverse_normalization exit status\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
     if (exit_status != 0)
     {
-        pf_printf("Assertion failed: reverse_normalization sample should exit successfully\n");
+        std::printf("Assertion failed: reverse_normalization sample should exit successfully\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -237,9 +237,9 @@ FT_TEST(test_cobol_transpiled_reverse_normalization_exit_status)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    if (ft_strlen(output_buffer) != 0)
+    if (std::strlen(output_buffer) != 0)
     {
-        pf_printf("Assertion failed: reverse_normalization sample should not emit output\n");
+        std::printf("Assertion failed: reverse_normalization sample should not emit output\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);

@@ -2,7 +2,7 @@
 #define STANDARD_LIBRARY_TEST_SUPPORT_HPP
 
 #include "../compiler/compiler_test_support.hpp"
-#include "../../libft/CMA/CMA.hpp"
+#include "../../compatibility/memory_compat.hpp"
 #include "../test_suites.hpp"
 
 #include <cerrno>
@@ -55,7 +55,7 @@ static int STANDARD_LIBRARY_TEST_UNUSED test_expect_transcript_double(const char
     cursor = end;
     if (line == cursor || errno == ERANGE)
     {
-        pf_printf("Assertion failed: %s (expected floating-point line, received '%s')\n",
+        std::printf("Assertion failed: %s (expected floating-point line, received '%s')\n",
             message, line);
         return (FT_FAILURE);
     }
@@ -63,12 +63,12 @@ static int STANDARD_LIBRARY_TEST_UNUSED test_expect_transcript_double(const char
         cursor += 1;
     if (*cursor != '\0')
     {
-        pf_printf("Assertion failed: %s (unexpected trailing characters '%s')\n", message, cursor);
+        std::printf("Assertion failed: %s (unexpected trailing characters '%s')\n", message, cursor);
         return (FT_FAILURE);
     }
     if (std::fabs(actual - expected) > tolerance)
     {
-        pf_printf("Assertion failed: %s (expected %.6f ± %.6f, observed %.6f)\n",
+        std::printf("Assertion failed: %s (expected %.6f ± %.6f, observed %.6f)\n",
             message, expected, tolerance, actual);
         return (FT_FAILURE);
     }
@@ -82,7 +82,7 @@ static int STANDARD_LIBRARY_TEST_UNUSED test_expect_transcript_double_line(const
 
     if (test_read_transcript_line(buffer, offset, line_buffer, sizeof(line_buffer)) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: %s (missing floating-point transcript line)\n", message);
+        std::printf("Assertion failed: %s (missing floating-point transcript line)\n", message);
         return (FT_FAILURE);
     }
     return (test_expect_transcript_double(line_buffer, expected, tolerance, message));
@@ -95,7 +95,7 @@ static int STANDARD_LIBRARY_TEST_UNUSED test_expect_transcript_status_line(const
 
     if (test_read_transcript_line(buffer, offset, line_buffer, sizeof(line_buffer)) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: %s (missing status transcript line)\n", message);
+        std::printf("Assertion failed: %s (missing status transcript line)\n", message);
         return (FT_FAILURE);
     }
     if (test_expect_cstring_equal(line_buffer, expected, message) != FT_SUCCESS)
@@ -110,7 +110,7 @@ static int STANDARD_LIBRARY_TEST_UNUSED test_expect_transcript_complete(const ch
         return (FT_FAILURE);
     if (buffer[offset] != '\0')
     {
-        pf_printf("Assertion failed: %s (unexpected trailing transcript data '%s')\n", message, buffer + offset);
+        std::printf("Assertion failed: %s (unexpected trailing transcript data '%s')\n", message, buffer + offset);
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);

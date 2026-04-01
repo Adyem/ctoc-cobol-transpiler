@@ -1,7 +1,7 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
 
 #include "test_suites.hpp"
 
@@ -11,6 +11,13 @@ typedef struct s_round_trip_fixture
     const char *label;
     int requires_copybook;
 }   t_round_trip_fixture;
+
+static int round_trip_expect_success(int status)
+{
+    if (status == FT_SUCCESS)
+        return (FT_SUCCESS);
+    return (FT_FAILURE);
+}
 
 static int register_customer_status_copybook(t_transpiler_context *context)
 {
@@ -80,138 +87,136 @@ static int run_round_trip_fixture(const t_round_trip_fixture *fixture)
     status = FT_FAILURE;
     if (!fixture)
         return (FT_FAILURE);
-    if (test_expect_success(test_read_text_file(fixture->cobol_path,
-                cobol_buffer, sizeof(cobol_buffer)),
-            fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(test_read_text_file(fixture->cobol_path,
+                cobol_buffer, sizeof(cobol_buffer))) != FT_SUCCESS)
         return (FT_FAILURE);
-    terminator = ft_strstr(cobol_buffer, "END PROGRAM");
+    terminator = std::strstr(cobol_buffer, "END PROGRAM");
     if (terminator)
         *terminator = '\0';
-    if (test_expect_success(transpiler_context_init(&context), fixture->label)
+    if (round_trip_expect_success(transpiler_context_init(&context))
         != FT_SUCCESS)
         goto cleanup;
     context_initialized = 1;
     transpiler_context_set_languages(&context, TRANSPILE_LANGUAGE_COBOL,
         TRANSPILE_LANGUAGE_CBL_C);
     context.active_source_text = cobol_buffer;
-    context.active_source_length = ft_strlen(cobol_buffer);
+    context.active_source_length = std::strlen(cobol_buffer);
     transpiler_context_clear_comments(&context);
     parser_init_with_context(&parser, cobol_buffer, &context);
     status = parser_parse_program(&parser, &program);
     parser_dispose(&parser);
-    if (test_expect_success(status, fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(status) != FT_SUCCESS)
         goto cleanup;
     if (program)
         message_status = FT_SUCCESS;
     else
         message_status = FT_FAILURE;
-    if (test_expect_success(message_status, fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(message_status) != FT_SUCCESS)
         goto cleanup;
     if (fixture->requires_copybook)
     {
-        if (test_expect_success(register_customer_status_copybook(&context),
-                fixture->label) != FT_SUCCESS)
+        if (round_trip_expect_success(register_customer_status_copybook(&context))
+            != FT_SUCCESS)
             goto cleanup;
     }
-    if (test_expect_success(transpiler_cobol_program_to_cblc(&context, program,
-                &first_pass_cblc), fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(transpiler_cobol_program_to_cblc(&context,
+                program, &first_pass_cblc)) != FT_SUCCESS)
         goto cleanup;
     if (first_pass_cblc)
         message_status = FT_SUCCESS;
     else
         message_status = FT_FAILURE;
-    if (test_expect_success(message_status, fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(message_status) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(transpiler_validate_generated_cblc(first_pass_cblc),
-            fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(transpiler_validate_generated_cblc(first_pass_cblc))
+        != FT_SUCCESS)
         goto cleanup;
     if (transpiler_context_has_errors(&context))
         message_status = FT_FAILURE;
     else
         message_status = FT_SUCCESS;
-    if (test_expect_success(message_status, fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(message_status) != FT_SUCCESS)
         goto cleanup;
     cblc_translation_unit_init(&unit);
     unit_initialized = 1;
-    if (test_expect_success(cblc_parse_translation_unit(first_pass_cblc, &unit),
-            fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(cblc_parse_translation_unit(first_pass_cblc, &unit))
+        != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
-            fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(cblc_generate_cobol(&unit, &generated_cobol))
+        != FT_SUCCESS)
         goto cleanup;
     if (generated_cobol)
         message_status = FT_SUCCESS;
     else
         message_status = FT_FAILURE;
-    if (test_expect_success(message_status, fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(message_status) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(transpiler_validate_generated_cobol(generated_cobol),
-            fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(transpiler_validate_generated_cobol(generated_cobol))
+        != FT_SUCCESS)
         goto cleanup;
-    generated_length = ft_strlen(generated_cobol);
+    generated_length = std::strlen(generated_cobol);
     generated_copy = static_cast<char *>(cma_calloc(generated_length + 1,
             sizeof(char)));
     if (!generated_copy)
         goto cleanup;
     ft_strlcpy(generated_copy, generated_cobol, generated_length + 1);
-    terminator = ft_strstr(generated_copy, "END PROGRAM");
+    terminator = std::strstr(generated_copy, "END PROGRAM");
     if (terminator)
         *terminator = '\0';
     context.active_source_text = generated_copy;
-    context.active_source_length = ft_strlen(generated_copy);
+    context.active_source_length = std::strlen(generated_copy);
     transpiler_context_clear_comments(&context);
     parser_init_with_context(&regenerated_parser, generated_copy, &context);
     status = parser_parse_program(&regenerated_parser, &regenerated_program);
     parser_dispose(&regenerated_parser);
-    if (test_expect_success(status, fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(status) != FT_SUCCESS)
         goto cleanup;
     if (regenerated_program)
         message_status = FT_SUCCESS;
     else
         message_status = FT_FAILURE;
-    if (test_expect_success(message_status, fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(message_status) != FT_SUCCESS)
         goto cleanup;
     transpiler_context_reset_unit_state(&context);
     context.active_source_text = generated_copy;
-    context.active_source_length = ft_strlen(generated_copy);
-    if (test_expect_success(transpiler_cobol_program_to_cblc(&context,
-                regenerated_program, &second_pass_cblc), fixture->label)
-        != FT_SUCCESS)
+    context.active_source_length = std::strlen(generated_copy);
+    if (round_trip_expect_success(transpiler_cobol_program_to_cblc(&context,
+                regenerated_program, &second_pass_cblc)) != FT_SUCCESS)
         goto cleanup;
     if (second_pass_cblc)
         message_status = FT_SUCCESS;
     else
         message_status = FT_FAILURE;
-    if (test_expect_success(message_status, fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(message_status) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(transpiler_validate_generated_cblc(second_pass_cblc),
-            fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(transpiler_validate_generated_cblc(second_pass_cblc))
+        != FT_SUCCESS)
         goto cleanup;
     if (transpiler_context_has_errors(&context))
         message_status = FT_FAILURE;
     else
         message_status = FT_SUCCESS;
-    if (test_expect_success(message_status, fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(message_status) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(transpiler_cblc_apply_layout(first_pass_cblc,
+    if (round_trip_expect_success(transpiler_cblc_apply_layout(first_pass_cblc,
                 TRANSPILE_LAYOUT_NORMALIZE, TRANSPILE_FORMAT_PRETTY,
-                &normalized_first), fixture->label) != FT_SUCCESS)
+                &normalized_first)) != FT_SUCCESS)
         goto cleanup;
     if (normalized_first)
         message_status = FT_SUCCESS;
     else
         message_status = FT_FAILURE;
-    if (test_expect_success(message_status, fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(message_status) != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(transpiler_cblc_apply_layout(second_pass_cblc,
+    if (round_trip_expect_success(transpiler_cblc_apply_layout(second_pass_cblc,
                 TRANSPILE_LAYOUT_NORMALIZE, TRANSPILE_FORMAT_PRETTY,
-                &normalized_second), fixture->label) != FT_SUCCESS)
+                &normalized_second)) != FT_SUCCESS)
         goto cleanup;
     if (normalized_second)
         message_status = FT_SUCCESS;
     else
         message_status = FT_FAILURE;
-    if (test_expect_success(message_status, fixture->label) != FT_SUCCESS)
+    if (round_trip_expect_success(message_status) != FT_SUCCESS)
         goto cleanup;
     if (test_expect_cstring_equal(normalized_first, normalized_second,
             "normalized round-trip should be stable") != FT_SUCCESS)

@@ -1,6 +1,6 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/Libft/libft.hpp"
+#include "compatibility/libft_compat.hpp"
 #include "test_suites.hpp"
 
 FT_TEST(test_parser_accepts_modulo_expression)
@@ -103,7 +103,7 @@ FT_TEST(test_parser_accepts_modulo_expression)
         return (FT_FAILURE);
     }
     if (!operator_node->token.lexeme
-        || ft_strncmp(operator_node->token.lexeme, "MOD", operator_node->token.length) != 0)
+        || std::strncmp(operator_node->token.lexeme, "MOD", operator_node->token.length) != 0)
     {
         ast_node_destroy(program);
         return (FT_FAILURE);
@@ -212,7 +212,7 @@ FT_TEST(test_parser_accepts_multiplication_expression)
         return (FT_FAILURE);
     }
     if (!operator_node->token.lexeme
-        || ft_strncmp(operator_node->token.lexeme, "*", operator_node->token.length) != 0)
+        || std::strncmp(operator_node->token.lexeme, "*", operator_node->token.length) != 0)
     {
         ast_node_destroy(program);
         return (FT_FAILURE);
@@ -321,7 +321,7 @@ FT_TEST(test_parser_accepts_division_expression)
         return (FT_FAILURE);
     }
     if (!operator_node->token.lexeme
-        || ft_strncmp(operator_node->token.lexeme, "/", operator_node->token.length) != 0)
+        || std::strncmp(operator_node->token.lexeme, "/", operator_node->token.length) != 0)
     {
         ast_node_destroy(program);
         return (FT_FAILURE);
@@ -430,7 +430,7 @@ FT_TEST(test_parser_accepts_subtraction_expression)
         return (FT_FAILURE);
     }
     if (!operator_node->token.lexeme
-        || ft_strncmp(operator_node->token.lexeme, "-", operator_node->token.length) != 0)
+        || std::strncmp(operator_node->token.lexeme, "-", operator_node->token.length) != 0)
     {
         ast_node_destroy(program);
         return (FT_FAILURE);
@@ -757,7 +757,7 @@ FT_TEST(test_parser_accepts_unary_abs_expression)
         return (FT_FAILURE);
     }
     if (!operator_node->token.lexeme
-        || ft_strncmp(operator_node->token.lexeme, "ABS", operator_node->token.length) != 0)
+        || std::strncmp(operator_node->token.lexeme, "ABS", operator_node->token.length) != 0)
     {
         ast_node_destroy(program);
         return (FT_FAILURE);

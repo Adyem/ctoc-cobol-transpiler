@@ -1,4 +1,4 @@
-#include "libft/Libft/libft.hpp"
+#include "compatibility/libft_compat.hpp"
 
 #include "semantics_test_support.hpp"
 #include "transpiler_semantics_internal.hpp"
@@ -83,7 +83,7 @@ static int semantics_attach_use_after_error_declaratives(t_ast_node *program,
     }
     token.kind = LEXER_TOKEN_IDENTIFIER;
     token.lexeme = section_name;
-    token.length = ft_strlen(section_name);
+    token.length = std::strlen(section_name);
     token.line = 1;
     token.column = 1;
     if (ast_node_set_token(section, &token) != FT_SUCCESS)
@@ -106,7 +106,7 @@ static int semantics_attach_use_after_error_declaratives(t_ast_node *program,
     }
     token.kind = LEXER_TOKEN_KEYWORD_USE;
     token.lexeme = "USE";
-    token.length = ft_strlen(token.lexeme);
+    token.length = std::strlen(token.lexeme);
     token.line = 1;
     token.column = 1;
     if (ast_node_set_token(use_node, &token) != FT_SUCCESS)
@@ -163,7 +163,7 @@ static int semantics_attach_empty_main_paragraph(t_ast_node *procedure_division)
         return (FT_FAILURE);
     token.kind = LEXER_TOKEN_IDENTIFIER;
     token.lexeme = "MAIN";
-    token.length = ft_strlen(token.lexeme);
+    token.length = std::strlen(token.lexeme);
     token.line = 1;
     token.column = 1;
     if (ast_node_set_token(paragraph, &token) != FT_SUCCESS)
@@ -348,10 +348,10 @@ FT_TEST(test_semantics_registers_use_after_error_binding)
                 &binding_count);
             if (bindings && binding_count == 1)
             {
-                if (ft_strncmp(bindings[0].section_name, "ERR-SECTION",
+                if (std::strncmp(bindings[0].section_name, "ERR-SECTION",
                         TRANSPILE_IDENTIFIER_MAX) == 0)
                 {
-                    if (ft_strncmp(bindings[0].file_name, "INPUT-FILE",
+                    if (std::strncmp(bindings[0].file_name, "INPUT-FILE",
                             TRANSPILE_IDENTIFIER_MAX) == 0)
                         status = FT_SUCCESS;
                 }
@@ -454,7 +454,7 @@ FT_TEST(test_semantics_collects_occurs_metadata)
     registered = transpiler_semantics_scope_lookup(&scope, "TABLE-FIELD");
     if (!registered)
     {
-        pf_printf("Assertion failed: OCCURS data item missing from scope\n");
+        std::printf("Assertion failed: OCCURS data item missing from scope\n");
         goto cleanup;
     }
     if (test_expect_int_equal(registered->occurs.present, 1,
@@ -476,7 +476,7 @@ FT_TEST(test_semantics_collects_occurs_metadata)
     context_item = transpiler_context_find_data_item(&context, "TABLE-FIELD");
     if (!context_item)
     {
-        pf_printf("Assertion failed: OCCURS data item missing from context registry\n");
+        std::printf("Assertion failed: OCCURS data item missing from context registry\n");
         goto cleanup;
     }
     if (test_expect_int_equal(context_item->occurs.present, 1,

@@ -2,7 +2,7 @@
 
 #include "compiler_test_support.hpp"
 #include "cobol/round_trip_pipeline_helpers.hpp"
-#include "libft/CMA/CMA.hpp"
+#include "compatibility/memory_compat.hpp"
 
 const t_test_case *get_compiler_differential_tests(size_t *count);
 
@@ -90,25 +90,25 @@ FT_TEST(test_compiler_differential_return_numeric_outputs_match)
             "cobc should compile generated return_numeric COBOL program")
         != FT_SUCCESS)
         goto cleanup;
-    command_length = pf_snprintf(command, sizeof(command), "cc %s -o %s",
+    command_length = std::snprintf(command, sizeof(command), "cc %s -o %s",
         c_source_path, c_binary_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
         goto cleanup;
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cc should compile generated return_numeric C program\n");
+        std::printf("Assertion failed: cc should compile generated return_numeric C program\n");
         goto cleanup;
     }
     if (execute_binary(directory, "return_numeric_cobol.bin", "return_numeric_cobol.txt",
             "generated COBOL binary should execute successfully") != FT_SUCCESS)
         goto cleanup;
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./return_numeric_c_backend.bin > return_numeric_c_backend.txt", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
         goto cleanup;
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: generated C binary should execute successfully\n");
+        std::printf("Assertion failed: generated C binary should execute successfully\n");
         goto cleanup;
     }
     if (test_read_text_file(cobol_output_path, cobol_output_buffer,
@@ -117,11 +117,11 @@ FT_TEST(test_compiler_differential_return_numeric_outputs_match)
     if (test_read_text_file(c_output_path, c_output_buffer,
             sizeof(c_output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (ft_strlen(cobol_output_buffer) != ft_strlen(c_output_buffer)
-        || ft_strncmp(cobol_output_buffer, c_output_buffer,
-            ft_strlen(cobol_output_buffer) + 1) != 0)
+    if (std::strlen(cobol_output_buffer) != std::strlen(c_output_buffer)
+        || std::strncmp(cobol_output_buffer, c_output_buffer,
+            std::strlen(cobol_output_buffer) + 1) != 0)
     {
-        pf_printf("Assertion failed: COBOL and C backends should emit matching output\n");
+        std::printf("Assertion failed: COBOL and C backends should emit matching output\n");
         goto cleanup;
     }
     status = FT_SUCCESS;

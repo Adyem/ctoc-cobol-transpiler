@@ -69,7 +69,7 @@ FT_TEST(test_cobol_transpiled_return_character_executes)
     binary_path = "test_transpiled_return_character.bin";
     output_path = "test_transpiled_return_character.txt";
     expected_output = "A\n";
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s samples/cobol/return_character.cob", binary_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -78,11 +78,11 @@ FT_TEST(test_cobol_transpiled_return_character_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile transpiled return_character program\n");
+        std::printf("Assertion failed: cobc should compile transpiled return_character program\n");
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    command_length = std::snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_generated_artifacts(binary_path, output_path);
@@ -90,7 +90,7 @@ FT_TEST(test_cobol_transpiled_return_character_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: transpiled return_character program should execute successfully\n");
+        std::printf("Assertion failed: transpiled return_character program should execute successfully\n");
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
@@ -99,9 +99,9 @@ FT_TEST(test_cobol_transpiled_return_character_executes)
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: transpiled return_character program should emit fetched grade\n");
+        std::printf("Assertion failed: transpiled return_character program should emit fetched grade\n");
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
@@ -123,7 +123,7 @@ FT_TEST(test_cobol_transpiled_return_character_exit_status)
     binary_path = "test_transpiled_return_character_status.bin";
     output_path = "test_transpiled_return_character_status.txt";
     expected_output = "A\n";
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s samples/cobol/return_character.cob", binary_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -132,11 +132,11 @@ FT_TEST(test_cobol_transpiled_return_character_exit_status)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile transpiled return_character program\n");
+        std::printf("Assertion failed: cobc should compile transpiled return_character program\n");
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    command_length = std::snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_generated_artifacts(binary_path, output_path);
@@ -144,13 +144,13 @@ FT_TEST(test_cobol_transpiled_return_character_exit_status)
     }
     if (test_run_command_capture_status(command, &exit_status) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: test harness should capture return_character COBOL exit status\n");
+        std::printf("Assertion failed: test harness should capture return_character COBOL exit status\n");
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
     if (exit_status != 0)
     {
-        pf_printf("Assertion failed: transpiled return_character program should exit successfully\n");
+        std::printf("Assertion failed: transpiled return_character program should exit successfully\n");
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
@@ -159,9 +159,9 @@ FT_TEST(test_cobol_transpiled_return_character_exit_status)
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: transpiled return_character program should emit fetched grade\n");
+        std::printf("Assertion failed: transpiled return_character program should emit fetched grade\n");
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
@@ -211,7 +211,7 @@ FT_TEST(test_cobol_transpiled_return_character_compile_logs_clean)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s samples/cobol/return_character.cob > %s 2>&1",
         binary_path, compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -222,7 +222,7 @@ FT_TEST(test_cobol_transpiled_return_character_compile_logs_clean)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile return_character sample while capturing log\n");
+        std::printf("Assertion failed: cobc should compile return_character sample while capturing log\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -233,7 +233,7 @@ FT_TEST(test_cobol_transpiled_return_character_compile_logs_clean)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./return_character_compile.bin > return_character_compile.txt",
         directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -244,7 +244,7 @@ FT_TEST(test_cobol_transpiled_return_character_compile_logs_clean)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: return_character binary should execute after log validation\n");
+        std::printf("Assertion failed: return_character binary should execute after log validation\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -255,9 +255,9 @@ FT_TEST(test_cobol_transpiled_return_character_compile_logs_clean)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: return_character binary should emit selected character after log validation\n");
+        std::printf("Assertion failed: return_character binary should emit selected character after log validation\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);

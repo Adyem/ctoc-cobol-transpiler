@@ -1,7 +1,7 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
 
 static void ast_node_reset_token(t_ast_node *node)
 {

@@ -92,7 +92,7 @@ FT_TEST(test_transpiler_pipeline_reports_failure)
     {
         transpiler_context_dispose(&context);
         transpiler_pipeline_dispose(&pipeline);
-        pf_printf("Assertion failed: pipeline execute should fail when a stage fails\n");
+        std::printf("Assertion failed: pipeline execute should fail when a stage fails\n");
         return (FT_FAILURE);
     }
     transpiler_context_dispose(&context);
@@ -134,7 +134,7 @@ FT_TEST(test_transpiler_pipeline_stops_after_failure)
     {
         transpiler_context_dispose(&context);
         transpiler_pipeline_dispose(&pipeline);
-        pf_printf("Assertion failed: pipeline execute should fail for early failure\n");
+        std::printf("Assertion failed: pipeline execute should fail for early failure\n");
         return (FT_FAILURE);
     }
     transpiler_context_dispose(&context);

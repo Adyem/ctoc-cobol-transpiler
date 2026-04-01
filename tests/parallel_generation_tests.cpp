@@ -92,9 +92,9 @@ FT_TEST(test_parallel_generate_cobol_emits_outputs_for_multiple_units)
         goto cleanup;
     if (!results[0].text || !results[1].text)
         goto cleanup;
-    if (!ft_strnstr(results[0].text, "PROGRAM-ID.", ft_strlen(results[0].text)))
+    if (!ft_strnstr(results[0].text, "PROGRAM-ID.", std::strlen(results[0].text)))
         goto cleanup;
-    if (!ft_strnstr(results[1].text, "PROGRAM-ID.", ft_strlen(results[1].text)))
+    if (!ft_strnstr(results[1].text, "PROGRAM-ID.", std::strlen(results[1].text)))
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:

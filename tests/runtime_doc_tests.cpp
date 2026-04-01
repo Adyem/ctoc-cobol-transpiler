@@ -1,7 +1,7 @@
 #include "test_suites.hpp"
 
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 
 static int runtime_doc_load(char *buffer, size_t buffer_size)
 {
@@ -11,7 +11,7 @@ static int runtime_doc_load(char *buffer, size_t buffer_size)
         return (FT_FAILURE);
     if (test_read_text_file("docs/runtime_api_reference.md", buffer, buffer_size) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: expected docs/runtime_api_reference.md to be readable\n");
+        std::printf("Assertion failed: expected docs/runtime_api_reference.md to be readable\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -25,12 +25,12 @@ static int runtime_doc_expect_contains(const char *buffer, const char *snippet)
         return (FT_FAILURE);
     if (!snippet)
         return (FT_FAILURE);
-    length = ft_strlen(buffer);
+    length = std::strlen(buffer);
     if (length == 0)
         return (FT_FAILURE);
     if (!ft_strnstr(buffer, snippet, length))
     {
-        pf_printf("Assertion failed: runtime API document should mention '%s'\n", snippet);
+        std::printf("Assertion failed: runtime API document should mention '%s'\n", snippet);
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -42,9 +42,9 @@ FT_TEST(test_runtime_doc_exists)
 
     if (runtime_doc_load(buffer, sizeof(buffer)) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (ft_strlen(buffer) == 0)
+    if (std::strlen(buffer) == 0)
     {
-        pf_printf("Assertion failed: docs/runtime_api_reference.md should not be empty\n");
+        std::printf("Assertion failed: docs/runtime_api_reference.md should not be empty\n");
         return (FT_FAILURE);
     }
     if (runtime_doc_expect_contains(buffer, "Runtime Helper API Reference") != FT_SUCCESS)
@@ -100,22 +100,22 @@ FT_TEST(test_design_doc_references_runtime_doc)
     FILE *file;
     char line[1024];
 
-    file = ft_fopen("design_doc.txt", "r");
+    file = std::fopen("design_doc.txt", "r");
     if (!file)
     {
-        pf_printf("Assertion failed: design_doc.txt should be readable\n");
+        std::printf("Assertion failed: design_doc.txt should be readable\n");
         return (FT_FAILURE);
     }
-    while (ft_fgets(line, sizeof(line), file))
+    while (std::fgets(line, sizeof(line), file))
     {
-        if (ft_strnstr(line, "docs/runtime_api_reference.md", ft_strlen(line)))
+        if (ft_strnstr(line, "docs/runtime_api_reference.md", std::strlen(line)))
         {
-            ft_fclose(file);
+            std::fclose(file);
             return (FT_SUCCESS);
         }
     }
-    ft_fclose(file);
-    pf_printf("Assertion failed: design_doc.txt should reference docs/runtime_api_reference.md\n");
+    std::fclose(file);
+    std::printf("Assertion failed: design_doc.txt should reference docs/runtime_api_reference.md\n");
     return (FT_FAILURE);
 }
 

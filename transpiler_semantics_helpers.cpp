@@ -1,6 +1,6 @@
 #include <cstddef>
 
-#include "libft/Libft/libft.hpp"
+#include "compatibility/libft_compat.hpp"
 
 #include "transpiler_semantics_internal.hpp"
 
@@ -314,7 +314,7 @@ size_t transpiler_semantics_literal_alphanumeric_length(const t_ast_node *litera
         return (0);
     if (!literal->token.lexeme)
         return (0);
-    length = ft_strlen(literal->token.lexeme);
+    length = std::strlen(literal->token.lexeme);
     if (length >= 2)
     {
         char first;

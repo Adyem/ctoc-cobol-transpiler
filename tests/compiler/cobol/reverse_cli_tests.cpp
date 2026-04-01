@@ -70,7 +70,7 @@ FT_TEST(test_reverse_control_flow_golden_cobol_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s %s > %s 2>&1", binary_path, source_path, compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -80,7 +80,7 @@ FT_TEST(test_reverse_control_flow_golden_cobol_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile generated reverse_control_flow COBOL\n");
+        std::printf("Assertion failed: cobc should compile generated reverse_control_flow COBOL\n");
         test_cleanup_example_artifacts_with_log(source_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -91,7 +91,7 @@ FT_TEST(test_reverse_control_flow_golden_cobol_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./reverse_control_flow_generated.bin > reverse_control_flow_generated.txt", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -101,7 +101,7 @@ FT_TEST(test_reverse_control_flow_golden_cobol_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: generated reverse_control_flow binary should execute successfully\n");
+        std::printf("Assertion failed: generated reverse_control_flow binary should execute successfully\n");
         test_cleanup_example_artifacts_with_log(source_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -112,9 +112,9 @@ FT_TEST(test_reverse_control_flow_golden_cobol_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: generated reverse_control_flow binary should emit expected DISPLAY output\n");
+        std::printf("Assertion failed: generated reverse_control_flow binary should emit expected DISPLAY output\n");
         test_cleanup_example_artifacts_with_log(source_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -221,7 +221,7 @@ FT_TEST(test_reverse_control_flow_multi_module_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s %s %s > %s 2>&1", binary_path, main_source_path, worker_source_path,
         compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -234,7 +234,7 @@ FT_TEST(test_reverse_control_flow_multi_module_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile generated multi-module COBOL\n");
+        std::printf("Assertion failed: cobc should compile generated multi-module COBOL\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
         test_remove_file(worker_source_path);
         test_remove_file(main_source_path);
@@ -249,7 +249,7 @@ FT_TEST(test_reverse_control_flow_multi_module_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./reverse_control_flow_multi.bin > reverse_control_flow_multi.txt", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -261,7 +261,7 @@ FT_TEST(test_reverse_control_flow_multi_module_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: generated multi-module COBOL should execute successfully\n");
+        std::printf("Assertion failed: generated multi-module COBOL should execute successfully\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
         test_remove_file(worker_source_path);
         test_remove_file(main_source_path);
@@ -276,9 +276,9 @@ FT_TEST(test_reverse_control_flow_multi_module_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: generated multi-module COBOL should emit expected banner and accumulator\n");
+        std::printf("Assertion failed: generated multi-module COBOL should emit expected banner and accumulator\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
         test_remove_file(worker_source_path);
         test_remove_file(main_source_path);

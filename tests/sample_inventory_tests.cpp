@@ -1,7 +1,7 @@
 #include "test_suites.hpp"
 
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 
 static int sample_manifest_extract_line(const char *buffer, size_t *offset, char *line, size_t line_size)
 {
@@ -49,11 +49,11 @@ static int validate_manifest_entries(const char *manifest_path)
     {
         if (sample_manifest_extract_line(manifest_buffer, &offset, line, sizeof(line)) != FT_SUCCESS)
             return (FT_FAILURE);
-        if (ft_strlen(line) == 0)
+        if (std::strlen(line) == 0)
             continue;
         if (test_read_text_file(line, sample_buffer, sizeof(sample_buffer)) != FT_SUCCESS)
         {
-            pf_printf("Assertion failed: sample '%s' listed in manifest '%s' should exist and be readable\n", line, manifest_path);
+            std::printf("Assertion failed: sample '%s' listed in manifest '%s' should exist and be readable\n", line, manifest_path);
             return (FT_FAILURE);
         }
     }
@@ -72,17 +72,17 @@ static int validate_inventory_mentions(const char *manifest_path, const char *in
         return (FT_FAILURE);
     if (test_read_text_file(inventory_path, inventory_buffer, sizeof(inventory_buffer)) != FT_SUCCESS)
         return (FT_FAILURE);
-    inventory_length = ft_strlen(inventory_buffer);
+    inventory_length = std::strlen(inventory_buffer);
     offset = 0;
     while (manifest_buffer[offset] != '\0')
     {
         if (sample_manifest_extract_line(manifest_buffer, &offset, line, sizeof(line)) != FT_SUCCESS)
             return (FT_FAILURE);
-        if (ft_strlen(line) == 0)
+        if (std::strlen(line) == 0)
             continue;
         if (!ft_strnstr(inventory_buffer, line, inventory_length))
         {
-            pf_printf("Assertion failed: inventory document '%s' should mention sample '%s'\n", inventory_path, line);
+            std::printf("Assertion failed: inventory document '%s' should mention sample '%s'\n", inventory_path, line);
             return (FT_FAILURE);
         }
     }
@@ -102,16 +102,16 @@ static int sample_manifest_extract_basename(const char *line, char *basename, si
         return (FT_FAILURE);
     if (basename_size == 0)
         return (FT_FAILURE);
-    start = ft_strrchr(line, '/');
+    start = std::strrchr(line, '/');
     if (start)
         start++;
     else
         start = line;
-    end = ft_strrchr(start, '.');
+    end = std::strrchr(start, '.');
     if (end)
         length = static_cast<size_t>(end - start);
     else
-        length = ft_strlen(start);
+        length = std::strlen(start);
     if (length + 1 >= basename_size)
         return (FT_FAILURE);
     index = 0;
@@ -144,11 +144,11 @@ static int sample_manifest_collect_basenames(const char *manifest_path, char nam
     {
         if (sample_manifest_extract_line(manifest_buffer, &offset, line, sizeof(line)) != FT_SUCCESS)
             return (FT_FAILURE);
-        if (ft_strlen(line) == 0)
+        if (std::strlen(line) == 0)
             continue;
         if (*count >= capacity)
         {
-            pf_printf("Assertion failed: manifest '%s' lists more samples than expected\n", manifest_path);
+            std::printf("Assertion failed: manifest '%s' lists more samples than expected\n", manifest_path);
             return (FT_FAILURE);
         }
         if (sample_manifest_extract_basename(line, names[*count], 64) != FT_SUCCESS)
@@ -167,7 +167,7 @@ static int sample_basename_exists(const char *needle, char names[][64], size_t c
     index = 0;
     while (index < count)
     {
-        if (ft_strncmp(needle, names[index], ft_strlen(needle) + 1) == 0)
+        if (std::strncmp(needle, names[index], std::strlen(needle) + 1) == 0)
             return (FT_SUCCESS);
         index++;
     }
@@ -193,7 +193,7 @@ static int validate_sample_pairs_match(void)
     {
         if (sample_basename_exists(cobol_names[index], cblc_names, cblc_count) != FT_SUCCESS)
         {
-            pf_printf("Assertion failed: COBOL sample '%s' should have a matching CBL-C fixture\n", cobol_names[index]);
+            std::printf("Assertion failed: COBOL sample '%s' should have a matching CBL-C fixture\n", cobol_names[index]);
             return (FT_FAILURE);
         }
         index++;
@@ -203,7 +203,7 @@ static int validate_sample_pairs_match(void)
     {
         if (sample_basename_exists(cblc_names[index], cobol_names, cobol_count) != FT_SUCCESS)
         {
-            pf_printf("Assertion failed: CBL-C sample '%s' should have a matching COBOL fixture\n", cblc_names[index]);
+            std::printf("Assertion failed: CBL-C sample '%s' should have a matching COBOL fixture\n", cblc_names[index]);
             return (FT_FAILURE);
         }
         index++;
@@ -227,8 +227,8 @@ static int sample_validate_unique_functions(const char *sample_path, const char 
     function_count = 0;
     offset = 0;
     needle = "function ";
-    needle_length = ft_strlen(needle);
-    length = ft_strlen(sample_source);
+    needle_length = std::strlen(needle);
+    length = std::strlen(sample_source);
     while (offset < length)
     {
         size_t remaining;
@@ -252,7 +252,7 @@ static int sample_validate_unique_functions(const char *sample_path, const char 
             type_start++;
         if (type_start >= length)
         {
-            pf_printf("Assertion failed: sample '%s' should declare a return type after keyword\n", sample_path);
+            std::printf("Assertion failed: sample '%s' should declare a return type after keyword\n", sample_path);
             return (FT_FAILURE);
         }
         type_length = 0;
@@ -262,7 +262,7 @@ static int sample_validate_unique_functions(const char *sample_path, const char 
         {
             if (type_length + 1 >= sizeof(return_type))
             {
-                pf_printf("Assertion failed: sample '%s' declares an unexpectedly long return type\n", sample_path);
+                std::printf("Assertion failed: sample '%s' declares an unexpectedly long return type\n", sample_path);
                 return (FT_FAILURE);
             }
             return_type[type_length] = sample_source[type_start + type_length];
@@ -270,18 +270,18 @@ static int sample_validate_unique_functions(const char *sample_path, const char 
         }
         if (type_length == 0)
         {
-            pf_printf("Assertion failed: sample '%s' should provide a return type before function name\n", sample_path);
+            std::printf("Assertion failed: sample '%s' should provide a return type before function name\n", sample_path);
             return (FT_FAILURE);
         }
         return_type[type_length] = '\0';
         if (type_start + type_length >= length)
         {
-            pf_printf("Assertion failed: sample '%s' should separate return type from function name\n", sample_path);
+            std::printf("Assertion failed: sample '%s' should separate return type from function name\n", sample_path);
             return (FT_FAILURE);
         }
         if (sample_source[type_start + type_length] == '(')
         {
-            pf_printf("Assertion failed: sample '%s' should include a function name after return type\n", sample_path);
+            std::printf("Assertion failed: sample '%s' should include a function name after return type\n", sample_path);
             return (FT_FAILURE);
         }
         name_start = type_start + type_length;
@@ -289,7 +289,7 @@ static int sample_validate_unique_functions(const char *sample_path, const char 
             name_start++;
         if (name_start >= length)
         {
-            pf_printf("Assertion failed: sample '%s' should declare a function name after return type\n", sample_path);
+            std::printf("Assertion failed: sample '%s' should declare a function name after return type\n", sample_path);
             return (FT_FAILURE);
         }
         name_length = 0;
@@ -297,17 +297,17 @@ static int sample_validate_unique_functions(const char *sample_path, const char 
         {
             if (sample_source[name_start + name_length] == ' ')
             {
-                pf_printf("Assertion failed: sample '%s' should not include spaces in function names\n", sample_path);
+                std::printf("Assertion failed: sample '%s' should not include spaces in function names\n", sample_path);
                 return (FT_FAILURE);
             }
             if (sample_source[name_start + name_length] == '\n')
             {
-                pf_printf("Assertion failed: sample '%s' should keep function name on declaration line\n", sample_path);
+                std::printf("Assertion failed: sample '%s' should keep function name on declaration line\n", sample_path);
                 return (FT_FAILURE);
             }
             if (name_length + 1 >= sizeof(name))
             {
-                pf_printf("Assertion failed: sample '%s' declares an unexpectedly long function name\n", sample_path);
+                std::printf("Assertion failed: sample '%s' declares an unexpectedly long function name\n", sample_path);
                 return (FT_FAILURE);
             }
             name[name_length] = sample_source[name_start + name_length];
@@ -315,34 +315,34 @@ static int sample_validate_unique_functions(const char *sample_path, const char 
         }
         if (name_start + name_length >= length)
         {
-            pf_printf("Assertion failed: sample '%s' should terminate function name with parentheses\n", sample_path);
+            std::printf("Assertion failed: sample '%s' should terminate function name with parentheses\n", sample_path);
             return (FT_FAILURE);
         }
         if (name_length == 0)
         {
-            pf_printf("Assertion failed: sample '%s' should not omit function names\n", sample_path);
+            std::printf("Assertion failed: sample '%s' should not omit function names\n", sample_path);
             return (FT_FAILURE);
         }
         name[name_length] = '\0';
-        if (ft_strncmp(name, "main", ft_strlen("main") + 1) == 0
-            && ft_strncmp(return_type, "void", ft_strlen("void") + 1) != 0)
+        if (std::strncmp(name, "main", std::strlen("main") + 1) == 0
+            && std::strncmp(return_type, "void", std::strlen("void") + 1) != 0)
         {
-            pf_printf("Assertion failed: sample '%s' should declare main with a void return type\n", sample_path);
+            std::printf("Assertion failed: sample '%s' should declare main with a void return type\n", sample_path);
             return (FT_FAILURE);
         }
         index = 0;
         while (index < function_count)
         {
-            if (ft_strncmp(function_names[index], name, ft_strlen(name) + 1) == 0)
+            if (std::strncmp(function_names[index], name, std::strlen(name) + 1) == 0)
             {
-                pf_printf("Assertion failed: sample '%s' should not declare duplicate function '%s'\n", sample_path, name);
+                std::printf("Assertion failed: sample '%s' should not declare duplicate function '%s'\n", sample_path, name);
                 return (FT_FAILURE);
             }
             index++;
         }
         if (function_count >= sizeof(function_names) / sizeof(function_names[0]))
         {
-            pf_printf("Assertion failed: sample '%s' declares more functions than expected\n", sample_path);
+            std::printf("Assertion failed: sample '%s' declares more functions than expected\n", sample_path);
             return (FT_FAILURE);
         }
         index = 0;
@@ -371,7 +371,7 @@ static int validate_cblc_sample_functions_unique(const char *manifest_path)
     {
         if (sample_manifest_extract_line(manifest_buffer, &offset, line, sizeof(line)) != FT_SUCCESS)
             return (FT_FAILURE);
-        if (ft_strlen(line) == 0)
+        if (std::strlen(line) == 0)
             continue;
         if (test_read_text_file(line, sample_buffer, sizeof(sample_buffer)) != FT_SUCCESS)
             return (FT_FAILURE);

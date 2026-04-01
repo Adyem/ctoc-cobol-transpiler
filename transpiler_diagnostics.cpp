@@ -1,6 +1,6 @@
 #include <cstdlib>
 
-#include "libft/CMA/CMA.hpp"
+#include "compatibility/memory_compat.hpp"
 #include "cblc_transpiler.hpp"
 
 static int transpiler_diagnostics_reserve(t_transpiler_diagnostic_list *list, size_t desired_capacity)
@@ -16,7 +16,7 @@ static int transpiler_diagnostics_reserve(t_transpiler_diagnostic_list *list, si
         return (FT_FAILURE);
     if (list->items)
     {
-        ft_memcpy(new_items, list->items, list->count * sizeof(t_transpiler_diagnostic));
+        std::memcpy(new_items, list->items, list->count * sizeof(t_transpiler_diagnostic));
         cma_free(list->items);
     }
     list->items = new_items;

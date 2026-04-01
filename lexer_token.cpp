@@ -1,6 +1,6 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/Libft/libft.hpp"
+#include "compatibility/libft_compat.hpp"
 
 typedef struct s_keyword_entry
 {
@@ -24,7 +24,7 @@ static int lexer_keyword_equals(const char *text, size_t length, const char *key
         return (0);
     if (!keyword)
         return (0);
-    keyword_length = static_cast<size_t>(ft_strlen(keyword));
+    keyword_length = std::strlen(keyword);
     if (keyword_length != length)
         return (0);
     index = 0;

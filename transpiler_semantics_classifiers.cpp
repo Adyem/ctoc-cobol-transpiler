@@ -1,5 +1,5 @@
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 
 #include "transpiler_semantics_internal.hpp"
 
@@ -15,7 +15,7 @@ int transpiler_semantics_classify_unary_expression(const t_ast_node *expression,
     size_t operand_length;
     const char *expression_role;
     char operand_role[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
-    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX * 3];
     t_lexer_token_kind operator_kind;
     const char *operator_text;
     int status;
@@ -33,7 +33,7 @@ int transpiler_semantics_classify_unary_expression(const t_ast_node *expression,
     expression_role = (role && role[0] != '\0') ? role : "unary expression";
     if (!expression)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s is missing", expression_role);
         return (transpiler_semantics_emit_invalid_expression(context, message));
     }
@@ -41,7 +41,7 @@ int transpiler_semantics_classify_unary_expression(const t_ast_node *expression,
         return (FT_FAILURE);
     if (ast_node_child_count(expression) < 2)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s is missing an operator or operand", expression_role);
         return (transpiler_semantics_emit_invalid_expression(context, message));
     }
@@ -49,13 +49,13 @@ int transpiler_semantics_classify_unary_expression(const t_ast_node *expression,
     operand = ast_node_get_child(expression, 1);
     if (!operator_node || operator_node->kind != AST_NODE_ARITHMETIC_OPERATOR)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s is missing an arithmetic operator", expression_role);
         return (transpiler_semantics_emit_invalid_expression(context, message));
     }
     if (!operand)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s is missing an operand", expression_role);
         return (transpiler_semantics_emit_invalid_expression(context, message));
     }
@@ -77,13 +77,13 @@ int transpiler_semantics_classify_unary_expression(const t_ast_node *expression,
             operator_text = operator_node->token.lexeme;
         else
             operator_text = "<operator>";
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "unary operator '%s' is not supported in %s",
             operator_text, expression_role);
         return (transpiler_semantics_emit_invalid_expression(context, message));
     }
     if (role && role[0] != '\0')
-        pf_snprintf(operand_role, sizeof(operand_role), "%s operand", role);
+        std::snprintf(operand_role, sizeof(operand_role), "%s operand", role);
     else
         ft_strlcpy(operand_role, "operand", sizeof(operand_role));
     operand_kind = TRANSPILE_SEMANTIC_DATA_UNKNOWN;
@@ -96,7 +96,7 @@ int transpiler_semantics_classify_unary_expression(const t_ast_node *expression,
         return (FT_FAILURE);
     if (!transpiler_semantics_is_numeric_kind(operand_kind))
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "unary operator '%s' requires numeric or floating operands but %s is %s",
             operator_text, operand_role,
             transpiler_semantics_kind_to_string(operand_kind));
@@ -132,7 +132,7 @@ int transpiler_semantics_classify_arithmetic_expression(const t_ast_node *expres
     int right_scale_known;
     size_t result_scale;
     int result_scale_known;
-    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX * 3];
     char left_role[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
     char right_role[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
     const char *expression_role;
@@ -151,7 +151,7 @@ int transpiler_semantics_classify_arithmetic_expression(const t_ast_node *expres
     expression_role = (role && role[0] != '\0') ? role : "arithmetic expression";
     if (!expression)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s is missing", expression_role);
         return (transpiler_semantics_emit_invalid_expression(context, message));
     }
@@ -159,7 +159,7 @@ int transpiler_semantics_classify_arithmetic_expression(const t_ast_node *expres
         return (FT_FAILURE);
     if (ast_node_child_count(expression) < 3)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s is missing operands or operator", expression_role);
         return (transpiler_semantics_emit_invalid_expression(context, message));
     }
@@ -168,8 +168,8 @@ int transpiler_semantics_classify_arithmetic_expression(const t_ast_node *expres
     right = ast_node_get_child(expression, 2);
     if (role && role[0] != '\0')
     {
-        pf_snprintf(left_role, sizeof(left_role), "%s left operand", role);
-        pf_snprintf(right_role, sizeof(right_role), "%s right operand", role);
+        std::snprintf(left_role, sizeof(left_role), "%s left operand", role);
+        std::snprintf(right_role, sizeof(right_role), "%s right operand", role);
     }
     else
     {
@@ -195,7 +195,7 @@ int transpiler_semantics_classify_arithmetic_expression(const t_ast_node *expres
         status = FT_FAILURE;
     if (!operator_node || operator_node->kind != AST_NODE_ARITHMETIC_OPERATOR)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "%s is missing an arithmetic operator", expression_role);
         if (transpiler_semantics_emit_invalid_expression(context, message) != FT_SUCCESS)
             status = FT_FAILURE;
@@ -222,7 +222,7 @@ int transpiler_semantics_classify_arithmetic_expression(const t_ast_node *expres
         if (left_kind != TRANSPILE_SEMANTIC_DATA_UNKNOWN
             && !transpiler_semantics_is_numeric_kind(left_kind))
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "arithmetic operator '%s' requires numeric or floating operands but %s is %s",
                 operator_text, left_role,
                 transpiler_semantics_kind_to_string(left_kind));
@@ -234,7 +234,7 @@ int transpiler_semantics_classify_arithmetic_expression(const t_ast_node *expres
         if (right_kind != TRANSPILE_SEMANTIC_DATA_UNKNOWN
             && !transpiler_semantics_is_numeric_kind(right_kind))
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "arithmetic operator '%s' requires numeric or floating operands but %s is %s",
                 operator_text, right_role,
                 transpiler_semantics_kind_to_string(right_kind));
@@ -246,7 +246,7 @@ int transpiler_semantics_classify_arithmetic_expression(const t_ast_node *expres
         if (status == FT_SUCCESS
             && !transpiler_semantics_numeric_kinds_match(left_kind, right_kind))
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "arithmetic operator '%s' requires operands of the same type but %s is %s and %s is %s",
                 operator_text, left_role,
                 transpiler_semantics_kind_to_string(left_kind), right_role,
@@ -327,7 +327,7 @@ int transpiler_semantics_classify_arithmetic_expression(const t_ast_node *expres
         if (left_kind != TRANSPILE_SEMANTIC_DATA_UNKNOWN
             && left_kind != TRANSPILE_SEMANTIC_DATA_NUMERIC)
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "arithmetic operator '%s' requires integral operands but %s is %s",
                 operator_text, left_role,
                 transpiler_semantics_kind_to_string(left_kind));
@@ -339,7 +339,7 @@ int transpiler_semantics_classify_arithmetic_expression(const t_ast_node *expres
         if (right_kind != TRANSPILE_SEMANTIC_DATA_UNKNOWN
             && right_kind != TRANSPILE_SEMANTIC_DATA_NUMERIC)
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "arithmetic operator '%s' requires integral operands but %s is %s",
                 operator_text, right_role,
                 transpiler_semantics_kind_to_string(right_kind));
@@ -372,7 +372,7 @@ int transpiler_semantics_classify_arithmetic_expression(const t_ast_node *expres
         if (left_kind != TRANSPILE_SEMANTIC_DATA_UNKNOWN
             && !transpiler_semantics_is_numeric_kind(left_kind))
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "arithmetic operator '%s' requires numeric or floating operands but %s is %s",
                 operator_text, left_role,
                 transpiler_semantics_kind_to_string(left_kind));
@@ -384,7 +384,7 @@ int transpiler_semantics_classify_arithmetic_expression(const t_ast_node *expres
         if (right_kind != TRANSPILE_SEMANTIC_DATA_UNKNOWN
             && !transpiler_semantics_is_numeric_kind(right_kind))
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "arithmetic operator '%s' requires numeric or floating operands but %s is %s",
                 operator_text, right_role,
                 transpiler_semantics_kind_to_string(right_kind));
@@ -396,7 +396,7 @@ int transpiler_semantics_classify_arithmetic_expression(const t_ast_node *expres
         if (status == FT_SUCCESS
             && !transpiler_semantics_numeric_kinds_match(left_kind, right_kind))
         {
-            pf_snprintf(message, sizeof(message),
+            std::snprintf(message, sizeof(message),
                 "arithmetic operator '%s' requires operands of the same type but %s is %s and %s is %s",
                 operator_text, left_role,
                 transpiler_semantics_kind_to_string(left_kind), right_role,
@@ -448,7 +448,7 @@ int transpiler_semantics_classify_arithmetic_expression(const t_ast_node *expres
         }
         return (status);
     }
-    pf_snprintf(message, sizeof(message),
+    std::snprintf(message, sizeof(message),
         "arithmetic operator '%s' is not supported in %s",
         operator_text, expression_role);
     transpiler_semantics_emit_invalid_expression(context, message);

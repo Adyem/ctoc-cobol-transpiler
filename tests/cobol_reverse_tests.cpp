@@ -1,5 +1,5 @@
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
 #include "test_suites.hpp"
 
 typedef int (*t_cobol_reverse_context_setup)(t_transpiler_context *context);
@@ -23,7 +23,7 @@ static int cobol_reverse_run_fixture(const char *cobol_path, const char *expecte
                     cobol_buffer, sizeof(cobol_buffer)),
             label) != FT_SUCCESS)
         return (FT_FAILURE);
-    char *terminator = ft_strstr(cobol_buffer, "END PROGRAM");
+    char *terminator = std::strstr(cobol_buffer, "END PROGRAM");
     if (terminator)
         *terminator = '\0';
     if (test_expect_success(test_read_text_file(expected_path,
@@ -37,7 +37,7 @@ static int cobol_reverse_run_fixture(const char *cobol_path, const char *expecte
     transpiler_context_set_languages(&context, TRANSPILE_LANGUAGE_COBOL,
         TRANSPILE_LANGUAGE_CBL_C);
     context.active_source_text = cobol_buffer;
-    context.active_source_length = ft_strlen(cobol_buffer);
+    context.active_source_length = std::strlen(cobol_buffer);
     transpiler_context_clear_comments(&context);
     parser_init_with_context(&parser, cobol_buffer, &context);
     status = parser_parse_program(&parser, &program);
@@ -45,14 +45,14 @@ static int cobol_reverse_run_fixture(const char *cobol_path, const char *expecte
     {
         size_t index;
 
-        pf_printf("Parser stopped at token kind %d text '", parser.current.kind);
+        std::printf("Parser stopped at token kind %d text '", parser.current.kind);
         index = 0;
         while (index < parser.current.length)
         {
-            pf_printf("%c", parser.current.lexeme[index]);
+            std::printf("%c", parser.current.lexeme[index]);
             index += 1;
         }
-        pf_printf("'\n");
+        std::printf("'\n");
     }
     if (test_expect_success(status,
             label) != FT_SUCCESS)
@@ -257,7 +257,7 @@ FT_TEST(test_cobol_reverse_emits_read_lock_variants)
     transpiler_context_set_languages(&context, TRANSPILE_LANGUAGE_COBOL,
         TRANSPILE_LANGUAGE_CBL_C);
     context.active_source_text = source;
-    context.active_source_length = ft_strlen(source);
+    context.active_source_length = std::strlen(source);
     transpiler_context_clear_comments(&context);
     parser_init_with_context(&parser, source, &context);
     status = parser_parse_program(&parser, &program);
@@ -278,22 +278,22 @@ FT_TEST(test_cobol_reverse_emits_read_lock_variants)
             cma_free(output);
         return (FT_FAILURE);
     }
-    if (!output || !ft_strstr(output, "read_next_with_lock(INPUT_FILE, INPUT_REC);"))
+    if (!output || !std::strstr(output, "read_next_with_lock(INPUT_FILE, INPUT_REC);"))
     {
         transpiler_context_dispose(&context);
         ast_node_destroy(program);
         if (output)
             cma_free(output);
-        pf_printf("Assertion failed: expected read_next_with_lock call in output\n");
+        std::printf("Assertion failed: expected read_next_with_lock call in output\n");
         return (FT_FAILURE);
     }
-    if (!ft_strstr(output, "read_with_no_lock(HISTORY);"))
+    if (!std::strstr(output, "read_with_no_lock(HISTORY);"))
     {
         transpiler_context_dispose(&context);
         ast_node_destroy(program);
         if (output)
             cma_free(output);
-        pf_printf("Assertion failed: expected read_with_no_lock call in output\n");
+        std::printf("Assertion failed: expected read_with_no_lock call in output\n");
         return (FT_FAILURE);
     }
     transpiler_context_dispose(&context);
@@ -330,7 +330,7 @@ FT_TEST(test_cobol_reverse_respects_occurs_depending_on_bounds)
     transpiler_context_set_languages(&context, TRANSPILE_LANGUAGE_COBOL,
         TRANSPILE_LANGUAGE_CBL_C);
     context.active_source_text = source;
-    context.active_source_length = ft_strlen(source);
+    context.active_source_length = std::strlen(source);
     transpiler_context_clear_comments(&context);
     parser_init_with_context(&parser, source, &context);
     status = parser_parse_program(&parser, &program);
@@ -351,22 +351,22 @@ FT_TEST(test_cobol_reverse_respects_occurs_depending_on_bounds)
             cma_free(output);
         return (FT_FAILURE);
     }
-    if (!output || !ft_strstr(output, "char TABLE_ITEM[ENTRY_COUNT][8];"))
+    if (!output || !std::strstr(output, "char TABLE_ITEM[ENTRY_COUNT][8];"))
     {
         transpiler_context_dispose(&context);
         ast_node_destroy(program);
         if (output)
             cma_free(output);
-        pf_printf("Assertion failed: expected OCCURS DEPENDING ON dimension in output\n");
+        std::printf("Assertion failed: expected OCCURS DEPENDING ON dimension in output\n");
         return (FT_FAILURE);
     }
-    if (ft_strstr(output, "char TABLE_ITEM[5][8];"))
+    if (std::strstr(output, "char TABLE_ITEM[5][8];"))
     {
         transpiler_context_dispose(&context);
         ast_node_destroy(program);
         if (output)
             cma_free(output);
-        pf_printf("Assertion failed: expected OCCURS DEPENDING ON to avoid maximum bound literal\n");
+        std::printf("Assertion failed: expected OCCURS DEPENDING ON to avoid maximum bound literal\n");
         return (FT_FAILURE);
     }
     transpiler_context_dispose(&context);

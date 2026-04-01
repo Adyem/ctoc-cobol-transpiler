@@ -119,8 +119,8 @@ const t_transpiler_standard_library_entry *transpiler_standard_library_lookup_wi
     index = 0;
     while (index < entry_count)
     {
-        if (ft_strncmp(entries[index].qualified_name, qualified_name,
-                ft_strlen(entries[index].qualified_name) + 1) == 0)
+        if (std::strncmp(entries[index].qualified_name, qualified_name,
+                std::strlen(entries[index].qualified_name) + 1) == 0)
         {
             if (buffer_kind == TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE
                 || entries[index].buffer_kind == buffer_kind)

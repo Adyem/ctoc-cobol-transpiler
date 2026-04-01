@@ -1,7 +1,7 @@
 #include "test_suites.hpp"
 
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 
 static int runtime_audit_expect_no_forbidden_allocator(const char *path)
 {
@@ -28,13 +28,13 @@ static int runtime_audit_expect_no_forbidden_allocator(const char *path)
         return (FT_FAILURE);
     if (test_read_text_file(path, buffer, sizeof(buffer)) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: expected %s to be readable\n", path);
+        std::printf("Assertion failed: expected %s to be readable\n", path);
         return (FT_FAILURE);
     }
-    length = ft_strlen(buffer);
+    length = std::strlen(buffer);
     if (length == 0)
     {
-        pf_printf("Assertion failed: expected %s to contain source code\n", path);
+        std::printf("Assertion failed: expected %s to contain source code\n", path);
         return (FT_FAILURE);
     }
     token_index = 0;
@@ -46,7 +46,7 @@ static int runtime_audit_expect_no_forbidden_allocator(const char *path)
         token = forbidden_tokens[token_index];
         if (ft_strnstr(buffer, token, length))
         {
-            pf_printf("Assertion failed: %s should not use allocator token '%s'\n", path, token);
+            std::printf("Assertion failed: %s should not use allocator token '%s'\n", path, token);
             return (FT_FAILURE);
         }
         token_index += 1;
@@ -83,13 +83,14 @@ static int runtime_audit_expect_cma_include(const char *path)
         return (FT_FAILURE);
     if (test_read_text_file(path, buffer, sizeof(buffer)) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: expected %s to be readable\n", path);
+        std::printf("Assertion failed: expected %s to be readable\n", path);
         return (FT_FAILURE);
     }
-    length = ft_strlen(buffer);
-    if (!ft_strnstr(buffer, "\"libft/CMA/CMA.hpp\"", length))
+    length = std::strlen(buffer);
+    if (!ft_strnstr(buffer, "\"compatibility/memory_compat.hpp\"", length))
     {
-        pf_printf("Assertion failed: %s should include libft/CMA/CMA.hpp to use CMA allocators\n", path);
+        std::printf("Assertion failed: %s should include compatibility/memory_compat.hpp to use project allocators\n",
+            path);
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);

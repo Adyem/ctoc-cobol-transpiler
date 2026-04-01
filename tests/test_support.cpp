@@ -2,6 +2,7 @@
 
 #include <cerrno>
 #include <cstdlib>
+#include <cstdio>
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -53,6 +54,7 @@ static int test_capture_stream_begin(t_test_output_capture *capture, int fd)
 
     if (!capture)
         return (FT_FAILURE);
+    std::fflush(NULL);
     capture->saved_fd = -1;
     capture->pipe_read_fd = -1;
     capture->target_fd = -1;
@@ -93,6 +95,7 @@ static int test_capture_stream_end(t_test_output_capture *capture, int fd, char 
         return (FT_FAILURE);
     if (capture->target_fd != fd)
     {
+        std::fflush(NULL);
         close(capture->saved_fd);
         capture->saved_fd = -1;
         close(capture->pipe_read_fd);
@@ -100,6 +103,7 @@ static int test_capture_stream_end(t_test_output_capture *capture, int fd, char 
         capture->target_fd = -1;
         return (FT_FAILURE);
     }
+    std::fflush(NULL);
     if (dup2(capture->saved_fd, fd) < 0)
     {
         close(capture->saved_fd);
@@ -213,7 +217,7 @@ int test_require_cobc_dependency(const char *test_name)
         return (FT_SUCCESS);
     if (!test_name || test_name[0] == '\0')
         test_name = "COBOL compiler dependent test";
-    pf_printf("Missing dependency: install 'cobc' to run %s.\n", test_name);
+    std::printf("Missing dependency: install 'cobc' to run %s.\n", test_name);
     return (FT_FAILURE);
 }
 
@@ -297,7 +301,7 @@ static void test_format_description(const char *name, char *buffer, size_t buffe
     if (!name)
         return ;
     start = 0;
-    if (ft_strncmp(name, "test_", 5) == 0)
+    if (std::strncmp(name, "test_", 5) == 0)
         start = 5;
     index = start;
     output = 0;
@@ -332,9 +336,9 @@ static void test_format_description(const char *name, char *buffer, size_t buffe
 int test_assert_failure(const char *expression, const char *file, int line)
 {
     if (expression)
-        pf_printf("Assertion failed: %s (%s:%d)\n", expression, file, line);
+        std::printf("Assertion failed: %s (%s:%d)\n", expression, file, line);
     else
-        pf_printf("Assertion failed at %s:%d\n", file, line);
+        std::printf("Assertion failed at %s:%d\n", file, line);
     return (FT_FAILURE);
 }
 
@@ -343,7 +347,7 @@ int test_expect_success(int status, const char *message)
     if (status == FT_SUCCESS)
         return (FT_SUCCESS);
     if (message)
-        pf_printf("Assertion failed: %s\n", message);
+        std::printf("Assertion failed: %s\n", message);
     return (FT_FAILURE);
 }
 
@@ -352,7 +356,7 @@ int test_expect_int_equal(int actual, int expected, const char *message)
     if (actual == expected)
         return (FT_SUCCESS);
     if (message)
-        pf_printf("Assertion failed: %s (expected %d, got %d)\n", message, expected, actual);
+        std::printf("Assertion failed: %s (expected %d, got %d)\n", message, expected, actual);
     return (FT_FAILURE);
 }
 
@@ -361,7 +365,7 @@ int test_expect_size_t_equal(size_t actual, size_t expected, const char *message
     if (actual == expected)
         return (FT_SUCCESS);
     if (message)
-        pf_printf("Assertion failed: %s (expected %zu, got %zu)\n", message, expected, actual);
+        std::printf("Assertion failed: %s (expected %zu, got %zu)\n", message, expected, actual);
     return (FT_FAILURE);
 }
 
@@ -370,7 +374,7 @@ int test_expect_char_equal(char actual, char expected, const char *message)
     if (actual == expected)
         return (FT_SUCCESS);
     if (message)
-        pf_printf("Assertion failed: %s (expected %c, got %c)\n", message, expected, actual);
+        std::printf("Assertion failed: %s (expected %c, got %c)\n", message, expected, actual);
     return (FT_FAILURE);
 }
 
@@ -381,14 +385,14 @@ int test_expect_cstring_equal(const char *actual, const char *expected, const ch
     if (!actual || !expected)
     {
         if (message)
-            pf_printf("Assertion failed: %s (expected %s, got %s)\n", message,
+            std::printf("Assertion failed: %s (expected %s, got %s)\n", message,
                 expected ? expected : "(null)", actual ? actual : "(null)");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(actual, expected, ft_strlen(expected) + 1) == 0)
+    if (std::strncmp(actual, expected, std::strlen(expected) + 1) == 0)
         return (FT_SUCCESS);
     if (message)
-        pf_printf("Assertion failed: %s (expected %s, got %s)\n", message, expected, actual);
+        std::printf("Assertion failed: %s (expected %s, got %s)\n", message, expected, actual);
     return (FT_FAILURE);
 }
 
@@ -402,37 +406,37 @@ int test_expect_token(const t_lexer_token *token, t_lexer_token_kind expected_ki
         return (FT_FAILURE);
     if (token->kind != expected_kind)
     {
-        pf_printf("Assertion failed: token kind mismatch (expected %d, got %d)\n", expected_kind, token->kind);
+        std::printf("Assertion failed: token kind mismatch (expected %d, got %d)\n", expected_kind, token->kind);
         return (FT_FAILURE);
     }
     if (token->line != expected_line)
     {
-        pf_printf("Assertion failed: token line mismatch (expected %zu, got %zu)\n", expected_line, token->line);
+        std::printf("Assertion failed: token line mismatch (expected %zu, got %zu)\n", expected_line, token->line);
         return (FT_FAILURE);
     }
     if (token->column != expected_column)
     {
-        pf_printf("Assertion failed: token column mismatch (expected %zu, got %zu)\n", expected_column, token->column);
+        std::printf("Assertion failed: token column mismatch (expected %zu, got %zu)\n", expected_column, token->column);
         return (FT_FAILURE);
     }
     if (!expected_lexeme)
     {
         if (token->length != 0)
         {
-            pf_printf("Assertion failed: token length mismatch (expected 0, got %zu)\n", token->length);
+            std::printf("Assertion failed: token length mismatch (expected 0, got %zu)\n", token->length);
             return (FT_FAILURE);
         }
         return (FT_SUCCESS);
     }
-    expected_length = ft_strlen(expected_lexeme);
+    expected_length = std::strlen(expected_lexeme);
     if (token->length != expected_length)
     {
-        pf_printf("Assertion failed: token length mismatch (expected %zu, got %zu)\n", expected_length, token->length);
+        std::printf("Assertion failed: token length mismatch (expected %zu, got %zu)\n", expected_length, token->length);
         return (FT_FAILURE);
     }
     if (!token->lexeme)
     {
-        pf_printf("Assertion failed: token lexeme should not be null\n");
+        std::printf("Assertion failed: token lexeme should not be null\n");
         return (FT_FAILURE);
     }
     index = 0;
@@ -440,7 +444,7 @@ int test_expect_token(const t_lexer_token *token, t_lexer_token_kind expected_ki
     {
         if (token->lexeme[index] != expected_lexeme[index])
         {
-            pf_printf("Assertion failed: token lexeme mismatch at index %zu (expected %c, got %c)\n",
+            std::printf("Assertion failed: token lexeme mismatch at index %zu (expected %c, got %c)\n",
                 index, expected_lexeme[index], token->lexeme[index]);
             return (FT_FAILURE);
         }
@@ -463,7 +467,7 @@ int test_write_text_file(const char *path, const char *contents)
     fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd < 0)
         return (FT_FAILURE);
-    length = ft_strlen(contents);
+    length = std::strlen(contents);
     offset = 0;
     while (offset < length)
     {
@@ -620,18 +624,18 @@ int run_test_case(const t_test_case *test)
     status = test->execute();
     if (status != FT_SUCCESS)
     {
-        pf_printf("FT_TEST KO test number ");
-        pf_printf("%s", index_text);
-        pf_printf(" - ");
-        pf_printf("%s\n", description);
+        std::printf("FT_TEST KO test number ");
+        std::printf("%s", index_text);
+        std::printf(" - ");
+        std::printf("%s\n", description);
         g_failed_tests += 1;
     }
     else
     {
-        pf_printf("FT_TEST OK test number ");
-        pf_printf("%s", index_text);
-        pf_printf(" - ");
-        pf_printf("%s\n", description);
+        std::printf("FT_TEST OK test number ");
+        std::printf("%s", index_text);
+        std::printf(" - ");
+        std::printf("%s\n", description);
     }
     return (status);
 }
@@ -659,10 +663,10 @@ void test_report_summary(void)
     size_t passed;
 
     passed = g_total_tests - g_failed_tests;
-    pf_printf("============================================\n");
-    pf_printf("Total: %zu | Passed: %zu | Failed: %zu\n", g_total_tests, passed, g_failed_tests);
+    std::printf("============================================\n");
+    std::printf("Total: %zu | Passed: %zu | Failed: %zu\n", g_total_tests, passed, g_failed_tests);
     if (g_failed_tests == 0)
-        pf_printf("Result: ALL TESTS PASSED\n");
+        std::printf("Result: ALL TESTS PASSED\n");
     else
-        pf_printf("Result: TESTS FAILED\n");
+        std::printf("Result: TESTS FAILED\n");
 }

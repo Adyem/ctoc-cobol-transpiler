@@ -24,7 +24,7 @@ FT_TEST(test_transpiler_context_registers_void_function)
     if (!signature)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected to locate registered function signature\n");
+        std::printf("Assertion failed: expected to locate registered function signature\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(signature->return_mode, TRANSPILE_FUNCTION_RETURN_VOID,
@@ -67,7 +67,7 @@ FT_TEST(test_transpiler_context_registers_value_return_function)
     if (!signature)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected to locate value-return function signature\n");
+        std::printf("Assertion failed: expected to locate value-return function signature\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(signature->return_mode, TRANSPILE_FUNCTION_RETURN_VALUE,
@@ -110,7 +110,7 @@ FT_TEST(test_transpiler_context_registers_main_entrypoint)
     if (!entrypoint)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected to retrieve registered entrypoint\n");
+        std::printf("Assertion failed: expected to retrieve registered entrypoint\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(entrypoint->present, 1,
@@ -177,7 +177,7 @@ FT_TEST(test_transpiler_context_entrypoint_registers_function_signature)
     if (!signature)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected entrypoint to register function signature\n");
+        std::printf("Assertion failed: expected entrypoint to register function signature\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(context.function_count), 1,
@@ -219,14 +219,14 @@ FT_TEST(test_transpiler_context_argument_mismatch_keeps_entrypoint_clear)
             TRANSPILE_FUNCTION_RETURN_VOID, "argc", NULL) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected entrypoint registration to fail for partial arguments\n");
+        std::printf("Assertion failed: expected entrypoint registration to fail for partial arguments\n");
         return (FT_FAILURE);
     }
     entrypoint = transpiler_context_get_entrypoint(&context);
     if (entrypoint)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected entrypoint query to return NULL after failure\n");
+        std::printf("Assertion failed: expected entrypoint query to return NULL after failure\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(context.function_count), 0,
@@ -281,7 +281,7 @@ FT_TEST(test_transpiler_context_rejects_duplicate_function_registration)
             TRANSPILE_FUNCTION_RETURN_VOID, TRANSPILE_SYMBOL_PRIVATE) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected duplicate function registration to fail\n");
+        std::printf("Assertion failed: expected duplicate function registration to fail\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(context.function_count), 1,
@@ -329,7 +329,7 @@ FT_TEST(test_transpiler_context_rejects_non_main_entrypoint)
             TRANSPILE_FUNCTION_RETURN_VOID, NULL, NULL) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected entrypoint registration to fail for non-main name\n");
+        std::printf("Assertion failed: expected entrypoint registration to fail for non-main name\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(transpiler_context_has_errors(&context), 1,
@@ -379,7 +379,7 @@ FT_TEST(test_transpiler_context_registers_main_without_arguments)
     if (!entrypoint)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected to retrieve registered entrypoint\n");
+        std::printf("Assertion failed: expected to retrieve registered entrypoint\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(entrypoint->present, 1,
@@ -438,7 +438,7 @@ FT_TEST(test_transpiler_context_rejects_argument_mismatch)
             TRANSPILE_FUNCTION_RETURN_VOID, "argc", NULL) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected entrypoint registration to fail for argument mismatch\n");
+        std::printf("Assertion failed: expected entrypoint registration to fail for argument mismatch\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(transpiler_context_has_errors(&context), 1,
@@ -480,7 +480,7 @@ FT_TEST(test_transpiler_context_rejects_non_void_entrypoint)
             TRANSPILE_FUNCTION_RETURN_VALUE, NULL, NULL) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected entrypoint registration to fail for non-void return\n");
+        std::printf("Assertion failed: expected entrypoint registration to fail for non-void return\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(transpiler_context_has_errors(&context), 1,
@@ -529,7 +529,7 @@ FT_TEST(test_transpiler_context_rejects_duplicate_entrypoint)
             TRANSPILE_FUNCTION_RETURN_VOID, NULL, NULL) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected duplicate entrypoint to be rejected\n");
+        std::printf("Assertion failed: expected duplicate entrypoint to be rejected\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(transpiler_context_has_errors(&context), 1,

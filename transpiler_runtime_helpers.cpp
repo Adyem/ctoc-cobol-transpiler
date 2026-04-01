@@ -1,7 +1,7 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
 
 static const char g_runtime_helper_min_size[] =
     "static size_t cblc_min_size(size_t left, size_t right)\n"
@@ -204,7 +204,7 @@ int transpiler_runtime_helpers_render_c_source(char **out_text)
     index = 0;
     while (index < entry_count)
     {
-        total_length += ft_strlen(entries[index].source);
+        total_length += std::strlen(entries[index].source);
         if (index + 1 < entry_count)
             total_length += 1;
         index += 1;
@@ -218,10 +218,10 @@ int transpiler_runtime_helpers_render_c_source(char **out_text)
     {
         size_t length;
 
-        length = ft_strlen(entries[index].source);
+        length = std::strlen(entries[index].source);
         if (length > 0)
         {
-            ft_memcpy(buffer + offset, entries[index].source, length);
+            std::memcpy(buffer + offset, entries[index].source, length);
             offset += length;
         }
         if (index + 1 < entry_count)

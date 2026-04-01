@@ -3,9 +3,9 @@
 #include <system_error>
 
 #include "cblc_transpiler.hpp"
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 #include "transpiler_semantic_dump.hpp"
 
 static t_transpiler_incremental_cache g_incremental_cache;
@@ -98,9 +98,9 @@ static const t_transpiler_standard_library_entry *pipeline_detect_standard_libra
     index = 0;
     while (index < entry_count)
     {
-        if (pf_snprintf(candidate, sizeof(candidate), "%s.cob", entries[index].program_name) < 0)
+        if (std::snprintf(candidate, sizeof(candidate), "%s.cob", entries[index].program_name) < 0)
             return (NULL);
-        if (ft_strncmp(filename, candidate, ft_strlen(candidate) + 1) == 0)
+        if (std::strncmp(filename, candidate, std::strlen(candidate) + 1) == 0)
             return (&entries[index]);
         index += 1;
     }
@@ -120,16 +120,16 @@ static int pipeline_select_cache_manifest(const t_transpiler_context *context, c
         directory = context->output_directory;
     if (directory && directory[0] != '\0')
     {
-        if (pf_snprintf(buffer, buffer_size, "%s/.ctoc-cache", directory) < 0)
+        if (std::snprintf(buffer, buffer_size, "%s/.ctoc-cache", directory) < 0)
             return (FT_FAILURE);
-        length = static_cast<size_t>(ft_strlen(buffer));
+        length = std::strlen(buffer);
         if (length + 1 > buffer_size)
             return (FT_FAILURE);
         return (FT_SUCCESS);
     }
-    if (pf_snprintf(buffer, buffer_size, ".ctoc-cache") < 0)
+    if (std::snprintf(buffer, buffer_size, ".ctoc-cache") < 0)
         return (FT_FAILURE);
-    length = static_cast<size_t>(ft_strlen(buffer));
+    length = std::strlen(buffer);
     if (length + 1 > buffer_size)
         return (FT_FAILURE);
     return (FT_SUCCESS);
@@ -219,14 +219,14 @@ static int pipeline_read_file(const char *path, char **out_text)
             if (!new_buffer)
                 goto cleanup;
             if (length > 0)
-                ft_memcpy(new_buffer, buffer, length);
+                std::memcpy(new_buffer, buffer, length);
             cma_free(buffer);
             buffer = new_buffer;
             capacity = new_capacity;
         }
         if (bytes_read > 0)
         {
-            ft_memcpy(buffer + length, stack_buffer, bytes_read);
+            std::memcpy(buffer + length, stack_buffer, bytes_read);
             length += bytes_read;
             buffer[length] = '\0';
         }
@@ -273,7 +273,7 @@ static int pipeline_write_file(const char *path, const char *text)
     runtime_file_init(&file);
     if (runtime_file_open_write(&file, path) != FT_SUCCESS)
         return (FT_FAILURE);
-    length = ft_strlen(text);
+    length = std::strlen(text);
     if (runtime_file_write(&file, text, length) != FT_SUCCESS)
     {
         runtime_file_close(&file);
@@ -298,19 +298,19 @@ static int pipeline_resolve_output_path(const t_transpiler_context *context, con
     if (directory && directory[0] != '\0')
     {
         filename = target_path;
-        separator = ft_strrchr(target_path, '/');
+        separator = std::strrchr(target_path, '/');
         if (!separator)
-            separator = ft_strrchr(target_path, '\\');
+            separator = std::strrchr(target_path, '\\');
         if (separator && separator[1] != '\0')
             filename = separator + 1;
-        if (pf_snprintf(buffer, buffer_size, "%s/%s", directory, filename) < 0)
+        if (std::snprintf(buffer, buffer_size, "%s/%s", directory, filename) < 0)
             return (FT_FAILURE);
-        length = ft_strlen(buffer);
+        length = std::strlen(buffer);
         if (length + 1 > buffer_size)
             return (FT_FAILURE);
         return (FT_SUCCESS);
     }
-    length = ft_strlen(target_path);
+    length = std::strlen(target_path);
     if (length + 1 > buffer_size)
         return (FT_FAILURE);
     ft_strlcpy(buffer, target_path, buffer_size);
@@ -347,7 +347,7 @@ static int pipeline_build_ast_output_path(const t_transpiler_context *context, c
         if (!filename || filename[0] == '\0')
             filename = "program";
         ft_strlcpy(base, filename, sizeof(base));
-        length = ft_strlen(base);
+        length = std::strlen(base);
         while (length > 0)
         {
             if (base[length - 1] == '.')
@@ -359,16 +359,16 @@ static int pipeline_build_ast_output_path(const t_transpiler_context *context, c
         }
         if (base[0] == '\0')
             ft_strlcpy(base, "program", sizeof(base));
-        if (pf_snprintf(buffer, buffer_size, "%s/%s.dot", directory, base) < 0)
+        if (std::snprintf(buffer, buffer_size, "%s/%s.dot", directory, base) < 0)
             return (FT_FAILURE);
-        length = ft_strlen(buffer);
+        length = std::strlen(buffer);
         if (length + 1 > buffer_size)
             return (FT_FAILURE);
         return (FT_SUCCESS);
     }
     if (!resolved_output_path)
         return (FT_FAILURE);
-    length = ft_strlen(resolved_output_path);
+    length = std::strlen(resolved_output_path);
     if (length + 5 > buffer_size)
         return (FT_FAILURE);
     ft_strlcpy(buffer, resolved_output_path, buffer_size);
@@ -418,7 +418,7 @@ static int pipeline_build_copybook_graph_output_path(const t_transpiler_context 
         if (!filename || filename[0] == '\0')
             filename = "program";
         ft_strlcpy(base, filename, sizeof(base));
-        length = ft_strlen(base);
+        length = std::strlen(base);
         while (length > 0)
         {
             if (base[length - 1] == '.')
@@ -430,16 +430,16 @@ static int pipeline_build_copybook_graph_output_path(const t_transpiler_context 
         }
         if (base[0] == '\0')
             ft_strlcpy(base, "program", sizeof(base));
-        if (pf_snprintf(buffer, buffer_size, "%s/%s.copybooks.dot", directory, base) < 0)
+        if (std::snprintf(buffer, buffer_size, "%s/%s.copybooks.dot", directory, base) < 0)
             return (FT_FAILURE);
-        length = ft_strlen(buffer);
+        length = std::strlen(buffer);
         if (length + 1 > buffer_size)
             return (FT_FAILURE);
         return (FT_SUCCESS);
     }
     if (!resolved_output_path)
         return (FT_FAILURE);
-    length = ft_strlen(resolved_output_path);
+    length = std::strlen(resolved_output_path);
     if (length + 15 > buffer_size)
         return (FT_FAILURE);
     ft_strlcpy(buffer, resolved_output_path, buffer_size);
@@ -503,7 +503,7 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
     context->active_source_length = 0;
     if (pipeline_resolve_output_path(context, output_path, resolved_path, sizeof(resolved_path)) != FT_SUCCESS)
     {
-        if (pf_snprintf(message, sizeof(message), "Unable to resolve output path for '%s'", output_path) >= 0)
+        if (std::snprintf(message, sizeof(message), "Unable to resolve output path for '%s'", output_path) >= 0)
             (void)pipeline_emit_error(context, message);
         goto cleanup;
     }
@@ -515,12 +515,12 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
         if (conflict_index != static_cast<size_t>(-1)
             && conflict_index < context->source_count)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Output path '%s' for source '%s' matches input source '%s'; refusing to overwrite",
                     resolved_path, input_path, context->source_paths[conflict_index]) >= 0)
                 (void)pipeline_emit_error(context, message);
         }
-        else if (pf_snprintf(message, sizeof(message),
+        else if (std::snprintf(message, sizeof(message),
                      "Output path '%s' for source '%s' matches an input source; refusing to overwrite",
                      resolved_path, input_path)
             >= 0)
@@ -537,12 +537,12 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
                 copybook_signature, &should_skip)
             != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message), "Unable to query incremental cache for '%s'", input_path) >= 0)
+            if (std::snprintf(message, sizeof(message), "Unable to query incremental cache for '%s'", input_path) >= 0)
                 (void)transpiler_logging_emit(context, TRANSPILE_SEVERITY_WARNING, 0, message);
         }
         else if (should_skip)
         {
-            if (pf_snprintf(message, sizeof(message), "Skipping '%s'; cached output is current", input_path) >= 0)
+            if (std::snprintf(message, sizeof(message), "Skipping '%s'; cached output is current", input_path) >= 0)
                 (void)transpiler_logging_emit(context, TRANSPILE_SEVERITY_INFO, 0, message);
             status = FT_SUCCESS;
             goto cleanup;
@@ -550,28 +550,28 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
     }
     if (pipeline_read_file(input_path, &source_text) != FT_SUCCESS)
     {
-        if (pf_snprintf(message, sizeof(message), "Unable to read input file '%s'", input_path) >= 0)
+        if (std::snprintf(message, sizeof(message), "Unable to read input file '%s'", input_path) >= 0)
             (void)pipeline_emit_error(context, message);
         goto cleanup;
     }
     context->active_source_text = source_text;
-    context->active_source_length = ft_strlen(source_text);
+    context->active_source_length = std::strlen(source_text);
     transpiler_context_clear_comments(context);
     parser_init_with_context(&parser, source_text, context);
     if (parser_parse_program(&parser, &program) != FT_SUCCESS)
     {
         parser_dispose(&parser);
-        if (pf_snprintf(message, sizeof(message), "Failed to parse COBOL source '%s'", input_path) >= 0)
+        if (std::snprintf(message, sizeof(message), "Failed to parse COBOL source '%s'", input_path) >= 0)
             (void)pipeline_emit_error(context, message);
         goto cleanup;
     }
     parser_dispose(&parser);
     transpiler_context_reset_unit_state(context);
     context->active_source_text = source_text;
-    context->active_source_length = ft_strlen(source_text);
+    context->active_source_length = std::strlen(source_text);
     if (transpiler_semantics_analyze_program(context, program) != FT_SUCCESS)
     {
-        if (pf_snprintf(message, sizeof(message), "Semantic analysis failed for '%s'", input_path) >= 0)
+        if (std::snprintf(message, sizeof(message), "Semantic analysis failed for '%s'", input_path) >= 0)
             (void)pipeline_emit_error(context, message);
         goto cleanup;
     }
@@ -579,7 +579,7 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
     {
         if (pipeline_emit_semantic_ir_snapshots(context, input_path, resolved_path) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Unable to emit semantic IR snapshots for '%s'", input_path) >= 0)
                 (void)pipeline_emit_error(context, message);
             goto cleanup;
@@ -587,20 +587,20 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
     }
     if (transpiler_cobol_program_to_cblc(context, program, &cblc_text) != FT_SUCCESS)
     {
-        if (pf_snprintf(message, sizeof(message), "Unable to generate CBL-C for '%s'", input_path) >= 0)
+        if (std::snprintf(message, sizeof(message), "Unable to generate CBL-C for '%s'", input_path) >= 0)
             (void)pipeline_emit_error(context, message);
         goto cleanup;
     }
     if (pipeline_apply_cblc_layout(cblc_text, context->layout_mode, context->format_mode,
             &formatted_text) != FT_SUCCESS)
     {
-        if (pf_snprintf(message, sizeof(message), "Failed to format generated CBL-C for '%s'", input_path) >= 0)
+        if (std::snprintf(message, sizeof(message), "Failed to format generated CBL-C for '%s'", input_path) >= 0)
             (void)pipeline_emit_error(context, message);
         goto cleanup;
     }
     if (transpiler_validate_generated_cblc(formatted_text) != FT_SUCCESS)
     {
-        if (pf_snprintf(message, sizeof(message), "Generated CBL-C failed validation for '%s'", input_path) >= 0)
+        if (std::snprintf(message, sizeof(message), "Generated CBL-C failed validation for '%s'", input_path) >= 0)
             (void)pipeline_emit_error(context, message);
         goto cleanup;
     }
@@ -609,21 +609,21 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
         if (pipeline_build_ast_output_path(context, input_path, resolved_path, ast_path,
                 sizeof(ast_path)) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Unable to select AST visualization path for '%s'", input_path) >= 0)
                 (void)pipeline_emit_error(context, message);
             goto cleanup;
         }
         if (pipeline_prepare_output_directory(ast_path) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Unable to prepare AST visualization path '%s'", ast_path) >= 0)
                 (void)pipeline_emit_error(context, message);
             goto cleanup;
         }
         if (transpiler_ast_visualize_program(program, ast_path) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Unable to emit AST visualization for '%s'", input_path) >= 0)
                 (void)pipeline_emit_error(context, message);
             goto cleanup;
@@ -634,21 +634,21 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
         if (pipeline_build_copybook_graph_output_path(context, input_path, resolved_path,
                 copybook_graph_path, sizeof(copybook_graph_path)) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Unable to select copybook graph path for '%s'", input_path) >= 0)
                 (void)pipeline_emit_error(context, message);
             goto cleanup;
         }
         if (pipeline_prepare_output_directory(copybook_graph_path) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Unable to prepare copybook graph path '%s'", copybook_graph_path) >= 0)
                 (void)pipeline_emit_error(context, message);
             goto cleanup;
         }
         if (transpiler_copybook_graph_emit(context, program, input_path, copybook_graph_path) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Unable to emit copybook graph for '%s'", input_path) >= 0)
                 (void)pipeline_emit_error(context, message);
             goto cleanup;
@@ -657,7 +657,7 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
     stdlib_entry = pipeline_detect_standard_library_conflict(resolved_path);
     if (stdlib_entry)
     {
-        if (pf_snprintf(message, sizeof(message),
+        if (std::snprintf(message, sizeof(message),
                 "Output file '%s' for source '%s' matches standard library program '%s'; refusing to emit",
                 resolved_path, input_path, stdlib_entry->program_name) >= 0)
             (void)pipeline_emit_error(context, message);
@@ -665,7 +665,7 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
     }
     if (pipeline_write_file(resolved_path, formatted_text) != FT_SUCCESS)
     {
-        if (pf_snprintf(message, sizeof(message), "Failed to write output file '%s'", resolved_path) >= 0)
+        if (std::snprintf(message, sizeof(message), "Failed to write output file '%s'", resolved_path) >= 0)
             (void)pipeline_emit_error(context, message);
         goto cleanup;
     }
@@ -681,7 +681,7 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
                 copybook_signature)
             != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message), "Failed to update incremental cache for '%s'", input_path) >= 0)
+            if (std::snprintf(message, sizeof(message), "Failed to update incremental cache for '%s'", input_path) >= 0)
                 (void)transpiler_logging_emit(context, TRANSPILE_SEVERITY_WARNING, 0, message);
         }
     }
@@ -724,13 +724,13 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
         char *program_text;
         int status;
 
-        if (pf_snprintf(filename, sizeof(filename), "%s.cob", entries[index].program_name) < 0)
+        if (std::snprintf(filename, sizeof(filename), "%s.cob", entries[index].program_name) < 0)
             return (FT_FAILURE);
         program_text = NULL;
         status = entries[index].generator(&program_text);
         if (status != FT_SUCCESS || !program_text)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Unable to generate standard library program '%s'", entries[index].program_name) >= 0)
                 (void)pipeline_emit_error(context, message);
             if (program_text)
@@ -744,7 +744,7 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
                 || skip_validation_env[0] == '0')
             && transpiler_validate_generated_cobol(program_text) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Generated standard library program '%s' failed validation",
                     entries[index].program_name) >= 0)
                 (void)pipeline_emit_error(context, message);
@@ -753,7 +753,7 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
         }
         if (pipeline_resolve_output_path(context, filename, resolved_path, sizeof(resolved_path)) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Unable to resolve output path for standard library program '%s'",
                     entries[index].program_name) >= 0)
                 (void)pipeline_emit_error(context, message);
@@ -762,7 +762,7 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
         }
         if (pipeline_write_file(resolved_path, program_text) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Unable to write standard library program '%s' to '%s'",
                     entries[index].program_name, resolved_path) >= 0)
                 (void)pipeline_emit_error(context, message);
@@ -777,7 +777,7 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
     {
         char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 
-        if (pf_snprintf(message, sizeof(message),
+        if (std::snprintf(message, sizeof(message),
                 "Unable to assemble runtime helper source for packaging") >= 0)
             (void)pipeline_emit_error(context, message);
         if (helper_source)
@@ -799,30 +799,30 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
         if (pipeline_resolve_output_path(context, "cblc_runtime_helpers.c", helper_path,
                 sizeof(helper_path)) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Unable to resolve output path for runtime helper source") >= 0)
                 (void)pipeline_emit_error(context, message);
             cma_free(helper_source);
             return (FT_FAILURE);
         }
         prefix = "#include <stddef.h>\n#include <stdio.h>\n\n";
-        prefix_length = ft_strlen(prefix);
-        helper_length = ft_strlen(helper_source);
+        prefix_length = std::strlen(prefix);
+        helper_length = std::strlen(helper_source);
         prefixed_source = static_cast<char *>(cma_calloc(prefix_length + helper_length + 1,
             sizeof(char)));
         if (!prefixed_source)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Unable to allocate buffer for runtime helper source") >= 0)
                 (void)pipeline_emit_error(context, message);
             cma_free(helper_source);
             return (FT_FAILURE);
         }
-        ft_memcpy(prefixed_source, prefix, prefix_length);
-        ft_memcpy(prefixed_source + prefix_length, helper_source, helper_length);
+        std::memcpy(prefixed_source, prefix, prefix_length);
+        std::memcpy(prefixed_source + prefix_length, helper_source, helper_length);
         if (pipeline_write_file(helper_path, prefixed_source) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Unable to write runtime helper source to '%s'", helper_path) >= 0)
                 (void)pipeline_emit_error(context, message);
             cma_free(prefixed_source);
@@ -937,7 +937,7 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
         cblc_translation_unit_init(unit);
         if (pipeline_read_file(context->source_paths[index], &sources[index]) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message), "Unable to read input file '%s'",
+            if (std::snprintf(message, sizeof(message), "Unable to read input file '%s'",
                     context->source_paths[index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
@@ -945,7 +945,7 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
         }
         if (cblc_parse_translation_unit(sources[index], unit) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message), "Failed to parse CBL-C source '%s'",
+            if (std::snprintf(message, sizeof(message), "Failed to parse CBL-C source '%s'",
                     context->source_paths[index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
@@ -953,7 +953,7 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
         }
         if (unit->function_count == 0)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "CBL-C source '%s' does not declare any functions;", context->source_paths[index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
@@ -969,7 +969,7 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
             if (unit->functions[entry_index].return_kind != CBLC_FUNCTION_RETURN_VOID
                 && !unit->functions[entry_index].saw_return)
             {
-                if (pf_snprintf(message, sizeof(message),
+                if (std::snprintf(message, sizeof(message),
                         "CBL-C source '%s' is missing a terminating return;", context->source_paths[index]) >= 0)
                     (void)pipeline_emit_error(context, message);
                 status = FT_FAILURE;
@@ -982,7 +982,7 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
         if (transpiler_context_register_module(context, module_name, context->source_paths[index])
             != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message), "Failed to register module for '%s'",
+            if (std::snprintf(message, sizeof(message), "Failed to register module for '%s'",
                     context->source_paths[index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
@@ -1000,7 +1000,7 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
             if (transpiler_context_register_module_import(context, module_name,
                     unit->imports[import_index].path) != FT_SUCCESS)
             {
-                if (pf_snprintf(message, sizeof(message),
+                if (std::snprintf(message, sizeof(message),
                         "Failed to register import '%s' for module '%s'", unit->imports[import_index].path,
                         module_name) >= 0)
                     (void)pipeline_emit_error(context, message);
@@ -1011,7 +1011,7 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
         }
         if (cblc_register_translation_unit_exports(context, module_name, unit) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Failed to register exports for module '%s'", module_name) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
@@ -1024,7 +1024,7 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
     {
         if (cblc_resolve_translation_unit_calls(context, module_names[index], &units[index]) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Failed to resolve function calls for module '%s'", module_names[index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
@@ -1091,7 +1091,7 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
         generated_text = NULL;
         if (cblc_generate_c(ordered_units[index], &generated_text) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message), "Failed to generate C output for '%s'",
+            if (std::snprintf(message, sizeof(message), "Failed to generate C output for '%s'",
                     ordered_source_paths[index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
@@ -1100,7 +1100,7 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
         if (pipeline_resolve_output_path(context, context->target_paths[source_index], resolved_path,
                 sizeof(resolved_path)) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message), "Unable to resolve output path for '%s'",
+            if (std::snprintf(message, sizeof(message), "Unable to resolve output path for '%s'",
                     context->target_paths[source_index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             if (generated_text)
@@ -1116,12 +1116,12 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
             if (conflict_index != static_cast<size_t>(-1)
                 && conflict_index < context->source_count)
             {
-                if (pf_snprintf(message, sizeof(message),
+                if (std::snprintf(message, sizeof(message),
                         "Output path '%s' for source '%s' matches input source '%s'; refusing to overwrite",
                         resolved_path, ordered_source_paths[index], context->source_paths[conflict_index]) >= 0)
                     (void)pipeline_emit_error(context, message);
             }
-            else if (pf_snprintf(message, sizeof(message),
+            else if (std::snprintf(message, sizeof(message),
                          "Output path '%s' for source '%s' matches an input source; refusing to overwrite",
                          resolved_path, ordered_source_paths[index])
                 >= 0)
@@ -1133,7 +1133,7 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
         }
         if (pipeline_write_file(resolved_path, generated_text) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message), "Failed to write output file '%s'",
+            if (std::snprintf(message, sizeof(message), "Failed to write output file '%s'",
                     resolved_path) >= 0)
                 (void)pipeline_emit_error(context, message);
             if (generated_text)
@@ -1239,7 +1239,7 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
         cblc_translation_unit_init(unit);
         if (pipeline_read_file(context->source_paths[index], &sources[index]) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message), "Unable to read input file '%s'",
+            if (std::snprintf(message, sizeof(message), "Unable to read input file '%s'",
                     context->source_paths[index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
@@ -1247,7 +1247,7 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
         }
         if (cblc_parse_translation_unit(sources[index], unit) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message), "Failed to parse CBL-C source '%s'",
+            if (std::snprintf(message, sizeof(message), "Failed to parse CBL-C source '%s'",
                     context->source_paths[index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
@@ -1255,7 +1255,7 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
         }
         if (unit->function_count == 0)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "CBL-C source '%s' does not declare any functions;", context->source_paths[index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
@@ -1271,7 +1271,7 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
             if (unit->functions[entry_index].return_kind != CBLC_FUNCTION_RETURN_VOID
                 && !unit->functions[entry_index].saw_return)
             {
-                if (pf_snprintf(message, sizeof(message),
+                if (std::snprintf(message, sizeof(message),
                         "CBL-C source '%s' is missing a terminating return;", context->source_paths[index]) >= 0)
                     (void)pipeline_emit_error(context, message);
                 status = FT_FAILURE;
@@ -1284,7 +1284,7 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
         if (transpiler_context_register_module(context, module_name, context->source_paths[index])
             != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message), "Failed to register module for '%s'",
+            if (std::snprintf(message, sizeof(message), "Failed to register module for '%s'",
                     context->source_paths[index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
@@ -1302,7 +1302,7 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
             if (transpiler_context_register_module_import(context, module_name,
                     unit->imports[import_index].path) != FT_SUCCESS)
             {
-                if (pf_snprintf(message, sizeof(message),
+                if (std::snprintf(message, sizeof(message),
                         "Failed to register import '%s' for module '%s'", unit->imports[import_index].path,
                         module_name) >= 0)
                     (void)pipeline_emit_error(context, message);
@@ -1313,7 +1313,7 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
         }
         if (cblc_register_translation_unit_exports(context, module_name, unit) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Failed to register exports for module '%s'", module_name) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
@@ -1326,7 +1326,7 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
     {
         if (cblc_resolve_translation_unit_calls(context, module_names[index], &units[index]) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Failed to resolve function calls for module '%s'", module_names[index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
@@ -1408,7 +1408,7 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
         if (pipeline_resolve_output_path(context, context->target_paths[source_index], resolved_path,
                 sizeof(resolved_path)) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message), "Unable to resolve output path for '%s'",
+            if (std::snprintf(message, sizeof(message), "Unable to resolve output path for '%s'",
                     context->target_paths[source_index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
@@ -1423,12 +1423,12 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
             if (conflict_index != static_cast<size_t>(-1)
                 && conflict_index < context->source_count)
             {
-                if (pf_snprintf(message, sizeof(message),
+                if (std::snprintf(message, sizeof(message),
                         "Output path '%s' for source '%s' matches input source '%s'; refusing to overwrite",
                         resolved_path, ordered_source_paths[index], context->source_paths[conflict_index]) >= 0)
                     (void)pipeline_emit_error(context, message);
             }
-            else if (pf_snprintf(message, sizeof(message),
+            else if (std::snprintf(message, sizeof(message),
                          "Output path '%s' for source '%s' matches an input source; refusing to overwrite",
                          resolved_path, ordered_source_paths[index])
                 >= 0)
@@ -1439,7 +1439,7 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
         stdlib_entry = pipeline_detect_standard_library_conflict(resolved_path);
         if (stdlib_entry)
         {
-            if (pf_snprintf(message, sizeof(message),
+            if (std::snprintf(message, sizeof(message),
                     "Output file '%s' for source '%s' matches standard library program '%s'; refusing to emit",
                     resolved_path, ordered_source_paths[index], stdlib_entry->program_name) >= 0)
                 (void)pipeline_emit_error(context, message);
@@ -1448,7 +1448,7 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
         }
         if (pipeline_write_file(resolved_path, parallel_results[index].text) != FT_SUCCESS)
         {
-            if (pf_snprintf(message, sizeof(message), "Failed to write output file '%s'",
+            if (std::snprintf(message, sizeof(message), "Failed to write output file '%s'",
                     resolved_path) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;

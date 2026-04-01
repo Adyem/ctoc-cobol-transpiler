@@ -5,8 +5,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 #include "cblc_transpiler.hpp"
 
 typedef struct s_test_case
@@ -20,7 +20,7 @@ static int test_expect_success(int status, const char *message)
     if (status == FT_SUCCESS)
         return (FT_SUCCESS);
     if (message)
-        pf_printf("Assertion failed: %s\n", message);
+        std::printf("Assertion failed: %s\n", message);
     return (FT_FAILURE);
 }
 
@@ -29,7 +29,7 @@ static int test_expect_int_equal(int actual, int expected, const char *message)
     if (actual == expected)
         return (FT_SUCCESS);
     if (message)
-        pf_printf("Assertion failed: %s (expected %d, got %d)\n", message, expected, actual);
+        std::printf("Assertion failed: %s (expected %d, got %d)\n", message, expected, actual);
     return (FT_FAILURE);
 }
 
@@ -38,7 +38,7 @@ static int test_expect_char_equal(char actual, char expected, const char *messag
     if (actual == expected)
         return (FT_SUCCESS);
     if (message)
-        pf_printf("Assertion failed: %s (expected %c, got %c)\n", message, expected, actual);
+        std::printf("Assertion failed: %s (expected %c, got %c)\n", message, expected, actual);
     return (FT_FAILURE);
 }
 
@@ -49,14 +49,14 @@ static int test_expect_cstring_equal(const char *actual, const char *expected, c
     if (!actual || !expected)
     {
         if (message)
-            pf_printf("Assertion failed: %s (expected %s, got %s)\n", message,
+            std::printf("Assertion failed: %s (expected %s, got %s)\n", message,
                 expected ? expected : "(null)", actual ? actual : "(null)");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(actual, expected, ft_strlen(expected) + 1) == 0)
+    if (std::strncmp(actual, expected, std::strlen(expected) + 1) == 0)
         return (FT_SUCCESS);
     if (message)
-        pf_printf("Assertion failed: %s (expected %s, got %s)\n", message, expected, actual);
+        std::printf("Assertion failed: %s (expected %s, got %s)\n", message, expected, actual);
     return (FT_FAILURE);
 }
 
@@ -70,37 +70,37 @@ static int test_expect_token(const t_lexer_token *token, t_lexer_token_kind expe
         return (FT_FAILURE);
     if (token->kind != expected_kind)
     {
-        pf_printf("Assertion failed: token kind mismatch (expected %d, got %d)\n", expected_kind, token->kind);
+        std::printf("Assertion failed: token kind mismatch (expected %d, got %d)\n", expected_kind, token->kind);
         return (FT_FAILURE);
     }
     if (token->line != expected_line)
     {
-        pf_printf("Assertion failed: token line mismatch (expected %zu, got %zu)\n", expected_line, token->line);
+        std::printf("Assertion failed: token line mismatch (expected %zu, got %zu)\n", expected_line, token->line);
         return (FT_FAILURE);
     }
     if (token->column != expected_column)
     {
-        pf_printf("Assertion failed: token column mismatch (expected %zu, got %zu)\n", expected_column, token->column);
+        std::printf("Assertion failed: token column mismatch (expected %zu, got %zu)\n", expected_column, token->column);
         return (FT_FAILURE);
     }
     if (!expected_lexeme)
     {
         if (token->length != 0)
         {
-            pf_printf("Assertion failed: token length mismatch (expected 0, got %zu)\n", token->length);
+            std::printf("Assertion failed: token length mismatch (expected 0, got %zu)\n", token->length);
             return (FT_FAILURE);
         }
         return (FT_SUCCESS);
     }
-    expected_length = ft_strlen(expected_lexeme);
+    expected_length = std::strlen(expected_lexeme);
     if (token->length != expected_length)
     {
-        pf_printf("Assertion failed: token length mismatch (expected %zu, got %zu)\n", expected_length, token->length);
+        std::printf("Assertion failed: token length mismatch (expected %zu, got %zu)\n", expected_length, token->length);
         return (FT_FAILURE);
     }
     if (!token->lexeme)
     {
-        pf_printf("Assertion failed: token lexeme should not be null\n");
+        std::printf("Assertion failed: token lexeme should not be null\n");
         return (FT_FAILURE);
     }
     index = 0;
@@ -108,7 +108,7 @@ static int test_expect_token(const t_lexer_token *token, t_lexer_token_kind expe
     {
         if (token->lexeme[index] != expected_lexeme[index])
         {
-            pf_printf("Assertion failed: token lexeme mismatch at index %zu (expected %c, got %c)\n",
+            std::printf("Assertion failed: token lexeme mismatch at index %zu (expected %c, got %c)\n",
                 index, expected_lexeme[index], token->lexeme[index]);
             return (FT_FAILURE);
         }
@@ -268,7 +268,7 @@ static int test_write_text_file(const char *path, const char *contents)
     fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd < 0)
         return (FT_FAILURE);
-    length = ft_strlen(contents);
+    length = std::strlen(contents);
     offset = 0;
     while (offset < length)
     {
@@ -411,22 +411,22 @@ FT_TEST(test_lexer_keyword_lookup_identifies_keywords)
 {
     t_lexer_token_kind kind;
 
-    kind = lexer_token_lookup_keyword("division", ft_strlen("division"));
+    kind = lexer_token_lookup_keyword("division", std::strlen("division"));
     if (kind != LEXER_TOKEN_KEYWORD_DIVISION)
     {
-        pf_printf("Assertion failed: lexer should classify DIVISION keyword\n");
+        std::printf("Assertion failed: lexer should classify DIVISION keyword\n");
         return (FT_FAILURE);
     }
-    kind = lexer_token_lookup_keyword("Program-Id", ft_strlen("Program-Id"));
+    kind = lexer_token_lookup_keyword("Program-Id", std::strlen("Program-Id"));
     if (kind != LEXER_TOKEN_KEYWORD_PROGRAM_ID)
     {
-        pf_printf("Assertion failed: lexer should classify PROGRAM-ID keyword\n");
+        std::printf("Assertion failed: lexer should classify PROGRAM-ID keyword\n");
         return (FT_FAILURE);
     }
-    kind = lexer_token_lookup_keyword("working-storage", ft_strlen("working-storage"));
+    kind = lexer_token_lookup_keyword("working-storage", std::strlen("working-storage"));
     if (kind != LEXER_TOKEN_KEYWORD_WORKING_STORAGE)
     {
-        pf_printf("Assertion failed: lexer should classify WORKING-STORAGE keyword\n");
+        std::printf("Assertion failed: lexer should classify WORKING-STORAGE keyword\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -436,10 +436,10 @@ FT_TEST(test_lexer_keyword_lookup_defaults_to_identifier)
 {
     t_lexer_token_kind kind;
 
-    kind = lexer_token_lookup_keyword("custom-name", ft_strlen("custom-name"));
+    kind = lexer_token_lookup_keyword("custom-name", std::strlen("custom-name"));
     if (kind != LEXER_TOKEN_IDENTIFIER)
     {
-        pf_printf("Assertion failed: lexer should treat unknown words as identifiers\n");
+        std::printf("Assertion failed: lexer should treat unknown words as identifiers\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -451,10 +451,10 @@ FT_TEST(test_lexer_trivia_detects_whitespace)
     t_lexer_trivia_kind trivia;
 
     text = " \t\n\r";
-    trivia = lexer_classify_trivia(text, ft_strlen(text));
+    trivia = lexer_classify_trivia(text, std::strlen(text));
     if (trivia != LEXER_TRIVIA_WHITESPACE)
     {
-        pf_printf("Assertion failed: lexer should treat whitespace as trivia\n");
+        std::printf("Assertion failed: lexer should treat whitespace as trivia\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -467,17 +467,17 @@ FT_TEST(test_lexer_trivia_detects_comments)
     t_lexer_trivia_kind trivia;
 
     comment = "*> comment line";
-    trivia = lexer_classify_trivia(comment, ft_strlen(comment));
+    trivia = lexer_classify_trivia(comment, std::strlen(comment));
     if (trivia != LEXER_TRIVIA_COMMENT)
     {
-        pf_printf("Assertion failed: lexer should classify *> lines as comments\n");
+        std::printf("Assertion failed: lexer should classify *> lines as comments\n");
         return (FT_FAILURE);
     }
     not_comment = "* missing arrow";
-    trivia = lexer_classify_trivia(not_comment, ft_strlen(not_comment));
+    trivia = lexer_classify_trivia(not_comment, std::strlen(not_comment));
     if (trivia != LEXER_TRIVIA_NONE)
     {
-        pf_printf("Assertion failed: lexer should ignore asterisk without > as comment start\n");
+        std::printf("Assertion failed: lexer should ignore asterisk without > as comment start\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -563,17 +563,17 @@ FT_TEST(test_lexer_reports_unterminated_string)
         return (FT_FAILURE);
     if (lexer_next_token(&lexer, &token) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: lexer should fail for unterminated string literal\n");
+        std::printf("Assertion failed: lexer should fail for unterminated string literal\n");
         return (FT_FAILURE);
     }
     if (token.kind != LEXER_TOKEN_UNKNOWN)
     {
-        pf_printf("Assertion failed: unterminated string should produce unknown token\n");
+        std::printf("Assertion failed: unterminated string should produce unknown token\n");
         return (FT_FAILURE);
     }
     if (token.line != 1 || token.column != 6)
     {
-        pf_printf("Assertion failed: unterminated string should report start location\n");
+        std::printf("Assertion failed: unterminated string should report start location\n");
         return (FT_FAILURE);
     }
     if (lexer_next_token(&lexer, &token) != FT_SUCCESS)
@@ -604,7 +604,7 @@ FT_TEST(test_runtime_file_write_and_read_text)
     runtime_file_init(&file);
     if (test_expect_success(runtime_file_open_write(&file, path), "runtime_file_open_write should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_expect_success(runtime_file_write(&file, contents, ft_strlen(contents)), "runtime_file_write should succeed") != FT_SUCCESS)
+    if (test_expect_success(runtime_file_write(&file, contents, std::strlen(contents)), "runtime_file_write should succeed") != FT_SUCCESS)
     {
         runtime_file_close(&file);
         test_remove_file(path);
@@ -621,17 +621,17 @@ FT_TEST(test_runtime_file_write_and_read_text)
         test_remove_file(path);
         return (FT_FAILURE);
     }
-    ft_memset(buffer, 0, sizeof(buffer));
+    std::memset(buffer, 0, sizeof(buffer));
     if (test_expect_success(runtime_file_read(&file, buffer, sizeof(buffer), &bytes_read), "runtime_file_read should succeed") != FT_SUCCESS)
     {
         runtime_file_close(&file);
         test_remove_file(path);
         return (FT_FAILURE);
     }
-    expected_length = static_cast<size_t>(ft_strlen(contents));
+    expected_length = std::strlen(contents);
     if (bytes_read != expected_length)
     {
-        pf_printf("Assertion failed: runtime_file_read should report full length (expected %zu, got %zu)\n",
+        std::printf("Assertion failed: runtime_file_read should report full length (expected %zu, got %zu)\n",
             expected_length, bytes_read);
         runtime_file_close(&file);
         test_remove_file(path);
@@ -655,7 +655,7 @@ FT_TEST(test_runtime_file_open_read_missing_path)
     runtime_file_init(&file);
     if (runtime_file_open_read(&file, "nonexistent-runtime-file.txt") != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_file_open_read should fail for missing files\n");
+        std::printf("Assertion failed: runtime_file_open_read should fail for missing files\n");
         runtime_file_close(&file);
         return (FT_FAILURE);
     }
@@ -678,7 +678,7 @@ FT_TEST(test_runtime_file_reopen_transitions_modes)
     runtime_file_init(&file);
     if (test_expect_success(runtime_file_open_write(&file, path), "runtime_file_open_write should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_expect_success(runtime_file_write(&file, contents, ft_strlen(contents)),
+    if (test_expect_success(runtime_file_write(&file, contents, std::strlen(contents)),
         "runtime_file_write should succeed") != FT_SUCCESS)
     {
         runtime_file_close(&file);
@@ -692,7 +692,7 @@ FT_TEST(test_runtime_file_reopen_transitions_modes)
         test_remove_file(path);
         return (FT_FAILURE);
     }
-    ft_memset(buffer, 0, sizeof(buffer));
+    std::memset(buffer, 0, sizeof(buffer));
     if (test_expect_success(runtime_file_read(&file, buffer, sizeof(buffer), &bytes_read),
         "runtime_file_read should succeed after reopening") != FT_SUCCESS)
     {
@@ -700,10 +700,10 @@ FT_TEST(test_runtime_file_reopen_transitions_modes)
         test_remove_file(path);
         return (FT_FAILURE);
     }
-    expected_length = ft_strlen(contents);
+    expected_length = std::strlen(contents);
     if (bytes_read != expected_length)
     {
-        pf_printf("Assertion failed: runtime_file_read should report full length after reopening (expected %zu, got %zu)\n",
+        std::printf("Assertion failed: runtime_file_read should report full length after reopening (expected %zu, got %zu)\n",
             expected_length, bytes_read);
         runtime_file_close(&file);
         test_remove_file(path);
@@ -733,12 +733,12 @@ FT_TEST(test_runtime_file_requires_open_descriptor)
     runtime_file_init(&file);
     if (runtime_file_read(&file, buffer, sizeof(buffer), &bytes_read) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_file_read should fail without open descriptor\n");
+        std::printf("Assertion failed: runtime_file_read should fail without open descriptor\n");
         return (FT_FAILURE);
     }
     if (runtime_file_write(&file, "x", 1) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_file_write should fail without open descriptor\n");
+        std::printf("Assertion failed: runtime_file_write should fail without open descriptor\n");
         return (FT_FAILURE);
     }
     if (test_expect_success(runtime_file_close(&file), "runtime_file_close should allow closing unopened file") != FT_SUCCESS)
@@ -776,7 +776,7 @@ FT_TEST(test_runtime_int_add_detects_overflow)
     runtime_int_set(&result, 73);
     if (runtime_int_add(left, right, &result) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_int_add should detect overflow\n");
+        std::printf("Assertion failed: runtime_int_add should detect overflow\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(result.value, 73, "runtime_int_add should not update on overflow") != FT_SUCCESS)
@@ -792,9 +792,9 @@ FT_TEST(test_runtime_int_to_string)
     runtime_int_set(&value, 512);
     if (test_expect_success(runtime_int_to_string(value, buffer, sizeof(buffer)), "runtime_int_to_string should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    if (ft_strncmp(buffer, "512", 4) != 0)
+    if (std::strncmp(buffer, "512", 4) != 0)
     {
-        pf_printf("Assertion failed: runtime_int_to_string should write textual representation\n");
+        std::printf("Assertion failed: runtime_int_to_string should write textual representation\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -809,7 +809,7 @@ FT_TEST(test_runtime_int_to_string_rejects_small_buffer)
     buffer[0] = 'Z';
     if (runtime_int_to_string(value, buffer, sizeof(buffer)) != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_int_to_string should reject undersized buffers\n");
+        std::printf("Assertion failed: runtime_int_to_string should reject undersized buffers\n");
         return (FT_FAILURE);
     }
     if (test_expect_char_equal(buffer[0], 'Z', "runtime_int_to_string should leave buffer unchanged on failure") != FT_SUCCESS)
@@ -829,7 +829,7 @@ FT_TEST(test_runtime_int_from_string)
     runtime_int_set(&value, 42);
     if (runtime_int_from_string(&value, "abc") != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_int_from_string should reject invalid text\n");
+        std::printf("Assertion failed: runtime_int_from_string should reject invalid text\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(value.value, 42, "runtime_int_from_string should keep destination on failure") != FT_SUCCESS)
@@ -858,7 +858,7 @@ FT_TEST(test_runtime_char_from_string_rejects_empty_input)
     runtime_char_set(&value, 'q');
     if (runtime_char_from_string(&value, "") != FT_FAILURE)
     {
-        pf_printf("Assertion failed: runtime_char_from_string should reject empty input\n");
+        std::printf("Assertion failed: runtime_char_from_string should reject empty input\n");
         return (FT_FAILURE);
     }
     if (test_expect_char_equal(value.value, 'q', "runtime_char_from_string should keep destination on failure") != FT_SUCCESS)
@@ -876,12 +876,12 @@ FT_TEST(test_runtime_char_to_string_and_compare)
     runtime_char_set(&right, 'Y');
     if (runtime_char_to_string(left, buffer, sizeof(buffer)) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: runtime_char_to_string should succeed\n");
+        std::printf("Assertion failed: runtime_char_to_string should succeed\n");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(buffer, "X", 2) != 0)
+    if (std::strncmp(buffer, "X", 2) != 0)
     {
-        pf_printf("Assertion failed: runtime_char_to_string should copy character to buffer\n");
+        std::printf("Assertion failed: runtime_char_to_string should copy character to buffer\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(runtime_char_compare(left, right), -1, "runtime_char_compare should order characters") != FT_SUCCESS)
@@ -1012,7 +1012,7 @@ FT_TEST(test_runtime_string_to_int_parses_numbers)
     if (runtime_string_to_int(&text, &value) != FT_FAILURE)
     {
         runtime_string_dispose(&text);
-        pf_printf("Assertion failed: runtime_string_to_int should reject invalid numbers\n");
+        std::printf("Assertion failed: runtime_string_to_int should reject invalid numbers\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(value.value, 73, "runtime_string_to_int should leave destination unchanged on failure") != FT_SUCCESS)
@@ -1113,7 +1113,7 @@ FT_TEST(test_transpiler_pipeline_reports_failure)
     {
         transpiler_context_dispose(&context);
         transpiler_pipeline_dispose(&pipeline);
-        pf_printf("Assertion failed: pipeline execute should fail when a stage fails\n");
+        std::printf("Assertion failed: pipeline execute should fail when a stage fails\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(counter, 1, "failing stage should still run once") != FT_SUCCESS)
@@ -1175,7 +1175,7 @@ FT_TEST(test_transpiler_pipeline_stops_after_failure)
     {
         transpiler_context_dispose(&context);
         transpiler_pipeline_dispose(&pipeline);
-        pf_printf("Assertion failed: pipeline should stop execution when an early stage fails\n");
+        std::printf("Assertion failed: pipeline should stop execution when an early stage fails\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(counter, 0, "pipeline should not run later stages after a failure") != FT_SUCCESS)
@@ -1213,7 +1213,7 @@ FT_TEST(test_compiler_builds_example_c_file)
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "cc %s -o %s", source_path, binary_path);
+    command_length = std::snprintf(command, sizeof(command), "cc %s -o %s", source_path, binary_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
@@ -1221,11 +1221,11 @@ FT_TEST(test_compiler_builds_example_c_file)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: compiler should build sample source\n");
+        std::printf("Assertion failed: compiler should build sample source\n");
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    command_length = std::snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
@@ -1233,7 +1233,7 @@ FT_TEST(test_compiler_builds_example_c_file)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: compiled program should run successfully\n");
+        std::printf("Assertion failed: compiled program should run successfully\n");
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
@@ -1242,9 +1242,9 @@ FT_TEST(test_compiler_builds_example_c_file)
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(output_buffer, "example-ok\n", 12) != 0)
+    if (std::strncmp(output_buffer, "example-ok\n", 12) != 0)
     {
-        pf_printf("Assertion failed: compiled program should emit expected output\n");
+        std::printf("Assertion failed: compiled program should emit expected output\n");
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
@@ -1274,7 +1274,7 @@ FT_TEST(test_compiler_rejects_invalid_c_file)
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "cc %s -o %s 2> %s", source_path, binary_path, output_path);
+    command_length = std::snprintf(command, sizeof(command), "cc %s -o %s 2> %s", source_path, binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
@@ -1282,20 +1282,20 @@ FT_TEST(test_compiler_rejects_invalid_c_file)
     }
     if (test_run_command_expect_failure(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: compiler should reject invalid source\n");
+        std::printf("Assertion failed: compiler should reject invalid source\n");
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
     if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: compiler diagnostics should be captured\n");
+        std::printf("Assertion failed: compiler diagnostics should be captured\n");
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
     expected_fragment = "error: expected";
-    if (!ft_strnstr(output_buffer, expected_fragment, ft_strlen(output_buffer)))
+    if (!ft_strnstr(output_buffer, expected_fragment, std::strlen(output_buffer)))
     {
-        pf_printf("Assertion failed: compiler diagnostics should mention syntax error\n");
+        std::printf("Assertion failed: compiler diagnostics should mention syntax error\n");
         test_cleanup_example_artifacts(source_path, binary_path, output_path);
         return (FT_FAILURE);
     }
@@ -1307,12 +1307,12 @@ static int run_test_case(const t_test_case *test)
 {
     int status;
 
-    pf_printf("Running %s...\n", test->name);
+    std::printf("Running %s...\n", test->name);
     status = test->execute();
     if (status != FT_SUCCESS)
-        pf_printf("FAILED %s\n", test->name);
+        std::printf("FAILED %s\n", test->name);
     else
-        pf_printf("PASSED %s\n", test->name);
+        std::printf("PASSED %s\n", test->name);
     return (status);
 }
 

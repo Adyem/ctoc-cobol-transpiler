@@ -1,7 +1,7 @@
 #include "test_suites.hpp"
 
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 
 static int cblc_inventory_doc_load(char *buffer, size_t buffer_size)
 {
@@ -11,7 +11,7 @@ static int cblc_inventory_doc_load(char *buffer, size_t buffer_size)
         return (FT_FAILURE);
     if (test_read_text_file("docs/cblc_sample_inventory.md", buffer, buffer_size) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: expected docs/cblc_sample_inventory.md to be readable\n");
+        std::printf("Assertion failed: expected docs/cblc_sample_inventory.md to be readable\n");
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -25,12 +25,12 @@ static int cblc_inventory_expect_contains(const char *buffer, const char *snippe
         return (FT_FAILURE);
     if (!snippet)
         return (FT_FAILURE);
-    length = ft_strlen(buffer);
+    length = std::strlen(buffer);
     if (length == 0)
         return (FT_FAILURE);
     if (!ft_strnstr(buffer, snippet, length))
     {
-        pf_printf("Assertion failed: cblc sample inventory should contain snippet:\n%s\n", snippet);
+        std::printf("Assertion failed: cblc sample inventory should contain snippet:\n%s\n", snippet);
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -48,10 +48,10 @@ static int cblc_inventory_expect_sample_block(const char *buffer, const char *sa
         return (FT_FAILURE);
     if (test_read_text_file(sample_path, sample_buffer, sizeof(sample_buffer)) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: expected sample '%s' to be readable\n", sample_path);
+        std::printf("Assertion failed: expected sample '%s' to be readable\n", sample_path);
         return (FT_FAILURE);
     }
-    sample_length = ft_strlen(sample_buffer);
+    sample_length = std::strlen(sample_buffer);
     if (ft_strlcpy(snippet, "```cblc\n", sizeof(snippet)) >= sizeof(snippet))
         return (FT_FAILURE);
     if (ft_strlcat(snippet, sample_buffer, sizeof(snippet)) >= sizeof(snippet))
@@ -74,9 +74,9 @@ FT_TEST(test_cblc_inventory_doc_exists)
 
     if (cblc_inventory_doc_load(buffer, sizeof(buffer)) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (ft_strlen(buffer) == 0)
+    if (std::strlen(buffer) == 0)
     {
-        pf_printf("Assertion failed: docs/cblc_sample_inventory.md should not be empty\n");
+        std::printf("Assertion failed: docs/cblc_sample_inventory.md should not be empty\n");
         return (FT_FAILURE);
     }
     if (cblc_inventory_expect_contains(buffer, "CBL-C Sample Inventory") != FT_SUCCESS)

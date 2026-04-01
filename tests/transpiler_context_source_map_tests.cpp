@@ -33,7 +33,7 @@ FT_TEST(test_transpiler_context_records_source_map_entry)
     if (!entry)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected to locate cblc to cobol mapping\n");
+        std::printf("Assertion failed: expected to locate cblc to cobol mapping\n");
         return (FT_FAILURE);
     }
     if (test_expect_cstring_equal(entry->cobol_span.path, "legacy.cob",
@@ -46,7 +46,7 @@ FT_TEST(test_transpiler_context_records_source_map_entry)
     if (!reverse_entry)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected to locate cobol to cblc mapping\n");
+        std::printf("Assertion failed: expected to locate cobol to cblc mapping\n");
         return (FT_FAILURE);
     }
     if (test_expect_cstring_equal(reverse_entry->cblc_span.path, "modern.cblc",
@@ -89,7 +89,7 @@ FT_TEST(test_transpiler_context_rejects_invalid_source_map_span)
     if (transpiler_context_record_source_map_entry(&context, &cblc_span, &cobol_span) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected invalid span registration to fail\n");
+        std::printf("Assertion failed: expected invalid span registration to fail\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(context.source_map_count), 0,

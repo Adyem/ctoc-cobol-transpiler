@@ -1,6 +1,6 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/Libft/libft.hpp"
+#include "compatibility/libft_compat.hpp"
 #include "test_suites.hpp"
 
 FT_TEST(test_parser_accepts_boolean_character_literals)

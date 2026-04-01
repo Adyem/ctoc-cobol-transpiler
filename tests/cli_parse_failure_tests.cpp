@@ -15,19 +15,19 @@ static int expect_cli_parse_failure(const char **argv, size_t argc,
         return (FT_FAILURE);
     if (test_capture_stdout_begin(&stdout_capture) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: test harness should capture stdout\\n");
+        std::printf("Assertion failed: test harness should capture stdout\\n");
         return (FT_FAILURE);
     }
     status = transpiler_cli_parse(&options, static_cast<int>(argc), argv);
     transpiler_cli_options_dispose(&options);
     if (test_capture_stdout_end(&stdout_capture, buffer, sizeof(buffer), NULL) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: test harness should restore stdout\\n");
+        std::printf("Assertion failed: test harness should restore stdout\\n");
         return (FT_FAILURE);
     }
     if (status == FT_SUCCESS)
     {
-        pf_printf("Assertion failed: %s\\n", assertion);
+        std::printf("Assertion failed: %s\\n", assertion);
         return (FT_FAILURE);
     }
     if (test_expect_cstring_equal(buffer, expected_output, assertion) != FT_SUCCESS)

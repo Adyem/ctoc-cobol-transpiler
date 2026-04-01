@@ -1,7 +1,7 @@
 #include "test_suites.hpp"
 
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 
 static int load_file(const char *path, char *buffer, size_t buffer_size)
 {
@@ -13,12 +13,12 @@ static int load_file(const char *path, char *buffer, size_t buffer_size)
         return (FT_FAILURE);
     if (test_read_text_file(path, buffer, buffer_size) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: expected %s to be readable\n", path);
+        std::printf("Assertion failed: expected %s to be readable\n", path);
         return (FT_FAILURE);
     }
-    if (ft_strlen(buffer) == 0)
+    if (std::strlen(buffer) == 0)
     {
-        pf_printf("Assertion failed: expected %s to be non-empty\n", path);
+        std::printf("Assertion failed: expected %s to be non-empty\n", path);
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -32,15 +32,15 @@ static int expect_contains(const char *buffer, const char *snippet, const char *
         return (FT_FAILURE);
     if (!snippet)
         return (FT_FAILURE);
-    length = ft_strlen(buffer);
+    length = std::strlen(buffer);
     if (length == 0)
         return (FT_FAILURE);
     if (!ft_strnstr(buffer, snippet, length))
     {
         if (label)
-            pf_printf("Assertion failed: %s should mention '%s'\n", label, snippet);
+            std::printf("Assertion failed: %s should mention '%s'\n", label, snippet);
         else
-            pf_printf("Assertion failed: expected to find '%s' in buffer\n", snippet);
+            std::printf("Assertion failed: expected to find '%s' in buffer\n", snippet);
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);
@@ -150,22 +150,22 @@ FT_TEST(test_ci_document_referenced_by_design_doc)
     FILE *file;
     char line[1024];
 
-    file = ft_fopen("design_doc.txt", "r");
+    file = std::fopen("design_doc.txt", "r");
     if (!file)
     {
-        pf_printf("Assertion failed: design_doc.txt should be readable\n");
+        std::printf("Assertion failed: design_doc.txt should be readable\n");
         return (FT_FAILURE);
     }
-    while (ft_fgets(line, sizeof(line), file))
+    while (std::fgets(line, sizeof(line), file))
     {
-        if (ft_strnstr(line, "docs/ci_pipeline.md", ft_strlen(line)))
+        if (ft_strnstr(line, "docs/ci_pipeline.md", std::strlen(line)))
         {
-            ft_fclose(file);
+            std::fclose(file);
             return (FT_SUCCESS);
         }
     }
-    ft_fclose(file);
-    pf_printf("Assertion failed: design_doc.txt should reference docs/ci_pipeline.md\n");
+    std::fclose(file);
+    std::printf("Assertion failed: design_doc.txt should reference docs/ci_pipeline.md\n");
     return (FT_FAILURE);
 }
 

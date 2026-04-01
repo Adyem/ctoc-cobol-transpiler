@@ -40,13 +40,13 @@ FT_TEST(test_transpiler_context_captures_semantic_ir_snapshots)
     before = transpiler_context_get_semantic_snapshot_before(&context);
     if (!before)
     {
-        pf_printf("Assertion failed: semantic snapshot before should exist\n");
+        std::printf("Assertion failed: semantic snapshot before should exist\n");
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    if (!ft_strnstr(before, "modules:", ft_strlen(before)))
+    if (!ft_strnstr(before, "modules:", std::strlen(before)))
     {
-        pf_printf("Assertion failed: semantic snapshot before should list modules\n");
+        std::printf("Assertion failed: semantic snapshot before should list modules\n");
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
@@ -68,26 +68,26 @@ FT_TEST(test_transpiler_context_captures_semantic_ir_snapshots)
     after = transpiler_context_get_semantic_snapshot_after(&context);
     if (!after)
     {
-        pf_printf("Assertion failed: semantic snapshot after should exist\n");
+        std::printf("Assertion failed: semantic snapshot after should exist\n");
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    if (!ft_strnstr(after, "copybooks:", ft_strlen(after)))
+    if (!ft_strnstr(after, "copybooks:", std::strlen(after)))
     {
-        pf_printf("Assertion failed: semantic snapshot after should list copybooks\n");
+        std::printf("Assertion failed: semantic snapshot after should list copybooks\n");
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     transpiler_context_clear_semantic_snapshots(&context);
     if (transpiler_context_get_semantic_snapshot_before(&context))
     {
-        pf_printf("Assertion failed: clearing snapshots should remove before snapshot\n");
+        std::printf("Assertion failed: clearing snapshots should remove before snapshot\n");
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     if (transpiler_context_get_semantic_snapshot_after(&context))
     {
-        pf_printf("Assertion failed: clearing snapshots should remove after snapshot\n");
+        std::printf("Assertion failed: clearing snapshots should remove after snapshot\n");
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
@@ -149,8 +149,8 @@ FT_TEST(test_transpiler_semantic_dump_emits_files_with_custom_directory)
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    ft_memcpy(context.semantic_snapshot_before, "before", 6);
-    ft_memcpy(context.semantic_snapshot_after, "after", 5);
+    std::memcpy(context.semantic_snapshot_before, "before", 6);
+    std::memcpy(context.semantic_snapshot_after, "after", 5);
     if (transpiler_semantic_dump_emit(&context, "input.cob", "output/result.cbl") != FT_SUCCESS)
     {
         transpiler_context_clear_semantic_snapshots(&context);
@@ -172,7 +172,7 @@ FT_TEST(test_transpiler_semantic_dump_emits_files_with_custom_directory)
         std::filesystem::remove_all(directory);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(buffer, "before", 6) != 0)
+    if (std::strncmp(buffer, "before", 6) != 0)
     {
         transpiler_context_clear_semantic_snapshots(&context);
         transpiler_context_dispose(&context);
@@ -186,7 +186,7 @@ FT_TEST(test_transpiler_semantic_dump_emits_files_with_custom_directory)
         std::filesystem::remove_all(directory);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(buffer, "after", 5) != 0)
+    if (std::strncmp(buffer, "after", 5) != 0)
     {
         transpiler_context_clear_semantic_snapshots(&context);
         transpiler_context_dispose(&context);
@@ -222,8 +222,8 @@ FT_TEST(test_transpiler_semantic_dump_uses_resolved_output_path)
         std::filesystem::remove_all("semantic-output");
         return (FT_FAILURE);
     }
-    ft_memcpy(context.semantic_snapshot_before, "one", 3);
-    ft_memcpy(context.semantic_snapshot_after, "two", 3);
+    std::memcpy(context.semantic_snapshot_before, "one", 3);
+    std::memcpy(context.semantic_snapshot_after, "two", 3);
     if (transpiler_semantic_dump_emit(&context, "input.cob", "semantic-output/input.cbl") != FT_SUCCESS)
     {
         transpiler_context_clear_semantic_snapshots(&context);
@@ -238,7 +238,7 @@ FT_TEST(test_transpiler_semantic_dump_uses_resolved_output_path)
         std::filesystem::remove_all("semantic-output");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(buffer, "one", 3) != 0)
+    if (std::strncmp(buffer, "one", 3) != 0)
     {
         transpiler_context_clear_semantic_snapshots(&context);
         transpiler_context_dispose(&context);
@@ -252,7 +252,7 @@ FT_TEST(test_transpiler_semantic_dump_uses_resolved_output_path)
         std::filesystem::remove_all("semantic-output");
         return (FT_FAILURE);
     }
-    if (ft_strncmp(buffer, "two", 3) != 0)
+    if (std::strncmp(buffer, "two", 3) != 0)
     {
         transpiler_context_clear_semantic_snapshots(&context);
         transpiler_context_dispose(&context);

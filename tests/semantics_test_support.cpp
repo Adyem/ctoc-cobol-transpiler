@@ -17,7 +17,7 @@ t_ast_node *semantics_create_identifier_node(const char *name)
         return (NULL);
     token.kind = LEXER_TOKEN_IDENTIFIER;
     token.lexeme = name;
-    token.length = ft_strlen(name);
+    token.length = std::strlen(name);
     token.line = 1;
     token.column = 1;
     if (ast_node_set_token(node, &token) != FT_SUCCESS)
@@ -39,7 +39,7 @@ t_ast_node *semantics_create_literal_node(const char *lexeme,
         return (NULL);
     token.kind = kind;
     token.lexeme = lexeme;
-    token.length = ft_strlen(lexeme);
+    token.length = std::strlen(lexeme);
     token.line = 1;
     token.column = 1;
     if (ast_node_set_token(node, &token) != FT_SUCCESS)
@@ -62,7 +62,7 @@ t_ast_node *semantics_create_picture_node(const char *text)
         return (NULL);
     token.kind = LEXER_TOKEN_IDENTIFIER;
     token.lexeme = text;
-    token.length = ft_strlen(text);
+    token.length = std::strlen(text);
     token.line = 1;
     token.column = 1;
     if (ast_node_set_token(node, &token) != FT_SUCCESS)
@@ -84,7 +84,7 @@ t_ast_node *semantics_create_comparison_operator_node(
         return (NULL);
     token.kind = kind;
     token.lexeme = lexeme;
-    token.length = lexeme ? ft_strlen(lexeme) : 0;
+    token.length = lexeme ? std::strlen(lexeme) : 0;
     token.line = 1;
     token.column = 1;
     if (ast_node_set_token(node, &token) != FT_SUCCESS)
@@ -106,7 +106,7 @@ t_ast_node *semantics_create_arithmetic_operator_node(
         return (NULL);
     token.kind = kind;
     token.lexeme = lexeme;
-    token.length = lexeme ? ft_strlen(lexeme) : 0;
+    token.length = lexeme ? std::strlen(lexeme) : 0;
     token.line = 1;
     token.column = 1;
     if (ast_node_set_token(node, &token) != FT_SUCCESS)
@@ -491,7 +491,7 @@ t_ast_node *semantics_find_data_item(t_ast_node *program, const char *name)
                 child = candidate->children[child_index];
                 if (child && child->kind == AST_NODE_IDENTIFIER
                     && child->token.lexeme
-                    && ft_strncmp(child->token.lexeme, name,
+                    && std::strncmp(child->token.lexeme, name,
                         TRANSPILE_IDENTIFIER_MAX) == 0)
                     return (candidate);
                 child_index += 1;

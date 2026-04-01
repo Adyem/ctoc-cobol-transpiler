@@ -86,7 +86,7 @@ FT_TEST(test_cobol_transpiled_multi_module_executes)
     binary_path = "test_transpiled_multi_module.bin";
     output_path = "test_transpiled_multi_module.txt";
     expected_output = "WORKER READY\n   1\n";
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s samples/cobol/multi_module_main.cob samples/cobol/multi_module_worker.cob",
         binary_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -96,11 +96,11 @@ FT_TEST(test_cobol_transpiled_multi_module_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile transpiled multi-module program\n");
+        std::printf("Assertion failed: cobc should compile transpiled multi-module program\n");
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    command_length = std::snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_generated_artifacts(binary_path, output_path);
@@ -108,7 +108,7 @@ FT_TEST(test_cobol_transpiled_multi_module_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: transpiled multi-module program should execute successfully\n");
+        std::printf("Assertion failed: transpiled multi-module program should execute successfully\n");
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
@@ -117,9 +117,9 @@ FT_TEST(test_cobol_transpiled_multi_module_executes)
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: transpiled multi-module program should emit banner and accumulator\n");
+        std::printf("Assertion failed: transpiled multi-module program should emit banner and accumulator\n");
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
@@ -141,7 +141,7 @@ FT_TEST(test_cobol_transpiled_multi_module_exit_status)
     binary_path = "test_transpiled_multi_module_status.bin";
     output_path = "test_transpiled_multi_module_status.txt";
     expected_output = "WORKER READY\n   1\n";
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s samples/cobol/multi_module_main.cob samples/cobol/multi_module_worker.cob",
         binary_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -151,11 +151,11 @@ FT_TEST(test_cobol_transpiled_multi_module_exit_status)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile transpiled multi-module program\n");
+        std::printf("Assertion failed: cobc should compile transpiled multi-module program\n");
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    command_length = std::snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
         test_cleanup_generated_artifacts(binary_path, output_path);
@@ -163,13 +163,13 @@ FT_TEST(test_cobol_transpiled_multi_module_exit_status)
     }
     if (test_run_command_capture_status(command, &exit_status) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: test harness should capture multi-module COBOL exit status\n");
+        std::printf("Assertion failed: test harness should capture multi-module COBOL exit status\n");
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
     if (exit_status != 0)
     {
-        pf_printf("Assertion failed: transpiled multi-module program should exit successfully\n");
+        std::printf("Assertion failed: transpiled multi-module program should exit successfully\n");
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
@@ -178,9 +178,9 @@ FT_TEST(test_cobol_transpiled_multi_module_exit_status)
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: transpiled multi-module program should emit banner and accumulator\n");
+        std::printf("Assertion failed: transpiled multi-module program should emit banner and accumulator\n");
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
@@ -230,7 +230,7 @@ FT_TEST(test_cobol_transpiled_multi_module_compile_logs_clean)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s samples/cobol/multi_module_main.cob samples/cobol/multi_module_worker.cob > %s 2>&1",
         binary_path, compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -241,7 +241,7 @@ FT_TEST(test_cobol_transpiled_multi_module_compile_logs_clean)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile multi-module sample with captured log\n");
+        std::printf("Assertion failed: cobc should compile multi-module sample with captured log\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -252,7 +252,7 @@ FT_TEST(test_cobol_transpiled_multi_module_compile_logs_clean)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./multi_module_compile.bin > multi_module_compile.txt", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -262,7 +262,7 @@ FT_TEST(test_cobol_transpiled_multi_module_compile_logs_clean)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: multi-module binary should execute successfully after log check\n");
+        std::printf("Assertion failed: multi-module binary should execute successfully after log check\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -273,9 +273,9 @@ FT_TEST(test_cobol_transpiled_multi_module_compile_logs_clean)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: multi-module binary should emit banner and accumulator after log validation\n");
+        std::printf("Assertion failed: multi-module binary should emit banner and accumulator after log validation\n");
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -322,7 +322,7 @@ FT_TEST(test_cobol_transpiled_multi_module_separate_compile_logs_clean)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -m -free -o %s samples/cobol/multi_module_worker.cob > %s 2>&1",
         module_path, worker_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -334,7 +334,7 @@ FT_TEST(test_cobol_transpiled_multi_module_separate_compile_logs_clean)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile worker module with captured log\n");
+        std::printf("Assertion failed: cobc should compile worker module with captured log\n");
         test_remove_file(module_path);
         test_remove_file(worker_log_path);
         test_remove_directory(directory);
@@ -374,7 +374,7 @@ FT_TEST(test_cobol_transpiled_multi_module_separate_compile_logs_clean)
         return (FT_FAILURE);
     }
     log_path = main_log_path;
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s samples/cobol/multi_module_main.cob %s > %s 2>&1",
         binary_path, module_path, main_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -387,7 +387,7 @@ FT_TEST(test_cobol_transpiled_multi_module_separate_compile_logs_clean)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should link main program with worker module while capturing log\n");
+        std::printf("Assertion failed: cobc should link main program with worker module while capturing log\n");
         test_remove_file(module_path);
         test_remove_file(worker_log_path);
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
@@ -402,7 +402,7 @@ FT_TEST(test_cobol_transpiled_multi_module_separate_compile_logs_clean)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && COB_LIBRARY_PATH=. ./multi_module_separate.bin > multi_module_separate.txt",
         directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -415,7 +415,7 @@ FT_TEST(test_cobol_transpiled_multi_module_separate_compile_logs_clean)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: multi-module binary should execute after separate compile log checks\n");
+        std::printf("Assertion failed: multi-module binary should execute after separate compile log checks\n");
         test_remove_file(module_path);
         test_remove_file(worker_log_path);
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
@@ -430,9 +430,9 @@ FT_TEST(test_cobol_transpiled_multi_module_separate_compile_logs_clean)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: separate-module execution should emit banner and accumulator after log validation\n");
+        std::printf("Assertion failed: separate-module execution should emit banner and accumulator after log validation\n");
         test_remove_file(module_path);
         test_remove_file(worker_log_path);
         test_cleanup_example_artifacts_with_log(NULL, binary_path, output_path, log_path);
@@ -460,7 +460,7 @@ FT_TEST(test_cobol_transpiled_multi_module_compiles_separately)
     binary_path = "test_transpiled_multi_module_separate.bin";
     output_path = "test_transpiled_multi_module_separate.txt";
     expected_output = "WORKER READY\n   1\n";
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -m -free -o %s samples/cobol/multi_module_worker.cob", module_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -469,11 +469,11 @@ FT_TEST(test_cobol_transpiled_multi_module_compiles_separately)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile worker module separately\n");
+        std::printf("Assertion failed: cobc should compile worker module separately\n");
         test_remove_file(module_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s samples/cobol/multi_module_main.cob %s",
         binary_path, module_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -484,12 +484,12 @@ FT_TEST(test_cobol_transpiled_multi_module_compiles_separately)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should link main program with worker module\n");
+        std::printf("Assertion failed: cobc should link main program with worker module\n");
         test_remove_file(module_path);
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "COB_LIBRARY_PATH=. ./%s > %s", binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -499,7 +499,7 @@ FT_TEST(test_cobol_transpiled_multi_module_compiles_separately)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: multi-module binary should execute with separate worker module\n");
+        std::printf("Assertion failed: multi-module binary should execute with separate worker module\n");
         test_remove_file(module_path);
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
@@ -510,9 +510,9 @@ FT_TEST(test_cobol_transpiled_multi_module_compiles_separately)
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: separate-module execution should emit banner and accumulator\n");
+        std::printf("Assertion failed: separate-module execution should emit banner and accumulator\n");
         test_remove_file(module_path);
         test_cleanup_generated_artifacts(binary_path, output_path);
         return (FT_FAILURE);
@@ -557,7 +557,7 @@ FT_TEST(test_cobol_transpiled_multi_module_executes_from_library_directory)
         test_cleanup_module_directory(directory, module_path, binary_path, NULL);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -m -free -o %s samples/cobol/multi_module_worker.cob", module_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -566,11 +566,11 @@ FT_TEST(test_cobol_transpiled_multi_module_executes_from_library_directory)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile worker module into library directory\n");
+        std::printf("Assertion failed: cobc should compile worker module into library directory\n");
         test_cleanup_module_directory(directory, module_path, binary_path, output_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s samples/cobol/multi_module_main.cob %s", binary_path, module_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -579,11 +579,11 @@ FT_TEST(test_cobol_transpiled_multi_module_executes_from_library_directory)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should link multi-module binary using library directory module\n");
+        std::printf("Assertion failed: cobc should link multi-module binary using library directory module\n");
         test_cleanup_module_directory(directory, module_path, binary_path, output_path);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "COB_LIBRARY_PATH=%s %s > %s", directory, binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -592,13 +592,13 @@ FT_TEST(test_cobol_transpiled_multi_module_executes_from_library_directory)
     }
     if (test_run_command_capture_status(command, &exit_status) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: should capture exit status when running with COB_LIBRARY_PATH\n");
+        std::printf("Assertion failed: should capture exit status when running with COB_LIBRARY_PATH\n");
         test_cleanup_module_directory(directory, module_path, binary_path, output_path);
         return (FT_FAILURE);
     }
     if (exit_status != 0)
     {
-        pf_printf("Assertion failed: multi-module binary should exit successfully from library directory\n");
+        std::printf("Assertion failed: multi-module binary should exit successfully from library directory\n");
         test_cleanup_module_directory(directory, module_path, binary_path, output_path);
         return (FT_FAILURE);
     }
@@ -607,9 +607,9 @@ FT_TEST(test_cobol_transpiled_multi_module_executes_from_library_directory)
         test_cleanup_module_directory(directory, module_path, binary_path, output_path);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: multi-module binary should emit banner and accumulator from library directory\n");
+        std::printf("Assertion failed: multi-module binary should emit banner and accumulator from library directory\n");
         test_cleanup_module_directory(directory, module_path, binary_path, output_path);
         return (FT_FAILURE);
     }

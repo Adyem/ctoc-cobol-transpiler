@@ -3,7 +3,7 @@
 
 #include "cblc_transpiler.hpp"
 
-#include "libft/Libft/libft.hpp"
+#include "compatibility/libft_compat.hpp"
 
 void semantics_destroy_program(t_ast_node *program);
 t_ast_node *semantics_create_identifier_node(const char *name);

@@ -1,7 +1,7 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 
 static const char *g_ast_node_kind_names[] = {
     "Unknown",
@@ -16,6 +16,7 @@ static const char *g_ast_node_kind_names[] = {
     "CopybookInclude",
     "PictureClause",
     "ValueClause",
+    "OccursClause",
     "StatementSequence",
     "Paragraph",
     "MoveStatement",
@@ -28,6 +29,7 @@ static const char *g_ast_node_kind_names[] = {
     "CloseStatement",
     "ReadStatement",
     "WriteStatement",
+    "CallStatement",
     "DisplayStatement",
     "StopStatement",
     "Condition",
@@ -36,7 +38,10 @@ static const char *g_ast_node_kind_names[] = {
     "ArithmeticOperator",
     "ComparisonOperator",
     "Identifier",
-    "Literal"
+    "Literal",
+    "Declaratives",
+    "DeclarativeSection",
+    "UseAfterErrorProcedure"
 };
 
 static const char *transpiler_ast_visualizer_node_kind_name(t_ast_node_kind kind)
@@ -126,7 +131,7 @@ static int transpiler_ast_visualizer_write_literal(t_runtime_file *file, const c
 
     if (!file || !text)
         return (FT_FAILURE);
-    length = ft_strlen(text);
+    length = std::strlen(text);
     if (runtime_file_write(file, text, length) != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
@@ -147,7 +152,7 @@ static int transpiler_ast_visualizer_emit_node(const t_ast_node *node, t_runtime
     node_id = *counter;
     *counter += 1;
     transpiler_ast_visualizer_format_label(node, label, sizeof(label));
-    formatted_length = pf_snprintf(line, sizeof(line), "    node%lu [label=\"%s\"];\n",
+    formatted_length = std::snprintf(line, sizeof(line), "    node%lu [label=\"%s\"];\n",
         static_cast<unsigned long>(node_id), label);
     if (formatted_length < 0)
         return (FT_FAILURE);
@@ -159,7 +164,7 @@ static int transpiler_ast_visualizer_emit_node(const t_ast_node *node, t_runtime
         if (transpiler_ast_visualizer_emit_node(node->children[child_index], file, counter,
                 &child_id) != FT_SUCCESS)
             return (FT_FAILURE);
-        formatted_length = pf_snprintf(line, sizeof(line), "    node%lu -> node%lu;\n",
+        formatted_length = std::snprintf(line, sizeof(line), "    node%lu -> node%lu;\n",
             static_cast<unsigned long>(node_id), static_cast<unsigned long>(child_id));
         if (formatted_length < 0)
             return (FT_FAILURE);

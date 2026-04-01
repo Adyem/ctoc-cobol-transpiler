@@ -2,9 +2,9 @@
 
 #include <cstdarg>
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 
 typedef struct s_c_backend_buffer
 {
@@ -47,7 +47,7 @@ static int c_backend_buffer_reserve(t_c_backend_buffer *buffer, size_t desired_c
     if (!new_data)
         return (FT_FAILURE);
     if (buffer->data && buffer->length > 0)
-        ft_memcpy(new_data, buffer->data, buffer->length);
+        std::memcpy(new_data, buffer->data, buffer->length);
     if (buffer->data)
         cma_free(buffer->data);
     buffer->data = new_data;
@@ -65,7 +65,7 @@ static int c_backend_buffer_append_span(t_c_backend_buffer *buffer, const char *
         return (FT_SUCCESS);
     if (c_backend_buffer_reserve(buffer, buffer->length + length + 1) != FT_SUCCESS)
         return (FT_FAILURE);
-    ft_memcpy(buffer->data + buffer->length, text, length);
+    std::memcpy(buffer->data + buffer->length, text, length);
     buffer->length += length;
     buffer->data[buffer->length] = '\0';
     return (FT_SUCCESS);
@@ -75,7 +75,7 @@ static int c_backend_buffer_append_string(t_c_backend_buffer *buffer, const char
 {
     if (!text)
         return (FT_SUCCESS);
-    return (c_backend_buffer_append_span(buffer, text, ft_strlen(text)));
+    return (c_backend_buffer_append_span(buffer, text, std::strlen(text)));
 }
 
 static int c_backend_buffer_append_vformat(t_c_backend_buffer *buffer, const char *format, va_list args)
@@ -91,7 +91,7 @@ static int c_backend_buffer_append_vformat(t_c_backend_buffer *buffer, const cha
     if (!format)
         return (FT_FAILURE);
     va_copy(copy, args);
-    required_length = pf_vsnprintf(stack_buffer, sizeof(stack_buffer), format, copy);
+    required_length = std::vsnprintf(stack_buffer, sizeof(stack_buffer), format, copy);
     va_end(copy);
     if (required_length < 0)
     {
@@ -106,7 +106,7 @@ static int c_backend_buffer_append_vformat(t_c_backend_buffer *buffer, const cha
     heap_buffer = static_cast<char *>(cma_calloc(static_cast<size_t>(required_length) + 1, sizeof(char)));
     if (!heap_buffer)
         return (FT_FAILURE);
-    if (pf_vsnprintf(heap_buffer, static_cast<size_t>(required_length) + 1, format, args) < 0)
+    if (std::vsnprintf(heap_buffer, static_cast<size_t>(required_length) + 1, format, args) < 0)
     {
         cma_free(heap_buffer);
         return (FT_FAILURE);
@@ -153,7 +153,7 @@ static const t_cblc_data_item *c_backend_find_data_item_by_cobol(const t_cblc_tr
     index = 0;
     while (index < unit->data_count)
     {
-        if (ft_strncmp(unit->data_items[index].cobol_name, cobol_name,
+        if (std::strncmp(unit->data_items[index].cobol_name, cobol_name,
                 sizeof(unit->data_items[index].cobol_name)) == 0)
             return (&unit->data_items[index]);
         index += 1;
@@ -168,16 +168,16 @@ static int c_backend_strip_suffix(const char *text, const char *suffix, char *bu
 
     if (!text || !suffix || !buffer || buffer_size == 0)
         return (0);
-    text_length = ft_strlen(text);
-    suffix_length = ft_strlen(suffix);
+    text_length = std::strlen(text);
+    suffix_length = std::strlen(suffix);
     if (suffix_length > text_length)
         return (0);
-    if (ft_strncmp(text + text_length - suffix_length, suffix, suffix_length) != 0)
+    if (std::strncmp(text + text_length - suffix_length, suffix, suffix_length) != 0)
         return (0);
     if (text_length - suffix_length + 1 > buffer_size)
         return (0);
     if (text_length - suffix_length > 0)
-        ft_memcpy(buffer, text, text_length - suffix_length);
+        std::memcpy(buffer, text, text_length - suffix_length);
     buffer[text_length - suffix_length] = '\0';
     return (1);
 }
@@ -190,7 +190,7 @@ static int c_backend_decode_cobol_literal(const char *literal, char *buffer, siz
 
     if (!literal || !buffer || buffer_size == 0)
         return (FT_FAILURE);
-    length = ft_strlen(literal);
+    length = std::strlen(literal);
     if (length < 2)
         return (FT_FAILURE);
     if (literal[0] != '"' || literal[length - 1] != '"')
@@ -291,7 +291,7 @@ static int c_backend_expression_append(char *buffer, size_t buffer_size, const c
 
     if (!buffer || !token)
         return (FT_FAILURE);
-    length = ft_strlen(buffer);
+    length = std::strlen(buffer);
     if (length > 0)
     {
         if (length + 1 >= buffer_size)
@@ -300,10 +300,10 @@ static int c_backend_expression_append(char *buffer, size_t buffer_size, const c
         length += 1;
         buffer[length] = '\0';
     }
-    token_length = ft_strlen(token);
+    token_length = std::strlen(token);
     if (length + token_length >= buffer_size)
         return (FT_FAILURE);
-    ft_memcpy(buffer + length, token, token_length);
+    std::memcpy(buffer + length, token, token_length);
     buffer[length + token_length] = '\0';
     return (FT_SUCCESS);
 }
@@ -321,18 +321,18 @@ static int c_backend_map_identifier_to_c(const t_cblc_translation_unit *unit, co
         item = c_backend_find_data_item_by_cobol(unit, base);
         if (!item || item->kind != CBLC_DATA_KIND_STRING)
             return (FT_FAILURE);
-        if (pf_snprintf(buffer, buffer_size, "%s_len", item->source_name) < 0)
+        if (std::snprintf(buffer, buffer_size, "%s_len", item->source_name) < 0)
             return (FT_FAILURE);
         return (FT_SUCCESS);
     }
     item = c_backend_find_data_item_by_cobol(unit, token);
     if (item)
     {
-        if (pf_snprintf(buffer, buffer_size, "%s", item->source_name) < 0)
+        if (std::snprintf(buffer, buffer_size, "%s", item->source_name) < 0)
             return (FT_FAILURE);
         return (FT_SUCCESS);
     }
-    if (pf_snprintf(buffer, buffer_size, "%s", token) < 0)
+    if (std::snprintf(buffer, buffer_size, "%s", token) < 0)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
@@ -438,7 +438,7 @@ static int c_backend_external_append(char (**out_array)[TRANSPILE_IDENTIFIER_MAX
     index = 0;
     while (index < *count)
     {
-        if (ft_strncmp(array[index], name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        if (std::strncmp(array[index], name, TRANSPILE_IDENTIFIER_MAX) == 0)
             return (FT_SUCCESS);
         index += 1;
     }
@@ -450,7 +450,7 @@ static int c_backend_external_append(char (**out_array)[TRANSPILE_IDENTIFIER_MAX
         if (!new_array)
             return (FT_FAILURE);
         if (array && *count > 0)
-            ft_memcpy(new_array, array, *count * sizeof(*new_array));
+            std::memcpy(new_array, array, *count * sizeof(*new_array));
         if (array)
             cma_free(array);
         *out_array = new_array;
@@ -656,7 +656,7 @@ static int c_backend_emit_display(const t_cblc_translation_unit *unit, const t_c
     {
         const char *paren;
 
-        paren = ft_strchr(statement->source, '(');
+        paren = std::strchr(statement->source, '(');
         if (paren)
         {
             char prefix[TRANSPILE_IDENTIFIER_MAX];
@@ -665,7 +665,7 @@ static int c_backend_emit_display(const t_cblc_translation_unit *unit, const t_c
             length = static_cast<size_t>(paren - statement->source);
             if (length + 1 >= sizeof(prefix))
                 return (FT_FAILURE);
-            ft_memcpy(prefix, statement->source, length);
+            std::memcpy(prefix, statement->source, length);
             prefix[length] = '\0';
             if (c_backend_strip_suffix(prefix, "-BUF", prefix, sizeof(prefix)))
             {
@@ -875,27 +875,65 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
             length = item->length;
             if (length == 0)
                 length = 1;
-            if (c_backend_buffer_append_format_line(&buffer,
-                    "static size_t %s_len = 0;", item->source_name) != FT_SUCCESS)
-                goto cleanup;
-            if (c_backend_buffer_append_format_line(&buffer,
-                    "static char %s_buf[%zu] = {0};", item->source_name,
-                    static_cast<unsigned long long>(length)) != FT_SUCCESS)
-                goto cleanup;
+            if (item->is_const && item->has_initializer)
+            {
+                if (c_backend_buffer_append_format_line(&buffer,
+                        "static const size_t %s_len = %zu;", item->source_name,
+                        static_cast<unsigned long long>(item->initializer_length)) != FT_SUCCESS)
+                    goto cleanup;
+                if (c_backend_buffer_append_format_line(&buffer,
+                        "static const char %s_buf[%zu] = %s;", item->source_name,
+                        static_cast<unsigned long long>(length),
+                        item->initializer_text) != FT_SUCCESS)
+                    goto cleanup;
+            }
+            else
+            {
+                if (c_backend_buffer_append_format_line(&buffer,
+                        "static size_t %s_len = 0;", item->source_name) != FT_SUCCESS)
+                    goto cleanup;
+                if (c_backend_buffer_append_format_line(&buffer,
+                        "static char %s_buf[%zu] = {0};", item->source_name,
+                        static_cast<unsigned long long>(length)) != FT_SUCCESS)
+                    goto cleanup;
+            }
         }
         else if (item->kind == CBLC_DATA_KIND_CHAR)
         {
             length = item->length;
             if (length == 0)
                 length = 1;
-            if (c_backend_buffer_append_format_line(&buffer,
+            if (item->is_const && item->has_initializer)
+            {
+                if (item->initializer_text[0] == '\'')
+                {
+                    if (c_backend_buffer_append_format_line(&buffer,
+                            "static const char %s[%zu] = {'%c'};", item->source_name,
+                            static_cast<unsigned long long>(length),
+                            item->initializer_text[1]) != FT_SUCCESS)
+                        goto cleanup;
+                }
+                else if (c_backend_buffer_append_format_line(&buffer,
+                        "static const char %s[%zu] = %s;", item->source_name,
+                        static_cast<unsigned long long>(length),
+                        item->initializer_text) != FT_SUCCESS)
+                    goto cleanup;
+            }
+            else if (c_backend_buffer_append_format_line(&buffer,
                     "static char %s[%zu] = {0};", item->source_name,
                     static_cast<unsigned long long>(length)) != FT_SUCCESS)
                 goto cleanup;
         }
         else if (item->kind == CBLC_DATA_KIND_INT)
         {
-            if (c_backend_buffer_append_format_line(&buffer,
+            if (item->is_const && item->has_initializer)
+            {
+                if (c_backend_buffer_append_format_line(&buffer,
+                        "static const int %s = %s;", item->source_name,
+                        item->initializer_text) != FT_SUCCESS)
+                    goto cleanup;
+            }
+            else if (c_backend_buffer_append_format_line(&buffer,
                     "static int %s = 0;", item->source_name) != FT_SUCCESS)
                 goto cleanup;
         }
@@ -927,7 +965,7 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
     if (unit->function_count > 0)
     {
         entry_function = &unit->functions[entry_index];
-        if (ft_strncmp(entry_function->source_name, "main", TRANSPILE_IDENTIFIER_MAX) == 0)
+        if (std::strncmp(entry_function->source_name, "main", TRANSPILE_IDENTIFIER_MAX) == 0)
             generate_main = 1;
     }
     index = 0;
@@ -1079,4 +1117,3 @@ cleanup:
         c_backend_buffer_dispose(&buffer);
     return (status);
 }
-

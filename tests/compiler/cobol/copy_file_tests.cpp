@@ -121,7 +121,7 @@ FT_TEST(test_cobol_transpiled_copy_file_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -o %s samples/cobol/copy_file.cob > %s 2>&1", binary_path,
         compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -132,7 +132,7 @@ FT_TEST(test_cobol_transpiled_copy_file_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile copy_file sample\n");
+        std::printf("Assertion failed: cobc should compile copy_file sample\n");
         test_cleanup_example_artifacts_with_log(input_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -143,7 +143,7 @@ FT_TEST(test_cobol_transpiled_copy_file_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./copy_file.bin", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -153,7 +153,7 @@ FT_TEST(test_cobol_transpiled_copy_file_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: copy_file binary should execute successfully\n");
+        std::printf("Assertion failed: copy_file binary should execute successfully\n");
         test_cleanup_example_artifacts_with_log(input_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -165,9 +165,9 @@ FT_TEST(test_cobol_transpiled_copy_file_executes)
         return (FT_FAILURE);
     }
     expected_output = "ALPHA\nBRAVO\n";
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: copy_file sample should copy all input lines\n");
+        std::printf("Assertion failed: copy_file sample should copy all input lines\n");
         test_cleanup_example_artifacts_with_log(input_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -229,7 +229,7 @@ FT_TEST(test_cobol_transpiled_copy_file_exit_status)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -o %s samples/cobol/copy_file.cob > %s 2>&1", binary_path,
         compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -240,7 +240,7 @@ FT_TEST(test_cobol_transpiled_copy_file_exit_status)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile copy_file sample for status capture\n");
+        std::printf("Assertion failed: cobc should compile copy_file sample for status capture\n");
         test_cleanup_example_artifacts_with_log(input_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -251,7 +251,7 @@ FT_TEST(test_cobol_transpiled_copy_file_exit_status)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./copy_file_status.bin", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -261,14 +261,14 @@ FT_TEST(test_cobol_transpiled_copy_file_exit_status)
     }
     if (test_run_command_capture_status(command, &exit_status) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: test harness should capture copy_file exit status\n");
+        std::printf("Assertion failed: test harness should capture copy_file exit status\n");
         test_cleanup_example_artifacts_with_log(input_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
     if (exit_status != 0)
     {
-        pf_printf("Assertion failed: copy_file program should exit with status 0\n");
+        std::printf("Assertion failed: copy_file program should exit with status 0\n");
         test_cleanup_example_artifacts_with_log(input_path, binary_path, output_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);

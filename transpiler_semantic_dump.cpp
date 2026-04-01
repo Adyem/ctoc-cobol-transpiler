@@ -3,8 +3,8 @@
 #include <filesystem>
 #include <system_error>
 
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 
 static int transpiler_semantic_dump_prepare_directory(const char *path)
 {
@@ -36,7 +36,7 @@ static int transpiler_semantic_dump_write_file(const char *path, const char *tex
     runtime_file_init(&file);
     if (runtime_file_open_write(&file, path) != FT_SUCCESS)
         return (FT_FAILURE);
-    length = ft_strlen_size_t(text);
+    length = std::strlen(text);
     if (runtime_file_write(&file, text, length) != FT_SUCCESS)
     {
         runtime_file_close(&file);
@@ -53,7 +53,7 @@ static void transpiler_semantic_dump_strip_extension(char *buffer)
 
     if (!buffer)
         return ;
-    length = ft_strlen_size_t(buffer);
+    length = std::strlen(buffer);
     while (length > 0)
     {
         if (buffer[length - 1] == '.')
@@ -100,9 +100,9 @@ int transpiler_semantic_dump_build_output_path(const t_transpiler_context *conte
         transpiler_semantic_dump_strip_extension(base);
         if (base[0] == '\0')
             ft_strlcpy(base, "program", sizeof(base));
-        if (pf_snprintf(buffer, buffer_size, "%s/%s.%s.txt", directory, base, suffix) < 0)
+        if (std::snprintf(buffer, buffer_size, "%s/%s.%s.txt", directory, base, suffix) < 0)
             return (FT_FAILURE);
-        if (ft_strlen_size_t(buffer) + 1 > buffer_size)
+        if (std::strlen(buffer) + 1 > buffer_size)
             return (FT_FAILURE);
         return (FT_SUCCESS);
     }

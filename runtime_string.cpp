@@ -1,7 +1,7 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
 
 static int runtime_string_reserve(t_runtime_string *value, size_t desired_capacity)
 {
@@ -72,7 +72,7 @@ int runtime_string_assign(t_runtime_string *value, const char *text)
         return (FT_FAILURE);
     if (!text)
         text = "";
-    length = ft_strlen(text);
+    length = std::strlen(text);
     if (runtime_string_reserve(value, length + 1) != FT_SUCCESS)
         return (FT_FAILURE);
     index = 0;
@@ -298,7 +298,7 @@ int runtime_string_concat(t_runtime_string *destination, const t_runtime_string 
         if (!left_copy)
             return (FT_FAILURE);
         if (left->length > 0)
-            ft_memcpy(left_copy, left->data, left->length);
+            std::memcpy(left_copy, left->data, left->length);
         left_data = left_copy;
     }
     if (right == destination)
@@ -311,7 +311,7 @@ int runtime_string_concat(t_runtime_string *destination, const t_runtime_string 
             return (FT_FAILURE);
         }
         if (right->length > 0)
-            ft_memcpy(right_copy, right->data, right->length);
+            std::memcpy(right_copy, right->data, right->length);
         right_data = right_copy;
     }
     index = 0;

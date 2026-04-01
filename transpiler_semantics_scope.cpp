@@ -1,8 +1,8 @@
 #include <cstddef>
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 
 #include "transpiler_semantics_internal.hpp"
 
@@ -116,14 +116,14 @@ static int transpiler_semantics_identifier_is_flag(const char *name)
         size_t suffix_length;
 
         suffix = g_transpiler_semantics_flag_suffixes[suffix_index];
-        normalized_length = ft_strlen(normalized);
-        suffix_length = ft_strlen(suffix);
+        normalized_length = std::strlen(normalized);
+        suffix_length = std::strlen(suffix);
         if (suffix_length > 0 && suffix_length <= normalized_length)
         {
             size_t start_index;
 
             start_index = normalized_length - suffix_length;
-            if (ft_strncmp(&normalized[start_index], suffix, suffix_length) == 0)
+            if (std::strncmp(&normalized[start_index], suffix, suffix_length) == 0)
                 return (1);
         }
         suffix_index += 1;
@@ -202,7 +202,7 @@ static int transpiler_semantics_scope_copybooks_reserve(t_transpiler_semantic_sc
         return (FT_FAILURE);
     if (scope->expanded_copybooks)
     {
-        ft_memcpy(copybooks, scope->expanded_copybooks,
+        std::memcpy(copybooks, scope->expanded_copybooks,
             scope->expanded_copybook_count * sizeof(*copybooks));
         cma_free(scope->expanded_copybooks);
     }
@@ -223,7 +223,7 @@ static int transpiler_semantics_scope_has_copybook(const t_transpiler_semantic_s
     index = 0;
     while (index < scope->expanded_copybook_count)
     {
-        if (ft_strncmp(scope->expanded_copybooks[index], name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        if (std::strncmp(scope->expanded_copybooks[index], name, TRANSPILE_IDENTIFIER_MAX) == 0)
             return (1);
         index += 1;
     }
@@ -268,7 +268,7 @@ static int transpiler_semantics_parse_size_literal(const t_ast_node *literal, si
     if (!text)
         return (FT_FAILURE);
     if (length == 0)
-        length = ft_strlen(text);
+        length = std::strlen(text);
     if (length == 0)
         return (FT_FAILURE);
     value = 0;
@@ -278,7 +278,7 @@ static int transpiler_semantics_parse_size_literal(const t_ast_node *literal, si
         char digit;
 
         digit = text[index];
-        if (!ft_isdigit(static_cast<unsigned char>(digit)))
+        if (!std::isdigit(static_cast<unsigned char>(digit)))
             return (FT_FAILURE);
         if (value > (SIZE_MAX / 10))
             return (FT_FAILURE);
@@ -372,7 +372,7 @@ const t_transpiler_semantic_data_item *transpiler_semantics_scope_lookup(
     index = 0;
     while (index < scope->item_count)
     {
-        if (ft_strncmp(scope->items[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        if (std::strncmp(scope->items[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
             return (&scope->items[index]);
         index += 1;
     }
@@ -395,7 +395,7 @@ static int transpiler_semantics_register_data_item(t_transpiler_semantic_scope *
         return (FT_FAILURE);
     if (!name || name[0] == '\0')
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "data item declaration is missing an identifier");
         return (transpiler_semantics_emit_error(context,
             TRANSPILE_ERROR_SEMANTIC_INVALID_MOVE, message));
@@ -406,7 +406,7 @@ static int transpiler_semantics_register_data_item(t_transpiler_semantic_scope *
     existing = transpiler_semantics_scope_lookup(scope, name);
     if (existing)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "data item '%s' declared multiple times in WORKING-STORAGE", name);
         return (transpiler_semantics_emit_error(context,
             TRANSPILE_ERROR_SEMANTIC_DUPLICATE_DATA_ITEM, message));
@@ -635,7 +635,7 @@ static int transpiler_semantics_collect_data_items(const t_ast_node *section,
             {
                 char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 
-                pf_snprintf(message, sizeof(message),
+                std::snprintf(message, sizeof(message),
                     "data item declaration is missing an identifier");
                 transpiler_semantics_emit_error(context,
                     TRANSPILE_ERROR_SEMANTIC_INVALID_MOVE, message);
@@ -676,7 +676,7 @@ static int transpiler_semantics_collect_data_items(const t_ast_node *section,
                 {
                     int level_value;
 
-                    level_value = ft_atoi(level_node->token.lexeme);
+                    level_value = std::atoi(level_node->token.lexeme);
                     if (level_value == 78)
                         is_read_only = 1;
                 }
@@ -687,7 +687,7 @@ static int transpiler_semantics_collect_data_items(const t_ast_node *section,
                     {
                         char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 
-                        pf_snprintf(message, sizeof(message),
+                        std::snprintf(message, sizeof(message),
                             "OCCURS clause on '%s' is invalid", name_node->token.lexeme);
                         transpiler_semantics_emit_error(context,
                             TRANSPILE_ERROR_SEMANTIC_INVALID_MOVE, message);
@@ -706,7 +706,7 @@ static int transpiler_semantics_collect_data_items(const t_ast_node *section,
                             {
                                 char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 
-                                pf_snprintf(message, sizeof(message),
+                                std::snprintf(message, sizeof(message),
                                     "OCCURS DEPENDING ON references unknown data item '%s'",
                                     occurs_metadata.depending_on);
                                 transpiler_semantics_emit_error(context,
@@ -767,7 +767,7 @@ static int transpiler_semantics_register_copybook(const t_ast_node *node,
     name_node = ast_node_get_child(node, 0);
     if (!name_node || name_node->kind != AST_NODE_IDENTIFIER || !name_node->token.lexeme)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "COPY directive is missing a copybook identifier");
         transpiler_semantics_emit_error(context,
             TRANSPILE_ERROR_SEMANTIC_INVALID_MOVE, message);
@@ -776,7 +776,7 @@ static int transpiler_semantics_register_copybook(const t_ast_node *node,
     copybook = transpiler_context_find_copybook(context, name_node->token.lexeme);
     if (!copybook)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "copybook '%s' is not registered in the current compilation context",
             name_node->token.lexeme);
         transpiler_semantics_emit_error(context,
@@ -786,7 +786,7 @@ static int transpiler_semantics_register_copybook(const t_ast_node *node,
     copybook_name = copybook->name;
     if (transpiler_semantics_scope_has_copybook(scope, copybook_name))
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "copybook '%s' is included multiple times in this source file; duplicate COPY ignored",
             copybook_name);
         (void)transpiler_semantics_emit_warning_at(context, node,
@@ -892,7 +892,7 @@ static int transpiler_semantics_file_declared(const t_transpiler_context *contex
     index = 0;
     while (index < count)
     {
-        if (ft_strncmp(files[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        if (std::strncmp(files[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
             return (1);
         index += 1;
     }
@@ -977,7 +977,7 @@ int transpiler_semantics_collect_use_after_error(const t_ast_node *program,
                                     {
                                         char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 
-                                        pf_snprintf(message, sizeof(message),
+                                        std::snprintf(message, sizeof(message),
                                             "file '%s' referenced by USE AFTER ERROR PROCEDURE is not declared",
                                             file_name);
                                         transpiler_semantics_emit_error(context,
@@ -1018,7 +1018,7 @@ int transpiler_semantics_validate_identifier_use(const t_transpiler_semantic_sco
         return (FT_FAILURE);
     if (!identifier->token.lexeme)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "MOVE %s is missing an identifier", is_target ? "target" : "source");
         transpiler_semantics_emit_error(context,
             TRANSPILE_ERROR_SEMANTIC_INVALID_MOVE, message);
@@ -1027,7 +1027,7 @@ int transpiler_semantics_validate_identifier_use(const t_transpiler_semantic_sco
     item = transpiler_semantics_scope_lookup(scope, identifier->token.lexeme);
     if (!item)
     {
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "identifier '%s' referenced in MOVE is not declared in WORKING-STORAGE",
             identifier->token.lexeme);
         transpiler_semantics_emit_error(context,
@@ -1070,13 +1070,13 @@ static int transpiler_semantics_emit_usage_warning(t_transpiler_context *context
     if (!name || name[0] == '\0')
         name = "<data item>";
     if (code == TRANSPILE_WARNING_SEMANTIC_UNUSED_DATA_ITEM)
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "data item '%s' is declared but never referenced", name);
     else if (code == TRANSPILE_WARNING_SEMANTIC_WRITE_ONLY_DATA_ITEM)
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "data item '%s' is written but its value is never read", name);
     else if (code == TRANSPILE_WARNING_SEMANTIC_READ_WITHOUT_WRITE)
-        pf_snprintf(message, sizeof(message),
+        std::snprintf(message, sizeof(message),
             "data item '%s' is read before any assignments", name);
     else
         return (FT_FAILURE);

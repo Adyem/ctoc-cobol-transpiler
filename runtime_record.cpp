@@ -1,6 +1,6 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/CMA/CMA.hpp"
+#include "compatibility/memory_compat.hpp"
 
 static int runtime_record_validate(t_runtime_record *record)
 {

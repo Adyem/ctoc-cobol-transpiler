@@ -1,4 +1,4 @@
-#include "libft/CMA/CMA.hpp"
+#include "compatibility/memory_compat.hpp"
 #include "test_suites.hpp"
 
 static t_transpiler_cobol_usage cobol_usage_make_invalid(void)

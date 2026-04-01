@@ -44,7 +44,7 @@ FT_TEST(test_copybook_graph_emits_dependencies)
     }
     token.kind = LEXER_TOKEN_IDENTIFIER;
     token.lexeme = "CUSTOM-COPY";
-    token.length = ft_strlen("CUSTOM-COPY");
+    token.length = std::strlen("CUSTOM-COPY");
     token.line = 1;
     token.column = 1;
     if (ast_node_set_token(identifier, &token) != FT_SUCCESS)
@@ -200,7 +200,7 @@ FT_TEST(test_copybook_graph_handles_cycles)
     }
     token.kind = LEXER_TOKEN_IDENTIFIER;
     token.lexeme = "alpha";
-    token.length = ft_strlen("alpha");
+    token.length = std::strlen("alpha");
     token.line = 1;
     token.column = 1;
     if (ast_node_set_token(identifier, &token) != FT_SUCCESS)

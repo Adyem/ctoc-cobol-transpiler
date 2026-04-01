@@ -82,12 +82,16 @@ FT_TEST(test_parser_rejects_incomplete_if_statement)
     return (FT_SUCCESS);
 }
 
-FT_TEST(test_parser_rejects_single_equals_condition)
+FT_TEST(test_parser_accepts_single_equals_condition)
 {
     const char *source;
     t_parser parser;
     t_ast_node *program;
-    int status;
+    t_ast_node *procedure_division;
+    t_ast_node *paragraph;
+    t_ast_node *sequence;
+    t_ast_node *if_statement;
+    t_ast_node *condition;
 
     source = "IDENTIFICATION DIVISION.\n"
         "PROGRAM-ID. SAMPLE.\n"
@@ -102,12 +106,56 @@ FT_TEST(test_parser_rejects_single_equals_condition)
         "    END-IF.\n";
     parser_init(&parser, source);
     program = NULL;
-    status = parser_parse_program(&parser, &program);
-    parser_dispose(&parser);
-    if (program)
-        ast_node_destroy(program);
-    if (status == FT_SUCCESS)
+    if (parser_parse_program(&parser, &program) != FT_SUCCESS)
+    {
+        parser_dispose(&parser);
         return (FT_FAILURE);
+    }
+    parser_dispose(&parser);
+    if (!program)
+        return (FT_FAILURE);
+    procedure_division = ast_node_get_child(program, 3);
+    if (!procedure_division || procedure_division->kind != AST_NODE_PROCEDURE_DIVISION)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    paragraph = ast_node_get_child(procedure_division, 0);
+    if (!paragraph || paragraph->kind != AST_NODE_PARAGRAPH)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    sequence = ast_node_get_child(paragraph, 0);
+    if (!sequence || sequence->kind != AST_NODE_STATEMENT_SEQUENCE)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    if_statement = ast_node_get_child(sequence, 0);
+    if (!if_statement || if_statement->kind != AST_NODE_IF_STATEMENT)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    condition = ast_node_get_child(if_statement, 0);
+    if (!condition || condition->kind != AST_NODE_CONDITION)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    if (ast_node_child_count(condition) != 3)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    if (!ast_node_get_child(condition, 1)
+        || ast_node_get_child(condition, 1)->token.kind != LEXER_TOKEN_EQUALS)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    ast_node_destroy(program);
     return (FT_SUCCESS);
 }
 

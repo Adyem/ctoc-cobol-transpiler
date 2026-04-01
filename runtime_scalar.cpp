@@ -1,5 +1,6 @@
 #include "cblc_transpiler.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/printf_compat.hpp"
+#include <cctype>
 #include <climits>
 
 static int runtime_check_destination_int(t_runtime_int *destination)
@@ -45,7 +46,7 @@ int runtime_int_from_string(t_runtime_int *destination, const char *text)
         return (FT_FAILURE);
     if (ft_validate_int(text) != FT_SUCCESS)
         return (FT_FAILURE);
-    destination->value = ft_atoi(text);
+    destination->value = std::atoi(text);
     return (FT_SUCCESS);
 }
 
@@ -390,7 +391,7 @@ int runtime_int_to_string(t_runtime_int value, char *buffer, size_t buffer_size)
         return (FT_FAILURE);
     if (buffer_size == 0)
         return (FT_FAILURE);
-    result = pf_snprintf(temporary, sizeof(temporary), "%d", value.value);
+    result = std::snprintf(temporary, sizeof(temporary), "%d", value.value);
     if (result < 0)
         return (FT_FAILURE);
     if (static_cast<size_t>(result) >= buffer_size)
@@ -414,35 +415,25 @@ int runtime_char_from_string(t_runtime_char *destination, const char *text)
         return (FT_FAILURE);
     if (!text)
         return (FT_FAILURE);
-    length = ft_strlen(text);
+    length = std::strlen(text);
     if (length != 1)
         return (FT_FAILURE);
     destination->value = text[0];
     return (FT_SUCCESS);
 }
 
-static void runtime_apply_unary_char(t_runtime_char *value, void (*transform)(char *))
-{
-    char buffer[2];
-
-    if (runtime_check_destination_char(value) != FT_SUCCESS)
-        return ;
-    if (!transform)
-        return ;
-    buffer[0] = value->value;
-    buffer[1] = '\0';
-    transform(buffer);
-    value->value = buffer[0];
-}
-
 void runtime_char_to_upper(t_runtime_char *value)
 {
-    runtime_apply_unary_char(value, ft_to_upper);
+    if (runtime_check_destination_char(value) != FT_SUCCESS)
+        return ;
+    value->value = static_cast<char>(std::toupper(static_cast<unsigned char>(value->value)));
 }
 
 void runtime_char_to_lower(t_runtime_char *value)
 {
-    runtime_apply_unary_char(value, ft_to_lower);
+    if (runtime_check_destination_char(value) != FT_SUCCESS)
+        return ;
+    value->value = static_cast<char>(std::tolower(static_cast<unsigned char>(value->value)));
 }
 
 int runtime_char_compare(t_runtime_char left, t_runtime_char right)
@@ -478,10 +469,10 @@ static void runtime_demo_ints(void)
     runtime_int_add(value_a, value_b, &addition);
     runtime_int_subtract(value_b, value_a, &subtraction);
     runtime_int_to_string(addition, buffer, sizeof(buffer));
-    pf_printf("int add: %s\n", buffer);
+    std::printf("int add: %s\n", buffer);
     runtime_int_to_string(subtraction, buffer, sizeof(buffer));
-    pf_printf("int sub: %s\n", buffer);
-    pf_printf("int cmp: %d\n", runtime_int_compare(value_a, value_b));
+    std::printf("int sub: %s\n", buffer);
+    std::printf("int cmp: %d\n", runtime_int_compare(value_a, value_b));
 }
 
 static void runtime_demo_chars(void)
@@ -495,10 +486,10 @@ static void runtime_demo_chars(void)
     runtime_char_to_lower(&char_b);
     runtime_char_to_upper(&char_a);
     runtime_char_to_string(char_a, buffer, sizeof(buffer));
-    pf_printf("char A: %s\n", buffer);
+    std::printf("char A: %s\n", buffer);
     runtime_char_to_string(char_b, buffer, sizeof(buffer));
-    pf_printf("char B: %s\n", buffer);
-    pf_printf("char cmp: %d\n", runtime_char_compare(char_a, char_b));
+    std::printf("char B: %s\n", buffer);
+    std::printf("char cmp: %d\n", runtime_char_compare(char_a, char_b));
 }
 
 void runtime_demo(void)

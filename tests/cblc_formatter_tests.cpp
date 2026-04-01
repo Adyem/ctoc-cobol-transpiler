@@ -2,7 +2,7 @@
 
 #include "test_suites.hpp"
 
-#include "libft/CMA/CMA.hpp"
+#include "compatibility/memory_compat.hpp"
 
 FT_TEST(test_cblc_formatter_formats_function_body)
 {

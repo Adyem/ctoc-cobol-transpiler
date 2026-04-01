@@ -36,7 +36,7 @@ FT_TEST(test_transpiler_context_scans_imports_and_orders_modules)
     if (!modules)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected to query registered modules\n");
+        std::printf("Assertion failed: expected to query registered modules\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(module_count), 2,
@@ -67,7 +67,7 @@ FT_TEST(test_transpiler_context_scans_imports_and_orders_modules)
     if (!order)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected module order to be available\n");
+        std::printf("Assertion failed: expected module order to be available\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(order_count), 2,
@@ -128,7 +128,7 @@ FT_TEST(test_transpiler_context_orders_modules_deterministically)
     if (!order)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected module order to be available\n");
+        std::printf("Assertion failed: expected module order to be available\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(order_count), 3,
@@ -209,7 +209,7 @@ FT_TEST(test_transpiler_context_resolves_imports_by_file_name)
     if (!modules)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected to query registered modules\n");
+        std::printf("Assertion failed: expected to query registered modules\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(module_count), 2,
@@ -218,7 +218,7 @@ FT_TEST(test_transpiler_context_resolves_imports_by_file_name)
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(modules[0].name, "metrics_worker.cblc", ft_strlen("metrics_worker.cblc") + 1) == 0)
+    if (std::strncmp(modules[0].name, "metrics_worker.cblc", std::strlen("metrics_worker.cblc") + 1) == 0)
     {
         worker_index = 0;
         main_index = 1;
@@ -272,7 +272,7 @@ FT_TEST(test_transpiler_context_resolves_imports_by_file_name)
     if (!order)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected module order to be available\n");
+        std::printf("Assertion failed: expected module order to be available\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(order_count), 2,
@@ -306,7 +306,7 @@ FT_TEST(test_transpiler_context_rejects_empty_module_name)
     if (transpiler_context_register_module(&context, "", NULL) != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected empty module name to be rejected\n");
+        std::printf("Assertion failed: expected empty module name to be rejected\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(context.module_count), 0,
@@ -342,14 +342,14 @@ FT_TEST(test_transpiler_context_rejects_empty_import_path)
     if (transpiler_context_register_module_import(&context, "main_mod", "") != FT_FAILURE)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected empty import path to be rejected\n");
+        std::printf("Assertion failed: expected empty import path to be rejected\n");
         return (FT_FAILURE);
     }
     modules = transpiler_context_get_modules(&context, &module_count);
     if (!modules)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected to inspect registered modules\n");
+        std::printf("Assertion failed: expected to inspect registered modules\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(module_count), 1,
@@ -405,17 +405,17 @@ FT_TEST(test_transpiler_context_deduplicates_module_imports)
     if (!modules)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected to inspect registered modules\n");
+        std::printf("Assertion failed: expected to inspect registered modules\n");
         return (FT_FAILURE);
     }
     main_index = 0;
     while (main_index < module_count
-        && ft_strncmp(modules[main_index].name, "main_mod", TRANSPILE_MODULE_NAME_MAX) != 0)
+        && std::strncmp(modules[main_index].name, "main_mod", TRANSPILE_MODULE_NAME_MAX) != 0)
         main_index += 1;
     if (main_index >= module_count)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected main module to be registered\n");
+        std::printf("Assertion failed: expected main module to be registered\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(modules[main_index].import_count), 1,
@@ -489,17 +489,17 @@ FT_TEST(test_transpiler_context_sorts_module_imports)
     if (!modules)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected to inspect registered modules\n");
+        std::printf("Assertion failed: expected to inspect registered modules\n");
         return (FT_FAILURE);
     }
     main_index = 0;
     while (main_index < module_count
-        && ft_strncmp(modules[main_index].name, "main_mod", TRANSPILE_MODULE_NAME_MAX) != 0)
+        && std::strncmp(modules[main_index].name, "main_mod", TRANSPILE_MODULE_NAME_MAX) != 0)
         main_index += 1;
     if (main_index >= module_count)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected main module to be registered\n");
+        std::printf("Assertion failed: expected main module to be registered\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(modules[main_index].import_count), 2,
@@ -569,7 +569,7 @@ FT_TEST(test_transpiler_context_resolves_imports_by_path)
     if (!modules)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected to inspect registered modules\n");
+        std::printf("Assertion failed: expected to inspect registered modules\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(module_count), 2,
@@ -609,7 +609,7 @@ FT_TEST(test_transpiler_context_resolves_imports_by_path)
     if (!order)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected module order to be available\n");
+        std::printf("Assertion failed: expected module order to be available\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(order_count), 2,
@@ -660,7 +660,7 @@ FT_TEST(test_transpiler_context_unit_reset_preserves_registered_modules)
     if (!modules)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected module registry to remain accessible\n");
+        std::printf("Assertion failed: expected module registry to remain accessible\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(module_count), 2,
@@ -686,7 +686,7 @@ FT_TEST(test_transpiler_context_unit_reset_preserves_registered_modules)
     if (!modules)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected module registry pointer to remain valid\n");
+        std::printf("Assertion failed: expected module registry pointer to remain valid\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(module_count), 0,

@@ -1,8 +1,8 @@
 #include <cstddef>
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 #include "cblc_transpiler.hpp"
 
 typedef struct s_cblc_builder
@@ -86,7 +86,7 @@ static int cblc_builder_reserve(t_cblc_builder *builder, size_t desired_capacity
     if (!new_data)
         return (FT_FAILURE);
     if (builder->data && builder->length > 0)
-        ft_memcpy(new_data, builder->data, builder->length);
+        std::memcpy(new_data, builder->data, builder->length);
     if (builder->data)
         cma_free(builder->data);
     builder->data = new_data;
@@ -104,7 +104,7 @@ static int cblc_builder_append_span(t_cblc_builder *builder, const char *text, s
         return (FT_SUCCESS);
     if (cblc_builder_reserve(builder, builder->length + length + 1) != FT_SUCCESS)
         return (FT_FAILURE);
-    ft_memcpy(builder->data + builder->length, text, length);
+    std::memcpy(builder->data + builder->length, text, length);
     builder->length += length;
     builder->data[builder->length] = '\0';
     return (FT_SUCCESS);
@@ -114,7 +114,7 @@ static int cblc_builder_append_string(t_cblc_builder *builder, const char *text)
 {
     if (!text)
         return (FT_SUCCESS);
-    return (cblc_builder_append_span(builder, text, ft_strlen(text)));
+    return (cblc_builder_append_span(builder, text, std::strlen(text)));
 }
 
 static int cblc_builder_append_char(t_cblc_builder *builder, char value)
@@ -262,7 +262,7 @@ static int cobol_reverse_condition_table_reserve(size_t desired_capacity)
     if (!entries)
         return (FT_FAILURE);
     if (g_cobol_reverse_conditions && g_cobol_reverse_condition_count > 0)
-        ft_memcpy(entries, g_cobol_reverse_conditions,
+        std::memcpy(entries, g_cobol_reverse_conditions,
             g_cobol_reverse_condition_count * sizeof(t_cobol_reverse_condition_entry));
     if (g_cobol_reverse_conditions)
         cma_free(g_cobol_reverse_conditions);
@@ -316,7 +316,7 @@ static const t_cobol_reverse_condition_entry *cobol_reverse_condition_table_find
     index = 0;
     while (index < g_cobol_reverse_condition_count)
     {
-        if (ft_strncmp(g_cobol_reverse_conditions[index].name, identifier,
+        if (std::strncmp(g_cobol_reverse_conditions[index].name, identifier,
                 TRANSPILE_IDENTIFIER_MAX) == 0)
             return (&g_cobol_reverse_conditions[index]);
         index += 1;
@@ -510,7 +510,7 @@ static int cobol_reverse_token_equals(const t_lexer_token *token, const char *te
     if (!text)
         return (0);
     length = token->length;
-    expected_length = ft_strlen(text);
+    expected_length = std::strlen(text);
     if (length != expected_length)
         return (0);
     index = 0;
@@ -558,7 +558,7 @@ static int cobol_reverse_append_identifier(t_cblc_builder *builder, const t_lexe
         char leading;
 
         leading = token->lexeme[0];
-        if (ft_isdigit(static_cast<unsigned char>(leading)))
+        if (std::isdigit(static_cast<unsigned char>(leading)))
         {
             normalized[write_index] = '_';
             write_index += 1;
@@ -569,16 +569,16 @@ static int cobol_reverse_append_identifier(t_cblc_builder *builder, const t_lexe
         char value;
 
         value = token->lexeme[index];
-        if (ft_isalpha(static_cast<unsigned char>(value)))
+        if (std::isalpha(static_cast<unsigned char>(value)))
         {
-            if (ft_islower(static_cast<unsigned char>(value)))
+            if (std::islower(static_cast<unsigned char>(value)))
                 value = static_cast<char>(value - ('a' - 'A'));
             normalized[write_index] = value;
             write_index += 1;
             previous_was_underscore = 0;
             has_significant = 1;
         }
-        else if (ft_isdigit(static_cast<unsigned char>(value)))
+        else if (std::isdigit(static_cast<unsigned char>(value)))
         {
             normalized[write_index] = value;
             write_index += 1;
@@ -840,7 +840,7 @@ static void cobol_reverse_skip_spaces(const char *text, size_t length, size_t *i
     if (*index >= length)
         return ;
     while (*index < length
-        && ft_isspace(static_cast<unsigned char>(text[*index])))
+        && std::isspace(static_cast<unsigned char>(text[*index])))
         *index += 1;
 }
 
@@ -855,10 +855,10 @@ static int cobol_reverse_parse_repeat(const char *text, size_t length, size_t *i
     cobol_reverse_skip_spaces(text, length, index);
     if (*index >= length)
         return (FT_FAILURE);
-    if (!ft_isdigit(static_cast<unsigned char>(text[*index])))
+    if (!std::isdigit(static_cast<unsigned char>(text[*index])))
         return (FT_FAILURE);
     value = 0;
-    while (*index < length && ft_isdigit(static_cast<unsigned char>(text[*index])))
+    while (*index < length && std::isdigit(static_cast<unsigned char>(text[*index])))
     {
         value = (value * 10) + static_cast<unsigned long long>(text[*index] - '0');
         if (value > SIZE_MAX)
@@ -882,53 +882,53 @@ static int cobol_reverse_parse_usage_keyword(const char *text,
 {
     if (!text || !out_picture)
         return (FT_FAILURE);
-    if (ft_strcmp(text, "USAGE") == 0)
+    if (std::strcmp(text, "USAGE") == 0)
         return (FT_SUCCESS);
-    if (ft_strcmp(text, "DISPLAY") == 0)
+    if (std::strcmp(text, "DISPLAY") == 0)
     {
         out_picture->usage = COBOL_REVERSE_USAGE_DISPLAY;
         return (FT_SUCCESS);
     }
-    if (ft_strcmp(text, "COMP-1") == 0
-        || ft_strcmp(text, "COMPUTATIONAL-1") == 0)
+    if (std::strcmp(text, "COMP-1") == 0
+        || std::strcmp(text, "COMPUTATIONAL-1") == 0)
     {
         out_picture->usage = COBOL_REVERSE_USAGE_COMP_1;
         return (FT_SUCCESS);
     }
-    if (ft_strcmp(text, "COMP-2") == 0
-        || ft_strcmp(text, "COMPUTATIONAL-2") == 0)
+    if (std::strcmp(text, "COMP-2") == 0
+        || std::strcmp(text, "COMPUTATIONAL-2") == 0)
     {
         out_picture->usage = COBOL_REVERSE_USAGE_COMP_2;
         return (FT_SUCCESS);
     }
-    if (ft_strcmp(text, "COMP-3") == 0
-        || ft_strcmp(text, "COMPUTATIONAL-3") == 0)
+    if (std::strcmp(text, "COMP-3") == 0
+        || std::strcmp(text, "COMPUTATIONAL-3") == 0)
     {
         out_picture->usage = COBOL_REVERSE_USAGE_COMP_3;
         return (FT_SUCCESS);
     }
-    if (ft_strcmp(text, "COMP-5") == 0
-        || ft_strcmp(text, "COMPUTATIONAL-5") == 0
-        || ft_strcmp(text, "BINARY") == 0)
+    if (std::strcmp(text, "COMP-5") == 0
+        || std::strcmp(text, "COMPUTATIONAL-5") == 0
+        || std::strcmp(text, "BINARY") == 0)
     {
         out_picture->usage = COBOL_REVERSE_USAGE_COMP_5;
         return (FT_SUCCESS);
     }
-    if (ft_strcmp(text, "COMP") == 0
-        || ft_strcmp(text, "COMPUTATIONAL") == 0)
+    if (std::strcmp(text, "COMP") == 0
+        || std::strcmp(text, "COMPUTATIONAL") == 0)
     {
         out_picture->usage = COBOL_REVERSE_USAGE_COMP;
         return (FT_SUCCESS);
     }
-    if (ft_strcmp(text, "SIGN") == 0)
+    if (std::strcmp(text, "SIGN") == 0)
         return (FT_SUCCESS);
-    if (ft_strcmp(text, "IS") == 0)
+    if (std::strcmp(text, "IS") == 0)
         return (FT_SUCCESS);
-    if (ft_strcmp(text, "LEADING") == 0)
+    if (std::strcmp(text, "LEADING") == 0)
         return (FT_SUCCESS);
-    if (ft_strcmp(text, "TRAILING") == 0)
+    if (std::strcmp(text, "TRAILING") == 0)
         return (FT_SUCCESS);
-    if (ft_strcmp(text, "SEPARATE") == 0)
+    if (std::strcmp(text, "SEPARATE") == 0)
         return (FT_SUCCESS);
     return (FT_FAILURE);
 }
@@ -971,7 +971,7 @@ static int cobol_reverse_parse_picture(const t_ast_node *picture, t_cobol_revers
         char value;
 
         value = text[index];
-        if (ft_isspace(static_cast<unsigned char>(value)))
+        if (std::isspace(static_cast<unsigned char>(value)))
         {
             index += 1;
             continue ;
@@ -1176,7 +1176,7 @@ static int cobol_reverse_get_data_item_level(const t_cobol_reverse_data_item_inf
         return (FT_FAILURE);
     if (!info->level_node || !info->level_node->token.lexeme)
         return (FT_FAILURE);
-    level = ft_atol(info->level_node->token.lexeme);
+    level = std::atol(info->level_node->token.lexeme);
     *out_level = level;
     return (FT_SUCCESS);
 }
@@ -1294,7 +1294,7 @@ static int cobol_reverse_infer_scalar_metadata(t_transpiler_context *context,
             cobol_reverse_emit_error(context, error_message);
         return (FT_FAILURE);
     }
-    if (ft_strcmp(type_text, "bool") == 0)
+    if (std::strcmp(type_text, "bool") == 0)
         is_boolean_type = 1;
     out_metadata->type_text = type_text;
     out_metadata->is_array = is_array;
@@ -1321,7 +1321,7 @@ static int cobol_reverse_parse_size_literal(const t_ast_node *literal, size_t *o
         char digit;
 
         digit = text[index];
-        if (!ft_isdigit(static_cast<unsigned char>(digit)))
+        if (!std::isdigit(static_cast<unsigned char>(digit)))
             return (FT_FAILURE);
         if (value > (SIZE_MAX / 10))
             return (FT_FAILURE);
@@ -1413,7 +1413,7 @@ static int cobol_reverse_identifier_has_suffix(const t_lexer_token *token, const
 
     if (!token || !suffix)
         return (0);
-    suffix_length = ft_strlen(suffix);
+    suffix_length = std::strlen(suffix);
     if (suffix_length == 0)
         return (0);
     cblc_builder_init(&builder);
@@ -1500,7 +1500,7 @@ static int cobol_reverse_identifier_token_matches_any_marker(const t_lexer_token
         size_t marker_length;
         size_t haystack_index;
 
-        marker_length = ft_strlen(markers[marker_index]);
+        marker_length = std::strlen(markers[marker_index]);
         if (marker_length == 0)
         {
             marker_index += 1;
@@ -1509,7 +1509,7 @@ static int cobol_reverse_identifier_token_matches_any_marker(const t_lexer_token
         haystack_index = 0;
         while (haystack_index + marker_length <= builder.length)
         {
-            if (ft_strncmp(builder.data + haystack_index, markers[marker_index], marker_length) == 0)
+            if (std::strncmp(builder.data + haystack_index, markers[marker_index], marker_length) == 0)
             {
                 result = 1;
                 break ;
@@ -2469,7 +2469,7 @@ static int cobol_reverse_emit_data_item(t_transpiler_context *context, t_cblc_bu
                 return (FT_FAILURE);
             }
             if (conditions && condition_count > 0)
-                ft_memcpy(new_conditions, conditions,
+                std::memcpy(new_conditions, conditions,
                     condition_count * sizeof(t_cobol_reverse_data_item_info));
             if (conditions)
                 cma_free(conditions);
@@ -2506,7 +2506,7 @@ static int cobol_reverse_emit_data_item(t_transpiler_context *context, t_cblc_bu
             return (FT_FAILURE);
         }
         ft_bzero(enum_name, sizeof(enum_name));
-        pf_snprintf(enum_name, sizeof(enum_name), "%s_CONDITIONS", parent_identifier);
+        std::snprintf(enum_name, sizeof(enum_name), "%s_CONDITIONS", parent_identifier);
         if (cblc_builder_append_string(builder, "enum ") != FT_SUCCESS)
         {
             cma_free(conditions);

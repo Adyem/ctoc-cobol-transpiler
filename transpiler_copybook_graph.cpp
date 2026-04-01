@@ -1,8 +1,8 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 
 #define COPYBOOK_GRAPH_MAX_SEGMENTS 64
 
@@ -85,7 +85,7 @@ static int copybook_collection_contains(const t_copybook_collection *collection,
     index = 0;
     while (index < collection->count)
     {
-        if (ft_strncmp(collection->names[index], name, TRANSPILE_FILE_PATH_MAX) == 0)
+        if (std::strncmp(collection->names[index], name, TRANSPILE_FILE_PATH_MAX) == 0)
             return (1);
         index += 1;
     }
@@ -122,7 +122,7 @@ static size_t copybook_collection_index_of(const t_copybook_collection *collecti
     index = 0;
     while (index < collection->count)
     {
-        if (ft_strncmp(collection->names[index], name, TRANSPILE_FILE_PATH_MAX) == 0)
+        if (std::strncmp(collection->names[index], name, TRANSPILE_FILE_PATH_MAX) == 0)
             return (index);
         index += 1;
     }
@@ -189,8 +189,8 @@ static int copybook_edge_list_add(t_copybook_edge_list *list, const char *from, 
     index = 0;
     while (index < list->count)
     {
-        if (ft_strncmp(list->edges[index].from, from, TRANSPILE_FILE_PATH_MAX) == 0
-            && ft_strncmp(list->edges[index].to, to, TRANSPILE_FILE_PATH_MAX) == 0)
+        if (std::strncmp(list->edges[index].from, from, TRANSPILE_FILE_PATH_MAX) == 0
+            && std::strncmp(list->edges[index].to, to, TRANSPILE_FILE_PATH_MAX) == 0)
             return (FT_SUCCESS);
         index += 1;
     }
@@ -350,7 +350,7 @@ static const t_transpiler_copybook *transpiler_copybook_graph_find_canonical(con
     index = 0;
     while (index < context->copybook_count)
     {
-        if (ft_strncmp(context->copybooks[index].canonical_name, canonical_name, TRANSPILE_FILE_PATH_MAX) == 0)
+        if (std::strncmp(context->copybooks[index].canonical_name, canonical_name, TRANSPILE_FILE_PATH_MAX) == 0)
             return (&context->copybooks[index]);
         index += 1;
     }
@@ -444,7 +444,7 @@ static int transpiler_copybook_graph_write_literal(t_runtime_file *file, const c
 
     if (!file || !text)
         return (FT_FAILURE);
-    length = ft_strlen(text);
+    length = std::strlen(text);
     if (runtime_file_write(file, text, length) != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
@@ -524,7 +524,7 @@ int transpiler_copybook_graph_emit(const t_transpiler_context *context, const t_
     {
         char line[TRANSPILE_FILE_PATH_MAX * 2];
 
-        if (pf_snprintf(line, sizeof(line), "    root [label=\"%s\"];\n", escaped_label) < 0)
+        if (std::snprintf(line, sizeof(line), "    root [label=\"%s\"];\n", escaped_label) < 0)
             goto cleanup;
         if (transpiler_copybook_graph_write_literal(&file, line) != FT_SUCCESS)
             goto cleanup;
@@ -536,7 +536,7 @@ int transpiler_copybook_graph_emit(const t_transpiler_context *context, const t_
         char line[TRANSPILE_FILE_PATH_MAX * 2];
 
         transpiler_copybook_graph_escape_label(nodes.names[index], node_label, sizeof(node_label));
-        if (pf_snprintf(line, sizeof(line), "    copybook_%lu [label=\"%s\"];\n",
+        if (std::snprintf(line, sizeof(line), "    copybook_%lu [label=\"%s\"];\n",
                 static_cast<unsigned long>(index), node_label) < 0)
             goto cleanup;
         if (transpiler_copybook_graph_write_literal(&file, line) != FT_SUCCESS)
@@ -552,7 +552,7 @@ int transpiler_copybook_graph_emit(const t_transpiler_context *context, const t_
         target_index = copybook_collection_index_of(&nodes, includes.names[index]);
         if (target_index < nodes.count)
         {
-            if (pf_snprintf(line, sizeof(line), "    root -> copybook_%lu;\n",
+            if (std::snprintf(line, sizeof(line), "    root -> copybook_%lu;\n",
                     static_cast<unsigned long>(target_index)) < 0)
                 goto cleanup;
             if (transpiler_copybook_graph_write_literal(&file, line) != FT_SUCCESS)
@@ -571,7 +571,7 @@ int transpiler_copybook_graph_emit(const t_transpiler_context *context, const t_
         to_index = copybook_collection_index_of(&nodes, edges.edges[index].to);
         if (from_index < nodes.count && to_index < nodes.count)
         {
-            if (pf_snprintf(line, sizeof(line), "    copybook_%lu -> copybook_%lu;\n",
+            if (std::snprintf(line, sizeof(line), "    copybook_%lu -> copybook_%lu;\n",
                     static_cast<unsigned long>(from_index),
                     static_cast<unsigned long>(to_index)) < 0)
                 goto cleanup;

@@ -126,7 +126,7 @@ FT_TEST(test_cobol_transpiled_filter_prefix_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -o %s samples/cobol/filter_prefix.cob > %s 2>&1", binary_path,
         compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -137,7 +137,7 @@ FT_TEST(test_cobol_transpiled_filter_prefix_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile filter_prefix sample\n");
+        std::printf("Assertion failed: cobc should compile filter_prefix sample\n");
         test_cleanup_example_artifacts_with_log(source_path, binary_path, target_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -148,7 +148,7 @@ FT_TEST(test_cobol_transpiled_filter_prefix_executes)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./filter_prefix.bin", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -158,7 +158,7 @@ FT_TEST(test_cobol_transpiled_filter_prefix_executes)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: filter_prefix binary should execute successfully\n");
+        std::printf("Assertion failed: filter_prefix binary should execute successfully\n");
         test_cleanup_example_artifacts_with_log(source_path, binary_path, target_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -170,9 +170,9 @@ FT_TEST(test_cobol_transpiled_filter_prefix_executes)
         return (FT_FAILURE);
     }
     expected_output = "ALLOW-FIRST\nALLOW-SECOND\n";
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: filter_prefix sample should emit only allowed lines\n");
+        std::printf("Assertion failed: filter_prefix sample should emit only allowed lines\n");
         test_cleanup_example_artifacts_with_log(source_path, binary_path, target_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -238,7 +238,7 @@ FT_TEST(test_cobol_transpiled_filter_prefix_exit_status)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -o %s samples/cobol/filter_prefix.cob > %s 2>&1", binary_path,
         compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
@@ -249,7 +249,7 @@ FT_TEST(test_cobol_transpiled_filter_prefix_exit_status)
     }
     if (test_run_command(command) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: cobc should compile filter_prefix sample for status check\n");
+        std::printf("Assertion failed: cobc should compile filter_prefix sample for status check\n");
         test_cleanup_example_artifacts_with_log(source_path, binary_path, target_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -260,7 +260,7 @@ FT_TEST(test_cobol_transpiled_filter_prefix_exit_status)
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cd %s && ./filter_prefix_status.bin", directory);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
     {
@@ -270,14 +270,14 @@ FT_TEST(test_cobol_transpiled_filter_prefix_exit_status)
     }
     if (test_run_command_capture_status(command, &exit_status) != FT_SUCCESS)
     {
-        pf_printf("Assertion failed: harness should capture filter_prefix exit status\n");
+        std::printf("Assertion failed: harness should capture filter_prefix exit status\n");
         test_cleanup_example_artifacts_with_log(source_path, binary_path, target_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
     }
     if (exit_status != 0)
     {
-        pf_printf("Assertion failed: filter_prefix binary should exit successfully\n");
+        std::printf("Assertion failed: filter_prefix binary should exit successfully\n");
         test_cleanup_example_artifacts_with_log(source_path, binary_path, target_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -289,9 +289,9 @@ FT_TEST(test_cobol_transpiled_filter_prefix_exit_status)
         return (FT_FAILURE);
     }
     expected_output = "ALLOW-FIRST\nALLOW-SECOND\n";
-    if (ft_strncmp(output_buffer, expected_output, ft_strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
     {
-        pf_printf("Assertion failed: filter_prefix binary should emit only allowed lines\n");
+        std::printf("Assertion failed: filter_prefix binary should emit only allowed lines\n");
         test_cleanup_example_artifacts_with_log(source_path, binary_path, target_path, log_path);
         test_remove_directory(directory);
         return (FT_FAILURE);

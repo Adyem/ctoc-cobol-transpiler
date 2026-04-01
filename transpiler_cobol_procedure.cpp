@@ -1,7 +1,7 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
 
 static int transpiler_cobol_statement_block_reserve(t_transpiler_cobol_statement_block *block,
     size_t desired_capacity)
@@ -374,7 +374,7 @@ t_transpiler_cobol_paragraph *transpiler_cobol_paragraph_create(const char *name
         sizeof(*paragraph)));
     if (!paragraph)
         return (NULL);
-    length = ft_strlen(name);
+    length = std::strlen(name);
     paragraph->name = static_cast<char *>(cma_calloc(length + 1, sizeof(char)));
     if (!paragraph->name)
     {

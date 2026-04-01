@@ -1,5 +1,5 @@
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
 #include "test_suites.hpp"
 
 static char *test_round_trip_join_fragments(const char *a, const char *b,
@@ -10,15 +10,15 @@ static char *test_round_trip_join_fragments(const char *a, const char *b,
 
     total_length = 0;
     if (a)
-        total_length += ft_strlen(a);
+        total_length += std::strlen(a);
     if (b)
-        total_length += ft_strlen(b);
+        total_length += std::strlen(b);
     if (c)
-        total_length += ft_strlen(c);
+        total_length += std::strlen(c);
     if (d)
-        total_length += ft_strlen(d);
+        total_length += std::strlen(d);
     if (e)
-        total_length += ft_strlen(e);
+        total_length += std::strlen(e);
     result = static_cast<char *>(cma_calloc(total_length + 1, sizeof(char)));
     if (!result)
         return (NULL);
@@ -186,7 +186,7 @@ FT_TEST(test_codegen_round_trip_parses_generated_cobol)
     if (test_expect_success(paragraph_node->token.lexeme ? FT_SUCCESS : FT_FAILURE,
             "paragraph should have a name") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(ft_strncmp(paragraph_node->token.lexeme, "MAIN",
+    if (test_expect_success(std::strncmp(paragraph_node->token.lexeme, "MAIN",
                 paragraph_node->token.length) == 0 ? FT_SUCCESS : FT_FAILURE,
             "paragraph name should match generated identifier") != FT_SUCCESS)
         goto cleanup;

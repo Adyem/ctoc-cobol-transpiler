@@ -1,6 +1,6 @@
 #include "transpiler_semantics_internal.hpp"
 
-#include "libft/Libft/libft.hpp"
+#include "compatibility/libft_compat.hpp"
 
 static void transpiler_semantics_build_span_from_node(const t_transpiler_context *context, const t_ast_node *node,
     t_transpiler_source_span *span)

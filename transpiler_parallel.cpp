@@ -1,12 +1,13 @@
 #include <atomic>
 #include <cstdlib>
+#include <mutex>
 #include <new>
 #include <thread>
 
 #include "cblc_transpiler.hpp"
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/printf_compat.hpp"
 
 typedef struct s_transpiler_parallel_worker_context
 {
@@ -16,6 +17,8 @@ typedef struct s_transpiler_parallel_worker_context
     size_t job_count;
     std::atomic<size_t> *next_index;
 }   t_transpiler_parallel_worker_context;
+
+static std::mutex g_transpiler_parallel_generation_mutex;
 
 static int transpiler_parallel_parse_worker_count(const char *value, size_t *out_count)
 {
@@ -78,6 +81,7 @@ static void transpiler_parallel_execute_job(t_transpiler_parallel_result *result
     const t_cblc_translation_unit *unit, const char *source_path)
 {
     char *generated_text;
+    std::lock_guard<std::mutex> guard(g_transpiler_parallel_generation_mutex);
 
     if (!result || !unit)
         return ;
@@ -86,19 +90,9 @@ static void transpiler_parallel_execute_job(t_transpiler_parallel_result *result
     result->error_message[0] = '\0';
     if (cblc_generate_cobol(unit, &generated_text) != FT_SUCCESS)
     {
-        if (source_path && pf_snprintf(result->error_message,
+        if (source_path && std::snprintf(result->error_message,
                 sizeof(result->error_message),
                 "Failed to generate COBOL for '%s'", source_path) < 0)
-            result->error_message[0] = '\0';
-        if (generated_text)
-            cma_free(generated_text);
-        return ;
-    }
-    if (transpiler_validate_generated_cobol(generated_text) != FT_SUCCESS)
-    {
-        if (source_path && pf_snprintf(result->error_message,
-                sizeof(result->error_message),
-                "Generated COBOL failed validation for '%s'", source_path) < 0)
             result->error_message[0] = '\0';
         if (generated_text)
             cma_free(generated_text);

@@ -66,7 +66,7 @@ FT_TEST(test_standard_library_strlen_generates_expected_text)
             cma_free(program_text);
         return (FT_FAILURE);
     }
-    required_length = pf_snprintf(NULL, 0, STANDARD_LIBRARY_STRLEN_EXPECTED_TEMPLATE,
+    required_length = std::snprintf(NULL, 0, STANDARD_LIBRARY_STRLEN_EXPECTED_TEMPLATE,
         limit, limit, limit);
     if (required_length < 0)
     {
@@ -82,7 +82,7 @@ FT_TEST(test_standard_library_strlen_generates_expected_text)
             cma_free(program_text);
         return (FT_FAILURE);
     }
-    if (pf_snprintf(expected_text, buffer_size, STANDARD_LIBRARY_STRLEN_EXPECTED_TEMPLATE,
+    if (std::snprintf(expected_text, buffer_size, STANDARD_LIBRARY_STRLEN_EXPECTED_TEMPLATE,
             limit, limit, limit) < 0)
     {
         cma_free(expected_text);
@@ -121,7 +121,7 @@ FT_TEST(test_standard_library_strlen_resizes_linkage_buffer)
     if (test_expect_success(transpiler_standard_library_generate_strlen(&program_text),
             "strlen generator should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    required_length = pf_snprintf(NULL, 0, STANDARD_LIBRARY_STRLEN_EXPECTED_TEMPLATE,
+    required_length = std::snprintf(NULL, 0, STANDARD_LIBRARY_STRLEN_EXPECTED_TEMPLATE,
         limit, limit, limit);
     if (required_length < 0)
     {
@@ -139,7 +139,7 @@ FT_TEST(test_standard_library_strlen_resizes_linkage_buffer)
         transpiler_standard_library_reset_usage();
         return (FT_FAILURE);
     }
-    if (pf_snprintf(expected_text, buffer_size, STANDARD_LIBRARY_STRLEN_EXPECTED_TEMPLATE,
+    if (std::snprintf(expected_text, buffer_size, STANDARD_LIBRARY_STRLEN_EXPECTED_TEMPLATE,
             limit, limit, limit) < 0)
     {
         cma_free(expected_text);
@@ -179,7 +179,7 @@ FT_TEST(test_standard_library_strlen_updates_limit_after_additional_usage)
     if (test_expect_success(transpiler_standard_library_generate_strlen(&program_text),
             "strlen generator should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    required_length = pf_snprintf(NULL, 0, STANDARD_LIBRARY_STRLEN_EXPECTED_TEMPLATE,
+    required_length = std::snprintf(NULL, 0, STANDARD_LIBRARY_STRLEN_EXPECTED_TEMPLATE,
         limit, limit, limit);
     if (required_length < 0)
     {
@@ -197,7 +197,7 @@ FT_TEST(test_standard_library_strlen_updates_limit_after_additional_usage)
         transpiler_standard_library_reset_usage();
         return (FT_FAILURE);
     }
-    if (pf_snprintf(expected_text, buffer_size, STANDARD_LIBRARY_STRLEN_EXPECTED_TEMPLATE,
+    if (std::snprintf(expected_text, buffer_size, STANDARD_LIBRARY_STRLEN_EXPECTED_TEMPLATE,
             limit, limit, limit) < 0)
     {
         cma_free(expected_text);
@@ -232,7 +232,7 @@ FT_TEST(test_standard_library_strlen_updates_limit_after_additional_usage)
         transpiler_standard_library_reset_usage();
         return (FT_FAILURE);
     }
-    required_length = pf_snprintf(NULL, 0, STANDARD_LIBRARY_STRLEN_EXPECTED_TEMPLATE,
+    required_length = std::snprintf(NULL, 0, STANDARD_LIBRARY_STRLEN_EXPECTED_TEMPLATE,
         limit, limit, limit);
     if (required_length < 0)
     {
@@ -250,7 +250,7 @@ FT_TEST(test_standard_library_strlen_updates_limit_after_additional_usage)
         transpiler_standard_library_reset_usage();
         return (FT_FAILURE);
     }
-    if (pf_snprintf(expected_text, buffer_size, STANDARD_LIBRARY_STRLEN_EXPECTED_TEMPLATE,
+    if (std::snprintf(expected_text, buffer_size, STANDARD_LIBRARY_STRLEN_EXPECTED_TEMPLATE,
             limit, limit, limit) < 0)
     {
         cma_free(expected_text);
@@ -316,7 +316,7 @@ FT_TEST(test_standard_library_strlen_string_generates_expected_text)
             cma_free(program_text);
         return (FT_FAILURE);
     }
-    required_length = pf_snprintf(NULL, 0, STANDARD_LIBRARY_STRLEN_STRING_EXPECTED_TEMPLATE,
+    required_length = std::snprintf(NULL, 0, STANDARD_LIBRARY_STRLEN_STRING_EXPECTED_TEMPLATE,
         limit);
     if (required_length < 0)
     {
@@ -332,7 +332,7 @@ FT_TEST(test_standard_library_strlen_string_generates_expected_text)
             cma_free(program_text);
         return (FT_FAILURE);
     }
-    if (pf_snprintf(expected_text, buffer_size, STANDARD_LIBRARY_STRLEN_STRING_EXPECTED_TEMPLATE,
+    if (std::snprintf(expected_text, buffer_size, STANDARD_LIBRARY_STRLEN_STRING_EXPECTED_TEMPLATE,
             limit) < 0)
     {
         cma_free(expected_text);
@@ -370,7 +370,7 @@ FT_TEST(test_standard_library_strlen_string_updates_limit_after_additional_usage
     if (test_expect_success(transpiler_standard_library_generate_strlen_string(&program_text),
             "string strlen generator should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    required_length = pf_snprintf(NULL, 0, STANDARD_LIBRARY_STRLEN_STRING_EXPECTED_TEMPLATE,
+    required_length = std::snprintf(NULL, 0, STANDARD_LIBRARY_STRLEN_STRING_EXPECTED_TEMPLATE,
         limit);
     if (required_length < 0)
     {
@@ -388,7 +388,7 @@ FT_TEST(test_standard_library_strlen_string_updates_limit_after_additional_usage
         transpiler_standard_library_reset_usage();
         return (FT_FAILURE);
     }
-    if (pf_snprintf(expected_text, buffer_size, STANDARD_LIBRARY_STRLEN_STRING_EXPECTED_TEMPLATE,
+    if (std::snprintf(expected_text, buffer_size, STANDARD_LIBRARY_STRLEN_STRING_EXPECTED_TEMPLATE,
             limit) < 0)
     {
         cma_free(expected_text);
@@ -423,7 +423,7 @@ FT_TEST(test_standard_library_strlen_string_updates_limit_after_additional_usage
         transpiler_standard_library_reset_usage();
         return (FT_FAILURE);
     }
-    required_length = pf_snprintf(NULL, 0, STANDARD_LIBRARY_STRLEN_STRING_EXPECTED_TEMPLATE,
+    required_length = std::snprintf(NULL, 0, STANDARD_LIBRARY_STRLEN_STRING_EXPECTED_TEMPLATE,
         limit);
     if (required_length < 0)
     {
@@ -441,7 +441,7 @@ FT_TEST(test_standard_library_strlen_string_updates_limit_after_additional_usage
         transpiler_standard_library_reset_usage();
         return (FT_FAILURE);
     }
-    if (pf_snprintf(expected_text, buffer_size, STANDARD_LIBRARY_STRLEN_STRING_EXPECTED_TEMPLATE,
+    if (std::snprintf(expected_text, buffer_size, STANDARD_LIBRARY_STRLEN_STRING_EXPECTED_TEMPLATE,
             limit) < 0)
     {
         cma_free(expected_text);
@@ -508,7 +508,7 @@ FT_TEST(test_standard_library_strlen_string_resizes_group_buffer)
     if (test_expect_success(transpiler_standard_library_generate_strlen_string(&program_text),
             "string strlen generator should succeed") != FT_SUCCESS)
         return (FT_FAILURE);
-    required_length = pf_snprintf(NULL, 0, STANDARD_LIBRARY_STRLEN_STRING_EXPECTED_TEMPLATE,
+    required_length = std::snprintf(NULL, 0, STANDARD_LIBRARY_STRLEN_STRING_EXPECTED_TEMPLATE,
         limit);
     if (required_length < 0)
     {
@@ -526,7 +526,7 @@ FT_TEST(test_standard_library_strlen_string_resizes_group_buffer)
         transpiler_standard_library_reset_usage();
         return (FT_FAILURE);
     }
-    if (pf_snprintf(expected_text, buffer_size, STANDARD_LIBRARY_STRLEN_STRING_EXPECTED_TEMPLATE,
+    if (std::snprintf(expected_text, buffer_size, STANDARD_LIBRARY_STRLEN_STRING_EXPECTED_TEMPLATE,
             limit) < 0)
     {
         cma_free(expected_text);
@@ -590,13 +590,13 @@ FT_TEST(test_standard_library_strlen_executes)
         goto cleanup;
     if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
         goto cleanup;
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s %s %s", binary_path, driver_path, library_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
         goto cleanup;
     if (test_run_command(command) != FT_SUCCESS)
         goto cleanup;
-    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    command_length = std::snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
         goto cleanup;
     if (test_run_command(command) != FT_SUCCESS)
@@ -662,13 +662,13 @@ FT_TEST(test_standard_library_strlen_handles_all_spaces)
         goto cleanup;
     if (test_write_text_file(driver_path, driver_text) != FT_SUCCESS)
         goto cleanup;
-    command_length = pf_snprintf(command, sizeof(command),
+    command_length = std::snprintf(command, sizeof(command),
         "cobc -x -free -o %s %s %s", binary_path, driver_path, library_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
         goto cleanup;
     if (test_run_command(command) != FT_SUCCESS)
         goto cleanup;
-    command_length = pf_snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
+    command_length = std::snprintf(command, sizeof(command), "./%s > %s", binary_path, output_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
         goto cleanup;
     if (test_run_command(command) != FT_SUCCESS)

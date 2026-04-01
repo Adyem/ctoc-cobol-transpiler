@@ -249,14 +249,14 @@ FT_TEST(test_logging_flush_directs_output_streams)
     if (test_capture_stdout_begin(&stdout_capture) != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: test harness should capture stdout\n");
+        std::printf("Assertion failed: test harness should capture stdout\n");
         return (FT_FAILURE);
     }
     if (test_capture_stderr_begin(&stderr_capture) != FT_SUCCESS)
     {
         test_capture_stdout_end(&stdout_capture, stdout_buffer, sizeof(stdout_buffer), NULL);
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: test harness should capture stderr\n");
+        std::printf("Assertion failed: test harness should capture stderr\n");
         return (FT_FAILURE);
     }
     transpiler_logging_flush(&context);
@@ -264,13 +264,13 @@ FT_TEST(test_logging_flush_directs_output_streams)
     {
         test_capture_stdout_end(&stdout_capture, stdout_buffer, sizeof(stdout_buffer), NULL);
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: test harness should restore stderr\n");
+        std::printf("Assertion failed: test harness should restore stderr\n");
         return (FT_FAILURE);
     }
     if (test_capture_stdout_end(&stdout_capture, stdout_buffer, sizeof(stdout_buffer), NULL) != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: test harness should restore stdout\n");
+        std::printf("Assertion failed: test harness should restore stdout\n");
         return (FT_FAILURE);
     }
     if (test_expect_cstring_equal(stdout_buffer, "[warning] (21) warning message\n",
@@ -299,14 +299,14 @@ FT_TEST(test_logging_flush_directs_output_streams)
     if (test_capture_stdout_begin(&stdout_capture) != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: test harness should capture stdout\n");
+        std::printf("Assertion failed: test harness should capture stdout\n");
         return (FT_FAILURE);
     }
     if (test_capture_stderr_begin(&stderr_capture) != FT_SUCCESS)
     {
         test_capture_stdout_end(&stdout_capture, stdout_buffer, sizeof(stdout_buffer), NULL);
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: test harness should capture stderr\n");
+        std::printf("Assertion failed: test harness should capture stderr\n");
         return (FT_FAILURE);
     }
     transpiler_logging_flush(&context);
@@ -314,19 +314,19 @@ FT_TEST(test_logging_flush_directs_output_streams)
     {
         test_capture_stdout_end(&stdout_capture, stdout_buffer, sizeof(stdout_buffer), NULL);
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: test harness should restore stderr\n");
+        std::printf("Assertion failed: test harness should restore stderr\n");
         return (FT_FAILURE);
     }
     if (test_capture_stdout_end(&stdout_capture, stdout_buffer, sizeof(stdout_buffer), &stdout_length) != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: test harness should restore stdout\n");
+        std::printf("Assertion failed: test harness should restore stdout\n");
         return (FT_FAILURE);
     }
     if (stdout_length != 0)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: escalated warning should not write to stdout\n");
+        std::printf("Assertion failed: escalated warning should not write to stdout\n");
         return (FT_FAILURE);
     }
     if (test_expect_cstring_equal(stderr_buffer, "[error] (77) escalated warning\n",

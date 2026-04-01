@@ -3,7 +3,7 @@
 
 #include <cstddef>
 
-#include "libft/Libft/libft.hpp"
+#include "compatibility/libft_compat.hpp"
 
 // ===============================
 // Core runtime support utilities
@@ -953,6 +953,10 @@ typedef struct s_cblc_data_item
     char cobol_name[TRANSPILE_IDENTIFIER_MAX];
     size_t length;
     t_cblc_data_kind kind;
+    int is_const;
+    int has_initializer;
+    size_t initializer_length;
+    char initializer_text[TRANSPILE_STATEMENT_TEXT_MAX];
 }   t_cblc_data_item;
 
 typedef struct s_cblc_import

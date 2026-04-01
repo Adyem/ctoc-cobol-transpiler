@@ -1,7 +1,7 @@
 #include "cblc_transpiler.hpp"
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
 #include "test_suites.hpp"
 
 static int test_stress_append_fragment(char *buffer, size_t buffer_size, size_t *used,
@@ -12,7 +12,7 @@ static int test_stress_append_fragment(char *buffer, size_t buffer_size, size_t 
 
     if (!buffer || buffer_size == 0 || !used || !fragment)
         return (FT_FAILURE);
-    fragment_length = ft_strlen(fragment);
+    fragment_length = std::strlen(fragment);
     if (*used + fragment_length >= buffer_size)
         return (FT_FAILURE);
     index = 0;
@@ -110,7 +110,7 @@ static int test_stress_build_program(size_t depth, size_t literal_length, char *
     footer = "       STOP RUN.\n"
         "       END PROGRAM STRESS.\n";
     wide_limit = "900000000000000000";
-    buffer_size = ft_strlen(header) + ft_strlen(footer) + depth * 256 + literal_length + 1024;
+    buffer_size = std::strlen(header) + std::strlen(footer) + depth * 256 + literal_length + 1024;
     program_text = static_cast<char *>(cma_calloc(buffer_size + 1, sizeof(char)));
     if (!program_text)
         return (FT_FAILURE);
@@ -245,7 +245,7 @@ FT_TEST(test_runtime_record_handles_large_length)
         runtime_record_dispose(&record);
         return (FT_FAILURE);
     }
-    if (test_expect_success(ft_memcmp(copy, buffer, length) == 0 ? FT_SUCCESS : FT_FAILURE,
+    if (test_expect_success(std::memcmp(copy, buffer, length) == 0 ? FT_SUCCESS : FT_FAILURE,
             "record data should match original buffer") != FT_SUCCESS)
     {
         cma_free(copy);
@@ -301,19 +301,19 @@ FT_TEST(test_parser_handles_stress_program)
         failure_stage = "if count";
         goto cleanup;
     }
-    if (!ft_strnstr(program_text, "X(1024)", ft_strlen(program_text)))
+    if (!ft_strnstr(program_text, "X(1024)", std::strlen(program_text)))
     {
         failure_stage = "picture literal";
         goto cleanup;
     }
-    literal_start = ft_strnstr(program_text, "MOVE \"", ft_strlen(program_text));
+    literal_start = ft_strnstr(program_text, "MOVE \"", std::strlen(program_text));
     if (!literal_start)
     {
         failure_stage = "long move";
         goto cleanup;
     }
-    literal_start += ft_strlen("MOVE \"");
-    literal_end = ft_strnstr(literal_start, "\" TO HUGE-FIELD.", ft_strlen(literal_start));
+    literal_start += std::strlen("MOVE \"");
+    literal_end = ft_strnstr(literal_start, "\" TO HUGE-FIELD.", std::strlen(literal_start));
     if (!literal_end)
     {
         failure_stage = "move terminator";
@@ -326,7 +326,7 @@ FT_TEST(test_parser_handles_stress_program)
         goto cleanup;
     }
     wide_literal = "COMPUTE WIDE-NUMERIC = 123456789012345678.";
-    if (!ft_strnstr(program_text, wide_literal, ft_strlen(program_text)))
+    if (!ft_strnstr(program_text, wide_literal, std::strlen(program_text)))
     {
         failure_stage = "compute literal";
         goto cleanup;
@@ -338,7 +338,7 @@ cleanup:
     if (status != FT_SUCCESS)
     {
         if (failure_stage)
-            pf_printf("Stress program failure: %s\n", failure_stage);
+            std::printf("Stress program failure: %s\n", failure_stage);
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);

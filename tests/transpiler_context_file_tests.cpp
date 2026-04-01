@@ -25,7 +25,7 @@ FT_TEST(test_transpiler_context_records_read_only_flag)
     if (!item)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected immutable data item to be registered\n");
+        std::printf("Assertion failed: expected immutable data item to be registered\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(item->is_read_only, 1,
@@ -56,7 +56,7 @@ FT_TEST(test_transpiler_context_registers_file_declaration)
     if (!files)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected file registry to be available\n");
+        std::printf("Assertion failed: expected file registry to be available\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(count), 1,
@@ -129,7 +129,7 @@ FT_TEST(test_transpiler_context_tracks_record_length_hint)
     if (!files)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected file registry to be available\n");
+        std::printf("Assertion failed: expected file registry to be available\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(files[0].inferred_record_length), 128,
@@ -181,7 +181,7 @@ FT_TEST(test_transpiler_context_configures_indexed_file_metadata)
     if (!files)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected file registry to be available\n");
+        std::printf("Assertion failed: expected file registry to be available\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(count), 1,
@@ -231,7 +231,7 @@ FT_TEST(test_transpiler_context_records_multiple_io_paths)
     if (transpiler_context_set_io_paths(&context, inputs, 2, outputs, 2) != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected to record multiple IO paths\n");
+        std::printf("Assertion failed: expected to record multiple IO paths\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(context.source_count), 2,
@@ -297,7 +297,7 @@ FT_TEST(test_transpiler_context_rejects_mismatched_io_paths)
     if (transpiler_context_set_io_paths(&context, inputs, 2, outputs, 1) == FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected mismatched counts to fail\n");
+        std::printf("Assertion failed: expected mismatched counts to fail\n");
         return (FT_FAILURE);
     }
     if (test_expect_int_equal(static_cast<int>(context.source_count), 0,
@@ -315,7 +315,7 @@ FT_TEST(test_transpiler_context_rejects_mismatched_io_paths)
     if (context.source_path || context.target_path)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: legacy path aliases should be cleared on failure\n");
+        std::printf("Assertion failed: legacy path aliases should be cleared on failure\n");
         return (FT_FAILURE);
     }
     transpiler_context_dispose(&context);

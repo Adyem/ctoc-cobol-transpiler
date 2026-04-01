@@ -4,9 +4,10 @@
 #include <cstddef>
 #include <sys/types.h>
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
-#include "libft/Printf/printf.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
+#include "compatibility/printf_compat.hpp"
+#include "../imported/test_runner.hpp"
 #include "cblc_transpiler.hpp"
 
 #define FT_SKIP 2
@@ -24,7 +25,26 @@ typedef struct s_test_output_capture
     int target_fd;
 }   t_test_output_capture;
 
-#define FT_TEST(name) int name(void); int name(void)
+#ifndef TEST_MODULE
+#define TEST_MODULE "CTOC"
+#endif
+
+#define FT_TEST(name) \
+    int name(void); \
+    static int registered_##name(void); \
+    static void register_##name(void) __attribute__((constructor)); \
+    static void register_##name(void) \
+    { \
+        imported_test_register(&registered_##name, #name, TEST_MODULE); \
+        return ; \
+    } \
+    static int registered_##name(void) \
+    { \
+        if (name() == FT_SUCCESS) \
+            return (1); \
+        return (0); \
+    } \
+    int name(void)
 
 int test_assert_failure(const char *expression, const char *file, int line);
 

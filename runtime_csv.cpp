@@ -2,8 +2,8 @@
 
 #include <unistd.h>
 
-#include "libft/CMA/CMA.hpp"
-#include "libft/Libft/libft.hpp"
+#include "compatibility/memory_compat.hpp"
+#include "compatibility/libft_compat.hpp"
 
 static int runtime_line_validate_file(t_runtime_file *file)
 {
@@ -181,7 +181,7 @@ int runtime_line_write_fixed(t_runtime_file *file, const char *buffer, size_t le
     if (copy_length > record_length)
         copy_length = record_length;
     if (copy_length > 0)
-        ft_memcpy(workspace, buffer, copy_length);
+        std::memcpy(workspace, buffer, copy_length);
     if (runtime_file_write(file, workspace, record_length) != FT_SUCCESS)
     {
         cma_free(workspace);
@@ -370,7 +370,7 @@ int runtime_csv_parse_line(const char *line, t_runtime_string *fields, size_t fi
         return (FT_FAILURE);
     if (field_capacity == 0)
         return (FT_FAILURE);
-    length = ft_strlen(line);
+    length = std::strlen(line);
     while (length > 0 && (line[length - 1] == '\n' || line[length - 1] == '\r'))
         length -= 1;
     workspace = static_cast<char *>(cma_calloc(length + 1, sizeof(char)));

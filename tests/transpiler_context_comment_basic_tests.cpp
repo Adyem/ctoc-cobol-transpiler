@@ -11,7 +11,7 @@ FT_TEST(test_transpiler_context_record_comment_stores_metadata)
         != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_expect_success(transpiler_context_record_comment(&context, 27, 3, text,
-                ft_strlen(text)), "recording comment should succeed") != FT_SUCCESS)
+                std::strlen(text)), "recording comment should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
@@ -29,7 +29,7 @@ FT_TEST(test_transpiler_context_record_comment_stores_metadata)
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    if (test_expect_size_t_equal(comment->length, ft_strlen(text),
+    if (test_expect_size_t_equal(comment->length, std::strlen(text),
             "comment should record text length") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
@@ -61,7 +61,7 @@ FT_TEST(test_transpiler_context_clear_comments_resets_state)
         != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_expect_success(transpiler_context_record_comment(&context, 12, 6, text,
-                ft_strlen(text)), "recording comment should succeed") != FT_SUCCESS)
+                std::strlen(text)), "recording comment should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
@@ -142,13 +142,13 @@ FT_TEST(test_transpiler_context_record_comment_appends_in_order)
         != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_expect_success(transpiler_context_record_comment(&context, 10, 2, first_text,
-                ft_strlen(first_text)), "recording first comment should succeed") != FT_SUCCESS)
+                std::strlen(first_text)), "recording first comment should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
     if (test_expect_success(transpiler_context_record_comment(&context, 12, 5, second_text,
-                ft_strlen(second_text)), "recording second comment should succeed") != FT_SUCCESS)
+                std::strlen(second_text)), "recording second comment should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
@@ -212,7 +212,7 @@ FT_TEST(test_transpiler_context_record_comment_preserves_emit_index)
         return (FT_FAILURE);
     context.comment_emit_index = 4;
     if (test_expect_success(transpiler_context_record_comment(&context, 18, 7, text,
-                ft_strlen(text)), "recording comment should succeed") != FT_SUCCESS)
+                std::strlen(text)), "recording comment should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
@@ -252,10 +252,10 @@ FT_TEST(test_transpiler_context_record_comment_respects_provided_length)
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
     }
-    if (ft_strncmp(comment->text, text, reported_length) != 0)
+    if (std::strncmp(comment->text, text, reported_length) != 0)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: comment should preserve prefix text\n");
+        std::printf("Assertion failed: comment should preserve prefix text\n");
         return (FT_FAILURE);
     }
     transpiler_context_dispose(&context);
@@ -274,7 +274,7 @@ FT_TEST(test_transpiler_context_clear_comments_preserves_allocation)
         != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_expect_success(transpiler_context_record_comment(&context, 6, 3, text,
-                ft_strlen(text)), "recording comment should succeed") != FT_SUCCESS)
+                std::strlen(text)), "recording comment should succeed") != FT_SUCCESS)
     {
         transpiler_context_dispose(&context);
         return (FT_FAILURE);
@@ -282,7 +282,7 @@ FT_TEST(test_transpiler_context_clear_comments_preserves_allocation)
     if (context.comment_capacity == 0 || !context.comments)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected comment storage to be allocated\n");
+        std::printf("Assertion failed: expected comment storage to be allocated\n");
         return (FT_FAILURE);
     }
     allocated_comments = context.comments;
@@ -297,7 +297,7 @@ FT_TEST(test_transpiler_context_clear_comments_preserves_allocation)
     if (context.comments != allocated_comments)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: clearing comments should retain allocation pointer\n");
+        std::printf("Assertion failed: clearing comments should retain allocation pointer\n");
         return (FT_FAILURE);
     }
     transpiler_context_dispose(&context);
