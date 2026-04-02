@@ -316,7 +316,7 @@ FT_TEST(test_standard_library_date_parse_rejects_invalid_day)
     if (test_expect_transcript_status_line(output_buffer, &output_offset, "00000000",
             "parser should clear packed output when input is invalid") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_transcript_status_line(output_buffer, &output_offset, "000000000",
+    if (test_expect_transcript_status_line(output_buffer, &output_offset, "+000000000",
             "parser should clear serial output when input is invalid") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_transcript_status_line(output_buffer, &output_offset, "3",

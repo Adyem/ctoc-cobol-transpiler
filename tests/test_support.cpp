@@ -227,7 +227,7 @@ int test_require_forward_translation_dependency(const char *test_name)
     {
         if (!g_forward_translation_notice_emitted)
         {
-            pf_printf("Skipping forward translation tests; set CTOC_ENABLE_FORWARD_TRANSLATION=1 to enable.\n");
+            std::printf("Skipping forward translation tests; set CTOC_ENABLE_FORWARD_TRANSLATION=1 to enable.\n");
             g_forward_translation_notice_emitted = 1;
         }
         return (FT_SKIP);
@@ -236,7 +236,7 @@ int test_require_forward_translation_dependency(const char *test_name)
         return (FT_SUCCESS);
     if (!test_name || test_name[0] == '\0')
         test_name = "forward translation test";
-    pf_printf("Missing dependency: install 'cobc' to run %s.\n", test_name);
+    std::printf("Missing dependency: install 'cobc' to run %s.\n", test_name);
     return (FT_FAILURE);
 }
 

@@ -1409,9 +1409,11 @@ static int cblc_parse_std_strlen_assignment(const char **cursor, t_cblc_translat
     const char *start;
     char identifier[TRANSPILE_IDENTIFIER_MAX];
     char argument_identifier[TRANSPILE_IDENTIFIER_MAX];
+    char literal_buffer[TRANSPILE_IDENTIFIER_MAX];
     char declared_length_literal[32];
     char call_arguments[TRANSPILE_STATEMENT_TEXT_MAX];
     t_cblc_data_item *argument_item;
+    size_t literal_length;
 
     if (!cursor || !*cursor || !unit || !function || !target_item)
         return (FT_FAILURE);
@@ -1431,6 +1433,38 @@ static int cblc_parse_std_strlen_assignment(const char **cursor, t_cblc_translat
     }
     *cursor += 1;
     cblc_skip_whitespace(cursor);
+    if (**cursor == '"')
+    {
+        if (cblc_parse_string_literal(cursor, literal_buffer, sizeof(literal_buffer))
+            != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        cblc_skip_whitespace(cursor);
+        if (**cursor != ')')
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        *cursor += 1;
+        cblc_skip_whitespace(cursor);
+        if (**cursor != ';')
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        *cursor += 1;
+        literal_length = std::strlen(literal_buffer);
+        if (std::snprintf(declared_length_literal, sizeof(declared_length_literal),
+                "%zu", literal_length) < 0)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        return (cblc_append_statement(function, CBLC_STATEMENT_COMPUTE,
+                target_item->cobol_name, declared_length_literal, 1));
+    }
     if (cblc_parse_identifier(cursor, argument_identifier,
             sizeof(argument_identifier)) != FT_SUCCESS)
     {

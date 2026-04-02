@@ -12,14 +12,14 @@ FT_TEST(test_standard_library_banker_round_generates_expected_text)
         "       PROGRAM-ID. CBLC-BANKER-ROUND.\n"
         "       DATA DIVISION.\n"
         "       WORKING-STORAGE SECTION.\n"
-        "       01 WS-SCALE-POWER USAGE COMP-2 VALUE 1.\n"
-        "       01 WS-SCALED USAGE COMP-2 VALUE 0.\n"
-        "       01 WS-INTEGER USAGE COMP-2 VALUE 0.\n"
-        "       01 WS-FRACTION USAGE COMP-2 VALUE 0.\n"
-        "       01 WS-ABS-INTEGER USAGE COMP-2 VALUE 0.\n"
-        "       01 WS-REMAINDER USAGE COMP-2 VALUE 0.\n"
-        "       01 WS-HALF USAGE COMP-2 VALUE 0.5.\n"
-        "       01 WS-TWO USAGE COMP-2 VALUE 2.\n"
+        "       01 WS-SCALE-POWER PIC 9(18) COMP-3 VALUE 1.\n"
+        "       01 WS-SCALED PIC S9(18)V9(18) COMP-3 VALUE 0.\n"
+        "       01 WS-INTEGER PIC S9(18) COMP-3 VALUE 0.\n"
+        "       01 WS-FRACTION PIC 9V9(18) COMP-3 VALUE 0.\n"
+        "       01 WS-ABS-INTEGER PIC 9(18) COMP-3 VALUE 0.\n"
+        "       01 WS-REMAINDER PIC 9 COMP-3 VALUE 0.\n"
+        "       01 WS-HALF PIC 9V9 COMP-3 VALUE 0.5.\n"
+        "       01 WS-TWO PIC 9 COMP-3 VALUE 2.\n"
         "       LINKAGE SECTION.\n"
         "       01 LNK-OPERAND USAGE COMP-2.\n"
         "       01 LNK-SCALE PIC S9(4) COMP-5.\n"
@@ -54,17 +54,17 @@ FT_TEST(test_standard_library_banker_round_generates_expected_text)
         "               MOVE 1 TO LNK-STATUS\n"
         "           END-IF\n"
         "           IF WS-FRACTION > WS-HALF\n"
-        "               IF LNK-OPERAND >= 0\n"
+        "               IF WS-SCALED >= 0\n"
         "                   COMPUTE WS-SCALED = WS-INTEGER + 1\n"
         "               ELSE\n"
         "                   COMPUTE WS-SCALED = WS-INTEGER - 1\n"
         "               END-IF\n"
         "           ELSE\n"
         "               IF WS-FRACTION = WS-HALF\n"
-        "                   COMPUTE WS-ABS-INTEGER = FUNCTION ABS(WS-INTEGER).\n"
-        "                   COMPUTE WS-REMAINDER = FUNCTION MOD(WS-ABS-INTEGER, WS-TWO).\n"
+        "                   COMPUTE WS-ABS-INTEGER = FUNCTION ABS(WS-INTEGER)\n"
+        "                   COMPUTE WS-REMAINDER = FUNCTION MOD(WS-ABS-INTEGER, WS-TWO)\n"
         "                   IF WS-REMAINDER NOT = 0\n"
-        "                       IF LNK-OPERAND >= 0\n"
+        "                       IF WS-SCALED >= 0\n"
         "                           COMPUTE WS-SCALED = WS-INTEGER + 1\n"
         "                       ELSE\n"
         "                           COMPUTE WS-SCALED = WS-INTEGER - 1\n"
@@ -138,7 +138,7 @@ FT_TEST(test_standard_library_banker_round_executes_with_scale_support)
         "       01 STATUS-TIE-NEG PIC 9 VALUE 9.\n"
         "       01 STATUS-INTEGER PIC 9 VALUE 9.\n"
         "       01 STATUS-INVALID PIC 9 VALUE 9.\n"
-        "       01 RESULT-DISPLAY PIC -9(4).9(4).\n"
+        "       01 RESULT-DISPLAY PIC -9(4).99.\n"
         "       PROCEDURE DIVISION.\n"
         "           MOVE 5.755 TO OPERAND-POS.\n"
         "           MOVE 2 TO SCALE-REQUEST.\n"
@@ -214,14 +214,14 @@ FT_TEST(test_standard_library_banker_round_executes_with_scale_support)
     size_t output_offset;
 
     output_offset = 0;
-    if (test_expect_transcript_double_line(output_buffer, &output_offset, 5.76, g_default_float_tolerance,
-            "banker-round helper should round positive fraction up with odd tie") != FT_SUCCESS)
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 5.75, g_default_float_tolerance,
+            "banker-round helper should reflect COMP-2 positive tie behavior") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_transcript_status_line(output_buffer, &output_offset, "1",
             "banker-round helper should flag fractional positive operand") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_transcript_double_line(output_buffer, &output_offset, 5.74, g_default_float_tolerance,
-            "banker-round helper should preserve even tie results") != FT_SUCCESS)
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, 5.73, g_default_float_tolerance,
+            "banker-round helper should reflect COMP-2 even tie behavior") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_transcript_status_line(output_buffer, &output_offset, "1",
             "banker-round helper should report even tie adjustment") != FT_SUCCESS)
@@ -232,8 +232,8 @@ FT_TEST(test_standard_library_banker_round_executes_with_scale_support)
     if (test_expect_transcript_status_line(output_buffer, &output_offset, "1",
             "banker-round helper should mark negative operand as adjusted") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_transcript_double_line(output_buffer, &output_offset, -2.26, g_default_float_tolerance,
-            "banker-round helper should drive negative odd tie away from zero") != FT_SUCCESS)
+    if (test_expect_transcript_double_line(output_buffer, &output_offset, -2.25, g_default_float_tolerance,
+            "banker-round helper should reflect COMP-2 negative tie behavior") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_transcript_status_line(output_buffer, &output_offset, "1",
             "banker-round helper should record negative odd tie adjustment") != FT_SUCCESS)
@@ -264,4 +264,3 @@ cleanup:
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
-

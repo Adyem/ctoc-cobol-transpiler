@@ -40,8 +40,8 @@ FT_TEST(test_standard_library_rounded_generates_expected_text)
         "               END-IF\n"
         "           ELSE\n"
         "               IF WS-FRACTION = WS-HALF\n"
-        "                   COMPUTE WS-ABS-INTEGER = FUNCTION ABS(WS-INTEGER).\n"
-        "                   COMPUTE WS-REMAINDER = FUNCTION MOD(WS-ABS-INTEGER, WS-TWO).\n"
+        "                   COMPUTE WS-ABS-INTEGER = FUNCTION ABS(WS-INTEGER)\n"
+        "                   COMPUTE WS-REMAINDER = FUNCTION MOD(WS-ABS-INTEGER, WS-TWO)\n"
         "                   IF WS-REMAINDER NOT = 0\n"
         "                       IF LNK-OPERAND >= 0\n"
         "                           COMPUTE LNK-RESULT = WS-INTEGER + 1\n"
@@ -225,4 +225,3 @@ cleanup:
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
-

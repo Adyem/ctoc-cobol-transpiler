@@ -212,11 +212,11 @@ FT_TEST(test_standard_library_date_duration_handles_reverse_range)
     int status;
 
     FT_REQUIRE_COBC();
-    duration_library_path = "stdlib_date_duration_reverse_lib.cob";
-    parse_library_path = "stdlib_date_duration_reverse_parse_lib.cob";
-    driver_path = "stdlib_date_duration_reverse_drv.cob";
-    binary_path = "stdlib_date_duration_reverse.bin";
-    output_path = "stdlib_date_duration_reverse.txt";
+    duration_library_path = "ddr_lib.cob";
+    parse_library_path = "ddr_parse.cob";
+    driver_path = "ddr_drv.cob";
+    binary_path = "ddr.bin";
+    output_path = "ddr.txt";
     driver_text =
         "       IDENTIFICATION DIVISION.\n"
         "       PROGRAM-ID. DATE-DURATION-REVERSE.\n"

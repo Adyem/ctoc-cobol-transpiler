@@ -106,19 +106,19 @@ FT_TEST(test_transpiler_context_records_copybook_replacements)
     ft_bzero(views, sizeof(views));
     views[0].pair_flags = AST_NODE_FLAG_COPYBOOK_PAIR_LEADING;
     views[0].source.text = "CUSTOMER";
-    views[0].source.length = ft_strlen("CUSTOMER");
+    views[0].source.length = std::strlen("CUSTOMER");
     views[0].source.flags = AST_NODE_FLAG_COPYBOOK_TEXT_WORD | AST_NODE_FLAG_COPYBOOK_TEXT_HAS_OF;
     views[0].source.qualifier = "TABLE";
-    views[0].source.qualifier_length = ft_strlen("TABLE");
+    views[0].source.qualifier_length = std::strlen("TABLE");
     views[0].target.text = "CLIENT";
-    views[0].target.length = ft_strlen("CLIENT");
+    views[0].target.length = std::strlen("CLIENT");
     views[0].target.flags = AST_NODE_FLAG_COPYBOOK_TEXT_DELIMITED;
     views[1].pair_flags = AST_NODE_FLAG_COPYBOOK_PAIR_TRAILING;
     views[1].source.text = "OLD";
-    views[1].source.length = ft_strlen("OLD");
+    views[1].source.length = std::strlen("OLD");
     views[1].source.flags = 0;
     views[1].target.text = "NEW";
-    views[1].target.length = ft_strlen("NEW");
+    views[1].target.length = std::strlen("NEW");
     views[1].target.flags = AST_NODE_FLAG_COPYBOOK_TEXT_WORD;
     if (transpiler_context_register_copybook_replacements(&context, "SALES-BOOK",
             views, 2) != FT_SUCCESS)
@@ -130,7 +130,7 @@ FT_TEST(test_transpiler_context_records_copybook_replacements)
     if (!copybook)
     {
         transpiler_context_dispose(&context);
-        pf_printf("Assertion failed: expected registered copybook\n");
+        std::printf("Assertion failed: expected registered copybook\n");
         return (FT_FAILURE);
     }
     if (test_expect_size_t_equal(copybook->replacement_count, 2,
@@ -189,4 +189,3 @@ FT_TEST(test_transpiler_context_records_copybook_replacements)
     transpiler_context_dispose(&context);
     return (FT_SUCCESS);
 }
-

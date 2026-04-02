@@ -218,6 +218,24 @@ FT_TEST(test_transpiler_validation_rejects_strcpy_into_const_char_buffer)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_transpiler_validation_accepts_strlen_string_literal_assignment)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "function void main()\n"
+        "{\n"
+        "    total = std::strlen(\"hello world\");\n"
+        "    display(total);\n"
+        "    return;\n"
+        "}\n";
+    if (test_expect_success(transpiler_validate_generated_cblc(source),
+            "validator should accept std::strlen with string literals")
+        != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_cblc_parse_translation_unit_records_imports)
 {
     const char *source;
@@ -729,6 +747,52 @@ FT_TEST(test_cblc_generate_cobol_handles_multiplication_and_division)
     if (!ft_strnstr(generated_cobol, "COMPUTE QUOTIENT = PRODUCT / RIGHT", std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: division should translate into COMPUTE statement\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_folds_strlen_string_literal_to_constant)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "int total;\n"
+        "function void main()\n"
+        "{\n"
+        "    total = std::strlen(\"hello world\");\n"
+        "    display(total);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "std::strlen with string literal should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "std::strlen with string literal should convert to COBOL")
+        != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol, "COMPUTE TOTAL = 11",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should fold std::strlen string literals to constants\n");
+        goto cleanup;
+    }
+    if (ft_strnstr(generated_cobol, "CALL 'CBLC-STRLEN'",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should not call CBLC-STRLEN for string literals\n");
         goto cleanup;
     }
     status = FT_SUCCESS;

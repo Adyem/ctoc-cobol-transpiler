@@ -1128,7 +1128,7 @@ static int transpiler_context_copybook_clone_text(t_transpiler_copybook_replacin
         buffer = static_cast<char *>(cma_calloc(view->length + 1, sizeof(char)));
         if (!buffer)
             return (FT_FAILURE);
-        ft_memcpy(buffer, view->text, view->length);
+        std::memcpy(buffer, view->text, view->length);
         buffer[view->length] = '\0';
         destination->text = buffer;
         destination->length = view->length;
@@ -1160,7 +1160,7 @@ static int transpiler_context_copybook_clone_text(t_transpiler_copybook_replacin
         qualifier_length = view->qualifier_length;
         if (qualifier_length >= sizeof(destination->qualifier))
             qualifier_length = sizeof(destination->qualifier) - 1;
-        ft_memcpy(destination->qualifier, view->qualifier, qualifier_length);
+        std::memcpy(destination->qualifier, view->qualifier, qualifier_length);
         destination->qualifier[qualifier_length] = '\0';
     }
     return (FT_SUCCESS);
@@ -3132,7 +3132,7 @@ int transpiler_context_register_copybook_replacements(t_transpiler_context *cont
     index = 0;
     while (index < context->copybook_count)
     {
-        if (ft_strncmp(context->copybooks[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+        if (std::strncmp(context->copybooks[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
         {
             copybook = &context->copybooks[index];
             break ;
@@ -3272,7 +3272,7 @@ unsigned long long transpiler_context_compute_copybook_signature(const t_transpi
                     transpiler_context_hash_update_bytes(&hash, replacement->source.text,
                         replacement->source.length);
                 transpiler_context_hash_update_bytes(&hash, replacement->source.qualifier,
-                    ft_strlen(replacement->source.qualifier));
+                    std::strlen(replacement->source.qualifier));
                 transpiler_context_hash_update_u64(&hash,
                     static_cast<unsigned long long>(replacement->target.flags));
                 transpiler_context_hash_update_u64(&hash,
@@ -3281,7 +3281,7 @@ unsigned long long transpiler_context_compute_copybook_signature(const t_transpi
                     transpiler_context_hash_update_bytes(&hash, replacement->target.text,
                         replacement->target.length);
                 transpiler_context_hash_update_bytes(&hash, replacement->target.qualifier,
-                    ft_strlen(replacement->target.qualifier));
+                    std::strlen(replacement->target.qualifier));
                 replacement_index += 1;
             }
         }

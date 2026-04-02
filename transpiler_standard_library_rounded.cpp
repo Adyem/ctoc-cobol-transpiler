@@ -44,8 +44,8 @@ int transpiler_standard_library_generate_rounded(char **out_text)
         "               END-IF\n"
         "           ELSE\n"
         "               IF WS-FRACTION = WS-HALF\n"
-        "                   COMPUTE WS-ABS-INTEGER = FUNCTION ABS(WS-INTEGER).\n"
-        "                   COMPUTE WS-REMAINDER = FUNCTION MOD(WS-ABS-INTEGER, WS-TWO).\n"
+        "                   COMPUTE WS-ABS-INTEGER = FUNCTION ABS(WS-INTEGER)\n"
+        "                   COMPUTE WS-REMAINDER = FUNCTION MOD(WS-ABS-INTEGER, WS-TWO)\n"
         "                   IF WS-REMAINDER NOT = 0\n"
         "                       IF LNK-OPERAND >= 0\n"
         "                           COMPUTE LNK-RESULT = WS-INTEGER + 1\n"
@@ -66,4 +66,3 @@ int transpiler_standard_library_generate_rounded(char **out_text)
     *out_text = buffer;
     return (FT_SUCCESS);
 }
-

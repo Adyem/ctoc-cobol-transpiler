@@ -36,7 +36,7 @@ int transpiler_standard_library_generate_atol(char **out_text)
         "       01 LNK-RESULT PIC S9(18).\n"
         "       01 LNK-STATUS PIC 9.\n"
         "       PROCEDURE DIVISION USING BY REFERENCE LNK-SOURCE\n"
-        "           BY VALUE LNK-SOURCE-LENGTH BY REFERENCE LNK-RESULT\n"
+        "           BY REFERENCE LNK-SOURCE-LENGTH BY REFERENCE LNK-RESULT\n"
         "           BY REFERENCE LNK-STATUS.\n"
         "       MAIN.\n"
         "           MOVE " TRANSPILE_STANDARD_LIBRARY_STATUS_LITERAL_SUCCESS " TO LNK-STATUS.\n"

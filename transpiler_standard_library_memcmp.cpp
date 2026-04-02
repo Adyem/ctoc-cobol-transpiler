@@ -29,8 +29,8 @@ int transpiler_standard_library_generate_memcmp(char **out_text)
         "       01 LNK-COUNT PIC 9(9).\n"
         "       01 LNK-RESULT PIC S9(9).\n"
         "       PROCEDURE DIVISION USING BY REFERENCE LNK-FIRST\n"
-        "           BY VALUE LNK-FIRST-LENGTH BY REFERENCE LNK-SECOND\n"
-        "           BY VALUE LNK-SECOND-LENGTH BY VALUE LNK-COUNT\n"
+        "           BY REFERENCE LNK-FIRST-LENGTH BY REFERENCE LNK-SECOND\n"
+        "           BY REFERENCE LNK-SECOND-LENGTH BY REFERENCE LNK-COUNT\n"
         "           BY REFERENCE LNK-RESULT.\n"
         "       MAIN.\n"
         "           MOVE 0 TO LNK-RESULT.\n"
@@ -93,4 +93,3 @@ int transpiler_standard_library_generate_memcmp(char **out_text)
     *out_text = buffer;
     return (FT_SUCCESS);
 }
-
