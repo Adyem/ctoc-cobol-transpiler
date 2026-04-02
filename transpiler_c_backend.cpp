@@ -161,6 +161,24 @@ static const t_cblc_data_item *c_backend_find_data_item_by_cobol(const t_cblc_tr
     return (NULL);
 }
 
+static const t_cblc_struct_type *c_backend_find_struct_type(const t_cblc_translation_unit *unit,
+    const char *identifier)
+{
+    size_t index;
+
+    if (!unit || !identifier)
+        return (NULL);
+    index = 0;
+    while (index < unit->struct_type_count)
+    {
+        if (std::strncmp(unit->struct_types[index].source_name, identifier,
+                sizeof(unit->struct_types[index].source_name)) == 0)
+            return (&unit->struct_types[index]);
+        index += 1;
+    }
+    return (NULL);
+}
+
 static int c_backend_strip_suffix(const char *text, const char *suffix, char *buffer, size_t buffer_size)
 {
     size_t text_length;
@@ -321,18 +339,53 @@ static int c_backend_map_identifier_to_c(const t_cblc_translation_unit *unit, co
         item = c_backend_find_data_item_by_cobol(unit, base);
         if (!item || item->kind != CBLC_DATA_KIND_STRING)
             return (FT_FAILURE);
-        if (std::snprintf(buffer, buffer_size, "%s_len", item->source_name) < 0)
+        if (std::strchr(item->source_name, '.'))
+        {
+            if (std::snprintf(buffer, buffer_size, "%s.len", item->source_name) < 0)
+                return (FT_FAILURE);
+        }
+        else if (std::snprintf(buffer, buffer_size, "%s_len", item->source_name) < 0)
             return (FT_FAILURE);
         return (FT_SUCCESS);
     }
     item = c_backend_find_data_item_by_cobol(unit, token);
     if (item)
     {
+        if (item->kind == CBLC_DATA_KIND_STRUCT)
+            return (FT_FAILURE);
         if (std::snprintf(buffer, buffer_size, "%s", item->source_name) < 0)
             return (FT_FAILURE);
         return (FT_SUCCESS);
     }
     if (std::snprintf(buffer, buffer_size, "%s", token) < 0)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int c_backend_build_string_len_ref(const t_cblc_data_item *item, char *buffer, size_t buffer_size)
+{
+    if (!item || !buffer || buffer_size == 0)
+        return (FT_FAILURE);
+    if (std::strchr(item->source_name, '.'))
+    {
+        if (std::snprintf(buffer, buffer_size, "%s.len", item->source_name) < 0)
+            return (FT_FAILURE);
+    }
+    else if (std::snprintf(buffer, buffer_size, "%s_len", item->source_name) < 0)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int c_backend_build_string_buf_ref(const t_cblc_data_item *item, char *buffer, size_t buffer_size)
+{
+    if (!item || !buffer || buffer_size == 0)
+        return (FT_FAILURE);
+    if (std::strchr(item->source_name, '.'))
+    {
+        if (std::snprintf(buffer, buffer_size, "%s.buf", item->source_name) < 0)
+            return (FT_FAILURE);
+    }
+    else if (std::snprintf(buffer, buffer_size, "%s_buf", item->source_name) < 0)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
@@ -467,6 +520,8 @@ static int c_backend_emit_string_literal_assignment(const t_cblc_data_item *item
 {
     char decoded[TRANSPILE_STATEMENT_TEXT_MAX];
     char encoded[TRANSPILE_STATEMENT_TEXT_MAX];
+    char buffer_ref[TRANSPILE_STATEMENT_TEXT_MAX];
+    char length_ref[TRANSPILE_STATEMENT_TEXT_MAX];
     size_t capacity;
 
     if (!item || !literal || !buffer)
@@ -478,9 +533,13 @@ static int c_backend_emit_string_literal_assignment(const t_cblc_data_item *item
     capacity = item->length;
     if (capacity == 0)
         capacity = 1;
+    if (c_backend_build_string_buf_ref(item, buffer_ref, sizeof(buffer_ref)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (c_backend_build_string_len_ref(item, length_ref, sizeof(length_ref)) != FT_SUCCESS)
+        return (FT_FAILURE);
     if (c_backend_buffer_append_format_line(buffer,
-            "    cblc_string_assign_literal(%s_buf, %zu, &%s_len, \"%s\");",
-            item->source_name, static_cast<unsigned long long>(capacity), item->source_name, encoded)
+            "    cblc_string_assign_literal(%s, %zu, &%s, \"%s\");",
+            buffer_ref, static_cast<unsigned long long>(capacity), length_ref, encoded)
         != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
@@ -541,6 +600,7 @@ static int c_backend_emit_assignment(const t_cblc_translation_unit *unit, const 
     if (c_backend_strip_suffix(statement->target, "-LEN", base, sizeof(base)))
     {
         char expression[TRANSPILE_STATEMENT_TEXT_MAX];
+        char length_ref[TRANSPILE_STATEMENT_TEXT_MAX];
         const t_cblc_data_item *length_item;
 
         length_item = c_backend_find_data_item_by_cobol(unit, base);
@@ -549,8 +609,10 @@ static int c_backend_emit_assignment(const t_cblc_translation_unit *unit, const 
         if (c_backend_translate_expression(unit, statement->source, expression,
                 sizeof(expression)) != FT_SUCCESS)
             return (FT_FAILURE);
+        if (c_backend_build_string_len_ref(length_item, length_ref, sizeof(length_ref)) != FT_SUCCESS)
+            return (FT_FAILURE);
         if (c_backend_buffer_append_format_line(buffer,
-                "    %s_len = %s;", length_item->source_name, expression) != FT_SUCCESS)
+                "    %s = %s;", length_ref, expression) != FT_SUCCESS)
             return (FT_FAILURE);
         return (FT_SUCCESS);
     }
@@ -560,14 +622,26 @@ static int c_backend_emit_assignment(const t_cblc_translation_unit *unit, const 
     if (item->kind == CBLC_DATA_KIND_STRING)
     {
         const t_cblc_data_item *source_item;
+        char target_buffer_ref[TRANSPILE_STATEMENT_TEXT_MAX];
+        char target_length_ref[TRANSPILE_STATEMENT_TEXT_MAX];
+        char source_buffer_ref[TRANSPILE_STATEMENT_TEXT_MAX];
+        char source_length_ref[TRANSPILE_STATEMENT_TEXT_MAX];
 
         source_item = c_backend_find_data_item_by_cobol(unit, statement->source);
         if (!source_item || source_item->kind != CBLC_DATA_KIND_STRING)
             return (FT_FAILURE);
+        if (c_backend_build_string_buf_ref(item, target_buffer_ref, sizeof(target_buffer_ref)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (c_backend_build_string_len_ref(item, target_length_ref, sizeof(target_length_ref)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (c_backend_build_string_buf_ref(source_item, source_buffer_ref, sizeof(source_buffer_ref)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (c_backend_build_string_len_ref(source_item, source_length_ref, sizeof(source_length_ref)) != FT_SUCCESS)
+            return (FT_FAILURE);
         if (c_backend_buffer_append_format_line(buffer,
-                "    cblc_string_copy(%s_buf, %zu, &%s_len, %s_buf, %s_len);",
-                item->source_name, static_cast<unsigned long long>(item->length), item->source_name,
-                source_item->source_name, source_item->source_name) != FT_SUCCESS)
+                "    cblc_string_copy(%s, %zu, &%s, %s, %s);",
+                target_buffer_ref, static_cast<unsigned long long>(item->length), target_length_ref,
+                source_buffer_ref, source_length_ref) != FT_SUCCESS)
             return (FT_FAILURE);
         return (FT_SUCCESS);
     }
@@ -674,9 +748,16 @@ static int c_backend_emit_display(const t_cblc_translation_unit *unit, const t_c
                 item = c_backend_find_data_item_by_cobol(unit, prefix);
                 if (!item || item->kind != CBLC_DATA_KIND_STRING)
                     return (FT_FAILURE);
+                char buffer_ref[TRANSPILE_STATEMENT_TEXT_MAX];
+                char length_ref[TRANSPILE_STATEMENT_TEXT_MAX];
+
+                if (c_backend_build_string_buf_ref(item, buffer_ref, sizeof(buffer_ref)) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                if (c_backend_build_string_len_ref(item, length_ref, sizeof(length_ref)) != FT_SUCCESS)
+                    return (FT_FAILURE);
                 if (c_backend_buffer_append_format_line(buffer,
-                        "    cblc_display_string(%s_buf, %s_len);",
-                        item->source_name, item->source_name) != FT_SUCCESS)
+                        "    cblc_display_string(%s, %s);",
+                        buffer_ref, length_ref) != FT_SUCCESS)
                     return (FT_FAILURE);
                 return (FT_SUCCESS);
             }
@@ -688,8 +769,12 @@ static int c_backend_emit_display(const t_cblc_translation_unit *unit, const t_c
             item = c_backend_find_data_item_by_cobol(unit, base);
             if (!item || item->kind != CBLC_DATA_KIND_STRING)
                 return (FT_FAILURE);
+            char length_ref[TRANSPILE_STATEMENT_TEXT_MAX];
+
+            if (c_backend_build_string_len_ref(item, length_ref, sizeof(length_ref)) != FT_SUCCESS)
+                return (FT_FAILURE);
             if (c_backend_buffer_append_format_line(buffer,
-                    "    cblc_display_size(%s_len);", item->source_name) != FT_SUCCESS)
+                    "    cblc_display_size(%s);", length_ref) != FT_SUCCESS)
                 return (FT_FAILURE);
             return (FT_SUCCESS);
         }
@@ -810,6 +895,50 @@ static const char *c_backend_function_return_type(const t_cblc_function *functio
         return ("int");
     return ("void");
 }
+
+static int c_backend_emit_struct_type(const t_cblc_struct_type *type, t_c_backend_buffer *buffer)
+{
+    size_t index;
+
+    if (!type || !buffer)
+        return (FT_FAILURE);
+    if (c_backend_buffer_append_format_line(buffer, "typedef struct s_%s", type->source_name) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (c_backend_buffer_append_line(buffer, "{") != FT_SUCCESS)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < type->field_count)
+    {
+        if (type->fields[index].kind == CBLC_DATA_KIND_STRING)
+        {
+            if (c_backend_buffer_append_format_line(buffer,
+                    "    struct { size_t len; char buf[%zu]; } %s;",
+                    static_cast<unsigned long long>(type->fields[index].length),
+                    type->fields[index].source_name) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        else if (type->fields[index].kind == CBLC_DATA_KIND_CHAR)
+        {
+            if (c_backend_buffer_append_format_line(buffer, "    char %s[%zu];",
+                    type->fields[index].source_name,
+                    static_cast<unsigned long long>(type->fields[index].length)) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        else if (type->fields[index].kind == CBLC_DATA_KIND_INT)
+        {
+            if (c_backend_buffer_append_format_line(buffer, "    int %s;",
+                    type->fields[index].source_name) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        else
+            return (FT_FAILURE);
+        index += 1;
+    }
+    if (c_backend_buffer_append_format_line(buffer, "} t_%s;", type->source_name) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
 {
     t_c_backend_buffer buffer;
@@ -864,12 +993,26 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
     if (c_backend_buffer_append_line(&buffer, "") != FT_SUCCESS)
         goto cleanup;
     index = 0;
+    while (index < unit->struct_type_count)
+    {
+        if (c_backend_emit_struct_type(&unit->struct_types[index], &buffer) != FT_SUCCESS)
+            goto cleanup;
+        if (c_backend_buffer_append_line(&buffer, "") != FT_SUCCESS)
+            goto cleanup;
+        index += 1;
+    }
+    index = 0;
     while (index < unit->data_count)
     {
         const t_cblc_data_item *item;
         size_t length;
 
         item = &unit->data_items[index];
+        if (std::strchr(item->source_name, '.'))
+        {
+            index += 1;
+            continue ;
+        }
         if (item->kind == CBLC_DATA_KIND_STRING)
         {
             length = item->length;
@@ -935,6 +1078,15 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
             }
             else if (c_backend_buffer_append_format_line(&buffer,
                     "static int %s = 0;", item->source_name) != FT_SUCCESS)
+                goto cleanup;
+        }
+        else if (item->kind == CBLC_DATA_KIND_STRUCT)
+        {
+            if (c_backend_find_struct_type(unit, item->struct_type_name) == NULL)
+                goto cleanup;
+            if (c_backend_buffer_append_format_line(&buffer,
+                    "static t_%s %s = {0};", item->struct_type_name,
+                    item->source_name) != FT_SUCCESS)
                 goto cleanup;
         }
         index += 1;

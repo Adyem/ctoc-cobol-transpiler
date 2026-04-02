@@ -803,6 +803,142 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_parse_translation_unit_accepts_struct_fields)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "struct Point\n"
+        "{\n"
+        "    int x;\n"
+        "    string name[8];\n"
+        "};\n"
+        "Point point;\n"
+        "function void main()\n"
+        "{\n"
+        "    point.x = 7;\n"
+        "    point.name = \"HI\";\n"
+        "    display(point.x);\n"
+        "    display(point.name);\n"
+        "    display(point.name.len);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "struct program should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_type_count, 1,
+            "one struct type should be recorded") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.data_count, 3,
+            "struct instance should register parent plus field items") != FT_SUCCESS)
+        goto cleanup;
+    if (std::strncmp(unit.data_items[0].source_name, "point",
+            sizeof(unit.data_items[0].source_name)) != 0
+        || unit.data_items[0].kind != CBLC_DATA_KIND_STRUCT)
+    {
+        std::printf("Assertion failed: first data item should be the struct instance\n");
+        goto cleanup;
+    }
+    if (std::strncmp(unit.data_items[1].source_name, "point.x",
+            sizeof(unit.data_items[1].source_name)) != 0
+        || unit.data_items[1].kind != CBLC_DATA_KIND_INT)
+    {
+        std::printf("Assertion failed: struct int field should be registered as data item\n");
+        goto cleanup;
+    }
+    if (std::strncmp(unit.data_items[2].source_name, "point.name",
+            sizeof(unit.data_items[2].source_name)) != 0
+        || unit.data_items[2].kind != CBLC_DATA_KIND_STRING)
+    {
+        std::printf("Assertion failed: struct string field should be registered as data item\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_emits_struct_groups)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "struct Point\n"
+        "{\n"
+        "    int x;\n"
+        "    string name[8];\n"
+        "};\n"
+        "Point point;\n"
+        "function void main()\n"
+        "{\n"
+        "    point.x = 7;\n"
+        "    point.name = \"HI\";\n"
+        "    display(point.name);\n"
+        "    display(point.name.len);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "struct COBOL sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "struct COBOL sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol, "01 POINT.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit struct group header\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "05 POINT-X PIC S9(9).", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit int struct field\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "05 POINT-NAME.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit string struct field group\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "10 POINT-NAME-LEN PIC 9(4) COMP VALUE 0.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit struct string length field\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "COMPUTE POINT-X = 7.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should assign to struct int field\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "DISPLAY POINT-NAME-BUF(1:POINT-NAME-LEN)",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should display struct string field via slice\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "DISPLAY POINT-NAME-LEN", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should display struct string length\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_generate_c_emits_main_and_helpers)
 {
     const char *source;
@@ -926,6 +1062,84 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_generate_c_emits_struct_types_and_field_access)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "struct Point\n"
+        "{\n"
+        "    int x;\n"
+        "    string name[8];\n"
+        "};\n"
+        "Point point;\n"
+        "function void main()\n"
+        "{\n"
+        "    point.x = 7;\n"
+        "    point.name = \"HELLO\";\n"
+        "    display(point.name);\n"
+        "    display(point.name.len);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "struct C sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "struct C sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "typedef struct s_Point", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit struct typedef\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "struct { size_t len; char buf[8]; } name;",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit nested string storage in struct\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "static t_Point point = {0};", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit struct instance global\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "point.x = 7;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should assign to struct int field\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "cblc_string_assign_literal(point.name.buf, 8, &point.name.len, \"HELLO\");",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should assign struct string field via helper\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "cblc_display_string(point.name.buf, point.name.len);",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should display struct string field via helper\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "cblc_display_size(point.name.len);", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should display struct string length\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_transpiler_validation_accepts_valid_cobol)
 {
     const char *source;
@@ -990,7 +1204,11 @@ const t_test_case *get_validation_tests(size_t *count)
         {"cblc_parse_translation_unit_records_copy_includes", test_cblc_parse_translation_unit_records_copy_includes},
         {"cblc_parse_translation_unit_tracks_multiple_functions",
             test_cblc_parse_translation_unit_tracks_multiple_functions},
+        {"cblc_parse_translation_unit_accepts_struct_fields",
+            test_cblc_parse_translation_unit_accepts_struct_fields},
         {"cblc_generate_cobol_emits_string_group", test_cblc_generate_cobol_emits_string_group},
+        {"cblc_generate_cobol_emits_struct_groups",
+            test_cblc_generate_cobol_emits_struct_groups},
         {"cblc_generate_cobol_emits_copy_includes", test_cblc_generate_cobol_emits_copy_includes},
         {"cblc_generate_cobol_emits_multiple_paragraphs",
             test_cblc_generate_cobol_emits_multiple_paragraphs},
@@ -1000,6 +1218,8 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_generate_cobol_handles_string_assignments_and_length_computations},
         {"cblc_generate_cobol_handles_multiplication_and_division",
             test_cblc_generate_cobol_handles_multiplication_and_division},
+        {"cblc_generate_c_emits_struct_types_and_field_access",
+            test_cblc_generate_c_emits_struct_types_and_field_access},
         {"cblc_resolve_calls_reports_missing_function",
             test_cblc_resolve_calls_reports_missing_function},
         {"transpiler_validation_accepts_valid_cobol", test_transpiler_validation_accepts_valid_cobol},

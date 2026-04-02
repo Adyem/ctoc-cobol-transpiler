@@ -936,7 +936,8 @@ typedef enum e_cblc_data_kind
 {
     CBLC_DATA_KIND_CHAR = 0,
     CBLC_DATA_KIND_INT,
-    CBLC_DATA_KIND_STRING
+    CBLC_DATA_KIND_STRING,
+    CBLC_DATA_KIND_STRUCT
 }   t_cblc_data_kind;
 
 typedef enum e_cblc_function_return_kind
@@ -951,6 +952,7 @@ typedef struct s_cblc_data_item
 {
     char source_name[TRANSPILE_IDENTIFIER_MAX];
     char cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    char struct_type_name[TRANSPILE_IDENTIFIER_MAX];
     size_t length;
     t_cblc_data_kind kind;
     int is_const;
@@ -958,6 +960,23 @@ typedef struct s_cblc_data_item
     size_t initializer_length;
     char initializer_text[TRANSPILE_STATEMENT_TEXT_MAX];
 }   t_cblc_data_item;
+
+typedef struct s_cblc_struct_field
+{
+    char source_name[TRANSPILE_IDENTIFIER_MAX];
+    char cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    size_t length;
+    t_cblc_data_kind kind;
+}   t_cblc_struct_field;
+
+typedef struct s_cblc_struct_type
+{
+    char source_name[TRANSPILE_IDENTIFIER_MAX];
+    char cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    t_cblc_struct_field *fields;
+    size_t field_count;
+    size_t field_capacity;
+}   t_cblc_struct_type;
 
 typedef struct s_cblc_import
 {
@@ -1008,6 +1027,9 @@ typedef struct s_cblc_translation_unit
     t_cblc_data_item *data_items;
     size_t data_count;
     size_t data_capacity;
+    t_cblc_struct_type *struct_types;
+    size_t struct_type_count;
+    size_t struct_type_capacity;
     t_cblc_import *imports;
     size_t import_count;
     size_t import_capacity;
