@@ -337,12 +337,12 @@ FT_TEST(test_cblc_parse_translation_unit_tracks_multiple_functions)
         std::printf("Assertion failed: second function should be named 'main'\n");
         goto cleanup;
     }
-    if (unit.functions[0].statement_count != 1)
+    if (unit.functions[0].statement_count != 2)
     {
         std::printf("Assertion failed: helper function should retain its statements\n");
         goto cleanup;
     }
-    if (unit.functions[1].statement_count != 1)
+    if (unit.functions[1].statement_count != 2)
     {
         std::printf("Assertion failed: main function should retain its statements\n");
         goto cleanup;
@@ -829,8 +829,8 @@ FT_TEST(test_cblc_parse_translation_unit_accepts_struct_fields)
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "struct program should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_type_count, 1,
-            "one struct type should be recorded") != FT_SUCCESS)
+    if (test_expect_size_t_equal(unit.struct_type_count, 2,
+            "builtin string plus one user struct type should be recorded") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_size_t_equal(unit.data_count, 3,
             "struct instance should register parent plus field items") != FT_SUCCESS)
@@ -1140,6 +1140,1203 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_parse_translation_unit_accepts_nested_struct_fields)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "struct Address\n"
+        "{\n"
+        "    string city[16];\n"
+        "};\n"
+        "struct Person\n"
+        "{\n"
+        "    Address address;\n"
+        "    int age;\n"
+        "};\n"
+        "Person person;\n"
+        "function void main()\n"
+        "{\n"
+        "    person.address.city = \"GHENT\";\n"
+        "    person.age = 7;\n"
+        "    display(person.address.city);\n"
+        "    display(person.address.city.len);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "nested struct program should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_type_count, 3,
+            "builtin string plus two user struct types should be recorded") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.data_count, 4,
+            "nested struct instance should register aggregate path items recursively") != FT_SUCCESS)
+        goto cleanup;
+    if (std::strncmp(unit.data_items[1].source_name, "person.address",
+            sizeof(unit.data_items[1].source_name)) != 0
+        || unit.data_items[1].kind != CBLC_DATA_KIND_STRUCT)
+    {
+        std::printf("Assertion failed: nested struct field should be registered as aggregate data item\n");
+        goto cleanup;
+    }
+    if (std::strncmp(unit.data_items[2].source_name, "person.address.city",
+            sizeof(unit.data_items[2].source_name)) != 0
+        || unit.data_items[2].kind != CBLC_DATA_KIND_STRING)
+    {
+        std::printf("Assertion failed: nested primitive field should be registered recursively\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_emits_nested_struct_groups)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "struct Address\n"
+        "{\n"
+        "    string city[16];\n"
+        "};\n"
+        "struct Person\n"
+        "{\n"
+        "    Address address;\n"
+        "    int age;\n"
+        "};\n"
+        "Person person;\n"
+        "function void main()\n"
+        "{\n"
+        "    person.address.city = \"GHENT\";\n"
+        "    display(person.address.city);\n"
+        "    display(person.address.city.len);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "nested struct COBOL sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "nested struct COBOL sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol, "05 PERSON-ADDRESS.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit nested struct group header\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "10 PERSON-ADDRESS-CITY.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit nested string group\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "15 PERSON-ADDRESS-CITY-LEN PIC 9(4) COMP VALUE 0.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit nested string length field\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "DISPLAY PERSON-ADDRESS-CITY-BUF(1:PERSON-ADDRESS-CITY-LEN)",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should display nested string field via slice\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_emits_nested_struct_types_and_field_access)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "struct Address\n"
+        "{\n"
+        "    string city[16];\n"
+        "};\n"
+        "struct Person\n"
+        "{\n"
+        "    Address address;\n"
+        "    int age;\n"
+        "};\n"
+        "Person person;\n"
+        "function void main()\n"
+        "{\n"
+        "    person.address.city = \"GHENT\";\n"
+        "    display(person.address.city);\n"
+        "    display(person.address.city.len);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "nested struct C sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "nested struct C sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "typedef struct s_Address", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit nested member type typedef\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "t_Address address;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should embed nested struct field type\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "cblc_string_assign_literal(person.address.city.buf, 16, &person.address.city.len, \"GHENT\");",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should assign nested string field via helper\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "cblc_display_string(person.address.city.buf, person.address.city.len);",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should display nested string field via helper\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_translation_unit_records_class_lifecycle_metadata)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "class Person\n"
+        "{\n"
+        "    string name[8];\n"
+        "    Person();\n"
+        "    ~Person();\n"
+        "};\n"
+        "Person person;\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "class lifecycle sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_type_count, 2,
+            "builtin string plus one class type should be recorded") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(unit.struct_types[1].is_class, 1,
+            "type should be marked as class") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(unit.struct_types[1].has_default_constructor, 1,
+            "class should record default constructor") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(unit.struct_types[1].has_destructor, 1,
+            "class should record destructor") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_emits_automatic_class_lifecycle)
+{
+    const char *source;
+    const char *needle;
+    const char *scan;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+    int count;
+
+    source = "class Person\n"
+        "{\n"
+        "    string name[8];\n"
+        "    Person();\n"
+        "    ~Person();\n"
+        "};\n"
+        "Person person;\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "class lifecycle C sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "class lifecycle C sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    needle = "person.name.len = 0;";
+    count = 0;
+    scan = generated_c;
+    while ((scan = std::strstr(scan, needle)) != NULL)
+    {
+        count += 1;
+        scan += std::strlen(needle);
+    }
+    if (test_expect_int_equal(count, 2,
+            "generated C should inject lifecycle before entry and before return") != FT_SUCCESS)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "memset(person.name.buf, 0, sizeof(person.name.buf));",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should zero string buffer during lifecycle\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_emits_automatic_class_lifecycle)
+{
+    const char *source;
+    const char *needle;
+    const char *scan;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+    int count;
+
+    source = "class Person\n"
+        "{\n"
+        "    string name[8];\n"
+        "    Person();\n"
+        "    ~Person();\n"
+        "};\n"
+        "Person person;\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "class lifecycle COBOL sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "class lifecycle COBOL sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+        goto cleanup;
+    needle = "MOVE 0 TO PERSON-NAME-LEN.";
+    count = 0;
+    scan = generated_cobol;
+    while ((scan = std::strstr(scan, needle)) != NULL)
+    {
+        count += 1;
+        scan += std::strlen(needle);
+    }
+    if (test_expect_int_equal(count, 2,
+            "generated COBOL should inject lifecycle before entry and before return") != FT_SUCCESS)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol, "MOVE SPACES TO PERSON-NAME-BUF.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should blank string buffer during lifecycle\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_emits_custom_class_lifecycle_body)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "class Person\n"
+        "{\n"
+        "    string name[8];\n"
+        "    Person() {\n"
+        "        name = \"HI\";\n"
+        "    }\n"
+        "    ~Person() {\n"
+        "        name = \"BYE\";\n"
+        "    }\n"
+        "};\n"
+        "Person person;\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "custom lifecycle C sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "custom lifecycle C sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "cblc_string_assign_literal(person.name.buf, 8, &person.name.len, \"HI\");",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit custom constructor body\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "cblc_string_assign_literal(person.name.buf, 8, &person.name.len, \"BYE\");",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit custom destructor body\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_emits_custom_class_lifecycle_body)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "class Person\n"
+        "{\n"
+        "    string name[8];\n"
+        "    Person() {\n"
+        "        name = \"HI\";\n"
+        "    }\n"
+        "    ~Person() {\n"
+        "        name = \"BYE\";\n"
+        "    }\n"
+        "};\n"
+        "Person person;\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "custom lifecycle COBOL sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "custom lifecycle COBOL sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol, "MOVE \"HI\" TO PERSON-NAME-BUF.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit custom constructor body\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "MOVE \"BYE\" TO PERSON-NAME-BUF.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit custom destructor body\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_emits_local_class_lifecycle)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "class Person\n"
+        "{\n"
+        "    string name[8];\n"
+        "    Person() {\n"
+        "        name = \"HI\";\n"
+        "    }\n"
+        "    ~Person() {\n"
+        "        name = \"BYE\";\n"
+        "    }\n"
+        "};\n"
+        "function void main()\n"
+        "{\n"
+        "    Person person;\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "local class lifecycle C sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "local class lifecycle C sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "t_Person main__person = {0};", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should declare local class storage inside function\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "cblc_string_assign_literal(main__person.name.buf, 8, &main__person.name.len, \"HI\");",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit local constructor body\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "cblc_string_assign_literal(main__person.name.buf, 8, &main__person.name.len, \"BYE\");",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit local destructor body before return\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_emits_local_class_lifecycle)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "class Person\n"
+        "{\n"
+        "    string name[8];\n"
+        "    Person() {\n"
+        "        name = \"HI\";\n"
+        "    }\n"
+        "    ~Person() {\n"
+        "        name = \"BYE\";\n"
+        "    }\n"
+        "};\n"
+        "function void main()\n"
+        "{\n"
+        "    Person person;\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "local class lifecycle COBOL sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "local class lifecycle COBOL sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol, "01 MAIN-PERSON.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit function-owned class storage\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "MOVE \"HI\" TO MAIN-PERSON-NAME-BUF.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit local constructor body\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "MOVE \"BYE\" TO MAIN-PERSON-NAME-BUF.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit local destructor body before return\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_emits_nested_block_local_class_cleanup_order)
+{
+    const char *source;
+    const char *first_ctor;
+    const char *first_dtor;
+    const char *second_ctor;
+    const char *second_dtor;
+    const char *p_first_ctor;
+    const char *p_first_dtor;
+    const char *p_second_ctor;
+    const char *p_second_dtor;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "class Person\n"
+        "{\n"
+        "    string name[8];\n"
+        "    Person() {\n"
+        "        name = \"HI\";\n"
+        "    }\n"
+        "    ~Person() {\n"
+        "        name = \"BYE\";\n"
+        "    }\n"
+        "};\n"
+        "function void main()\n"
+        "{\n"
+        "    {\n"
+        "        Person first;\n"
+        "    }\n"
+        "    Person second;\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "nested block local class C sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "nested block local class C sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    first_ctor = "cblc_string_assign_literal(main__first.name.buf, 8, &main__first.name.len, \"HI\");";
+    first_dtor = "cblc_string_assign_literal(main__first.name.buf, 8, &main__first.name.len, \"BYE\");";
+    second_ctor = "cblc_string_assign_literal(main__second.name.buf, 8, &main__second.name.len, \"HI\");";
+    second_dtor = "cblc_string_assign_literal(main__second.name.buf, 8, &main__second.name.len, \"BYE\");";
+    p_first_ctor = std::strstr(generated_c, first_ctor);
+    p_first_dtor = std::strstr(generated_c, first_dtor);
+    p_second_ctor = std::strstr(generated_c, second_ctor);
+    p_second_dtor = std::strstr(generated_c, second_dtor);
+    if (!p_first_ctor || !p_first_dtor || !p_second_ctor || !p_second_dtor)
+    {
+        std::printf("Assertion failed: generated C should emit all nested block lifecycle statements\n");
+        goto cleanup;
+    }
+    if (!(p_first_ctor < p_first_dtor && p_first_dtor < p_second_ctor && p_second_ctor < p_second_dtor))
+    {
+        std::printf("Assertion failed: generated C should destroy inner block object before later outer object construction/cleanup\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_emits_nested_block_local_class_cleanup_order)
+{
+    const char *source;
+    const char *first_ctor;
+    const char *first_dtor;
+    const char *second_ctor;
+    const char *second_dtor;
+    const char *p_first_ctor;
+    const char *p_first_dtor;
+    const char *p_second_ctor;
+    const char *p_second_dtor;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "class Person\n"
+        "{\n"
+        "    string name[8];\n"
+        "    Person() {\n"
+        "        name = \"HI\";\n"
+        "    }\n"
+        "    ~Person() {\n"
+        "        name = \"BYE\";\n"
+        "    }\n"
+        "};\n"
+        "function void main()\n"
+        "{\n"
+        "    {\n"
+        "        Person first;\n"
+        "    }\n"
+        "    Person second;\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "nested block local class COBOL sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "nested block local class COBOL sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+        goto cleanup;
+    first_ctor = "MOVE \"HI\" TO MAIN-FIRST-NAME-BUF.";
+    first_dtor = "MOVE \"BYE\" TO MAIN-FIRST-NAME-BUF.";
+    second_ctor = "MOVE \"HI\" TO MAIN-SECOND-NAME-BUF.";
+    second_dtor = "MOVE \"BYE\" TO MAIN-SECOND-NAME-BUF.";
+    p_first_ctor = std::strstr(generated_cobol, first_ctor);
+    p_first_dtor = std::strstr(generated_cobol, first_dtor);
+    p_second_ctor = std::strstr(generated_cobol, second_ctor);
+    p_second_dtor = std::strstr(generated_cobol, second_dtor);
+    if (!p_first_ctor || !p_first_dtor || !p_second_ctor || !p_second_dtor)
+    {
+        std::printf("Assertion failed: generated COBOL should emit all nested block lifecycle statements\n");
+        goto cleanup;
+    }
+    if (!(p_first_ctor < p_first_dtor && p_first_dtor < p_second_ctor && p_second_ctor < p_second_dtor))
+    {
+        std::printf("Assertion failed: generated COBOL should destroy inner block object before later outer object construction/cleanup\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_translation_unit_registers_builtin_string_class)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "string greeting[8];\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "builtin string class sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_type_count, 1,
+            "builtin string class should be registered even without user classes") != FT_SUCCESS)
+        goto cleanup;
+    if (std::strncmp(unit.struct_types[0].source_name, "string",
+            sizeof(unit.struct_types[0].source_name)) != 0)
+    {
+        std::printf("Assertion failed: builtin string class should be registered under the string name\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(unit.struct_types[0].is_class, 1,
+            "builtin string should be marked as a class") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(unit.struct_types[0].is_builtin, 1,
+            "builtin string should be marked as builtin") != FT_SUCCESS)
+        goto cleanup;
+    if (std::strncmp(unit.data_items[0].declared_type_name, "string",
+            sizeof(unit.data_items[0].declared_type_name)) != 0)
+    {
+        std::printf("Assertion failed: string variables should record the string class as their declared type\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_emits_local_string_lifecycle)
+{
+    const char *source;
+    const char *ctor_reset;
+    const char *assign_call;
+    const char *dtor_reset;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "function void main()\n"
+        "{\n"
+        "    string greeting[8];\n"
+        "    greeting = \"HI\";\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "local string lifecycle sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "local string lifecycle sample should generate C") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "size_t main__greeting_len = 0;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit local string length storage\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "char main__greeting_buf[8] = {0};", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit local string buffer storage\n");
+        goto cleanup;
+    }
+    ctor_reset = std::strstr(generated_c, "memset(main__greeting_buf, 0, sizeof(main__greeting_buf));");
+    if (!ctor_reset)
+    {
+        std::printf("Assertion failed: generated C should construct local string objects\n");
+        goto cleanup;
+    }
+    assign_call = std::strstr(ctor_reset, "cblc_string_assign_literal(main__greeting_buf, 8, &main__greeting_len, \"HI\");");
+    if (!assign_call)
+    {
+        std::printf("Assertion failed: generated C should preserve local string assignment after construction\n");
+        goto cleanup;
+    }
+    dtor_reset = std::strstr(assign_call, "memset(main__greeting_buf, 0, sizeof(main__greeting_buf));");
+    if (!dtor_reset)
+    {
+        std::printf("Assertion failed: generated C should destroy local string objects before return\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_translation_unit_records_class_methods)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    int value;\n"
+        "    void reset() {\n"
+        "        value = 0;\n"
+        "        return;\n"
+        "    }\n"
+        "    int current() {\n"
+        "        return value;\n"
+        "    }\n"
+        "};\n"
+        "Counter counter;\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "class method sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_types[1].method_count, 2,
+            "class should record both methods") != FT_SUCCESS)
+        goto cleanup;
+    if (std::strncmp(unit.struct_types[1].methods[0].source_name, "reset",
+            sizeof(unit.struct_types[1].methods[0].source_name)) != 0)
+    {
+        std::printf("Assertion failed: first class method should be reset\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(unit.struct_types[1].methods[0].return_kind,
+            CBLC_FUNCTION_RETURN_VOID, "reset should be a void method") != FT_SUCCESS)
+        goto cleanup;
+    if (std::strncmp(unit.struct_types[1].methods[1].source_name, "current",
+            sizeof(unit.struct_types[1].methods[1].source_name)) != 0)
+    {
+        std::printf("Assertion failed: second class method should be current\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(unit.struct_types[1].methods[1].return_kind,
+            CBLC_FUNCTION_RETURN_INT, "current should be an int method") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_emits_class_methods)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    int value;\n"
+        "    void reset() {\n"
+        "        value = 0;\n"
+        "        return;\n"
+        "    }\n"
+        "    int current() {\n"
+        "        return value;\n"
+        "    }\n"
+        "};\n"
+        "Counter counter;\n"
+        "int total;\n"
+        "function void main()\n"
+        "{\n"
+        "    counter.value = 7;\n"
+        "    counter.reset();\n"
+        "    total = counter.current();\n"
+        "    display(total);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "class method C sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "class method C sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "counter.value = 0;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should inline void method body against receiver\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "total = counter.value;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should inline int-returning method body against receiver\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_emits_class_methods)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    int value;\n"
+        "    void reset() {\n"
+        "        value = 0;\n"
+        "        return;\n"
+        "    }\n"
+        "    int current() {\n"
+        "        return value;\n"
+        "    }\n"
+        "};\n"
+        "Counter counter;\n"
+        "int total;\n"
+        "function void main()\n"
+        "{\n"
+        "    counter.value = 7;\n"
+        "    counter.reset();\n"
+        "    total = counter.current();\n"
+        "    display(total);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "class method COBOL sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "class method COBOL sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol, "COMPUTE COUNTER-VALUE = 0.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should inline void method body against receiver\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "COMPUTE TOTAL = COUNTER-VALUE.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should inline int-returning method body against receiver\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_emits_constructor_initializer_list_in_declaration_order)
+{
+    const char *source;
+    const char *first_assign;
+    const char *second_assign;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "class Pair\n"
+        "{\n"
+        "    int first;\n"
+        "    int second;\n"
+        "    Pair() : second(2), first(1) {\n"
+        "    }\n"
+        "};\n"
+        "Pair pair;\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "initializer list order sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "initializer list order sample should generate C") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    first_assign = std::strstr(generated_c, "pair.first = 1;");
+    second_assign = std::strstr(generated_c, "pair.second = 2;");
+    if (!first_assign || !second_assign)
+    {
+        std::printf("Assertion failed: generated C should emit all constructor initializer list assignments\n");
+        goto cleanup;
+    }
+    if (!(first_assign < second_assign))
+    {
+        std::printf("Assertion failed: generated C should initialize members in declaration order\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_parses_const_member_initializer_list)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "class Person\n"
+        "{\n"
+        "    const int id;\n"
+        "    string name[8];\n"
+        "    Person() : name(\"HI\"), id(7) {\n"
+        "    }\n"
+        "};\n"
+        "Person person;\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "const member initializer list sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "const member initializer list sample should generate C") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "person.id = 7;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should initialize const int members from initializer list\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c,
+            "cblc_string_assign_literal(person.name.buf, 8, &person.name.len, \"HI\");",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should initialize string members from initializer list\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_translation_unit_accepts_const_member_initialized_once_in_constructor_body)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "class Person\n"
+        "{\n"
+        "    const int id;\n"
+        "    Person() {\n"
+        "        id = 7;\n"
+        "    }\n"
+        "};\n"
+        "Person person;\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "const member should be assignable once in constructor body") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_translation_unit_rejects_const_member_reassignment_in_constructor)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "class Person\n"
+        "{\n"
+        "    const int id;\n"
+        "    Person() : id(7) {\n"
+        "        id = 8;\n"
+        "    }\n"
+        "};\n"
+        "Person person;\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_SUCCESS)
+    {
+        std::printf("Assertion failed: const member should not be assignable more than once during construction\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_translation_unit_rejects_const_member_assignment_outside_constructor)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "class Person\n"
+        "{\n"
+        "    const int id;\n"
+        "    Person() : id(7) {\n"
+        "    }\n"
+        "    void reset() {\n"
+        "        id = 0;\n"
+        "        return;\n"
+        "    }\n"
+        "};\n"
+        "Person person;\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_SUCCESS)
+    {
+        std::printf("Assertion failed: const member should not be assignable outside constructors\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_translation_unit_rejects_missing_const_member_initialization)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "class Person\n"
+        "{\n"
+        "    const int id;\n"
+        "    Person() {\n"
+        "    }\n"
+        "};\n"
+        "Person person;\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_SUCCESS)
+    {
+        std::printf("Assertion failed: const member should require exactly one construction-time initialization\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_transpiler_validation_accepts_valid_cobol)
 {
     const char *source;
@@ -1206,9 +2403,13 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_parse_translation_unit_tracks_multiple_functions},
         {"cblc_parse_translation_unit_accepts_struct_fields",
             test_cblc_parse_translation_unit_accepts_struct_fields},
+        {"cblc_parse_translation_unit_accepts_nested_struct_fields",
+            test_cblc_parse_translation_unit_accepts_nested_struct_fields},
         {"cblc_generate_cobol_emits_string_group", test_cblc_generate_cobol_emits_string_group},
         {"cblc_generate_cobol_emits_struct_groups",
             test_cblc_generate_cobol_emits_struct_groups},
+        {"cblc_generate_cobol_emits_nested_struct_groups",
+            test_cblc_generate_cobol_emits_nested_struct_groups},
         {"cblc_generate_cobol_emits_copy_includes", test_cblc_generate_cobol_emits_copy_includes},
         {"cblc_generate_cobol_emits_multiple_paragraphs",
             test_cblc_generate_cobol_emits_multiple_paragraphs},
@@ -1220,6 +2421,48 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_generate_cobol_handles_multiplication_and_division},
         {"cblc_generate_c_emits_struct_types_and_field_access",
             test_cblc_generate_c_emits_struct_types_and_field_access},
+        {"cblc_generate_c_emits_nested_struct_types_and_field_access",
+            test_cblc_generate_c_emits_nested_struct_types_and_field_access},
+        {"cblc_parse_translation_unit_records_class_lifecycle_metadata",
+            test_cblc_parse_translation_unit_records_class_lifecycle_metadata},
+        {"cblc_generate_c_emits_automatic_class_lifecycle",
+            test_cblc_generate_c_emits_automatic_class_lifecycle},
+        {"cblc_generate_cobol_emits_automatic_class_lifecycle",
+            test_cblc_generate_cobol_emits_automatic_class_lifecycle},
+        {"cblc_generate_c_emits_custom_class_lifecycle_body",
+            test_cblc_generate_c_emits_custom_class_lifecycle_body},
+        {"cblc_generate_cobol_emits_custom_class_lifecycle_body",
+            test_cblc_generate_cobol_emits_custom_class_lifecycle_body},
+        {"cblc_generate_c_emits_local_class_lifecycle",
+            test_cblc_generate_c_emits_local_class_lifecycle},
+        {"cblc_generate_cobol_emits_local_class_lifecycle",
+            test_cblc_generate_cobol_emits_local_class_lifecycle},
+        {"cblc_generate_c_emits_nested_block_local_class_cleanup_order",
+            test_cblc_generate_c_emits_nested_block_local_class_cleanup_order},
+        {"cblc_generate_cobol_emits_nested_block_local_class_cleanup_order",
+            test_cblc_generate_cobol_emits_nested_block_local_class_cleanup_order},
+        {"cblc_parse_translation_unit_registers_builtin_string_class",
+            test_cblc_parse_translation_unit_registers_builtin_string_class},
+        {"cblc_generate_c_emits_local_string_lifecycle",
+            test_cblc_generate_c_emits_local_string_lifecycle},
+        {"cblc_parse_translation_unit_records_class_methods",
+            test_cblc_parse_translation_unit_records_class_methods},
+        {"cblc_generate_c_emits_class_methods",
+            test_cblc_generate_c_emits_class_methods},
+        {"cblc_generate_cobol_emits_class_methods",
+            test_cblc_generate_cobol_emits_class_methods},
+        {"cblc_generate_c_emits_constructor_initializer_list_in_declaration_order",
+            test_cblc_generate_c_emits_constructor_initializer_list_in_declaration_order},
+        {"cblc_generate_c_parses_const_member_initializer_list",
+            test_cblc_generate_c_parses_const_member_initializer_list},
+        {"cblc_parse_translation_unit_accepts_const_member_initialized_once_in_constructor_body",
+            test_cblc_parse_translation_unit_accepts_const_member_initialized_once_in_constructor_body},
+        {"cblc_parse_translation_unit_rejects_const_member_reassignment_in_constructor",
+            test_cblc_parse_translation_unit_rejects_const_member_reassignment_in_constructor},
+        {"cblc_parse_translation_unit_rejects_const_member_assignment_outside_constructor",
+            test_cblc_parse_translation_unit_rejects_const_member_assignment_outside_constructor},
+        {"cblc_parse_translation_unit_rejects_missing_const_member_initialization",
+            test_cblc_parse_translation_unit_rejects_missing_const_member_initialization},
         {"cblc_resolve_calls_reports_missing_function",
             test_cblc_resolve_calls_reports_missing_function},
         {"transpiler_validation_accepts_valid_cobol", test_transpiler_validation_accepts_valid_cobol},

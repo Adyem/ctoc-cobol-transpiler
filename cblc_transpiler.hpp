@@ -948,14 +948,21 @@ typedef enum e_cblc_function_return_kind
 
 #define TRANSPILE_STATEMENT_TEXT_MAX 256
 
+typedef struct s_cblc_statement t_cblc_statement;
+
 typedef struct s_cblc_data_item
 {
     char source_name[TRANSPILE_IDENTIFIER_MAX];
     char cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    char declared_type_name[TRANSPILE_IDENTIFIER_MAX];
     char struct_type_name[TRANSPILE_IDENTIFIER_MAX];
+    char owner_function_name[TRANSPILE_IDENTIFIER_MAX];
     size_t length;
     t_cblc_data_kind kind;
     int is_const;
+    int is_function_local;
+    int is_alias;
+    int is_active;
     int has_initializer;
     size_t initializer_length;
     char initializer_text[TRANSPILE_STATEMENT_TEXT_MAX];
@@ -965,9 +972,22 @@ typedef struct s_cblc_struct_field
 {
     char source_name[TRANSPILE_IDENTIFIER_MAX];
     char cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    char declared_type_name[TRANSPILE_IDENTIFIER_MAX];
+    char struct_type_name[TRANSPILE_IDENTIFIER_MAX];
     size_t length;
     t_cblc_data_kind kind;
+    int is_const;
 }   t_cblc_struct_field;
+
+typedef struct s_cblc_method
+{
+    char source_name[TRANSPILE_IDENTIFIER_MAX];
+    char cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    t_cblc_function_return_kind return_kind;
+    t_cblc_statement *statements;
+    size_t statement_count;
+    size_t statement_capacity;
+}   t_cblc_method;
 
 typedef struct s_cblc_struct_type
 {
@@ -976,6 +996,19 @@ typedef struct s_cblc_struct_type
     t_cblc_struct_field *fields;
     size_t field_count;
     size_t field_capacity;
+    t_cblc_method *methods;
+    size_t method_count;
+    size_t method_capacity;
+    int is_class;
+    int is_builtin;
+    int has_default_constructor;
+    int has_destructor;
+    t_cblc_statement *constructor_statements;
+    size_t constructor_statement_count;
+    size_t constructor_statement_capacity;
+    t_cblc_statement *destructor_statements;
+    size_t destructor_statement_count;
+    size_t destructor_statement_capacity;
 }   t_cblc_struct_type;
 
 typedef struct s_cblc_import
@@ -995,10 +1028,14 @@ typedef enum e_cblc_statement_type
     CBLC_STATEMENT_COMPUTE,
     CBLC_STATEMENT_CALL,
     CBLC_STATEMENT_CALL_ASSIGN,
-    CBLC_STATEMENT_RETURN
+    CBLC_STATEMENT_RETURN,
+    CBLC_STATEMENT_DEFAULT_CONSTRUCT,
+    CBLC_STATEMENT_DESTRUCT,
+    CBLC_STATEMENT_METHOD_CALL,
+    CBLC_STATEMENT_METHOD_CALL_ASSIGN
 }   t_cblc_statement_type;
 
-typedef struct s_cblc_statement
+struct s_cblc_statement
 {
     t_cblc_statement_type type;
     char target[TRANSPILE_IDENTIFIER_MAX];
@@ -1006,7 +1043,7 @@ typedef struct s_cblc_statement
     int is_literal;
     char call_identifier[TRANSPILE_IDENTIFIER_MAX];
     int call_is_external;
-}   t_cblc_statement;
+};
 
 typedef struct s_cblc_function
 {
@@ -1020,6 +1057,9 @@ typedef struct s_cblc_function
     int return_item_index;
     char return_cobol_name[TRANSPILE_IDENTIFIER_MAX];
     char return_source_name[TRANSPILE_IDENTIFIER_MAX];
+    char (*local_destructor_targets)[TRANSPILE_IDENTIFIER_MAX];
+    size_t local_destructor_count;
+    size_t local_destructor_capacity;
 }   t_cblc_function;
 
 typedef struct s_cblc_translation_unit
