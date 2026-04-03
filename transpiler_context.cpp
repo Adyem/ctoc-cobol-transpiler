@@ -264,8 +264,8 @@ static int transpiler_context_render_semantic_snapshot(const t_transpiler_contex
                         transpiler_context_semantic_buffer_dispose(&buffer);
                         return (FT_FAILURE);
                     }
-                    if (std::snprintf(line, sizeof(line), "    resolved-index: %lu",
-                            static_cast<unsigned long>(module->imports[import_index].resolved_index)) < 0)
+                    if (std::snprintf(line, sizeof(line), "    resolved-index: %zu",
+                            module->imports[import_index].resolved_index) < 0)
                     {
                         transpiler_context_semantic_buffer_dispose(&buffer);
                         return (FT_FAILURE);
@@ -2929,10 +2929,10 @@ int transpiler_context_register_data_item(t_transpiler_context *context, const c
                     char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 
                     std::snprintf(message, sizeof(message),
-                        "subprogram data item '%s' (%lu characters) is smaller than caller buffer (%lu characters)",
+                        "subprogram data item '%s' (%zu characters) is smaller than caller buffer (%zu characters)",
                         name,
-                        static_cast<unsigned long>(declared_length),
-                        static_cast<unsigned long>(existing_length));
+                        declared_length,
+                        existing_length);
                     transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
                         TRANSPILE_ERROR_DATA_ITEM_PARAMETER_TRUNCATION, message);
                     transpiler_context_record_error(context, TRANSPILE_ERROR_DATA_ITEM_PARAMETER_TRUNCATION);

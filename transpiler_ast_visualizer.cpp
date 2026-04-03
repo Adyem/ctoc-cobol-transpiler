@@ -155,8 +155,8 @@ static int transpiler_ast_visualizer_emit_node(const t_ast_node *node, t_runtime
     node_id = *counter;
     *counter += 1;
     transpiler_ast_visualizer_format_label(node, label, sizeof(label));
-    formatted_length = std::snprintf(line, sizeof(line), "    node%lu [label=\"%s\"];\n",
-        static_cast<unsigned long>(node_id), label);
+    formatted_length = std::snprintf(line, sizeof(line), "    node%zu [label=\"%s\"];\n",
+        node_id, label);
     if (formatted_length < 0)
         return (FT_FAILURE);
     if (runtime_file_write(file, line, static_cast<size_t>(formatted_length)) != FT_SUCCESS)
@@ -167,8 +167,8 @@ static int transpiler_ast_visualizer_emit_node(const t_ast_node *node, t_runtime
         if (transpiler_ast_visualizer_emit_node(node->children[child_index], file, counter,
                 &child_id) != FT_SUCCESS)
             return (FT_FAILURE);
-        formatted_length = std::snprintf(line, sizeof(line), "    node%lu -> node%lu;\n",
-            static_cast<unsigned long>(node_id), static_cast<unsigned long>(child_id));
+        formatted_length = std::snprintf(line, sizeof(line), "    node%zu -> node%zu;\n",
+            node_id, child_id);
         if (formatted_length < 0)
             return (FT_FAILURE);
         if (runtime_file_write(file, line, static_cast<size_t>(formatted_length)) != FT_SUCCESS)

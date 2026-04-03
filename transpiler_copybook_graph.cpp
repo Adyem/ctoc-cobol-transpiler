@@ -536,8 +536,8 @@ int transpiler_copybook_graph_emit(const t_transpiler_context *context, const t_
         char line[TRANSPILE_FILE_PATH_MAX * 2];
 
         transpiler_copybook_graph_escape_label(nodes.names[index], node_label, sizeof(node_label));
-        if (std::snprintf(line, sizeof(line), "    copybook_%lu [label=\"%s\"];\n",
-                static_cast<unsigned long>(index), node_label) < 0)
+        if (std::snprintf(line, sizeof(line), "    copybook_%zu [label=\"%s\"];\n",
+                index, node_label) < 0)
             goto cleanup;
         if (transpiler_copybook_graph_write_literal(&file, line) != FT_SUCCESS)
             goto cleanup;
@@ -552,8 +552,8 @@ int transpiler_copybook_graph_emit(const t_transpiler_context *context, const t_
         target_index = copybook_collection_index_of(&nodes, includes.names[index]);
         if (target_index < nodes.count)
         {
-            if (std::snprintf(line, sizeof(line), "    root -> copybook_%lu;\n",
-                    static_cast<unsigned long>(target_index)) < 0)
+            if (std::snprintf(line, sizeof(line), "    root -> copybook_%zu;\n",
+                    target_index) < 0)
                 goto cleanup;
             if (transpiler_copybook_graph_write_literal(&file, line) != FT_SUCCESS)
                 goto cleanup;
@@ -571,9 +571,9 @@ int transpiler_copybook_graph_emit(const t_transpiler_context *context, const t_
         to_index = copybook_collection_index_of(&nodes, edges.edges[index].to);
         if (from_index < nodes.count && to_index < nodes.count)
         {
-            if (std::snprintf(line, sizeof(line), "    copybook_%lu -> copybook_%lu;\n",
-                    static_cast<unsigned long>(from_index),
-                    static_cast<unsigned long>(to_index)) < 0)
+            if (std::snprintf(line, sizeof(line), "    copybook_%zu -> copybook_%zu;\n",
+                    from_index,
+                    to_index) < 0)
                 goto cleanup;
             if (transpiler_copybook_graph_write_literal(&file, line) != FT_SUCCESS)
                 goto cleanup;
