@@ -1,52 +1,42 @@
-char intro_header[40];
-char stage_label[16];
-char stage_detail[48];
-char stage_summary[64];
-int module_counter;
-int header_length;
+struct ModuleState
+{
+    string name[16];
+    int active;
+};
+
+ModuleState underwriting;
+ModuleState claims;
+ModuleState reporting_module;
+int module_count;
 int summary_length;
 
 function void main()
 {
-    std::strcpy(intro_header, "RISK ENGINE MODULES");
-    std::strcpy(stage_detail, "Bootstrapping analytics banner");
-    display(intro_header);
-    display(stage_detail);
-    header_length = std::strlen(intro_header);
-    display("Header chars");
-    display(header_length);
+    string banner[24];
+    string summary[32];
 
-    module_counter = 0;
+    banner = "RISK MODULES LIVE";
+    display(banner);
 
-    std::strcpy(stage_label, "UNDERWRITING");
-    std::strcpy(stage_detail, "Policy analytics active");
-    display(stage_label);
-    display(stage_detail);
-    std::strcpy(stage_summary, "UNDERWRITING / Policy analytics active");
-    display(stage_summary);
-    module_counter = module_counter + 1;
+    underwriting.name = "UNDERWRITING";
+    underwriting.active = 1;
+    claims.name = "CLAIMS";
+    claims.active = 1;
+    reporting_module.name = "REPORTING";
+    reporting_module.active = 1;
 
-    std::strcpy(stage_label, "CLAIMS");
-    std::strcpy(stage_detail, "Claims triage active");
-    display(stage_label);
-    display(stage_detail);
-    std::strcpy(stage_summary, "CLAIMS / Claims triage active");
-    display(stage_summary);
-    module_counter = module_counter + 1;
-
-    std::strcpy(stage_label, "REPORTING");
-    std::strcpy(stage_detail, "Compliance publishing ready");
-    display(stage_label);
-    display(stage_detail);
-    std::strcpy(stage_summary, "REPORTING / Compliance publishing ready");
-    display(stage_summary);
-    summary_length = std::strlen(stage_summary);
-    display("Latest summary length");
+    summary = "UNDERWRITING + CLAIMS";
+    display(summary);
+    summary_length = summary.len();
+    display("Summary length");
     display(summary_length);
-    module_counter = module_counter + 1;
 
-    std::strcpy(stage_label, "MODULE COUNT");
-    display(stage_label);
-    display(module_counter);
+    display(underwriting.name);
+    display(claims.name);
+    display(reporting_module.name);
+
+    module_count = underwriting.active + claims.active + reporting_module.active;
+    display("Module count");
+    display(module_count);
     return;
 }

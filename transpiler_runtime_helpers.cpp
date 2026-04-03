@@ -72,6 +72,66 @@ static const char g_runtime_helper_string_copy[] =
     "        *destination_length = copy_length;\n"
     "}\n";
 
+static const char g_runtime_helper_string_append_literal[] =
+    "static void cblc_string_append_literal(char *buffer, size_t capacity, size_t *length, const char *literal)\n"
+    "{\n"
+    "    size_t start;\n"
+    "    size_t literal_length;\n"
+    "    size_t write_length;\n"
+    "    size_t index;\n"
+    "\n"
+    "    if (!buffer || !length)\n"
+    "        return ;\n"
+    "    start = *length;\n"
+    "    if (start > capacity)\n"
+    "        start = capacity;\n"
+    "    literal_length = cblc_string_length(literal);\n"
+    "    write_length = literal_length;\n"
+    "    if (start + write_length > capacity)\n"
+    "        write_length = capacity - start;\n"
+    "    index = 0;\n"
+    "    while (index < write_length)\n"
+    "    {\n"
+    "        buffer[start + index] = literal[index];\n"
+    "        index += 1;\n"
+    "    }\n"
+    "    *length = start + write_length;\n"
+    "    while (start + index < capacity)\n"
+    "    {\n"
+    "        buffer[start + index] = ' ';\n"
+    "        index += 1;\n"
+    "    }\n"
+    "}\n";
+
+static const char g_runtime_helper_string_append[] =
+    "static void cblc_string_append(char *destination, size_t destination_capacity, size_t *destination_length, const char *source, size_t source_length)\n"
+    "{\n"
+    "    size_t start;\n"
+    "    size_t copy_length;\n"
+    "    size_t index;\n"
+    "\n"
+    "    if (!destination || !destination_length)\n"
+    "        return ;\n"
+    "    start = *destination_length;\n"
+    "    if (start > destination_capacity)\n"
+    "        start = destination_capacity;\n"
+    "    copy_length = source_length;\n"
+    "    if (start + copy_length > destination_capacity)\n"
+    "        copy_length = destination_capacity - start;\n"
+    "    index = 0;\n"
+    "    while (index < copy_length)\n"
+    "    {\n"
+    "        destination[start + index] = source[index];\n"
+    "        index += 1;\n"
+    "    }\n"
+    "    *destination_length = start + copy_length;\n"
+    "    while (start + index < destination_capacity)\n"
+    "    {\n"
+    "        destination[start + index] = ' ';\n"
+    "        index += 1;\n"
+    "    }\n"
+    "}\n";
+
 static const char g_runtime_helper_char_assign_literal[] =
     "static void cblc_char_assign_literal(char *buffer, size_t capacity, const char *literal)\n"
     "{\n"
@@ -171,6 +231,8 @@ static const t_transpiler_runtime_helper_entry g_runtime_helper_entries[] = {
     {"cblc_string_length", g_runtime_helper_string_length},
     {"cblc_string_assign_literal", g_runtime_helper_string_assign_literal},
     {"cblc_string_copy", g_runtime_helper_string_copy},
+    {"cblc_string_append_literal", g_runtime_helper_string_append_literal},
+    {"cblc_string_append", g_runtime_helper_string_append},
     {"cblc_char_assign_literal", g_runtime_helper_char_assign_literal},
     {"cblc_char_copy", g_runtime_helper_char_copy},
     {"cblc_display_string", g_runtime_helper_display_string},

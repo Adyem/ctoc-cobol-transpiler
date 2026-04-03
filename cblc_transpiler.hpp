@@ -946,6 +946,12 @@ typedef enum e_cblc_function_return_kind
     CBLC_FUNCTION_RETURN_INT
 }   t_cblc_function_return_kind;
 
+typedef enum e_cblc_member_visibility
+{
+    CBLC_MEMBER_VISIBILITY_PRIVATE = 0,
+    CBLC_MEMBER_VISIBILITY_PUBLIC
+}   t_cblc_member_visibility;
+
 #define TRANSPILE_STATEMENT_TEXT_MAX 256
 
 typedef struct s_cblc_statement t_cblc_statement;
@@ -977,6 +983,7 @@ typedef struct s_cblc_struct_field
     size_t length;
     t_cblc_data_kind kind;
     int is_const;
+    t_cblc_member_visibility visibility;
 }   t_cblc_struct_field;
 
 typedef struct s_cblc_method
@@ -984,6 +991,7 @@ typedef struct s_cblc_method
     char source_name[TRANSPILE_IDENTIFIER_MAX];
     char cobol_name[TRANSPILE_IDENTIFIER_MAX];
     t_cblc_function_return_kind return_kind;
+    t_cblc_member_visibility visibility;
     t_cblc_statement *statements;
     size_t statement_count;
     size_t statement_capacity;

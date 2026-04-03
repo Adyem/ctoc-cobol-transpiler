@@ -1943,6 +1943,135 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_parse_translation_unit_accepts_builtin_string_methods)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "int total;\n"
+        "function void main()\n"
+        "{\n"
+        "    string greeting[8];\n"
+        "    string suffix[4];\n"
+        "    greeting = \"HI\";\n"
+        "    suffix = \"!\";\n"
+        "    greeting.append(suffix);\n"
+        "    total = greeting.len();\n"
+        "    display(total);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "builtin string methods sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_emits_builtin_string_methods)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "int total;\n"
+        "function void main()\n"
+        "{\n"
+        "    string greeting[8];\n"
+        "    string suffix[4];\n"
+        "    greeting = \"HI\";\n"
+        "    suffix = \"!\";\n"
+        "    greeting.append(suffix);\n"
+        "    total = greeting.len();\n"
+        "    display(total);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "builtin string methods C sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "builtin string methods C sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c,
+            "cblc_string_append(main__greeting_buf, 8, &main__greeting_len, main__suffix_buf, main__suffix_len);",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit builtin string append helper call\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "total = (int)main__greeting_len;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should map builtin string len method to length storage\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_emits_builtin_string_methods)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "int total;\n"
+        "function void main()\n"
+        "{\n"
+        "    string greeting[8];\n"
+        "    string suffix[4];\n"
+        "    greeting = \"HI\";\n"
+        "    suffix = \"!\";\n"
+        "    greeting.append(suffix);\n"
+        "    total = greeting.len();\n"
+        "    display(total);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "builtin string methods COBOL sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "builtin string methods COBOL sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol,
+            "CALL 'CBLC-STRCAT-STRING' USING BY REFERENCE MAIN-GREETING BY REFERENCE MAIN-GREETING BY REFERENCE MAIN-SUFFIX BY REFERENCE CBLC-HELPER-STATUS.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit builtin string append helper call\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "COMPUTE TOTAL = MAIN-GREETING-LEN.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should map builtin string len method to GREETING-LEN\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_parse_translation_unit_records_class_methods)
 {
     const char *source;
@@ -1951,6 +2080,7 @@ FT_TEST(test_cblc_parse_translation_unit_records_class_methods)
 
     source = "class Counter\n"
         "{\n"
+        "    public:\n"
         "    int value;\n"
         "    void reset() {\n"
         "        value = 0;\n"
@@ -2006,6 +2136,7 @@ FT_TEST(test_cblc_generate_c_emits_class_methods)
 
     source = "class Counter\n"
         "{\n"
+        "    public:\n"
         "    int value;\n"
         "    void reset() {\n"
         "        value = 0;\n"
@@ -2063,6 +2194,7 @@ FT_TEST(test_cblc_generate_cobol_emits_class_methods)
 
     source = "class Counter\n"
         "{\n"
+        "    public:\n"
         "    int value;\n"
         "    void reset() {\n"
         "        value = 0;\n"
@@ -2107,6 +2239,144 @@ FT_TEST(test_cblc_generate_cobol_emits_class_methods)
 cleanup:
     if (generated_cobol)
         cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_translation_unit_rejects_private_field_access_outside_class)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    int value;\n"
+        "};\n"
+        "Counter counter;\n"
+        "function void main()\n"
+        "{\n"
+        "    counter.value = 7;\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_SUCCESS)
+    {
+        std::printf("Assertion failed: private class fields should not be accessible outside the class\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_translation_unit_rejects_private_method_call_outside_class)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    void reset() {\n"
+        "        return;\n"
+        "    }\n"
+        "};\n"
+        "Counter counter;\n"
+        "function void main()\n"
+        "{\n"
+        "    counter.reset();\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_SUCCESS)
+    {
+        std::printf("Assertion failed: private class methods should not be callable outside the class\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_translation_unit_accepts_public_members_outside_class)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    private:\n"
+        "    int value;\n"
+        "    public:\n"
+        "    void reset() {\n"
+        "        value = 0;\n"
+        "        return;\n"
+        "    }\n"
+        "    int current() {\n"
+        "        return value;\n"
+        "    }\n"
+        "};\n"
+        "Counter counter;\n"
+        "int total;\n"
+        "function void main()\n"
+        "{\n"
+        "    counter.reset();\n"
+        "    total = counter.current();\n"
+        "    display(total);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "public class methods should be callable outside the class") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_translation_unit_accepts_private_access_within_class_methods)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    private:\n"
+        "    int value;\n"
+        "    public:\n"
+        "    void reset() {\n"
+        "        value = 0;\n"
+        "        return;\n"
+        "    }\n"
+        "    int current() {\n"
+        "        return value;\n"
+        "    }\n"
+        "};\n"
+        "Counter counter;\n"
+        "int total;\n"
+        "function void main()\n"
+        "{\n"
+        "    counter.reset();\n"
+        "    total = counter.current();\n"
+        "    display(total);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "class methods should be allowed to access private fields internally") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
     cblc_translation_unit_dispose(&unit);
     return (status);
 }
@@ -2445,12 +2715,26 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_parse_translation_unit_registers_builtin_string_class},
         {"cblc_generate_c_emits_local_string_lifecycle",
             test_cblc_generate_c_emits_local_string_lifecycle},
+        {"cblc_parse_translation_unit_accepts_builtin_string_methods",
+            test_cblc_parse_translation_unit_accepts_builtin_string_methods},
+        {"cblc_generate_c_emits_builtin_string_methods",
+            test_cblc_generate_c_emits_builtin_string_methods},
+        {"cblc_generate_cobol_emits_builtin_string_methods",
+            test_cblc_generate_cobol_emits_builtin_string_methods},
         {"cblc_parse_translation_unit_records_class_methods",
             test_cblc_parse_translation_unit_records_class_methods},
         {"cblc_generate_c_emits_class_methods",
             test_cblc_generate_c_emits_class_methods},
         {"cblc_generate_cobol_emits_class_methods",
             test_cblc_generate_cobol_emits_class_methods},
+        {"cblc_parse_translation_unit_rejects_private_field_access_outside_class",
+            test_cblc_parse_translation_unit_rejects_private_field_access_outside_class},
+        {"cblc_parse_translation_unit_rejects_private_method_call_outside_class",
+            test_cblc_parse_translation_unit_rejects_private_method_call_outside_class},
+        {"cblc_parse_translation_unit_accepts_public_members_outside_class",
+            test_cblc_parse_translation_unit_accepts_public_members_outside_class},
+        {"cblc_parse_translation_unit_accepts_private_access_within_class_methods",
+            test_cblc_parse_translation_unit_accepts_private_access_within_class_methods},
         {"cblc_generate_c_emits_constructor_initializer_list_in_declaration_order",
             test_cblc_generate_c_emits_constructor_initializer_list_in_declaration_order},
         {"cblc_generate_c_parses_const_member_initializer_list",

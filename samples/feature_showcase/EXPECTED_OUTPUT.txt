@@ -1,19 +1,6 @@
-DAILY INSURANCE SNAPSHOT
-Header length
-+000000024
-STEP 1
-Load underwriting context
-Detail summary: Load underwriting context
-STEP 2
-Sync policy counters
-Detail summary: Sync policy counters
-Copy header into report buffer
-DAILY INSURANCE SNAPSHOT
-Report line length
-+000000024
-STEP 3
-Evaluate reserve impact
-Reserve impact review complete
+DAILY SNAPSHOT READY
+Title length
++000000020
 Policies in force
 +000001250
 Claims reported
@@ -24,26 +11,15 @@ Loss ratio percent
 +000000015
 Claim clearance delta
 +000000027
-STEP 4
-All metrics published
-AUDIT COMPLETE
 
-RISK ENGINE MODULES
-Bootstrapping analytics banner
-Header chars
-+000000019
+RISK MODULES LIVE
+UNDERWRITING + CLAIMS
+Summary length
++000000021
 UNDERWRITING
-Policy analytics active
-UNDERWRITING / Policy analytics active
 CLAIMS
-Claims triage active
-CLAIMS / Claims triage active
 REPORTING
-Compliance publishing ready
-REPORTING / Compliance publishing ready
-Latest summary length
-+000000039
-MODULE COUNT
+Module count
 +000000003
 
 DAILY RISK METRICS
@@ -57,15 +33,9 @@ Reserve target gap
 +000120000
 Average paid claim
 +000036000
-Trend note: Average claim stable
+Average claim stable
 Note length
-+000000032
-SUMMARY TOTALS
-+000480000
-+000072000
-+000000015
-+000120000
-+000036000
++000000020
 
 Standard library functions bundled with the showcase:
 stdlib/CBLC-ABS.cob

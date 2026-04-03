@@ -19,6 +19,7 @@ typedef struct s_cblc_constructor_parse_state
 }   t_cblc_constructor_parse_state;
 
 static t_cblc_constructor_parse_state g_cblc_constructor_parse_state = {NULL, NULL, 0};
+static const t_cblc_struct_type *g_cblc_member_access_type = NULL;
 
 static int cblc_parse_std_strcpy(const char **cursor, t_cblc_translation_unit *unit,
     t_cblc_function *function);
@@ -50,6 +51,8 @@ static int cblc_parse_numeric_expression(const char **cursor, t_cblc_translation
     char *buffer, size_t buffer_size);
 static int cblc_parse_numeric_expression_until_paren(const char **cursor,
     t_cblc_translation_unit *unit, char *buffer, size_t buffer_size);
+static const t_cblc_struct_type *cblc_find_receiver_type(const t_cblc_translation_unit *unit,
+    const t_cblc_data_item *item);
 
 static void cobol_text_builder_init(t_cobol_text_builder *builder)
 {
@@ -427,6 +430,7 @@ static int cblc_translation_unit_ensure_struct_capacity(t_cblc_translation_unit 
 static int cblc_register_builtin_string_type(t_cblc_translation_unit *unit)
 {
     t_cblc_struct_type *type;
+    t_cblc_method *method;
 
     if (!unit)
         return (FT_FAILURE);
@@ -444,6 +448,22 @@ static int cblc_register_builtin_string_type(t_cblc_translation_unit *unit)
     type->is_builtin = 1;
     type->has_default_constructor = 1;
     type->has_destructor = 1;
+    if (cblc_struct_type_ensure_method_capacity(type, 2) != FT_SUCCESS)
+        return (FT_FAILURE);
+    method = &type->methods[type->method_count];
+    std::memset(method, 0, sizeof(*method));
+    ft_strlcpy(method->source_name, "append", sizeof(method->source_name));
+    cblc_identifier_to_cobol(method->source_name, method->cobol_name, sizeof(method->cobol_name));
+    method->return_kind = CBLC_FUNCTION_RETURN_VOID;
+    method->visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
+    type->method_count += 1;
+    method = &type->methods[type->method_count];
+    std::memset(method, 0, sizeof(*method));
+    ft_strlcpy(method->source_name, "len", sizeof(method->source_name));
+    cblc_identifier_to_cobol(method->source_name, method->cobol_name, sizeof(method->cobol_name));
+    method->return_kind = CBLC_FUNCTION_RETURN_INT;
+    method->visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
+    type->method_count += 1;
     unit->struct_type_count += 1;
     return (FT_SUCCESS);
 }
@@ -1064,6 +1084,63 @@ static const t_cblc_method *cblc_find_method_on_type(const t_cblc_struct_type *t
     return (NULL);
 }
 
+static const t_cblc_struct_field *cblc_find_field_on_type(const t_cblc_struct_type *type,
+    const char *identifier)
+{
+    size_t index;
+
+    if (!type || !identifier)
+        return (NULL);
+    index = 0;
+    while (index < type->field_count)
+    {
+        if (std::strncmp(type->fields[index].source_name, identifier,
+                sizeof(type->fields[index].source_name)) == 0)
+            return (&type->fields[index]);
+        index += 1;
+    }
+    return (NULL);
+}
+
+static int cblc_member_visibility_is_allowed(const t_cblc_struct_type *owner_type,
+    t_cblc_member_visibility visibility)
+{
+    if (visibility == CBLC_MEMBER_VISIBILITY_PUBLIC)
+        return (1);
+    if (!owner_type || !g_cblc_member_access_type)
+        return (0);
+    if (std::strncmp(owner_type->source_name, g_cblc_member_access_type->source_name,
+            sizeof(owner_type->source_name)) == 0)
+        return (1);
+    return (0);
+}
+
+static int cblc_parse_member_visibility_label(const char **cursor,
+    t_cblc_member_visibility *current_visibility)
+{
+    const char *start;
+    t_cblc_member_visibility visibility;
+
+    if (!cursor || !*cursor || !current_visibility)
+        return (FT_FAILURE);
+    start = *cursor;
+    if (cblc_match_keyword(cursor, "private"))
+        visibility = CBLC_MEMBER_VISIBILITY_PRIVATE;
+    else if (cblc_match_keyword(cursor, "public"))
+        visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
+    else
+        return (FT_FAILURE);
+    cblc_skip_whitespace(cursor);
+    if (**cursor != ':')
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    *cursor += 1;
+    *current_visibility = visibility;
+    return (FT_SUCCESS);
+}
+
 static const t_cblc_struct_type *cblc_find_declared_type_for_item(
     const t_cblc_translation_unit *unit, const t_cblc_data_item *item)
 {
@@ -1185,6 +1262,8 @@ static int cblc_parse_data_reference(const char **cursor, t_cblc_translation_uni
     {
         char member_identifier[TRANSPILE_IDENTIFIER_MAX];
         char field_source_name[TRANSPILE_IDENTIFIER_MAX];
+        const t_cblc_struct_type *owner_type;
+        const t_cblc_struct_field *field;
 
         *cursor += 1;
         if (cblc_parse_identifier(cursor, member_identifier,
@@ -1200,6 +1279,10 @@ static int cblc_parse_data_reference(const char **cursor, t_cblc_translation_uni
         }
         if (item->kind != CBLC_DATA_KIND_STRUCT)
             return (FT_FAILURE);
+        owner_type = cblc_find_receiver_type(unit, item);
+        field = cblc_find_field_on_type(owner_type, member_identifier);
+        if (!field || !cblc_member_visibility_is_allowed(owner_type, field->visibility))
+            return (FT_FAILURE);
         cblc_build_field_source_name(item->source_name, member_identifier, field_source_name,
             sizeof(field_source_name));
         item = cblc_find_data_item(unit, field_source_name);
@@ -1213,7 +1296,8 @@ static int cblc_parse_data_reference(const char **cursor, t_cblc_translation_uni
 }
 
 static int cblc_struct_type_append_field(t_cblc_struct_type *type, const char *identifier,
-    size_t length, t_cblc_data_kind kind, const char *struct_type_name, int is_const)
+    size_t length, t_cblc_data_kind kind, const char *struct_type_name, int is_const,
+    t_cblc_member_visibility visibility)
 {
     t_cblc_struct_field *field;
 
@@ -1239,12 +1323,13 @@ static int cblc_struct_type_append_field(t_cblc_struct_type *type, const char *i
     field->length = length;
     field->kind = kind;
     field->is_const = is_const;
+    field->visibility = visibility;
     type->field_count += 1;
     return (FT_SUCCESS);
 }
 
 static int cblc_parse_struct_field_declaration(const char **cursor, t_cblc_translation_unit *unit,
-    t_cblc_struct_type *type)
+    t_cblc_struct_type *type, t_cblc_member_visibility visibility)
 {
     const char *start;
     const t_cblc_struct_type *field_type;
@@ -1271,7 +1356,7 @@ static int cblc_parse_struct_field_declaration(const char **cursor, t_cblc_trans
             return (FT_FAILURE);
         *cursor += 1;
         return (cblc_struct_type_append_field(type, identifier, 0, CBLC_DATA_KIND_INT, NULL,
-                is_const));
+                is_const, visibility));
     }
     if (cblc_match_keyword(cursor, "char"))
     {
@@ -1296,7 +1381,7 @@ static int cblc_parse_struct_field_declaration(const char **cursor, t_cblc_trans
             return (FT_FAILURE);
         *cursor += 1;
         return (cblc_struct_type_append_field(type, identifier, length, CBLC_DATA_KIND_CHAR, NULL,
-                is_const));
+                is_const, visibility));
     }
     if (cblc_match_keyword(cursor, "string"))
     {
@@ -1321,7 +1406,7 @@ static int cblc_parse_struct_field_declaration(const char **cursor, t_cblc_trans
             return (FT_FAILURE);
         *cursor += 1;
         return (cblc_struct_type_append_field(type, identifier, length, CBLC_DATA_KIND_STRING, NULL,
-                is_const));
+                is_const, visibility));
     }
     start = *cursor;
     if (cblc_parse_identifier(cursor, type_identifier, sizeof(type_identifier)) != FT_SUCCESS)
@@ -1346,7 +1431,7 @@ static int cblc_parse_struct_field_declaration(const char **cursor, t_cblc_trans
     }
     *cursor += 1;
     return (cblc_struct_type_append_field(type, identifier, 0, CBLC_DATA_KIND_STRUCT,
-        field_type->source_name, is_const));
+        field_type->source_name, is_const, visibility));
 }
 
 static int cblc_parse_lifecycle_declaration(const char **cursor, t_cblc_translation_unit *unit,
@@ -1447,6 +1532,7 @@ static int cblc_capture_method_body(const char **cursor, t_cblc_translation_unit
 {
     t_cblc_function method_function;
     size_t saved_data_count;
+    const t_cblc_struct_type *saved_access_type;
     int status;
 
     if (!cursor || !*cursor || !unit || !type || !out_statements || !out_count || !out_capacity)
@@ -1457,10 +1543,13 @@ static int cblc_capture_method_body(const char **cursor, t_cblc_translation_unit
         ft_strlcpy(method_function.return_cobol_name, "CBLC-THIS-RET",
             sizeof(method_function.return_cobol_name));
     saved_data_count = unit->data_count;
+    saved_access_type = g_cblc_member_access_type;
     if (cblc_bind_lifecycle_scope(unit, type, &saved_data_count) != FT_SUCCESS)
         return (FT_FAILURE);
+    g_cblc_member_access_type = type;
     status = cblc_parse_statement_block(cursor, unit, &method_function, 1);
     cblc_unbind_lifecycle_scope(unit, saved_data_count);
+    g_cblc_member_access_type = saved_access_type;
     if (status != FT_SUCCESS || (return_kind == CBLC_FUNCTION_RETURN_INT && !method_function.saw_return))
     {
         if (method_function.statements)
@@ -1478,7 +1567,7 @@ static int cblc_capture_method_body(const char **cursor, t_cblc_translation_unit
 }
 
 static int cblc_parse_method_definition(const char **cursor, t_cblc_translation_unit *unit,
-    t_cblc_struct_type *type)
+    t_cblc_struct_type *type, t_cblc_member_visibility visibility)
 {
     const char *start;
     t_cblc_method *method;
@@ -1553,6 +1642,7 @@ static int cblc_parse_method_definition(const char **cursor, t_cblc_translation_
     ft_strlcpy(method->source_name, identifier, sizeof(method->source_name));
     cblc_identifier_to_cobol(identifier, method->cobol_name, sizeof(method->cobol_name));
     method->return_kind = return_kind;
+    method->visibility = visibility;
     method->statements = statements;
     method->statement_count = statement_count;
     method->statement_capacity = statement_capacity;
@@ -1565,6 +1655,7 @@ static int cblc_parse_struct_definition(const char **cursor, t_cblc_translation_
     t_cblc_struct_type *type;
     char identifier[TRANSPILE_IDENTIFIER_MAX];
     int is_class;
+    t_cblc_member_visibility current_visibility;
 
     if (!cursor || !*cursor || !unit)
         return (FT_FAILURE);
@@ -1593,17 +1684,25 @@ static int cblc_parse_struct_definition(const char **cursor, t_cblc_translation_
     ft_strlcpy(type->source_name, identifier, sizeof(type->source_name));
     cblc_identifier_to_cobol(identifier, type->cobol_name, sizeof(type->cobol_name));
     type->is_class = is_class;
+    if (is_class)
+        current_visibility = CBLC_MEMBER_VISIBILITY_PRIVATE;
+    else
+        current_visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
     *cursor += 1;
     while (**cursor != '\0')
     {
         cblc_skip_whitespace(cursor);
         if (**cursor == '}')
             break ;
+        if (type->is_class
+            && cblc_parse_member_visibility_label(cursor, &current_visibility) == FT_SUCCESS)
+            continue ;
         if (cblc_parse_lifecycle_declaration(cursor, unit, type) == FT_SUCCESS)
             continue ;
-        if (cblc_parse_method_definition(cursor, unit, type) == FT_SUCCESS)
+        if (cblc_parse_method_definition(cursor, unit, type, current_visibility) == FT_SUCCESS)
             continue ;
-        if (cblc_parse_struct_field_declaration(cursor, unit, type) != FT_SUCCESS)
+        if (cblc_parse_struct_field_declaration(cursor, unit, type, current_visibility)
+            != FT_SUCCESS)
             return (FT_FAILURE);
     }
     if (**cursor != '}')
@@ -2036,6 +2135,8 @@ static int cblc_parse_method_receiver(const char **cursor, t_cblc_translation_un
         const char *member_start;
         char member_identifier[TRANSPILE_IDENTIFIER_MAX];
         const t_cblc_struct_type *receiver_type;
+        const t_cblc_struct_field *field;
+        const t_cblc_method *method;
         char field_source_name[TRANSPILE_IDENTIFIER_MAX];
         t_cblc_data_item *next_item;
         const char *after_member;
@@ -2049,7 +2150,9 @@ static int cblc_parse_method_receiver(const char **cursor, t_cblc_translation_un
         }
         after_member = *cursor;
         receiver_type = cblc_find_receiver_type(unit, item);
-        if (receiver_type && cblc_find_method_on_type(receiver_type, member_identifier))
+        method = cblc_find_method_on_type(receiver_type, member_identifier);
+        if (receiver_type && method
+            && cblc_member_visibility_is_allowed(receiver_type, method->visibility))
         {
             const char *probe;
 
@@ -2069,6 +2172,12 @@ static int cblc_parse_method_receiver(const char **cursor, t_cblc_translation_un
             return (FT_FAILURE);
         }
         if (item->kind != CBLC_DATA_KIND_STRUCT)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        field = cblc_find_field_on_type(receiver_type, member_identifier);
+        if (!field || !cblc_member_visibility_is_allowed(receiver_type, field->visibility))
         {
             *cursor = start;
             return (FT_FAILURE);
@@ -2225,16 +2334,20 @@ static int cblc_capture_lifecycle_body(const char **cursor, t_cblc_translation_u
 {
     t_cblc_function lifecycle_function;
     size_t saved_data_count;
+    const t_cblc_struct_type *saved_access_type;
     int status;
 
     if (!cursor || !*cursor || !unit || !type || !out_statements || !out_count || !out_capacity)
         return (FT_FAILURE);
     std::memset(&lifecycle_function, 0, sizeof(lifecycle_function));
     saved_data_count = unit->data_count;
+    saved_access_type = g_cblc_member_access_type;
     if (cblc_bind_lifecycle_scope(unit, type, &saved_data_count) != FT_SUCCESS)
         return (FT_FAILURE);
+    g_cblc_member_access_type = type;
     status = cblc_parse_statement_block(cursor, unit, &lifecycle_function, 0);
     cblc_unbind_lifecycle_scope(unit, saved_data_count);
+    g_cblc_member_access_type = saved_access_type;
     if (status != FT_SUCCESS)
     {
         if (lifecycle_function.statements)
@@ -2498,6 +2611,7 @@ static int cblc_capture_constructor_body(const char **cursor, t_cblc_translation
     int *seen_fields;
     size_t saved_data_count;
     size_t index;
+    const t_cblc_struct_type *saved_access_type;
     int status;
 
     if (!cursor || !*cursor || !unit || !type || !out_statements || !out_count || !out_capacity)
@@ -2516,6 +2630,7 @@ static int cblc_capture_constructor_body(const char **cursor, t_cblc_translation
         return (FT_FAILURE);
     }
     saved_data_count = unit->data_count;
+    saved_access_type = g_cblc_member_access_type;
     if (cblc_bind_lifecycle_scope(unit, type, &saved_data_count) != FT_SUCCESS)
     {
         cma_free(field_functions);
@@ -2525,6 +2640,7 @@ static int cblc_capture_constructor_body(const char **cursor, t_cblc_translation
     g_cblc_constructor_parse_state.type = type;
     g_cblc_constructor_parse_state.initialized_fields = seen_fields;
     g_cblc_constructor_parse_state.active = 1;
+    g_cblc_member_access_type = type;
     cblc_skip_whitespace(cursor);
     if (**cursor == ':')
     {
@@ -2606,6 +2722,7 @@ cleanup:
     g_cblc_constructor_parse_state.type = NULL;
     g_cblc_constructor_parse_state.initialized_fields = NULL;
     g_cblc_constructor_parse_state.active = 0;
+    g_cblc_member_access_type = saved_access_type;
     cblc_unbind_lifecycle_scope(unit, saved_data_count);
     if (constructor_function.statements)
         cma_free(constructor_function.statements);
@@ -3632,6 +3749,136 @@ static int cblc_parse_method_call_assignment(const char **cursor,
     return (FT_SUCCESS);
 }
 
+static int cblc_parse_builtin_string_append_call(const char **cursor,
+    t_cblc_translation_unit *unit, t_cblc_function *function)
+{
+    const char *start;
+    t_cblc_data_item *receiver_item;
+    const t_cblc_struct_type *receiver_type;
+    t_cblc_data_item *argument_item;
+    char method_name[TRANSPILE_IDENTIFIER_MAX];
+    char receiver_cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    char source_cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    char literal_buffer[TRANSPILE_STATEMENT_TEXT_MAX];
+    char cobol_literal[TRANSPILE_STATEMENT_TEXT_MAX];
+    t_cblc_statement *statement;
+
+    if (!cursor || !*cursor || !unit || !function)
+        return (FT_FAILURE);
+    start = *cursor;
+    if (cblc_parse_method_receiver(cursor, unit, &receiver_item, method_name,
+            sizeof(method_name)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    receiver_type = cblc_find_receiver_type(unit, receiver_item);
+    if (!receiver_type || !receiver_type->is_builtin
+        || std::strncmp(receiver_type->source_name, "string", TRANSPILE_IDENTIFIER_MAX) != 0
+        || std::strncmp(method_name, "append", sizeof(method_name)) != 0)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    cblc_skip_whitespace(cursor);
+    if (**cursor != '(')
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    *cursor += 1;
+    cblc_skip_whitespace(cursor);
+    ft_strlcpy(receiver_cobol_name, receiver_item->cobol_name, sizeof(receiver_cobol_name));
+    if (**cursor == '"')
+    {
+        t_cblc_data_item *source_item;
+        size_t literal_length;
+
+        if (cblc_parse_string_literal(cursor, literal_buffer, sizeof(literal_buffer)) != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        literal_length = std::strlen(literal_buffer);
+        cobol_literal[0] = '"';
+        cobol_literal[1] = '\0';
+        ft_strlcat(cobol_literal, literal_buffer, sizeof(cobol_literal));
+        ft_strlcat(cobol_literal, "\"", sizeof(cobol_literal));
+        source_item = cblc_create_literal_buffer(unit, literal_length);
+        if (!source_item)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        if (cblc_append_statement(function, CBLC_STATEMENT_ASSIGNMENT,
+                source_item->cobol_name, cobol_literal, 1) != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        cblc_skip_whitespace(cursor);
+        if (**cursor != ')')
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        *cursor += 1;
+        cblc_skip_whitespace(cursor);
+        if (**cursor != ';')
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        *cursor += 1;
+        if (!cblc_ensure_helper_status(unit))
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        if (cblc_append_statement(function, CBLC_STATEMENT_METHOD_CALL,
+                receiver_cobol_name, source_item->cobol_name, 0) != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        statement = &function->statements[function->statement_count - 1];
+        ft_strlcpy(statement->call_identifier, method_name, sizeof(statement->call_identifier));
+        return (FT_SUCCESS);
+    }
+    if (cblc_parse_data_reference(cursor, unit, &argument_item, NULL) != FT_SUCCESS
+        || !argument_item || argument_item->kind != CBLC_DATA_KIND_STRING)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    ft_strlcpy(source_cobol_name, argument_item->cobol_name, sizeof(source_cobol_name));
+    cblc_skip_whitespace(cursor);
+    if (**cursor != ')')
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    *cursor += 1;
+    cblc_skip_whitespace(cursor);
+    if (**cursor != ';')
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    *cursor += 1;
+    if (!cblc_ensure_helper_status(unit))
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    if (cblc_append_statement(function, CBLC_STATEMENT_METHOD_CALL,
+            receiver_cobol_name, source_cobol_name, 0) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    statement = &function->statements[function->statement_count - 1];
+    ft_strlcpy(statement->call_identifier, method_name, sizeof(statement->call_identifier));
+    return (FT_SUCCESS);
+}
+
 static int cblc_parse_std_strlen_assignment(const char **cursor, t_cblc_translation_unit *unit,
     t_cblc_function *function, t_cblc_data_item *target_item)
 {
@@ -4067,6 +4314,9 @@ static int cblc_parse_method_call(const char **cursor, t_cblc_translation_unit *
     if (!cursor || !*cursor || !unit || !function)
         return (FT_FAILURE);
     start = *cursor;
+    if (cblc_parse_builtin_string_append_call(cursor, unit, function) == FT_SUCCESS)
+        return (FT_SUCCESS);
+    *cursor = start;
     if (cblc_parse_method_receiver(cursor, unit, &receiver_item, method_name,
             sizeof(method_name)) != FT_SUCCESS)
         return (FT_FAILURE);
@@ -4752,6 +5002,50 @@ static int cblc_emit_method_statement(const t_cblc_translation_unit *unit,
     method = cblc_find_method_on_type(receiver_type, statement->call_identifier);
     if (!method)
         return (FT_FAILURE);
+    if (receiver_type->is_builtin
+        && std::strncmp(receiver_type->source_name, "string", TRANSPILE_IDENTIFIER_MAX) == 0)
+    {
+        char line[512];
+        const t_cblc_data_item *status_item;
+
+        if (std::strncmp(statement->call_identifier, "append",
+                sizeof(statement->call_identifier)) == 0)
+        {
+            if (unit->helper_status_index < 0
+                || static_cast<size_t>(unit->helper_status_index) >= unit->data_count)
+                return (FT_FAILURE);
+            status_item = &unit->data_items[unit->helper_status_index];
+            if (!status_item)
+                return (FT_FAILURE);
+            if (statement->is_literal)
+            {
+                if (std::snprintf(line, sizeof(line),
+                        "           CALL 'CBLC-STRCAT-STRING' USING BY REFERENCE %s BY REFERENCE %s BY REFERENCE 0 %s BY REFERENCE %s.",
+                        receiver->cobol_name, receiver->cobol_name, statement->source,
+                        status_item->cobol_name) < 0)
+                    return (FT_FAILURE);
+            }
+            else
+            {
+                if (std::snprintf(line, sizeof(line),
+                        "           CALL 'CBLC-STRCAT-STRING' USING BY REFERENCE %s BY REFERENCE %s BY REFERENCE %s BY REFERENCE %s.",
+                        receiver->cobol_name, receiver->cobol_name, statement->source,
+                        status_item->cobol_name) < 0)
+                    return (FT_FAILURE);
+            }
+            return (cobol_text_builder_append_line(builder, line));
+        }
+        if (std::strncmp(statement->call_identifier, "len",
+                sizeof(statement->call_identifier)) == 0)
+        {
+            if (!assign_target || assign_target[0] == '\0')
+                return (FT_FAILURE);
+            if (std::snprintf(line, sizeof(line), "           COMPUTE %s = %s-LEN.",
+                    assign_target, receiver->cobol_name) < 0)
+                return (FT_FAILURE);
+            return (cobol_text_builder_append_line(builder, line));
+        }
+    }
     return (cblc_emit_method_body(unit, receiver, method, assign_target, builder));
 }
 

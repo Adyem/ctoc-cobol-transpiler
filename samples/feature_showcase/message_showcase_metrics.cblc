@@ -1,53 +1,75 @@
-char metrics_header[32];
-char trend_note[48];
-char note_line[64];
-int net_premium;
-int claim_payout;
-int reserve_target;
-int reserve_gap;
-int loss_ratio_percent;
-int claims_paid;
-int average_claim;
-int payout_scaled;
+const int reserve_target = 600000;
+const int claims_paid = 2;
+
+class Metrics
+{
+    private:
+    int net_premium_value;
+    int claim_payout_value;
+
+    public:
+    void load() {
+        net_premium_value = 480000;
+        claim_payout_value = 72000;
+        return;
+    }
+
+    int net_premium() {
+        return net_premium_value;
+    }
+
+    int claim_payout() {
+        return claim_payout_value;
+    }
+
+    int reserve_gap() {
+        return reserve_target - net_premium_value;
+    }
+
+    int loss_ratio_percent() {
+        return claim_payout_value * 100 / net_premium_value;
+    }
+
+    int average_claim() {
+        return claim_payout_value / claims_paid;
+    }
+};
+
+Metrics metrics;
+int net_premium_total;
+int claim_payout_total;
+int reserve_gap_total;
+int loss_ratio_total;
+int average_claim_total;
 int note_length;
 
 function void main()
 {
-    std::strcpy(metrics_header, "DAILY RISK METRICS");
-    display(metrics_header);
+    string note[32];
 
-    claims_paid = 2;
-    net_premium = 480000;
-    claim_payout = 72000;
-    reserve_target = 600000;
-    reserve_gap = reserve_target - net_premium;
-    payout_scaled = claim_payout * 100;
-    loss_ratio_percent = payout_scaled / net_premium;
-    average_claim = claim_payout / claims_paid;
+    metrics.load();
+    net_premium_total = metrics.net_premium();
+    claim_payout_total = metrics.claim_payout();
+    reserve_gap_total = metrics.reserve_gap();
+    loss_ratio_total = metrics.loss_ratio_percent();
+    average_claim_total = metrics.average_claim();
 
+    display("DAILY RISK METRICS");
     display("Net premium written");
-    display(net_premium);
+    display(net_premium_total);
     display("Claim payout total");
-    display(claim_payout);
+    display(claim_payout_total);
     display("Loss ratio percent");
-    display(loss_ratio_percent);
+    display(loss_ratio_total);
     display("Reserve target gap");
-    display(reserve_gap);
+    display(reserve_gap_total);
     display("Average paid claim");
-    display(average_claim);
+    display(average_claim_total);
 
-    std::strcpy(trend_note, "Average claim stable");
-    std::strcpy(note_line, "Trend note: Average claim stable");
-    display(note_line);
-    note_length = std::strlen(note_line);
+    note = "Average claim stable";
+    display(note);
+    note_length = note.len();
     display("Note length");
     display(note_length);
-
-    display("SUMMARY TOTALS");
-    display(net_premium);
-    display(claim_payout);
-    display(loss_ratio_percent);
-    display(reserve_gap);
-    display(average_claim);
     return;
 }

@@ -83,7 +83,7 @@ $(STD_DIR)/%$(MODULE_EXT): $(STD_SENTINEL) | ensure_cobc
 ensure_environment: $(SETUP_SENTINEL)
 
 $(SETUP_SENTINEL):
-	$(MAKE) -C $(REPO_ROOT) initialize
+	$(MAKE) -C $(REPO_ROOT) all
 	$(MAKE) -C $(REPO_ROOT) install_cobc
 	touch $@
 
