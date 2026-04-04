@@ -277,6 +277,23 @@ static int parser_set_error(t_parser *parser)
 {
     if (!parser)
         return (FT_FAILURE);
+    if (!parser->has_error_token)
+    {
+        if (parser->has_current)
+        {
+            parser->error_token = parser->current;
+            parser->has_error_token = 1;
+        }
+        else
+        {
+            parser->error_token.kind = LEXER_TOKEN_END_OF_FILE;
+            parser->error_token.lexeme = parser->lexer.text + parser->lexer.offset;
+            parser->error_token.length = 0;
+            parser->error_token.line = parser->lexer.line;
+            parser->error_token.column = parser->lexer.column;
+            parser->has_error_token = 1;
+        }
+    }
     parser->last_error = FT_FAILURE;
     return (FT_FAILURE);
 }
@@ -293,6 +310,11 @@ static void parser_record_recoverable_error(t_parser *parser)
 {
     if (!parser)
         return ;
+    if (!parser->has_error_token && parser->has_current)
+    {
+        parser->error_token = parser->current;
+        parser->has_error_token = 1;
+    }
     parser->error_count += 1;
     parser->last_error = FT_FAILURE;
 }
@@ -343,7 +365,10 @@ void parser_init(t_parser *parser, const char *text)
         return ;
     lexer_init(&parser->lexer, text);
     lexer_set_context(&parser->lexer, NULL);
+    ft_bzero(&parser->current, sizeof(parser->current));
+    ft_bzero(&parser->error_token, sizeof(parser->error_token));
     parser->has_current = 0;
+    parser->has_error_token = 0;
     parser->last_error = FT_SUCCESS;
     parser->error_count = 0;
 }
@@ -354,7 +379,10 @@ void parser_init_with_context(t_parser *parser, const char *text, t_transpiler_c
         return ;
     lexer_init(&parser->lexer, text);
     lexer_set_context(&parser->lexer, context);
+    ft_bzero(&parser->current, sizeof(parser->current));
+    ft_bzero(&parser->error_token, sizeof(parser->error_token));
     parser->has_current = 0;
+    parser->has_error_token = 0;
     parser->last_error = FT_SUCCESS;
     parser->error_count = 0;
 }
@@ -363,7 +391,10 @@ void parser_dispose(t_parser *parser)
 {
     if (!parser)
         return ;
+    ft_bzero(&parser->current, sizeof(parser->current));
+    ft_bzero(&parser->error_token, sizeof(parser->error_token));
     parser->has_current = 0;
+    parser->has_error_token = 0;
     parser->last_error = FT_SUCCESS;
     parser->error_count = 0;
 }

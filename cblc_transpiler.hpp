@@ -757,6 +757,8 @@ typedef struct s_lexer_token
 
 t_lexer_token_kind lexer_token_lookup_keyword(const char *text, size_t length);
 t_lexer_trivia_kind lexer_classify_trivia(const char *text, size_t length);
+int lexer_token_get_span(const t_lexer_token *token, const char *path,
+    struct s_transpiler_source_span *span);
 
 typedef struct s_lexer
 {
@@ -842,6 +844,8 @@ void ast_node_destroy(t_ast_node *node);
 
 int ast_node_set_token(t_ast_node *node, const t_lexer_token *token);
 int ast_node_add_child(t_ast_node *parent, t_ast_node *child);
+int ast_node_get_span(const t_ast_node *node, const char *path,
+    struct s_transpiler_source_span *span);
 
 size_t ast_node_child_count(const t_ast_node *node);
 t_ast_node *ast_node_get_child(const t_ast_node *node, size_t index);
@@ -850,7 +854,9 @@ typedef struct s_parser
 {
     t_lexer lexer;
     t_lexer_token current;
+    t_lexer_token error_token;
     int has_current;
+    int has_error_token;
     int last_error;
     size_t error_count;
 }   t_parser;
@@ -859,6 +865,82 @@ void parser_init(t_parser *parser, const char *text);
 void parser_init_with_context(t_parser *parser, const char *text, t_transpiler_context *context);
 void parser_dispose(t_parser *parser);
 int parser_parse_program(t_parser *parser, t_ast_node **out_program);
+
+typedef struct s_cblc_translation_unit t_cblc_translation_unit;
+
+typedef struct s_cblc_frontend_analysis
+{
+    char path[TRANSPILE_FILE_PATH_MAX];
+    char *source_text;
+    t_cblc_translation_unit *unit;
+    t_transpiler_diagnostic_list diagnostics;
+    int parse_status;
+}   t_cblc_frontend_analysis;
+
+int cblc_frontend_analysis_init(t_cblc_frontend_analysis *analysis);
+void cblc_frontend_analysis_dispose(t_cblc_frontend_analysis *analysis);
+int cblc_frontend_analyze_document(t_cblc_frontend_analysis *analysis, const char *path,
+    const char *text);
+
+typedef enum e_cblc_document_symbol_kind
+{
+    CBLC_DOCUMENT_SYMBOL_UNKNOWN = 0,
+    CBLC_DOCUMENT_SYMBOL_CLASS,
+    CBLC_DOCUMENT_SYMBOL_STRUCT,
+    CBLC_DOCUMENT_SYMBOL_FUNCTION,
+    CBLC_DOCUMENT_SYMBOL_DATA_ITEM
+}   t_cblc_document_symbol_kind;
+
+typedef struct s_cblc_document_symbol
+{
+    t_cblc_document_symbol_kind kind;
+    char name[TRANSPILE_IDENTIFIER_MAX];
+    t_transpiler_source_span span;
+}   t_cblc_document_symbol;
+
+typedef struct s_cblc_document_symbol_list
+{
+    t_cblc_document_symbol *items;
+    size_t count;
+    size_t capacity;
+}   t_cblc_document_symbol_list;
+
+int cblc_document_symbol_list_init(t_cblc_document_symbol_list *list);
+void cblc_document_symbol_list_dispose(t_cblc_document_symbol_list *list);
+int cblc_frontend_collect_document_symbols(const t_cblc_frontend_analysis *analysis,
+    t_cblc_document_symbol_list *symbols);
+int cblc_frontend_find_definition(const t_cblc_frontend_analysis *analysis, size_t line,
+    size_t column, t_transpiler_source_span *definition_span);
+int cblc_frontend_get_hover(const t_cblc_frontend_analysis *analysis, size_t line,
+    size_t column, char *buffer, size_t buffer_size);
+
+typedef enum e_cblc_completion_item_kind
+{
+    CBLC_COMPLETION_ITEM_UNKNOWN = 0,
+    CBLC_COMPLETION_ITEM_KEYWORD,
+    CBLC_COMPLETION_ITEM_CLASS,
+    CBLC_COMPLETION_ITEM_STRUCT,
+    CBLC_COMPLETION_ITEM_FUNCTION,
+    CBLC_COMPLETION_ITEM_DATA_ITEM
+}   t_cblc_completion_item_kind;
+
+typedef struct s_cblc_completion_item
+{
+    t_cblc_completion_item_kind kind;
+    char label[TRANSPILE_IDENTIFIER_MAX];
+}   t_cblc_completion_item;
+
+typedef struct s_cblc_completion_list
+{
+    t_cblc_completion_item *items;
+    size_t count;
+    size_t capacity;
+}   t_cblc_completion_list;
+
+int cblc_completion_list_init(t_cblc_completion_list *list);
+void cblc_completion_list_dispose(t_cblc_completion_list *list);
+int cblc_frontend_complete(const t_cblc_frontend_analysis *analysis, size_t line,
+    size_t column, t_cblc_completion_list *completions);
 
 #define AST_READ_FLAG_NEXT 0x1
 #define AST_READ_FLAG_WITH_LOCK 0x2
@@ -964,6 +1046,7 @@ typedef struct s_cblc_data_item
     char struct_type_name[TRANSPILE_IDENTIFIER_MAX];
     char owner_function_name[TRANSPILE_IDENTIFIER_MAX];
     size_t length;
+    size_t array_count;
     t_cblc_data_kind kind;
     int is_const;
     int is_function_local;
@@ -981,6 +1064,7 @@ typedef struct s_cblc_struct_field
     char declared_type_name[TRANSPILE_IDENTIFIER_MAX];
     char struct_type_name[TRANSPILE_IDENTIFIER_MAX];
     size_t length;
+    size_t array_count;
     t_cblc_data_kind kind;
     int is_const;
     t_cblc_member_visibility visibility;
@@ -1046,7 +1130,7 @@ typedef enum e_cblc_statement_type
 struct s_cblc_statement
 {
     t_cblc_statement_type type;
-    char target[TRANSPILE_IDENTIFIER_MAX];
+    char target[TRANSPILE_STATEMENT_TEXT_MAX];
     char source[TRANSPILE_STATEMENT_TEXT_MAX];
     int is_literal;
     char call_identifier[TRANSPILE_IDENTIFIER_MAX];
@@ -1070,7 +1154,7 @@ typedef struct s_cblc_function
     size_t local_destructor_capacity;
 }   t_cblc_function;
 
-typedef struct s_cblc_translation_unit
+struct s_cblc_translation_unit
 {
     t_cblc_data_item *data_items;
     size_t data_count;
@@ -1091,7 +1175,7 @@ typedef struct s_cblc_translation_unit
     size_t helper_literal_counter;
     int helper_status_index;
     char program_name[TRANSPILE_IDENTIFIER_MAX];
-}   t_cblc_translation_unit;
+};
 
 void cblc_translation_unit_init(t_cblc_translation_unit *unit);
 void cblc_translation_unit_dispose(t_cblc_translation_unit *unit);

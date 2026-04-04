@@ -9,6 +9,7 @@ endif
 NAME        = ctoc_cobol_transpiler$(EXE_EXT)
 NAME_DEBUG  = ctoc_cobol_transpiler_debug$(EXE_EXT)
 TEST_NAME   = automated_tests$(EXE_EXT)
+LSP_NAME    = cblc_lsp$(EXE_EXT)
 
 ifdef FORWARD_TRANSLATION
 export CTOC_ENABLE_FORWARD_TRANSLATION := $(FORWARD_TRANSLATION)
@@ -36,6 +37,7 @@ SRC         = \
     lexer_token.cpp \
     ast.cpp \
     parser.cpp \
+    transpiler_frontend.cpp \
     transpiler_diagnostics.cpp \
     transpiler_context.cpp \
     transpiler_pipeline.cpp \
@@ -199,6 +201,8 @@ endif
 OBJS        = $(SRC:%.cpp=$(OBJ_DIR)/%.o)
 
 OBJS_NO_MAIN = $(filter-out $(OBJ_DIR)/main.o,$(OBJS))
+LSP_SRC     = cblc_lsp.cpp
+LSP_OBJ     = $(LSP_SRC:%.cpp=$(OBJ_DIR)/%.o)
 
 .SILENT:
 
@@ -341,7 +345,11 @@ TEST_OBJS   = $(TEST_SRC:%.cpp=$(OBJ_DIR_TEST)/%.o)
 
 TOTAL_TEST_OBJS     := $(words $(TEST_OBJS))
 
-all: dirs $(TARGET)
+all: dirs transpiler lsp
+
+transpiler: $(TARGET)
+
+lsp: $(LSP_NAME)
 
 tests: dirs $(TEST_NAME)
 
@@ -372,6 +380,10 @@ $(TARGET): $(OBJS)
 	@printf '\033[1;36m[CTOC BUILD] Linking %s\033[0m\n' "$@"
 	@$(CC) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
 
+$(LSP_NAME): $(LSP_OBJ) $(OBJS_NO_MAIN)
+	@printf '\033[1;36m[CTOC BUILD] Linking %s\033[0m\n' "$@"
+	@$(CC) $(CFLAGS) $(LSP_OBJ) $(OBJS_NO_MAIN) -o $@ $(LDFLAGS)
+
 $(TEST_NAME): $(TEST_OBJS) $(OBJS_NO_MAIN) $(TARGET)
 	@printf '\033[1;36m[CTOC BUILD] Linking %s\033[0m\n' "$@"
 	@$(CC) $(CFLAGS) $(TEST_OBJS) $(OBJS_NO_MAIN) -o $@ $(LDFLAGS)
@@ -400,7 +412,7 @@ clean:
 	-$(RMDIR) $(BUILD_LOG_DIR)
 
 fclean: clean
-	-$(RM) $(NAME) $(NAME_DEBUG) $(TEST_NAME)
+	-$(RM) $(NAME) $(NAME_DEBUG) $(TEST_NAME) $(LSP_NAME)
 	-$(RMDIR) $(OBJ_DIR) $(OBJ_DIR_DEBUG) $(OBJ_DIR_TEST) data
 
 re: fclean all

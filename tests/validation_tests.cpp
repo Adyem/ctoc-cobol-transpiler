@@ -73,6 +73,63 @@ FT_TEST(test_transpiler_validation_accepts_string_assignment_and_length_usage)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_transpiler_validation_accepts_int_array_and_string_array_declarations)
+{
+    const char *source;
+
+    source = "int numbers[16];\n"
+        "string names[4](12);\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    if (test_expect_success(transpiler_validate_generated_cblc(source),
+            "validator should accept int arrays and string arrays with explicit capacity")
+        != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_validation_accepts_string_capacity_parentheses)
+{
+    const char *source;
+
+    source = "string greeting(16);\n"
+        "function void main()\n"
+        "{\n"
+        "    greeting = \"HI\";\n"
+        "    display(greeting.len);\n"
+        "    return;\n"
+        "}\n";
+    if (test_expect_success(transpiler_validate_generated_cblc(source),
+            "validator should accept string capacity in parentheses") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_validation_accepts_indexed_array_usage)
+{
+    const char *source;
+
+    source = "int numbers[3];\n"
+        "int total;\n"
+        "string names[2](8);\n"
+        "function void main()\n"
+        "{\n"
+        "    numbers[0] = 7;\n"
+        "    total = numbers[0];\n"
+        "    names[1] = \"HI\";\n"
+        "    display(numbers[0]);\n"
+        "    display(names[1]);\n"
+        "    display(names[1].len);\n"
+        "    return;\n"
+        "}\n";
+    if (test_expect_success(transpiler_validate_generated_cblc(source),
+            "validator should accept indexed int and string array usage") != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_transpiler_validation_accepts_const_declarations)
 {
     const char *source;
@@ -409,6 +466,358 @@ FT_TEST(test_cblc_generate_cobol_emits_string_group)
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should display buffer slice using length\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_emits_array_declarations)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "int numbers[16];\n"
+        "string names[4](12);\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "array declaration sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "array declaration sample should convert to C") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "static int numbers[16] = {0};", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit int array storage\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c,
+            "static struct { size_t len; char buf[12]; } names[4] = {{0}};",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit string array storage\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_emits_array_declarations)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "int numbers[16];\n"
+        "string names[4](12);\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "array declaration COBOL sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "array declaration COBOL sample should convert") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol, "01 NUMBERS PIC S9(9) OCCURS 16 TIMES.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit int array OCCURS storage\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "01 NAMES OCCURS 4 TIMES.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit string array group OCCURS storage\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "05 NAMES-BUF PIC X(12).", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should keep string array element capacity\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_emits_indexed_array_access)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "int numbers[3];\n"
+        "int total;\n"
+        "string names[2](8);\n"
+        "function void main()\n"
+        "{\n"
+        "    numbers[0] = 7;\n"
+        "    total = numbers[0];\n"
+        "    names[1] = \"HI\";\n"
+        "    display(numbers[0]);\n"
+        "    display(names[1]);\n"
+        "    display(names[1].len);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "indexed array sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "indexed array sample should convert to C") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "numbers[0] = 7;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should assign to int array element\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "total = numbers[0];", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should read from int array element\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c,
+            "cblc_string_assign_literal(names[1].buf, 8, &names[1].len, \"HI\");",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should assign string array literal to indexed element\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "cblc_display_string(names[1].buf, names[1].len);",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should display indexed string element\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "cblc_display_size(names[1].len);", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should display indexed string length\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_emits_indexed_array_access)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "int numbers[3];\n"
+        "int total;\n"
+        "string names[2](8);\n"
+        "function void main()\n"
+        "{\n"
+        "    numbers[0] = 7;\n"
+        "    total = numbers[0];\n"
+        "    names[1] = \"HI\";\n"
+        "    display(numbers[0]);\n"
+        "    display(names[1]);\n"
+        "    display(names[1].len);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "indexed array COBOL sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "indexed array COBOL sample should convert") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol, "COMPUTE NUMBERS(1) = 7.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should assign to int array element\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "COMPUTE TOTAL = NUMBERS(1).", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should read from int array element\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "MOVE \"HI\" TO NAMES-BUF(2).", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should assign indexed string buffer\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "DISPLAY NAMES-BUF(2)(1:NAMES-LEN(2)).",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should display indexed string element\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "DISPLAY NAMES-LEN(2).", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should display indexed string length\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_emits_variable_index_array_access)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "int numbers[3];\n"
+        "int total;\n"
+        "int index;\n"
+        "string names[2](8);\n"
+        "function void main()\n"
+        "{\n"
+        "    index = 1;\n"
+        "    total = numbers[index];\n"
+        "    names[index] = \"HI\";\n"
+        "    display(numbers[index]);\n"
+        "    display(names[index]);\n"
+        "    display(names[index].len);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "variable index sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "variable index sample should convert to C") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "total = numbers[index];", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should read int array with variable index\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c,
+            "cblc_string_assign_literal(names[index].buf, 8, &names[index].len, \"HI\");",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should assign indexed string array with variable index\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "cblc_display_string(names[index].buf, names[index].len);",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should display indexed string array with variable index\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "cblc_display_size(names[index].len);", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should display indexed string length with variable index\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_emits_variable_index_array_access)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "int numbers[3];\n"
+        "int total;\n"
+        "int index;\n"
+        "string names[2](8);\n"
+        "function void main()\n"
+        "{\n"
+        "    index = 1;\n"
+        "    total = numbers[index];\n"
+        "    names[index] = \"HI\";\n"
+        "    display(numbers[index]);\n"
+        "    display(names[index]);\n"
+        "    display(names[index].len);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "variable index COBOL sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "variable index COBOL sample should convert") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol, "COMPUTE TOTAL = NUMBERS(INDEX + 1).",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should read int array with variable index\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "MOVE \"HI\" TO NAMES-BUF(INDEX + 1).",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should assign string array with variable index\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "DISPLAY NAMES-BUF(INDEX + 1)(1:NAMES-LEN(INDEX + 1)).",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should display string array with variable index\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "DISPLAY NAMES-LEN(INDEX + 1).",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should display string length with variable index\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -2659,6 +3068,598 @@ FT_TEST(test_transpiler_validation_rejects_invalid_cobol)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_lexer_token_get_span_reports_expected_columns)
+{
+    t_lexer lexer;
+    t_lexer_token token;
+    t_transpiler_source_span span;
+    int status;
+
+    lexer_init(&lexer, "MOVE VALUE TO TARGET.");
+    ft_bzero(&token, sizeof(token));
+    ft_bzero(&span, sizeof(span));
+    status = FT_FAILURE;
+    if (test_expect_success(lexer_next_token(&lexer, &token),
+            "lexer should produce first token for span test") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(lexer_token_get_span(&token, "span_test.cob", &span),
+            "token span helper should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_size_t_equal(span.start_line, 1,
+            "token span should start on line 1") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_size_t_equal(span.start_column, 1,
+            "token span should start at column 1") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_size_t_equal(span.end_line, 1,
+            "token span should end on line 1") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_size_t_equal(span.end_column, 5,
+            "token span end column should be one past the token") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_cstring_equal(span.path, "span_test.cob",
+            "token span should carry the supplied path") != FT_SUCCESS)
+        return (FT_FAILURE);
+    status = FT_SUCCESS;
+    return (status);
+}
+
+FT_TEST(test_ast_node_get_span_uses_node_token)
+{
+    t_lexer_token token;
+    t_ast_node *node;
+    t_transpiler_source_span span;
+    int status;
+
+    ft_bzero(&token, sizeof(token));
+    ft_bzero(&span, sizeof(span));
+    node = NULL;
+    status = FT_FAILURE;
+    token.kind = LEXER_TOKEN_IDENTIFIER;
+    token.lexeme = "FIELD-NAME";
+    token.length = 10;
+    token.line = 3;
+    token.column = 7;
+    node = ast_node_create(AST_NODE_IDENTIFIER);
+    if (!node)
+        return (FT_FAILURE);
+    if (test_expect_success(ast_node_set_token(node, &token),
+            "AST token assignment should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(ast_node_get_span(node, "node_span.cob", &span),
+            "AST node span helper should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(span.start_line, 3,
+            "node span should start on the token line") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(span.start_column, 7,
+            "node span should start on the token column") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(span.end_column, 17,
+            "node span should end one past the token length") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (node)
+        ast_node_destroy(node);
+    return (status);
+}
+
+FT_TEST(test_cblc_frontend_analysis_reports_parse_diagnostic)
+{
+    const char *source;
+    t_cblc_frontend_analysis analysis;
+    int status;
+
+    source = "class Greeter\n"
+        "{\n"
+        "    string name(16)\n"
+        "};\n";
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_frontend_analysis_init(&analysis),
+            "CBL-C frontend analysis should initialize") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_frontend_analyze_document(&analysis, "broken_sample.cblc", source) == FT_SUCCESS)
+    {
+        std::printf("Assertion failed: broken CBL-C sample should not parse successfully\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(static_cast<int>(analysis.diagnostics.count), 1,
+            "broken CBL-C sample should emit one parse diagnostic") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(analysis.diagnostics.items[0].message, "Parse error",
+            "CBL-C parse diagnostic should use stable parse message") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(analysis.diagnostics.items[0].span.path, "broken_sample.cblc",
+            "CBL-C parse diagnostic should carry the document path") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(analysis.diagnostics.items[0].span.start_line, 1,
+            "CBL-C parse diagnostic should currently point at the start of the file") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_frontend_analysis_dispose(&analysis);
+    return (status);
+}
+
+FT_TEST(test_cblc_frontend_collect_document_symbols_returns_types_functions_and_data)
+{
+    const char *source;
+    t_cblc_frontend_analysis analysis;
+    t_cblc_document_symbol_list symbols;
+    int status;
+
+    source = "class Greeter\n"
+        "{\n"
+        "    public:\n"
+        "        string name(16);\n"
+        "};\n"
+        "\n"
+        "int counter;\n"
+        "function void main()\n"
+        "{\n"
+        "    display(counter);\n"
+        "    return;\n"
+        "}\n";
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_frontend_analysis_init(&analysis),
+            "CBL-C frontend analysis should initialize for symbol test") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(cblc_document_symbol_list_init(&symbols),
+            "CBL-C symbol list should initialize") != FT_SUCCESS)
+    {
+        cblc_frontend_analysis_dispose(&analysis);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(cblc_frontend_analyze_document(&analysis, "symbols_sample.cblc", source),
+            "CBL-C symbol sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_frontend_collect_document_symbols(&analysis, &symbols),
+            "CBL-C symbol collection should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(static_cast<int>(symbols.count), 3,
+            "CBL-C symbol collection should return class, function, and data item") != FT_SUCCESS)
+        goto cleanup;
+    if (symbols.items[0].kind != CBLC_DOCUMENT_SYMBOL_CLASS
+        || test_expect_cstring_equal(symbols.items[0].name, "Greeter",
+            "first symbol should be the class name") != FT_SUCCESS)
+        goto cleanup;
+    if (symbols.items[1].kind != CBLC_DOCUMENT_SYMBOL_FUNCTION
+        || test_expect_cstring_equal(symbols.items[1].name, "main",
+            "second symbol should be the function name") != FT_SUCCESS)
+        goto cleanup;
+    if (symbols.items[2].kind != CBLC_DOCUMENT_SYMBOL_DATA_ITEM
+        || test_expect_cstring_equal(symbols.items[2].name, "counter",
+            "third symbol should be the global data item") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_document_symbol_list_dispose(&symbols);
+    cblc_frontend_analysis_dispose(&analysis);
+    return (status);
+}
+
+FT_TEST(test_cblc_frontend_find_definition_resolves_data_item_reference)
+{
+    const char *source;
+    t_cblc_frontend_analysis analysis;
+    t_transpiler_source_span definition_span;
+    int status;
+
+    source = "int counter;\n"
+        "function void main()\n"
+        "{\n"
+        "    display(counter);\n"
+        "    return;\n"
+        "}\n";
+    status = FT_FAILURE;
+    ft_bzero(&definition_span, sizeof(definition_span));
+    if (test_expect_success(cblc_frontend_analysis_init(&analysis),
+            "CBL-C frontend analysis should initialize for definition lookup") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(cblc_frontend_analyze_document(&analysis, "definition_sample.cblc", source),
+            "CBL-C definition sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_frontend_find_definition(&analysis, 4, 13, &definition_span),
+            "CBL-C definition lookup should resolve the displayed data item") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(definition_span.start_line, 1,
+            "CBL-C variable definition should resolve to the declaration line") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(definition_span.start_column, 5,
+            "CBL-C variable definition should resolve to the identifier column") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(definition_span.path, "definition_sample.cblc",
+            "CBL-C definition lookup should preserve the analysis path") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_frontend_analysis_dispose(&analysis);
+    return (status);
+}
+
+FT_TEST(test_cblc_frontend_find_definition_resolves_function_call_target)
+{
+    const char *source;
+    t_cblc_frontend_analysis analysis;
+    t_transpiler_source_span definition_span;
+    int status;
+
+    source = "function void helper()\n"
+        "{\n"
+        "    return;\n"
+        "}\n"
+        "\n"
+        "function void main()\n"
+        "{\n"
+        "    helper();\n"
+        "    return;\n"
+        "}\n";
+    status = FT_FAILURE;
+    ft_bzero(&definition_span, sizeof(definition_span));
+    if (test_expect_success(cblc_frontend_analysis_init(&analysis),
+            "CBL-C frontend analysis should initialize for function definition lookup") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(cblc_frontend_analyze_document(&analysis, "call_definition_sample.cblc", source),
+            "CBL-C function definition sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_frontend_find_definition(&analysis, 8, 6, &definition_span),
+            "CBL-C definition lookup should resolve the function call target") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(definition_span.start_line, 1,
+            "CBL-C function definition should resolve to the declaration line") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(definition_span.start_column, 15,
+            "CBL-C function definition should resolve to the function identifier column") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_frontend_analysis_dispose(&analysis);
+    return (status);
+}
+
+FT_TEST(test_cblc_frontend_get_hover_reports_variable_summary)
+{
+    const char *source;
+    t_cblc_frontend_analysis analysis;
+    char hover[128];
+    int status;
+
+    source = "int counter;\n"
+        "function void main()\n"
+        "{\n"
+        "    display(counter);\n"
+        "    return;\n"
+        "}\n";
+    status = FT_FAILURE;
+    ft_bzero(hover, sizeof(hover));
+    if (test_expect_success(cblc_frontend_analysis_init(&analysis),
+            "CBL-C frontend analysis should initialize for hover lookup") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(cblc_frontend_analyze_document(&analysis, "hover_sample.cblc", source),
+            "CBL-C hover sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_frontend_get_hover(&analysis, 4, 13, hover, sizeof(hover)),
+            "CBL-C hover should resolve for variable reference") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(hover, "Variable counter : int",
+            "CBL-C variable hover should include kind, name, and type") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_frontend_analysis_dispose(&analysis);
+    return (status);
+}
+
+FT_TEST(test_cblc_frontend_get_hover_reports_class_summary)
+{
+    const char *source;
+    t_cblc_frontend_analysis analysis;
+    char hover[128];
+    int status;
+
+    source = "class Greeter\n"
+        "{\n"
+        "    public:\n"
+        "        string name(16);\n"
+        "};\n"
+        "\n"
+        "Greeter greeter;\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    status = FT_FAILURE;
+    ft_bzero(hover, sizeof(hover));
+    if (test_expect_success(cblc_frontend_analysis_init(&analysis),
+            "CBL-C frontend analysis should initialize for class hover") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(cblc_frontend_analyze_document(&analysis, "program_hover_sample.cblc", source),
+            "CBL-C class hover sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_frontend_get_hover(&analysis, 7, 2, hover, sizeof(hover)),
+            "CBL-C hover should resolve for class type usage") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(hover, "Class Greeter",
+            "CBL-C class hover should include the class name") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_frontend_analysis_dispose(&analysis);
+    return (status);
+}
+
+FT_TEST(test_cblc_frontend_complete_returns_keywords_and_symbols)
+{
+    const char *source;
+    t_cblc_frontend_analysis analysis;
+    t_cblc_completion_list completions;
+    size_t index;
+    int found_display;
+    int found_counter;
+    int status;
+
+    source = "int counter;\n"
+        "function void main()\n"
+        "{\n"
+        "\n"
+        "    return;\n"
+        "}\n";
+    status = FT_FAILURE;
+    found_display = 0;
+    found_counter = 0;
+    if (test_expect_success(cblc_frontend_analysis_init(&analysis),
+            "CBL-C frontend analysis should initialize for completion") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(cblc_completion_list_init(&completions),
+            "CBL-C completion list should initialize") != FT_SUCCESS)
+    {
+        cblc_frontend_analysis_dispose(&analysis);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(cblc_frontend_analyze_document(&analysis, "completion_sample.cblc", source),
+            "CBL-C completion sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_frontend_complete(&analysis, 4, 1, &completions),
+            "CBL-C completion should succeed on an empty statement line") != FT_SUCCESS)
+        goto cleanup;
+    index = 0;
+    while (index < completions.count)
+    {
+        if (std::strncmp(completions.items[index].label, "display",
+                sizeof(completions.items[index].label)) == 0)
+            found_display = 1;
+        if (std::strncmp(completions.items[index].label, "counter",
+                sizeof(completions.items[index].label)) == 0)
+            found_counter = 1;
+        index += 1;
+    }
+    if (test_expect_int_equal(found_display, 1,
+            "CBL-C completion should include language keywords like display") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(found_counter, 1,
+            "CBL-C completion should include in-document symbols like counter") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_completion_list_dispose(&completions);
+    cblc_frontend_analysis_dispose(&analysis);
+    return (status);
+}
+
+FT_TEST(test_cblc_frontend_complete_filters_function_local_scope)
+{
+    const char *source;
+    t_cblc_frontend_analysis analysis;
+    t_cblc_completion_list completions;
+    size_t index;
+    int found_message;
+    int found_other;
+    int status;
+
+    source = "function void helper()\n"
+        "{\n"
+        "    string other(8);\n"
+        "    return;\n"
+        "}\n"
+        "\n"
+        "function void main()\n"
+        "{\n"
+        "    string message(8);\n"
+        "\n"
+        "    return;\n"
+        "}\n";
+    status = FT_FAILURE;
+    found_message = 0;
+    found_other = 0;
+    if (test_expect_success(cblc_frontend_analysis_init(&analysis),
+            "CBL-C frontend analysis should initialize for local scope completion")
+        != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(cblc_completion_list_init(&completions),
+            "CBL-C completion list should initialize for local scope completion") != FT_SUCCESS)
+    {
+        cblc_frontend_analysis_dispose(&analysis);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(cblc_frontend_analyze_document(&analysis,
+                "local_scope_completion_sample.cblc", source),
+            "CBL-C local scope completion sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_frontend_complete(&analysis, 10, 1, &completions),
+            "CBL-C completion should succeed inside the main function body") != FT_SUCCESS)
+        goto cleanup;
+    index = 0;
+    while (index < completions.count)
+    {
+        if (std::strncmp(completions.items[index].label, "message",
+                sizeof(completions.items[index].label)) == 0)
+            found_message = 1;
+        if (std::strncmp(completions.items[index].label, "other",
+                sizeof(completions.items[index].label)) == 0)
+            found_other = 1;
+        index += 1;
+    }
+    if (test_expect_int_equal(found_message, 1,
+            "CBL-C completion should include locals from the current function") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(found_other, 0,
+            "CBL-C completion should exclude locals from other functions") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_completion_list_dispose(&completions);
+    cblc_frontend_analysis_dispose(&analysis);
+    return (status);
+}
+
+FT_TEST(test_cblc_frontend_complete_returns_public_members_only)
+{
+    const char *source;
+    t_cblc_frontend_analysis analysis;
+    t_cblc_completion_list completions;
+    size_t index;
+    int found_name;
+    int found_hidden;
+    int found_speak;
+    int status;
+
+    source = "class Greeter\n"
+        "{\n"
+        "    private:\n"
+        "        int hidden;\n"
+        "\n"
+        "    public:\n"
+        "        string name(16);\n"
+        "        void speak()\n"
+        "        {\n"
+        "            return;\n"
+        "        }\n"
+        "};\n"
+        "\n"
+        "Greeter greeter;\n"
+        "function void main()\n"
+        "{\n"
+        "    greeter.name = \"HI\";\n"
+        "    return;\n"
+        "}\n";
+    status = FT_FAILURE;
+    found_name = 0;
+    found_hidden = 0;
+    found_speak = 0;
+    if (test_expect_success(cblc_frontend_analysis_init(&analysis),
+            "CBL-C frontend analysis should initialize for member completion") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(cblc_completion_list_init(&completions),
+            "CBL-C completion list should initialize for member completion") != FT_SUCCESS)
+    {
+        cblc_frontend_analysis_dispose(&analysis);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(cblc_frontend_analyze_document(&analysis,
+                "member_completion_sample.cblc", source),
+            "CBL-C member completion sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_frontend_complete(&analysis, 17, 13, &completions),
+            "CBL-C completion should succeed for member access") != FT_SUCCESS)
+        goto cleanup;
+    index = 0;
+    while (index < completions.count)
+    {
+        if (std::strncmp(completions.items[index].label, "name",
+                sizeof(completions.items[index].label)) == 0)
+            found_name = 1;
+        if (std::strncmp(completions.items[index].label, "hidden",
+                sizeof(completions.items[index].label)) == 0)
+            found_hidden = 1;
+        if (std::strncmp(completions.items[index].label, "speak",
+                sizeof(completions.items[index].label)) == 0)
+            found_speak = 1;
+        index += 1;
+    }
+    if (test_expect_int_equal(found_name, 1,
+            "CBL-C completion should include public fields for member access") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(found_speak, 1,
+            "CBL-C completion should include public methods for member access") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(found_hidden, 0,
+            "CBL-C completion should exclude private members for external access") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_completion_list_dispose(&completions);
+    cblc_frontend_analysis_dispose(&analysis);
+    return (status);
+}
+
+FT_TEST(test_cblc_frontend_complete_returns_std_namespace_functions)
+{
+    const char *source;
+    t_cblc_frontend_analysis analysis;
+    t_cblc_completion_list completions;
+    size_t index;
+    int found_strlen;
+    int found_strcpy;
+    int found_append;
+    int status;
+
+    source = "int total;\n"
+        "function void main()\n"
+        "{\n"
+        "    total = std::strlen(\"HI\");\n"
+        "    return;\n"
+        "}\n";
+    status = FT_FAILURE;
+    found_strlen = 0;
+    found_strcpy = 0;
+    found_append = 0;
+    if (test_expect_success(cblc_frontend_analysis_init(&analysis),
+            "CBL-C frontend analysis should initialize for std completion") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(cblc_completion_list_init(&completions),
+            "CBL-C completion list should initialize for std completion") != FT_SUCCESS)
+    {
+        cblc_frontend_analysis_dispose(&analysis);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(cblc_frontend_analyze_document(&analysis,
+                "std_completion_sample.cblc", source),
+            "CBL-C std completion sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_frontend_complete(&analysis, 4, 20, &completions),
+            "CBL-C completion should succeed for std namespace access") != FT_SUCCESS)
+        goto cleanup;
+    index = 0;
+    while (index < completions.count)
+    {
+        if (std::strncmp(completions.items[index].label, "std::strlen",
+                sizeof(completions.items[index].label)) == 0)
+            found_strlen = 1;
+        if (std::strncmp(completions.items[index].label, "std::strcpy",
+                sizeof(completions.items[index].label)) == 0)
+            found_strcpy = 1;
+        if (std::strncmp(completions.items[index].label, "append",
+                sizeof(completions.items[index].label)) == 0)
+            found_append = 1;
+        index += 1;
+    }
+    if (test_expect_int_equal(found_strlen, 1,
+            "CBL-C completion should include matching std namespace functions") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(found_strcpy, 1,
+            "CBL-C completion should include other matching std string helpers") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(found_append, 0,
+            "CBL-C std completion should not mix in unrelated member names") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_completion_list_dispose(&completions);
+    cblc_frontend_analysis_dispose(&analysis);
+    return (status);
+}
+
 const t_test_case *get_validation_tests(size_t *count)
 {
     static const t_test_case tests[] = {
@@ -2667,6 +3668,12 @@ const t_test_case *get_validation_tests(size_t *count)
         {"transpiler_validation_accepts_string_declaration", test_transpiler_validation_accepts_string_declaration},
         {"transpiler_validation_accepts_string_assignment_and_length_usage",
             test_transpiler_validation_accepts_string_assignment_and_length_usage},
+        {"transpiler_validation_accepts_int_array_and_string_array_declarations",
+            test_transpiler_validation_accepts_int_array_and_string_array_declarations},
+        {"transpiler_validation_accepts_string_capacity_parentheses",
+            test_transpiler_validation_accepts_string_capacity_parentheses},
+        {"transpiler_validation_accepts_indexed_array_usage",
+            test_transpiler_validation_accepts_indexed_array_usage},
         {"cblc_parse_translation_unit_records_imports", test_cblc_parse_translation_unit_records_imports},
         {"cblc_parse_translation_unit_records_copy_includes", test_cblc_parse_translation_unit_records_copy_includes},
         {"cblc_parse_translation_unit_tracks_multiple_functions",
@@ -2693,6 +3700,18 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_generate_c_emits_struct_types_and_field_access},
         {"cblc_generate_c_emits_nested_struct_types_and_field_access",
             test_cblc_generate_c_emits_nested_struct_types_and_field_access},
+        {"cblc_generate_c_emits_array_declarations",
+            test_cblc_generate_c_emits_array_declarations},
+        {"cblc_generate_cobol_emits_array_declarations",
+            test_cblc_generate_cobol_emits_array_declarations},
+        {"cblc_generate_c_emits_indexed_array_access",
+            test_cblc_generate_c_emits_indexed_array_access},
+        {"cblc_generate_cobol_emits_indexed_array_access",
+            test_cblc_generate_cobol_emits_indexed_array_access},
+        {"cblc_generate_c_emits_variable_index_array_access",
+            test_cblc_generate_c_emits_variable_index_array_access},
+        {"cblc_generate_cobol_emits_variable_index_array_access",
+            test_cblc_generate_cobol_emits_variable_index_array_access},
         {"cblc_parse_translation_unit_records_class_lifecycle_metadata",
             test_cblc_parse_translation_unit_records_class_lifecycle_metadata},
         {"cblc_generate_c_emits_automatic_class_lifecycle",
@@ -2751,7 +3770,30 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_resolve_calls_reports_missing_function},
         {"transpiler_validation_accepts_valid_cobol", test_transpiler_validation_accepts_valid_cobol},
         {"transpiler_validation_accepts_working_storage_program", test_transpiler_validation_accepts_working_storage_program},
-        {"transpiler_validation_rejects_invalid_cobol", test_transpiler_validation_rejects_invalid_cobol}
+        {"transpiler_validation_rejects_invalid_cobol", test_transpiler_validation_rejects_invalid_cobol},
+        {"lexer_token_get_span_reports_expected_columns",
+            test_lexer_token_get_span_reports_expected_columns},
+        {"ast_node_get_span_uses_node_token", test_ast_node_get_span_uses_node_token},
+        {"cblc_frontend_analysis_reports_parse_diagnostic",
+            test_cblc_frontend_analysis_reports_parse_diagnostic},
+        {"cblc_frontend_collect_document_symbols_returns_types_functions_and_data",
+            test_cblc_frontend_collect_document_symbols_returns_types_functions_and_data},
+        {"cblc_frontend_find_definition_resolves_data_item_reference",
+            test_cblc_frontend_find_definition_resolves_data_item_reference},
+        {"cblc_frontend_find_definition_resolves_function_call_target",
+            test_cblc_frontend_find_definition_resolves_function_call_target},
+        {"cblc_frontend_get_hover_reports_variable_summary",
+            test_cblc_frontend_get_hover_reports_variable_summary},
+        {"cblc_frontend_get_hover_reports_class_summary",
+            test_cblc_frontend_get_hover_reports_class_summary},
+        {"cblc_frontend_complete_returns_keywords_and_symbols",
+            test_cblc_frontend_complete_returns_keywords_and_symbols},
+        {"cblc_frontend_complete_filters_function_local_scope",
+            test_cblc_frontend_complete_filters_function_local_scope},
+        {"cblc_frontend_complete_returns_public_members_only",
+            test_cblc_frontend_complete_returns_public_members_only},
+        {"cblc_frontend_complete_returns_std_namespace_functions",
+            test_cblc_frontend_complete_returns_std_namespace_functions}
     };
 
     if (count)
