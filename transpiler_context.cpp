@@ -2486,8 +2486,10 @@ const size_t *transpiler_context_get_module_initialization_order(const t_transpi
     return (context->module_order);
 }
 
-int transpiler_context_register_function(t_transpiler_context *context, const char *module_name, const char *name,
-    t_transpiler_function_return_mode return_mode, t_transpiler_symbol_visibility visibility)
+int transpiler_context_register_function_signature(t_transpiler_context *context, const char *module_name,
+    const char *name, t_transpiler_function_return_mode return_mode,
+    t_transpiler_symbol_visibility visibility,
+    const t_transpiler_function_parameter_kind *parameter_kinds, size_t parameter_count)
 {
     t_transpiler_function_signature *signature;
     char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
@@ -2498,6 +2500,8 @@ int transpiler_context_register_function(t_transpiler_context *context, const ch
         return (FT_FAILURE);
     if (transpiler_context_string_is_blank(module_name)
         || transpiler_context_string_is_blank(name))
+        return (FT_FAILURE);
+    if (parameter_count > TRANSPILE_FUNCTION_PARAMETER_MAX)
         return (FT_FAILURE);
     module_index = transpiler_context_find_module_index_by_name(context, module_name);
     if (module_index < 0)
@@ -2547,9 +2551,23 @@ int transpiler_context_register_function(t_transpiler_context *context, const ch
     ft_strlcpy(signature->module, module_name, sizeof(signature->module));
     signature->return_mode = return_mode;
     signature->visibility = visibility;
+    signature->parameter_count = parameter_count;
+    index = 0;
+    while (index < parameter_count)
+    {
+        signature->parameter_kinds[index] = parameter_kinds[index];
+        index += 1;
+    }
     context->function_count += 1;
     (void)module_index;
     return (FT_SUCCESS);
+}
+
+int transpiler_context_register_function(t_transpiler_context *context, const char *module_name, const char *name,
+    t_transpiler_function_return_mode return_mode, t_transpiler_symbol_visibility visibility)
+{
+    return (transpiler_context_register_function_signature(context, module_name, name,
+            return_mode, visibility, NULL, 0));
 }
 
 const t_transpiler_function_signature *transpiler_context_find_function(const t_transpiler_context *context,

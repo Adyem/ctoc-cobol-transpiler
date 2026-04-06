@@ -1265,11 +1265,151 @@ static int c_backend_emit_display(const t_cblc_translation_unit *unit, const t_c
     return (FT_FAILURE);
 }
 
-static int c_backend_emit_call(const t_cblc_statement *statement, t_c_backend_buffer *buffer)
+static const t_cblc_function *c_backend_find_function(const t_cblc_translation_unit *unit,
+    const char *identifier)
 {
+    size_t index;
+
+    if (!unit || !identifier)
+        return (NULL);
+    index = 0;
+    while (index < unit->function_count)
+    {
+        if (std::strncmp(unit->functions[index].source_name, identifier,
+                sizeof(unit->functions[index].source_name)) == 0)
+            return (&unit->functions[index]);
+        index += 1;
+    }
+    return (NULL);
+}
+
+static int c_backend_extract_call_argument(const t_cblc_statement *statement,
+    size_t argument_index, char *buffer, size_t buffer_size)
+{
+    const char *cursor;
+    size_t current_index;
+    size_t length;
+
+    if (!statement || !buffer || buffer_size == 0)
+        return (FT_FAILURE);
+    cursor = statement->call_arguments;
+    current_index = 0;
+    while (*cursor != '\0' && current_index < argument_index)
+    {
+        while (*cursor != '\0' && *cursor != ',')
+            cursor += 1;
+        if (*cursor == ',')
+        {
+            cursor += 1;
+            current_index += 1;
+        }
+    }
+    if (current_index != argument_index)
+        return (FT_FAILURE);
+    while (*cursor == ' ' || *cursor == '\t')
+        cursor += 1;
+    length = 0;
+    while (cursor[length] != '\0' && cursor[length] != ',')
+        length += 1;
+    while (length > 0
+        && (cursor[length - 1] == ' ' || cursor[length - 1] == '\t'))
+        length -= 1;
+    if (length + 1 > buffer_size)
+        return (FT_FAILURE);
+    std::memcpy(buffer, cursor, length);
+    buffer[length] = '\0';
+    return (FT_SUCCESS);
+}
+
+static int c_backend_emit_local_call_argument_moves(const t_cblc_translation_unit *unit,
+    const t_cblc_function *target_function, const t_cblc_statement *statement,
+    t_c_backend_buffer *buffer)
+{
+    size_t index;
+
+    if (!unit || !target_function || !statement || !buffer)
+        return (FT_FAILURE);
+    if (target_function->parameter_count != statement->call_argument_count)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < target_function->parameter_count)
+    {
+        char argument[TRANSPILE_STATEMENT_TEXT_MAX];
+        char expression[TRANSPILE_STATEMENT_TEXT_MAX];
+
+        if (c_backend_extract_call_argument(statement, index, argument,
+                sizeof(argument)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (c_backend_translate_expression(unit, argument, expression,
+                sizeof(expression)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (c_backend_buffer_append_format_line(buffer, "    %s = %s;",
+                target_function->parameters[index].actual_source_name,
+                expression) != FT_SUCCESS)
+            return (FT_FAILURE);
+        index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+static int c_backend_build_external_call_arguments(const t_cblc_translation_unit *unit,
+    const t_cblc_statement *statement, char *buffer, size_t buffer_size)
+{
+    size_t index;
+
+    if (!unit || !statement || !buffer || buffer_size == 0)
+        return (FT_FAILURE);
+    buffer[0] = '\0';
+    index = 0;
+    while (index < statement->call_argument_count)
+    {
+        char argument[TRANSPILE_STATEMENT_TEXT_MAX];
+        char expression[TRANSPILE_STATEMENT_TEXT_MAX];
+
+        if (c_backend_extract_call_argument(statement, index, argument,
+                sizeof(argument)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (c_backend_translate_expression(unit, argument, expression,
+                sizeof(expression)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (index > 0)
+            ft_strlcat(buffer, ", ", buffer_size);
+        ft_strlcat(buffer, expression, buffer_size);
+        index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+static int c_backend_emit_call(const t_cblc_translation_unit *unit,
+    const t_cblc_statement *statement, t_c_backend_buffer *buffer)
+{
+    const t_cblc_function *target_function;
+
+    if (!unit || !statement || !buffer)
+        return (FT_FAILURE);
+    if (!statement->call_is_external)
+    {
+        target_function = c_backend_find_function(unit, statement->call_identifier);
+        if (!target_function)
+            return (FT_FAILURE);
+        if (c_backend_emit_local_call_argument_moves(unit, target_function,
+                statement, buffer) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
     if (!statement || !buffer)
         return (FT_FAILURE);
-    if (c_backend_buffer_append_format_line(buffer,
+    if (statement->call_is_external && statement->call_argument_count > 0)
+    {
+        char arguments[TRANSPILE_STATEMENT_TEXT_MAX];
+
+        if (c_backend_build_external_call_arguments(unit, statement, arguments,
+                sizeof(arguments)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (c_backend_buffer_append_format_line(buffer,
+                "    %s(%s);", statement->call_identifier, arguments) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    else if (c_backend_buffer_append_format_line(buffer,
             "    %s();", statement->call_identifier) != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
@@ -1278,11 +1418,18 @@ static int c_backend_emit_call(const t_cblc_statement *statement, t_c_backend_bu
 static int c_backend_emit_call_assignment(const t_cblc_translation_unit *unit,
     const t_cblc_statement *statement, t_c_backend_buffer *buffer)
 {
+    const t_cblc_function *target_function;
     char target[TRANSPILE_IDENTIFIER_MAX];
 
     if (!unit || !statement || !buffer)
         return (FT_FAILURE);
     if (statement->call_identifier[0] == '\0')
+        return (FT_FAILURE);
+    target_function = c_backend_find_function(unit, statement->call_identifier);
+    if (!target_function)
+        return (FT_FAILURE);
+    if (c_backend_emit_local_call_argument_moves(unit, target_function,
+            statement, buffer) != FT_SUCCESS)
         return (FT_FAILURE);
     if (c_backend_map_identifier_to_c(unit, statement->target, target,
             sizeof(target)) != FT_SUCCESS)
@@ -1513,7 +1660,7 @@ static int c_backend_emit_lifecycle(const t_cblc_translation_unit *unit, const t
             }
             else if (substituted.type == CBLC_STATEMENT_CALL)
             {
-                if (c_backend_emit_call(&substituted, buffer) != FT_SUCCESS)
+                if (c_backend_emit_call(unit, &substituted, buffer) != FT_SUCCESS)
                     return (FT_FAILURE);
             }
             else if (substituted.type == CBLC_STATEMENT_CALL_ASSIGN)
@@ -1574,7 +1721,7 @@ static int c_backend_emit_lifecycle(const t_cblc_translation_unit *unit, const t
             }
             else if (substituted.type == CBLC_STATEMENT_CALL)
             {
-                if (c_backend_emit_call(&substituted, buffer) != FT_SUCCESS)
+                if (c_backend_emit_call(unit, &substituted, buffer) != FT_SUCCESS)
                     return (FT_FAILURE);
             }
             else if (substituted.type == CBLC_STATEMENT_CALL_ASSIGN)
@@ -1664,7 +1811,7 @@ static int c_backend_emit_method_body(const t_cblc_translation_unit *unit,
         }
         else if (substituted.type == CBLC_STATEMENT_CALL)
         {
-            if (c_backend_emit_call(&substituted, buffer) != FT_SUCCESS)
+            if (c_backend_emit_call(unit, &substituted, buffer) != FT_SUCCESS)
                 return (FT_FAILURE);
         }
         else if (substituted.type == CBLC_STATEMENT_CALL_ASSIGN)
@@ -2285,7 +2432,7 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
             }
             else if (statement->type == CBLC_STATEMENT_CALL)
             {
-                if (c_backend_emit_call(statement, &buffer) != FT_SUCCESS)
+                if (c_backend_emit_call(unit, statement, &buffer) != FT_SUCCESS)
                     goto cleanup;
             }
             else if (statement->type == CBLC_STATEMENT_CALL_ASSIGN)

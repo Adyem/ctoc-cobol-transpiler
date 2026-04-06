@@ -923,6 +923,335 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_parse_translation_unit_records_int_function_parameters)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "function int add_one(int value)\n"
+        "{\n"
+        "    return value + 1;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "int function with parameters should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.function_count, 1,
+            "translation unit should record one function") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.functions[0].parameter_count, 1,
+            "function should record one parameter") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(unit.functions[0].parameters[0].source_name, "value",
+            "parameter source name should be recorded") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(unit.functions[0].parameters[0].actual_source_name,
+            "add_one__value", "parameter storage name should be recorded") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(unit.functions[0].parameters[0].cobol_name,
+            "ADD-ONE-VALUE", "parameter COBOL name should be recorded") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_emits_parameter_slot_assignments_for_local_calls)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "int total;\n"
+        "int result;\n"
+        "function int add_one(int value)\n"
+        "{\n"
+        "    return value + 1;\n"
+        "}\n"
+        "function void main()\n"
+        "{\n"
+        "    total = 4;\n"
+        "    result = add_one(total);\n"
+        "    display(result);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "parameterized local call sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "parameterized local call sample should generate C") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "static int add_one__value = 0;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit global parameter storage\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "add_one__value = total;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should assign argument into parameter storage before local call\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "result = add_one();", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should still call local helper after assigning parameters\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_emits_parameter_slot_assignments_for_local_calls)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "int total;\n"
+        "int result;\n"
+        "function int add_one(int value)\n"
+        "{\n"
+        "    return value + 1;\n"
+        "}\n"
+        "function void main()\n"
+        "{\n"
+        "    total = 4;\n"
+        "    result = add_one(total);\n"
+        "    display(result);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "parameterized local call COBOL sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "parameterized local call COBOL sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol, "01 ADD-ONE-VALUE PIC S9(9).", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit parameter storage item\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "COMPUTE ADD-ONE-VALUE = TOTAL.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should assign argument into parameter storage before PERFORM\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "PERFORM ADD-ONE.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should perform local helper after assigning parameters\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_resolve_translation_unit_calls_rejects_local_argument_count_mismatch)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    t_transpiler_context context;
+    int context_initialized;
+    int status;
+
+    source = "function void helper(int value)\n"
+        "{\n"
+        "    return;\n"
+        "}\n"
+        "function void main()\n"
+        "{\n"
+        "    helper();\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    context_initialized = 0;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "local argument mismatch sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        goto cleanup;
+    context_initialized = 1;
+    if (transpiler_context_register_module(&context, "main_mod", "main_mod") != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_register_translation_unit_exports(&context, "main_mod", &unit) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_resolve_translation_unit_calls(&context, "main_mod", &unit) != FT_FAILURE)
+    {
+        std::printf("Assertion failed: local call with wrong argument count should fail resolution\n");
+        goto cleanup;
+    }
+    if (context.diagnostics.count == 0
+        || context.diagnostics.items[context.diagnostics.count - 1].code
+            != TRANSPILE_ERROR_FUNCTION_ARGUMENT_COUNT_MISMATCH)
+    {
+        std::printf("Assertion failed: local argument count mismatch should record dedicated diagnostic\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    if (context_initialized)
+        transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_cblc_resolve_translation_unit_calls_accepts_external_parameterized_calls)
+{
+    const char *main_source;
+    const char *worker_source;
+    t_cblc_translation_unit main_unit;
+    t_cblc_translation_unit worker_unit;
+    t_transpiler_context context;
+    int context_initialized;
+    int status;
+
+    main_source = "import \"worker_mod\";\n"
+        "int total;\n"
+        "function void main()\n"
+        "{\n"
+        "    total = 4;\n"
+        "    worker(total);\n"
+        "    return;\n"
+        "}\n";
+    worker_source = "function void worker(int value)\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&main_unit);
+    cblc_translation_unit_init(&worker_unit);
+    context_initialized = 0;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(main_source, &main_unit),
+            "main module with external parameterized call should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_parse_translation_unit(worker_source, &worker_unit),
+            "worker module with parameter should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        goto cleanup;
+    context_initialized = 1;
+    if (transpiler_context_register_module(&context, "worker_mod", "worker_mod") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_register_module(&context, "main_mod", "main_mod") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_register_module_import(&context, "main_mod", "worker_mod") != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_register_translation_unit_exports(&context, "worker_mod", &worker_unit) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_register_translation_unit_exports(&context, "main_mod", &main_unit) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_resolve_translation_unit_calls(&context, "main_mod", &main_unit) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: external parameterized calls should resolve when imports and signatures match\n");
+        goto cleanup;
+    }
+    if (!main_unit.functions[0].statements[1].call_is_external)
+    {
+        std::printf("Assertion failed: resolved external parameterized call should stay marked external\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&main_unit);
+    cblc_translation_unit_dispose(&worker_unit);
+    if (context_initialized)
+        transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_emits_external_parameterized_call_arguments)
+{
+    const char *main_source;
+    const char *worker_source;
+    t_cblc_translation_unit main_unit;
+    t_cblc_translation_unit worker_unit;
+    t_transpiler_context context;
+    char *generated_c;
+    int status;
+    int context_initialized;
+
+    main_source = "import \"worker_mod\";\n"
+        "int total;\n"
+        "function void main()\n"
+        "{\n"
+        "    total = 4;\n"
+        "    worker(total);\n"
+        "    return;\n"
+        "}\n";
+    worker_source = "function void worker(int value)\n"
+        "{\n"
+        "    display(value);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&main_unit);
+    cblc_translation_unit_init(&worker_unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    context_initialized = 0;
+    if (test_expect_success(cblc_parse_translation_unit(main_source, &main_unit),
+            "main module with external parameterized call should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_parse_translation_unit(worker_source, &worker_unit),
+            "worker module with external parameter should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        goto cleanup;
+    context_initialized = 1;
+    if (transpiler_context_register_module(&context, "worker_mod", "worker_mod") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_register_module(&context, "main_mod", "main_mod") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_register_module_import(&context, "main_mod", "worker_mod") != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_register_translation_unit_exports(&context, "worker_mod", &worker_unit) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_register_translation_unit_exports(&context, "main_mod", &main_unit) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_resolve_translation_unit_calls(&context, "main_mod", &main_unit) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&main_unit, &generated_c),
+            "main module with external parameterized call should generate C") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "worker(total);", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit external call arguments directly\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&main_unit);
+    cblc_translation_unit_dispose(&worker_unit);
+    if (context_initialized)
+        transpiler_context_dispose(&context);
+    return (status);
+}
+
 FT_TEST(test_cblc_generate_cobol_emits_perform_and_call_statements)
 {
     const char *main_source;
@@ -994,6 +1323,189 @@ FT_TEST(test_cblc_generate_cobol_emits_perform_and_call_statements)
 cleanup:
     if (generated_cobol)
         cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&main_unit);
+    cblc_translation_unit_dispose(&worker_unit);
+    if (context_initialized)
+        transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_emits_external_parameterized_call_and_linkage)
+{
+    const char *main_source;
+    const char *worker_source;
+    t_cblc_translation_unit main_unit;
+    t_cblc_translation_unit worker_unit;
+    t_transpiler_context context;
+    char *generated_main_cobol;
+    char *generated_worker_cobol;
+    int status;
+    int context_initialized;
+
+    main_source = "import \"worker_mod\";\n"
+        "int total;\n"
+        "function void main()\n"
+        "{\n"
+        "    total = 4;\n"
+        "    worker(total);\n"
+        "    return;\n"
+        "}\n";
+    worker_source = "function void worker(int value)\n"
+        "{\n"
+        "    display(value);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&main_unit);
+    cblc_translation_unit_init(&worker_unit);
+    generated_main_cobol = NULL;
+    generated_worker_cobol = NULL;
+    status = FT_FAILURE;
+    context_initialized = 0;
+    if (test_expect_success(cblc_parse_translation_unit(main_source, &main_unit),
+            "main module with external parameterized COBOL call should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_parse_translation_unit(worker_source, &worker_unit),
+            "worker module with external parameterized COBOL call should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        goto cleanup;
+    context_initialized = 1;
+    if (transpiler_context_register_module(&context, "worker_mod", "worker_mod") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_register_module(&context, "main_mod", "main_mod") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_register_module_import(&context, "main_mod", "worker_mod") != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_register_translation_unit_exports(&context, "worker_mod", &worker_unit) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_register_translation_unit_exports(&context, "main_mod", &main_unit) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_resolve_translation_unit_calls(&context, "main_mod", &main_unit) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&main_unit, &generated_main_cobol),
+            "main module with external parameterized call should convert to COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&worker_unit, &generated_worker_cobol),
+            "worker module with parameter should convert to COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!ft_strnstr(generated_main_cobol,
+            "CALL 'WORKER' USING BY REFERENCE TOTAL", std::strlen(generated_main_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should pass external int parameter by reference\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_worker_cobol, "LINKAGE SECTION.", std::strlen(generated_worker_cobol)))
+    {
+        std::printf("Assertion failed: worker COBOL should emit linkage section for entry parameters\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_worker_cobol,
+            "01 WORKER-VALUE PIC S9(9).", std::strlen(generated_worker_cobol)))
+    {
+        std::printf("Assertion failed: worker COBOL should emit linkage storage for parameter\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_worker_cobol,
+            "PROCEDURE DIVISION USING WORKER-VALUE.", std::strlen(generated_worker_cobol)))
+    {
+        std::printf("Assertion failed: worker COBOL should accept parameter in procedure division\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_main_cobol)
+        cma_free(generated_main_cobol);
+    if (generated_worker_cobol)
+        cma_free(generated_worker_cobol);
+    cblc_translation_unit_dispose(&main_unit);
+    cblc_translation_unit_dispose(&worker_unit);
+    if (context_initialized)
+        transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_emits_external_return_call_and_linkage)
+{
+    const char *main_source;
+    const char *worker_source;
+    t_cblc_translation_unit main_unit;
+    t_cblc_translation_unit worker_unit;
+    t_transpiler_context context;
+    char *generated_main_cobol;
+    char *generated_worker_cobol;
+    int status;
+    int context_initialized;
+
+    main_source = "import \"worker_mod\";\n"
+        "int total;\n"
+        "function void main()\n"
+        "{\n"
+        "    total = worker(4);\n"
+        "    display(total);\n"
+        "    return;\n"
+        "}\n";
+    worker_source = "function int worker(int value)\n"
+        "{\n"
+        "    return value + 1;\n"
+        "}\n";
+    cblc_translation_unit_init(&main_unit);
+    cblc_translation_unit_init(&worker_unit);
+    generated_main_cobol = NULL;
+    generated_worker_cobol = NULL;
+    status = FT_FAILURE;
+    context_initialized = 0;
+    if (test_expect_success(cblc_parse_translation_unit(main_source, &main_unit),
+            "main module with external return call should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_parse_translation_unit(worker_source, &worker_unit),
+            "worker module with external return should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        goto cleanup;
+    context_initialized = 1;
+    if (transpiler_context_register_module(&context, "worker_mod", "worker_mod") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_register_module(&context, "main_mod", "main_mod") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_register_module_import(&context, "main_mod", "worker_mod") != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_register_translation_unit_exports(&context, "worker_mod", &worker_unit) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_register_translation_unit_exports(&context, "main_mod", &main_unit) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_resolve_translation_unit_calls(&context, "main_mod", &main_unit) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&main_unit, &generated_main_cobol),
+            "main module with external return call should convert to COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&worker_unit, &generated_worker_cobol),
+            "worker module with external return should convert to COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!ft_strnstr(generated_main_cobol,
+            "CALL 'WORKER' USING BY VALUE 4 BY REFERENCE TOTAL", std::strlen(generated_main_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should append assignment target as external return slot\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_worker_cobol,
+            "01 CBLC-RETURN-WORKER PIC S9(9).", std::strlen(generated_worker_cobol)))
+    {
+        std::printf("Assertion failed: worker COBOL should emit linkage storage for return slot\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_worker_cobol,
+            "PROCEDURE DIVISION USING WORKER-VALUE CBLC-RETURN-WORKER.",
+            std::strlen(generated_worker_cobol)))
+    {
+        std::printf("Assertion failed: worker COBOL should accept parameter and return slot in procedure division\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_main_cobol)
+        cma_free(generated_main_cobol);
+    if (generated_worker_cobol)
+        cma_free(generated_worker_cobol);
     cblc_translation_unit_dispose(&main_unit);
     cblc_translation_unit_dispose(&worker_unit);
     if (context_initialized)
@@ -1117,6 +1629,64 @@ cleanup:
     cblc_translation_unit_dispose(&unit);
     if (context_initialized)
         transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_requires_resolved_imported_calls)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "import \"worker_mod\";\n"
+        "function void main()\n"
+        "{\n"
+        "    worker();\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "imported external call sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_generate_cobol(&unit, &generated_cobol) != FT_FAILURE)
+    {
+        std::printf("Assertion failed: direct COBOL generation should reject unresolved imported calls\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_translation_unit_accepts_external_return_assignment)
+{
+    const char *main_source;
+    t_cblc_translation_unit main_unit;
+    int status;
+
+    main_source = "import \"worker_mod\";\n"
+        "int total;\n"
+        "function void main()\n"
+        "{\n"
+        "    total = worker();\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&main_unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(main_source, &main_unit) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: parser should accept external return assignment syntax\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&main_unit);
     return (status);
 }
 
@@ -3660,6 +4230,122 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_frontend_complete_returns_builtin_string_members)
+{
+    const char *source;
+    t_cblc_frontend_analysis analysis;
+    t_cblc_completion_list completions;
+    size_t index;
+    int found_append;
+    int found_len;
+    int status;
+
+    source = "function void main()\n"
+        "{\n"
+        "    string.\n"
+        "    return;\n"
+        "}\n";
+    status = FT_FAILURE;
+    found_append = 0;
+    found_len = 0;
+    if (test_expect_success(cblc_frontend_analysis_init(&analysis),
+            "CBL-C frontend analysis should initialize for builtin string completion")
+        != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(cblc_completion_list_init(&completions),
+            "CBL-C completion list should initialize for builtin string completion")
+        != FT_SUCCESS)
+    {
+        cblc_frontend_analysis_dispose(&analysis);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(cblc_frontend_analyze_document(&analysis,
+                "string_member_completion_sample.cblc", source) != FT_SUCCESS
+                ? FT_SUCCESS : FT_FAILURE,
+            "CBL-C builtin string completion sample should remain incomplete while typing")
+        != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_frontend_complete(&analysis, 3, 12, &completions),
+            "CBL-C completion should succeed for builtin string member access") != FT_SUCCESS)
+        goto cleanup;
+    index = 0;
+    while (index < completions.count)
+    {
+        if (std::strncmp(completions.items[index].label, "append",
+                sizeof(completions.items[index].label)) == 0)
+            found_append = 1;
+        if (std::strncmp(completions.items[index].label, "len",
+                sizeof(completions.items[index].label)) == 0)
+            found_len = 1;
+        index += 1;
+    }
+    if (test_expect_int_equal(found_append, 1,
+            "CBL-C completion should include builtin string append") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(found_len, 1,
+            "CBL-C completion should include builtin string len") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_completion_list_dispose(&completions);
+    cblc_frontend_analysis_dispose(&analysis);
+    return (status);
+}
+
+FT_TEST(test_cblc_frontend_complete_allows_private_members_on_this_inside_class)
+{
+    const char *source;
+    t_cblc_frontend_analysis analysis;
+    t_cblc_completion_list completions;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    private:\n"
+        "    int value;\n"
+        "    void reset()\n"
+        "    {\n"
+        "        return;\n"
+        "    }\n"
+        "    public:\n"
+        "    void expose()\n"
+        "    {\n"
+        "        this.\n"
+        "        return;\n"
+        "    }\n"
+        "};\n"
+        "function void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_frontend_analysis_init(&analysis),
+            "CBL-C frontend analysis should initialize for this member completion")
+        != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(cblc_completion_list_init(&completions),
+            "CBL-C completion list should initialize for this member completion") != FT_SUCCESS)
+    {
+        cblc_frontend_analysis_dispose(&analysis);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(cblc_frontend_analyze_document(&analysis,
+                "this_member_completion_sample.cblc", source) != FT_SUCCESS
+                ? FT_SUCCESS : FT_FAILURE,
+            "CBL-C this member completion sample should remain incomplete while typing")
+        != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_frontend_complete(&analysis, 12, 14, &completions),
+            "CBL-C completion should succeed inside a class while typing this member access")
+        != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_completion_list_dispose(&completions);
+    cblc_frontend_analysis_dispose(&analysis);
+    return (status);
+}
+
 const t_test_case *get_validation_tests(size_t *count)
 {
     static const t_test_case tests[] = {
@@ -3793,7 +4479,9 @@ const t_test_case *get_validation_tests(size_t *count)
         {"cblc_frontend_complete_returns_public_members_only",
             test_cblc_frontend_complete_returns_public_members_only},
         {"cblc_frontend_complete_returns_std_namespace_functions",
-            test_cblc_frontend_complete_returns_std_namespace_functions}
+            test_cblc_frontend_complete_returns_std_namespace_functions},
+        {"cblc_frontend_complete_returns_builtin_string_members",
+            test_cblc_frontend_complete_returns_builtin_string_members}
     };
 
     if (count)

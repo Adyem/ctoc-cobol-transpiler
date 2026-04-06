@@ -3,12 +3,24 @@
 const t_test_case *get_compiler_cobol_round_trip_pipeline_tests(size_t *count);
 
 int test_cblc_copy_file_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_append_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_len_translates_to_cobol_and_executes(void);
+int test_cblc_inline_std_strlen_literal_translates_to_cobol_and_executes(void);
+int test_cblc_inline_class_methods_translates_to_cobol_and_executes(void);
+int test_cblc_inline_array_access_translates_to_cobol_and_executes(void);
+int test_cblc_inline_const_values_translates_to_cobol_and_executes(void);
+int test_cblc_inline_struct_field_access_translates_to_cobol_and_executes(void);
+int test_cblc_inline_nested_struct_field_access_translates_to_cobol_and_executes(void);
+int test_cblc_inline_variable_index_array_access_translates_to_cobol_and_executes(void);
+int test_cblc_inline_constructor_initializer_translates_to_cobol_and_executes(void);
 int test_cblc_filter_prefix_translates_to_cobol_and_executes(void);
 int test_cblc_reverse_control_flow_translates_to_cobol_and_executes(void);
 int test_cblc_integration_showcase_translates_to_cobol_and_executes(void);
 int test_cblc_message_showcase_translates_to_cobol_and_executes(void);
 int test_message_showcase_sample_make_pipeline(void);
 int test_cblc_multi_module_translates_to_cobol_and_executes(void);
+int test_cblc_multi_module_parameterized_call_translates_to_cobol_and_executes(void);
+int test_cblc_multi_module_return_call_translates_to_cobol_and_executes(void);
 int test_cblc_numeric_precision_translates_to_cobol_and_executes(void);
 int test_cblc_floating_point_mix_translates_to_cobol_and_executes(void);
 int test_cblc_mixed_numeric_types_translates_to_cobol_and_executes(void);
@@ -36,6 +48,26 @@ const t_test_case *get_compiler_cobol_round_trip_pipeline_tests(size_t *count)
     static const t_test_case tests[] = {
         {"cblc_copy_file_translates_to_cobol_and_executes",
             test_cblc_copy_file_translates_to_cobol_and_executes},
+        {"cblc_inline_string_append_translates_to_cobol_and_executes",
+            test_cblc_inline_string_append_translates_to_cobol_and_executes},
+        {"cblc_inline_string_len_translates_to_cobol_and_executes",
+            test_cblc_inline_string_len_translates_to_cobol_and_executes},
+        {"cblc_inline_std_strlen_literal_translates_to_cobol_and_executes",
+            test_cblc_inline_std_strlen_literal_translates_to_cobol_and_executes},
+        {"cblc_inline_class_methods_translates_to_cobol_and_executes",
+            test_cblc_inline_class_methods_translates_to_cobol_and_executes},
+        {"cblc_inline_array_access_translates_to_cobol_and_executes",
+            test_cblc_inline_array_access_translates_to_cobol_and_executes},
+        {"cblc_inline_const_values_translates_to_cobol_and_executes",
+            test_cblc_inline_const_values_translates_to_cobol_and_executes},
+        {"cblc_inline_struct_field_access_translates_to_cobol_and_executes",
+            test_cblc_inline_struct_field_access_translates_to_cobol_and_executes},
+        {"cblc_inline_nested_struct_field_access_translates_to_cobol_and_executes",
+            test_cblc_inline_nested_struct_field_access_translates_to_cobol_and_executes},
+        {"cblc_inline_variable_index_array_access_translates_to_cobol_and_executes",
+            test_cblc_inline_variable_index_array_access_translates_to_cobol_and_executes},
+        {"cblc_inline_constructor_initializer_translates_to_cobol_and_executes",
+            test_cblc_inline_constructor_initializer_translates_to_cobol_and_executes},
         {"cblc_filter_prefix_translates_to_cobol_and_executes",
             test_cblc_filter_prefix_translates_to_cobol_and_executes},
         {"cblc_reverse_control_flow_translates_to_cobol_and_executes",
@@ -47,6 +79,10 @@ const t_test_case *get_compiler_cobol_round_trip_pipeline_tests(size_t *count)
         {"message_showcase_sample_make_pipeline", test_message_showcase_sample_make_pipeline},
         {"cblc_multi_module_translates_to_cobol_and_executes",
             test_cblc_multi_module_translates_to_cobol_and_executes},
+        {"cblc_multi_module_parameterized_call_translates_to_cobol_and_executes",
+            test_cblc_multi_module_parameterized_call_translates_to_cobol_and_executes},
+        {"cblc_multi_module_return_call_translates_to_cobol_and_executes",
+            test_cblc_multi_module_return_call_translates_to_cobol_and_executes},
         {"cblc_numeric_precision_translates_to_cobol_and_executes",
             test_cblc_numeric_precision_translates_to_cobol_and_executes},
         {"cblc_floating_point_mix_translates_to_cobol_and_executes",

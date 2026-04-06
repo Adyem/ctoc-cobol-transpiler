@@ -1,8 +1,25 @@
 #include "cblc_transpiler.hpp"
 
+static int cblc_function_has_return_statement(const t_cblc_function *function)
+{
+    size_t index;
+
+    if (!function)
+        return (0);
+    index = 0;
+    while (index < function->statement_count)
+    {
+        if (function->statements[index].type == CBLC_STATEMENT_RETURN)
+            return (1);
+        index += 1;
+    }
+    return (0);
+}
+
 int transpiler_validate_generated_cblc(const char *text)
 {
     t_cblc_translation_unit unit;
+    size_t index;
 
     if (!text)
         return (FT_FAILURE);
@@ -25,11 +42,22 @@ int transpiler_validate_generated_cblc(const char *text)
         if (entry_index == static_cast<size_t>(-1) || entry_index >= unit.function_count)
             entry_index = 0;
         if (unit.functions[entry_index].return_kind != CBLC_FUNCTION_RETURN_VOID
-            && !unit.functions[entry_index].saw_return)
+            && !cblc_function_has_return_statement(&unit.functions[entry_index]))
         {
             cblc_translation_unit_dispose(&unit);
             return (FT_FAILURE);
         }
+    }
+    index = 0;
+    while (index < unit.function_count)
+    {
+        if (unit.functions[index].return_kind != CBLC_FUNCTION_RETURN_VOID
+            && !cblc_function_has_return_statement(&unit.functions[index]))
+        {
+            cblc_translation_unit_dispose(&unit);
+            return (FT_FAILURE);
+        }
+        index += 1;
     }
     cblc_translation_unit_dispose(&unit);
     return (FT_SUCCESS);

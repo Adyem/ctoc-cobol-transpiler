@@ -1047,6 +1047,47 @@ static int transpiler_source_find_function_body_offsets(const char *path, const 
     return (FT_FAILURE);
 }
 
+static int transpiler_source_find_type_body_offsets(const char *path, const char *text,
+    const char *keyword, const char *name, size_t *body_start, size_t *body_end)
+{
+    t_transpiler_source_span span;
+    size_t scan_offset;
+    size_t open_brace_offset;
+    size_t depth;
+
+    if (!path || !text || !keyword || !name || !body_start || !body_end)
+        return (FT_FAILURE);
+    if (transpiler_source_find_type_name_span(path, text, keyword, name, &span) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (transpiler_source_position_to_offset(text, span.end_line, span.end_column,
+            &scan_offset) != FT_SUCCESS)
+        return (FT_FAILURE);
+    while (text[scan_offset] != '\0' && text[scan_offset] != '{')
+        scan_offset += 1;
+    if (text[scan_offset] != '{')
+        return (FT_FAILURE);
+    open_brace_offset = scan_offset;
+    depth = 1;
+    scan_offset += 1;
+    while (text[scan_offset] != '\0')
+    {
+        if (text[scan_offset] == '{')
+            depth += 1;
+        else if (text[scan_offset] == '}')
+        {
+            depth -= 1;
+            if (depth == 0)
+            {
+                *body_start = open_brace_offset + 1;
+                *body_end = scan_offset;
+                return (FT_SUCCESS);
+            }
+        }
+        scan_offset += 1;
+    }
+    return (FT_FAILURE);
+}
+
 static int cblc_frontend_find_enclosing_function(const t_cblc_frontend_analysis *analysis,
     size_t line, size_t column, char *function_name, size_t function_name_size)
 {
@@ -1126,6 +1167,46 @@ static int cblc_frontend_find_enclosing_function(const t_cblc_frontend_analysis 
     if (function_name[0] == '\0')
         return (FT_FAILURE);
     return (FT_SUCCESS);
+}
+
+static int cblc_frontend_find_enclosing_type(const t_cblc_frontend_analysis *analysis,
+    size_t line, size_t column, char *type_name, size_t type_name_size)
+{
+    size_t cursor_offset;
+    size_t body_start;
+    size_t body_end;
+    size_t index;
+    const char *keyword;
+
+    if (!analysis || !analysis->source_text || !type_name || type_name_size == 0)
+        return (FT_FAILURE);
+    type_name[0] = '\0';
+    if (transpiler_source_position_to_offset(analysis->source_text, line, column, &cursor_offset)
+        != FT_SUCCESS)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < analysis->unit->struct_type_count)
+    {
+        if (!analysis->unit->struct_types[index].is_builtin)
+        {
+            keyword = "struct";
+            if (analysis->unit->struct_types[index].is_class)
+                keyword = "class";
+            if (transpiler_source_find_type_body_offsets(analysis->path, analysis->source_text,
+                    keyword, analysis->unit->struct_types[index].source_name, &body_start,
+                    &body_end) == FT_SUCCESS)
+            {
+                if (cursor_offset >= body_start && cursor_offset <= body_end)
+                {
+                    ft_strlcpy(type_name, analysis->unit->struct_types[index].source_name,
+                        type_name_size);
+                    return (FT_SUCCESS);
+                }
+            }
+        }
+        index += 1;
+    }
+    return (FT_FAILURE);
 }
 
 static const t_cblc_data_item *cblc_frontend_find_data_item_in_scope(
@@ -1392,7 +1473,8 @@ static int cblc_frontend_append_string_member_completions(t_cblc_completion_list
 }
 
 static int cblc_frontend_append_struct_member_completions(
-    const t_cblc_struct_type *type, t_cblc_completion_list *completions, const char *prefix)
+    const t_cblc_struct_type *type, t_cblc_completion_list *completions, const char *prefix,
+    int allow_private)
 {
     size_t index;
 
@@ -1401,7 +1483,7 @@ static int cblc_frontend_append_struct_member_completions(
     index = 0;
     while (index < type->field_count)
     {
-        if ((!type->is_class
+        if ((allow_private || !type->is_class
                 || type->fields[index].visibility == CBLC_MEMBER_VISIBILITY_PUBLIC)
             && cblc_completion_matches_prefix(type->fields[index].source_name, prefix))
         {
@@ -1414,7 +1496,7 @@ static int cblc_frontend_append_struct_member_completions(
     index = 0;
     while (index < type->method_count)
     {
-        if ((!type->is_class
+        if ((allow_private || !type->is_class
                 || type->methods[index].visibility == CBLC_MEMBER_VISIBILITY_PUBLIC)
             && cblc_completion_matches_prefix(type->methods[index].source_name, prefix))
         {
@@ -1429,13 +1511,24 @@ static int cblc_frontend_append_struct_member_completions(
 
 static int cblc_frontend_append_member_completions(const t_cblc_frontend_analysis *analysis,
     t_cblc_completion_list *completions, const t_cblc_completion_context *context,
-    const char *function_name)
+    const char *function_name, const char *current_type_name)
 {
     const t_cblc_data_item *receiver_item;
     const t_cblc_struct_type *type;
+    int allow_private;
 
     if (!analysis || !completions || !context)
         return (FT_FAILURE);
+    if (std::strncmp(context->receiver, "string", sizeof(context->receiver)) == 0)
+        return (cblc_frontend_append_string_member_completions(completions, context->prefix));
+    if (std::strncmp(context->receiver, "this", sizeof(context->receiver)) == 0)
+    {
+        type = cblc_frontend_find_struct_type(analysis, current_type_name);
+        if (!type)
+            return (FT_SUCCESS);
+        return (cblc_frontend_append_struct_member_completions(type, completions,
+                context->prefix, 1));
+    }
     receiver_item = cblc_frontend_find_data_item_in_scope(analysis, context->receiver,
             function_name);
     if (!receiver_item)
@@ -1447,7 +1540,12 @@ static int cblc_frontend_append_member_completions(const t_cblc_frontend_analysi
     type = cblc_frontend_find_struct_type(analysis, receiver_item->struct_type_name);
     if (!type)
         return (FT_SUCCESS);
-    return (cblc_frontend_append_struct_member_completions(type, completions, context->prefix));
+    allow_private = 0;
+    if (current_type_name && current_type_name[0] != '\0'
+        && std::strncmp(type->source_name, current_type_name, sizeof(type->source_name)) == 0)
+        allow_private = 1;
+    return (cblc_frontend_append_struct_member_completions(type, completions, context->prefix,
+            allow_private));
 }
 
 int cblc_frontend_complete(const t_cblc_frontend_analysis *analysis, size_t line,
@@ -1455,26 +1553,28 @@ int cblc_frontend_complete(const t_cblc_frontend_analysis *analysis, size_t line
 {
     t_cblc_completion_context context;
     char function_name[TRANSPILE_IDENTIFIER_MAX];
+    char current_type_name[TRANSPILE_IDENTIFIER_MAX];
 
     if (!analysis || !completions || !analysis->source_text)
         return (FT_FAILURE);
     cblc_completion_list_dispose(completions);
     if (cblc_completion_list_init(completions) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (analysis->parse_status != FT_SUCCESS)
-        return (FT_FAILURE);
     if (cblc_frontend_extract_completion_context(analysis->source_text, line, column, &context)
         != FT_SUCCESS)
         return (FT_FAILURE);
     function_name[0] = '\0';
+    current_type_name[0] = '\0';
     cblc_frontend_find_enclosing_function(analysis, line, column, function_name,
         sizeof(function_name));
+    cblc_frontend_find_enclosing_type(analysis, line, column, current_type_name,
+        sizeof(current_type_name));
     if (context.kind == CBLC_COMPLETION_CONTEXT_STD_NAMESPACE)
         return (cblc_frontend_append_stdlib_completions(completions, context.prefix));
     if (context.kind == CBLC_COMPLETION_CONTEXT_MEMBER)
     {
         return (cblc_frontend_append_member_completions(analysis, completions, &context,
-                function_name));
+                function_name, current_type_name));
     }
     if (cblc_frontend_append_keyword_completions(completions, context.prefix) != FT_SUCCESS)
         return (FT_FAILURE);

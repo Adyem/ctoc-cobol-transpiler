@@ -215,6 +215,7 @@ typedef enum e_transpiler_diagnostic_level
 #define TRANSPILE_IDENTIFIER_MAX 64
 #define TRANSPILE_MODULE_NAME_MAX 64
 #define TRANSPILE_FILE_PATH_MAX 260
+#define TRANSPILE_FUNCTION_PARAMETER_MAX 8
 
 typedef struct s_transpiler_source_span
 {
@@ -288,12 +289,20 @@ typedef enum e_transpiler_symbol_visibility
     TRANSPILE_SYMBOL_PUBLIC
 }   t_transpiler_symbol_visibility;
 
+typedef enum e_transpiler_function_parameter_kind
+{
+    TRANSPILE_FUNCTION_PARAMETER_UNKNOWN = 0,
+    TRANSPILE_FUNCTION_PARAMETER_INT
+}   t_transpiler_function_parameter_kind;
+
 typedef struct s_transpiler_function_signature
 {
     char name[TRANSPILE_FUNCTION_NAME_MAX];
     char module[TRANSPILE_MODULE_NAME_MAX];
     t_transpiler_function_return_mode return_mode;
     t_transpiler_symbol_visibility visibility;
+    t_transpiler_function_parameter_kind parameter_kinds[TRANSPILE_FUNCTION_PARAMETER_MAX];
+    size_t parameter_count;
 }   t_transpiler_function_signature;
 
 #define TRANSPILE_ERROR_FUNCTION_RETURNS_VALUE 1001
@@ -313,6 +322,9 @@ typedef struct s_transpiler_function_signature
 #define TRANSPILE_ERROR_COPYBOOK_DUPLICATE 1015
 #define TRANSPILE_ERROR_MODULE_IMPORT_REQUIRED 1016
 #define TRANSPILE_ERROR_FUNCTION_UNRESOLVED 1017
+#define TRANSPILE_ERROR_FUNCTION_EXTERNAL_RETURN_UNSUPPORTED 1018
+#define TRANSPILE_ERROR_FUNCTION_ARGUMENT_COUNT_MISMATCH 1019
+#define TRANSPILE_ERROR_FUNCTION_EXTERNAL_PARAMETERS_UNSUPPORTED 1020
 
 typedef enum e_transpiler_file_role
 {
@@ -585,6 +597,10 @@ int transpiler_context_compute_module_initialization_order(t_transpiler_context 
 const size_t *transpiler_context_get_module_initialization_order(const t_transpiler_context *context, size_t *count);
 int transpiler_context_register_function(t_transpiler_context *context, const char *module_name, const char *name,
     t_transpiler_function_return_mode return_mode, t_transpiler_symbol_visibility visibility);
+int transpiler_context_register_function_signature(t_transpiler_context *context, const char *module_name,
+    const char *name, t_transpiler_function_return_mode return_mode,
+    t_transpiler_symbol_visibility visibility,
+    const t_transpiler_function_parameter_kind *parameter_kinds, size_t parameter_count);
 const t_transpiler_function_signature *transpiler_context_find_function(const t_transpiler_context *context,
     const char *module_name, const char *name);
 const t_transpiler_function_signature *transpiler_context_resolve_function_access(t_transpiler_context *context,
@@ -1135,12 +1151,24 @@ struct s_cblc_statement
     int is_literal;
     char call_identifier[TRANSPILE_IDENTIFIER_MAX];
     int call_is_external;
+    char call_arguments[TRANSPILE_STATEMENT_TEXT_MAX];
+    size_t call_argument_count;
 };
+
+typedef struct s_cblc_parameter
+{
+    char source_name[TRANSPILE_IDENTIFIER_MAX];
+    char actual_source_name[TRANSPILE_IDENTIFIER_MAX];
+    char cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    t_transpiler_function_parameter_kind kind;
+}   t_cblc_parameter;
 
 typedef struct s_cblc_function
 {
     char source_name[TRANSPILE_IDENTIFIER_MAX];
     char cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    t_cblc_parameter parameters[TRANSPILE_FUNCTION_PARAMETER_MAX];
+    size_t parameter_count;
     t_cblc_statement *statements;
     size_t statement_count;
     size_t statement_capacity;
