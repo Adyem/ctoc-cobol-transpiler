@@ -1,6 +1,6 @@
 char SHARED_ARG[12];
 
-function void MAIN() {
+void MAIN() {
     SHARED_ARG = "A";
     return ;
 }

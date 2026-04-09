@@ -11,7 +11,7 @@ char CUSTOMER_NAME[24];
 float CUSTOMER_BALANCE;
 char CUSTOMER_STATUS = "N";
 
-function void MAIN() {
+void MAIN() {
     CUSTOMER_ID = "00001234";
     CUSTOMER_NAME = "ALPHA";
     CUSTOMER_BALANCE = 12345;

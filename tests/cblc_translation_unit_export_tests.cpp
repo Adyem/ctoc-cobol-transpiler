@@ -9,10 +9,10 @@ FT_TEST(test_cblc_register_translation_unit_exports_records_entrypoint_and_helpe
     const char *source;
     int status;
 
-    source = "function void helper() {\n"
+    source = "void helper() {\n"
         "    return;\n"
         "}\n\n"
-        "function void main() {\n"
+        "void main() {\n"
         "    return;\n"
         "}\n";
     status = FT_FAILURE;
@@ -74,7 +74,7 @@ FT_TEST(test_cblc_register_translation_unit_exports_skips_entrypoint_without_mai
     const char *source;
     int status;
 
-    source = "function void show_banner() {\n"
+    source = "void show_banner() {\n"
         "    return;\n"
         "}\n";
     status = FT_FAILURE;
@@ -124,10 +124,10 @@ FT_TEST(test_cblc_register_translation_unit_exports_reports_duplicate_entrypoint
     const char *second_source;
     int status;
 
-    first_source = "function void main() {\n"
+    first_source = "void main() {\n"
         "    return;\n"
         "}\n";
-    second_source = "function void main() {\n"
+    second_source = "void main() {\n"
         "    return;\n"
         "}\n";
     status = FT_FAILURE;

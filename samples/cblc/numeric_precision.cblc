@@ -4,7 +4,7 @@ long long threshold;
 float day_ratio;
 double combined_ratio;
 
-function void analyze_precision() {
+void analyze_precision() {
     long deposit;
     long withdrawal;
     long long bonus_pool;

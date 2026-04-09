@@ -1,4 +1,4 @@
-function int load_backlog_minutes()
+int load_backlog_minutes()
 {
     char first_minutes[8];
     char second_minutes[8];

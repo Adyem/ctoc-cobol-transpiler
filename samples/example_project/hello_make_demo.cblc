@@ -1,6 +1,6 @@
 char greeting[32];
 
-function void main() {
+void main() {
     greeting = "HELLO FROM CBL-C";
     display(greeting);
     return;

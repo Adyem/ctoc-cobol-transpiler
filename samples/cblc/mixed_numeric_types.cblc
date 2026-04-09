@@ -3,7 +3,7 @@ long regional_total;
 long long national_total;
 bool exceeded_limit;
 
-function void track_totals() {
+void track_totals() {
     order_count = 45;
     regional_total = 250000;
     national_total = 5000000000;
@@ -25,6 +25,6 @@ function void track_totals() {
     display(national_total);
 }
 
-function void main() {
+void main() {
     track_totals();
 }

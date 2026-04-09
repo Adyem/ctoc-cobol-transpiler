@@ -51,6 +51,13 @@ int transpiler_validate_generated_cblc(const char *text)
     index = 0;
     while (index < unit.function_count)
     {
+        if (std::strncmp(unit.functions[index].source_name, "main",
+                sizeof(unit.functions[index].source_name)) == 0
+            && unit.functions[index].return_kind != CBLC_FUNCTION_RETURN_VOID)
+        {
+            cblc_translation_unit_dispose(&unit);
+            return (FT_FAILURE);
+        }
         if (unit.functions[index].return_kind != CBLC_FUNCTION_RETURN_VOID
             && !cblc_function_has_return_statement(&unit.functions[index]))
         {

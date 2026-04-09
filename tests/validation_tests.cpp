@@ -6,7 +6,7 @@ FT_TEST(test_transpiler_validation_accepts_valid_cblc)
 {
     const char *source;
 
-    source = "function void main()\n"
+    source = "void main()\n"
         "{\n"
         "    display(\"HELLO\");\n"
         "    return;\n"
@@ -21,7 +21,7 @@ FT_TEST(test_transpiler_validation_rejects_cblc_without_return)
 {
     const char *source;
 
-    source = "function int main()\n"
+    source = "int main()\n"
         "{\n"
         "    display(\"HELLO\");\n"
         "}\n";
@@ -38,7 +38,7 @@ FT_TEST(test_transpiler_validation_accepts_string_declaration)
     const char *source;
 
     source = "string greeting[16];\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    greeting = \"HI\";\n"
         "    display(greeting.len);\n"
@@ -57,7 +57,7 @@ FT_TEST(test_transpiler_validation_accepts_string_assignment_and_length_usage)
     source = "string greeting[12];\n"
         "string copy[12];\n"
         "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    greeting = \"HELLO\";\n"
         "    copy = greeting;\n"
@@ -79,7 +79,7 @@ FT_TEST(test_transpiler_validation_accepts_int_array_and_string_array_declaratio
 
     source = "int numbers[16];\n"
         "string names[4](12);\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -95,7 +95,7 @@ FT_TEST(test_transpiler_validation_accepts_string_capacity_parentheses)
     const char *source;
 
     source = "string greeting(16);\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    greeting = \"HI\";\n"
         "    display(greeting.len);\n"
@@ -114,7 +114,7 @@ FT_TEST(test_transpiler_validation_accepts_indexed_array_usage)
     source = "int numbers[3];\n"
         "int total;\n"
         "string names[2](8);\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    numbers[0] = 7;\n"
         "    total = numbers[0];\n"
@@ -137,7 +137,7 @@ FT_TEST(test_transpiler_validation_accepts_const_declarations)
     source = "const int answer = 42;\n"
         "const char marker = 'A';\n"
         "const string greeting[12] = \"HELLO\";\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    display(answer);\n"
         "    display(marker);\n"
@@ -155,7 +155,7 @@ FT_TEST(test_transpiler_validation_rejects_const_without_initializer)
     const char *source;
 
     source = "const int answer;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -172,7 +172,7 @@ FT_TEST(test_transpiler_validation_rejects_const_reassignment)
     const char *source;
 
     source = "const int answer = 42;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    answer = 7;\n"
         "    return;\n"
@@ -190,7 +190,7 @@ FT_TEST(test_transpiler_validation_accepts_const_char_buffer_declaration)
     const char *source;
 
     source = "const char label[8] = \"HELLO\";\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    display(label);\n"
         "    return;\n"
@@ -208,7 +208,7 @@ FT_TEST(test_transpiler_validation_accepts_const_string_length_usage)
 
     source = "const string greeting[12] = \"HELLO\";\n"
         "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    total = greeting.len;\n"
         "    display(total);\n"
@@ -226,7 +226,7 @@ FT_TEST(test_transpiler_validation_rejects_const_char_scalar_reassignment)
     const char *source;
 
     source = "const char marker = 'A';\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    marker = 'B';\n"
         "    return;\n"
@@ -244,7 +244,7 @@ FT_TEST(test_transpiler_validation_rejects_const_string_reassignment)
     const char *source;
 
     source = "const string greeting[12] = \"HELLO\";\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    greeting = \"BYE\";\n"
         "    return;\n"
@@ -262,7 +262,7 @@ FT_TEST(test_transpiler_validation_rejects_strcpy_into_const_char_buffer)
     const char *source;
 
     source = "const char label[8] = \"HELLO\";\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    std::strcpy(label, \"BYE\");\n"
         "    return;\n"
@@ -280,7 +280,7 @@ FT_TEST(test_transpiler_validation_accepts_strlen_string_literal_assignment)
     const char *source;
 
     source = "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    total = std::strlen(\"hello world\");\n"
         "    display(total);\n"
@@ -300,7 +300,7 @@ FT_TEST(test_cblc_parse_translation_unit_records_imports)
     int status;
 
     source = "import \"helper.cblc\";\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -332,7 +332,7 @@ FT_TEST(test_cblc_parse_translation_unit_records_copy_includes)
     int status;
 
     source = "copy \"shared-status\";\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -364,12 +364,12 @@ FT_TEST(test_cblc_parse_translation_unit_tracks_multiple_functions)
     t_cblc_translation_unit unit;
     int status;
 
-    source = "function void helper()\n"
+    source = "void helper()\n"
         "{\n"
         "    display(\"FIRST\");\n"
         "    return;\n"
         "}\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    display(\"SECOND\");\n"
         "    return;\n"
@@ -420,6 +420,50 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_parse_translation_unit_accepts_functions_without_keyword)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "void helper()\n"
+        "{\n"
+        "    display(\"FIRST\");\n"
+        "    return;\n"
+        "}\n"
+        "void main()\n"
+        "{\n"
+        "    helper();\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "functions without the function keyword should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (unit.function_count != 2)
+    {
+        std::printf("Assertion failed: expected two parsed functions without the function keyword\n");
+        goto cleanup;
+    }
+    if (std::strncmp(unit.functions[0].source_name, "helper",
+            sizeof(unit.functions[0].source_name)) != 0)
+    {
+        std::printf("Assertion failed: helper should be recorded without the function keyword\n");
+        goto cleanup;
+    }
+    if (std::strncmp(unit.functions[1].source_name, "main",
+            sizeof(unit.functions[1].source_name)) != 0)
+    {
+        std::printf("Assertion failed: main should be recorded without the function keyword\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_generate_cobol_emits_string_group)
 {
     const char *source;
@@ -428,7 +472,7 @@ FT_TEST(test_cblc_generate_cobol_emits_string_group)
     int status;
 
     source = "string greeting[8];\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    greeting = \"HELLO\";\n"
         "    display(greeting);\n"
@@ -485,7 +529,7 @@ FT_TEST(test_cblc_generate_c_emits_array_declarations)
 
     source = "int numbers[16];\n"
         "string names[4](12);\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -529,7 +573,7 @@ FT_TEST(test_cblc_generate_cobol_emits_array_declarations)
 
     source = "int numbers[16];\n"
         "string names[4](12);\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -579,7 +623,7 @@ FT_TEST(test_cblc_generate_c_emits_indexed_array_access)
     source = "int numbers[3];\n"
         "int total;\n"
         "string names[2](8);\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    numbers[0] = 7;\n"
         "    total = numbers[0];\n"
@@ -646,7 +690,7 @@ FT_TEST(test_cblc_generate_cobol_emits_indexed_array_access)
     source = "int numbers[3];\n"
         "int total;\n"
         "string names[2](8);\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    numbers[0] = 7;\n"
         "    total = numbers[0];\n"
@@ -712,7 +756,7 @@ FT_TEST(test_cblc_generate_c_emits_variable_index_array_access)
         "int total;\n"
         "int index;\n"
         "string names[2](8);\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    index = 1;\n"
         "    total = numbers[index];\n"
@@ -775,7 +819,7 @@ FT_TEST(test_cblc_generate_cobol_emits_variable_index_array_access)
         "int total;\n"
         "int index;\n"
         "string names[2](8);\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    index = 1;\n"
         "    total = numbers[index];\n"
@@ -836,7 +880,7 @@ FT_TEST(test_cblc_generate_cobol_emits_copy_includes)
     int status;
 
     source = "copy \"shared-status\";\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -874,12 +918,12 @@ FT_TEST(test_cblc_generate_cobol_emits_multiple_paragraphs)
     char *generated_cobol;
     int status;
 
-    source = "function void helper()\n"
+    source = "void helper()\n"
         "{\n"
         "    display(\"FIRST\");\n"
         "    return;\n"
         "}\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    display(\"SECOND\");\n"
         "    return;\n"
@@ -929,7 +973,7 @@ FT_TEST(test_cblc_parse_translation_unit_records_int_function_parameters)
     t_cblc_translation_unit unit;
     int status;
 
-    source = "function int add_one(int value)\n"
+    source = "int add_one(int value)\n"
         "{\n"
         "    return value + 1;\n"
         "}\n";
@@ -959,6 +1003,42 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_parse_translation_unit_records_struct_return_type)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "struct Point\n"
+        "{\n"
+        "    int x;\n"
+        "};\n"
+        "Point make_point()\n"
+        "{\n"
+        "    Point result;\n"
+        "    result.x = 7;\n"
+        "    return result;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "struct-returning function should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.function_count, 1,
+            "translation unit should record one struct-returning function") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(unit.functions[0].return_kind, CBLC_FUNCTION_RETURN_STRUCT,
+            "function should record a struct return kind") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(unit.functions[0].return_type_name, "Point",
+            "function should record the struct return type name") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_generate_c_emits_parameter_slot_assignments_for_local_calls)
 {
     const char *source;
@@ -968,11 +1048,11 @@ FT_TEST(test_cblc_generate_c_emits_parameter_slot_assignments_for_local_calls)
 
     source = "int total;\n"
         "int result;\n"
-        "function int add_one(int value)\n"
+        "int add_one(int value)\n"
         "{\n"
         "    return value + 1;\n"
         "}\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    total = 4;\n"
         "    result = add_one(total);\n"
@@ -1013,6 +1093,58 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_generate_c_emits_struct_returning_function_and_call_assignment)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "struct Point\n"
+        "{\n"
+        "    int x;\n"
+        "};\n"
+        "Point point;\n"
+        "Point make_point()\n"
+        "{\n"
+        "    Point result;\n"
+        "    result.x = 7;\n"
+        "    return result;\n"
+        "}\n"
+        "void main()\n"
+        "{\n"
+        "    point = make_point();\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "struct return sample should parse for C generation") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "struct return sample should generate C") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "t_Point make_point(void)", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit a struct return type for helper functions\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "point = make_point();", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should assign returned struct values into matching targets\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_generate_cobol_emits_parameter_slot_assignments_for_local_calls)
 {
     const char *source;
@@ -1022,11 +1154,11 @@ FT_TEST(test_cblc_generate_cobol_emits_parameter_slot_assignments_for_local_call
 
     source = "int total;\n"
         "int result;\n"
-        "function int add_one(int value)\n"
+        "int add_one(int value)\n"
         "{\n"
         "    return value + 1;\n"
         "}\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    total = 4;\n"
         "    result = add_one(total);\n"
@@ -1049,7 +1181,7 @@ FT_TEST(test_cblc_generate_cobol_emits_parameter_slot_assignments_for_local_call
         std::printf("Assertion failed: generated COBOL should emit parameter storage item\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "COMPUTE ADD-ONE-VALUE = TOTAL.", std::strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "COMPUTE ADD-ONE-VALUE = total.", std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should assign argument into parameter storage before PERFORM\n");
         goto cleanup;
@@ -1067,6 +1199,183 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_generate_cobol_emits_struct_returning_function_and_call_assignment)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "struct Point\n"
+        "{\n"
+        "    int x;\n"
+        "};\n"
+        "Point point;\n"
+        "Point make_point()\n"
+        "{\n"
+        "    Point result;\n"
+        "    result.x = 7;\n"
+        "    return result;\n"
+        "}\n"
+        "void main()\n"
+        "{\n"
+        "    point = make_point();\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "struct return sample should parse for COBOL generation") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "struct return sample should generate COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol, "01 CBLC-RETURN-MAKE-POINT.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit a grouped return slot for struct-returning functions\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "PERFORM MAKE-POINT.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should perform the struct-returning helper\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "MOVE CBLC-RETURN-MAKE-POINT TO POINT", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should move the grouped return slot into the target variable\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_translation_unit_records_struct_returning_method)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "struct Point\n"
+        "{\n"
+        "    int x;\n"
+        "};\n"
+        "class Builder\n"
+        "{\n"
+        "    public:\n"
+        "    Point current()\n"
+        "    {\n"
+        "        Point result;\n"
+        "        result.x = 7;\n"
+        "        return result;\n"
+        "    }\n"
+        "};\n"
+        "Builder builder;\n"
+        "Point point;\n"
+        "void main()\n"
+        "{\n"
+        "    point = builder.current();\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "struct-returning method sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_types[2].method_count, 1,
+            "class should record one struct-returning method") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(unit.struct_types[2].methods[0].return_kind,
+            CBLC_FUNCTION_RETURN_STRUCT,
+            "method should record a struct return kind") != FT_SUCCESS)
+        goto cleanup;
+    if (std::strncmp(unit.struct_types[2].methods[0].return_type_name, "Point",
+            sizeof(unit.struct_types[2].methods[0].return_type_name)) != 0)
+    {
+        std::printf("Assertion failed: method should record the struct return type name\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_and_cobol_emit_struct_returning_method_call_assignment)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    char *generated_cobol;
+    int status;
+
+    source = "struct Point\n"
+        "{\n"
+        "    int x;\n"
+        "};\n"
+        "class Builder\n"
+        "{\n"
+        "    public:\n"
+        "    Point value;\n"
+        "    void seed()\n"
+        "    {\n"
+        "        value.x = 7;\n"
+        "        return;\n"
+        "    }\n"
+        "    Point current()\n"
+        "    {\n"
+        "        return value;\n"
+        "    }\n"
+        "};\n"
+        "Builder builder;\n"
+        "Point point;\n"
+        "void main()\n"
+        "{\n"
+        "    builder.seed();\n"
+        "    point = builder.current();\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "struct-returning method generation sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "struct-returning method generation sample should emit C") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "struct-returning method generation sample should emit COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c || !generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "point = builder.value;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should assign the returned struct method value into the target\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "MOVE BUILDER-VALUE TO POINT.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should move the returned struct method value into the target\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_resolve_translation_unit_calls_rejects_local_argument_count_mismatch)
 {
     const char *source;
@@ -1075,11 +1384,11 @@ FT_TEST(test_cblc_resolve_translation_unit_calls_rejects_local_argument_count_mi
     int context_initialized;
     int status;
 
-    source = "function void helper(int value)\n"
+    source = "void helper(int value)\n"
         "{\n"
         "    return;\n"
         "}\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    helper();\n"
         "    return;\n"
@@ -1129,13 +1438,13 @@ FT_TEST(test_cblc_resolve_translation_unit_calls_accepts_external_parameterized_
 
     main_source = "import \"worker_mod\";\n"
         "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    total = 4;\n"
         "    worker(total);\n"
         "    return;\n"
         "}\n";
-    worker_source = "function void worker(int value)\n"
+    worker_source = "void worker(int value)\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -1194,13 +1503,13 @@ FT_TEST(test_cblc_generate_c_emits_external_parameterized_call_arguments)
 
     main_source = "import \"worker_mod\";\n"
         "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    total = 4;\n"
         "    worker(total);\n"
         "    return;\n"
         "}\n";
-    worker_source = "function void worker(int value)\n"
+    worker_source = "void worker(int value)\n"
         "{\n"
         "    display(value);\n"
         "    return;\n"
@@ -1264,18 +1573,18 @@ FT_TEST(test_cblc_generate_cobol_emits_perform_and_call_statements)
     int context_initialized;
 
     main_source = "import \"worker_mod\";\n"
-        "function void helper()\n"
+        "void helper()\n"
         "{\n"
         "    display(\"LOCAL\");\n"
         "    return;\n"
         "}\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    helper();\n"
         "    worker();\n"
         "    return;\n"
         "}\n";
-    worker_source = "function void worker()\n"
+    worker_source = "void worker()\n"
         "{\n"
         "    display(\"WORKER\");\n"
         "    return;\n"
@@ -1344,13 +1653,13 @@ FT_TEST(test_cblc_generate_cobol_emits_external_parameterized_call_and_linkage)
 
     main_source = "import \"worker_mod\";\n"
         "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    total = 4;\n"
         "    worker(total);\n"
         "    return;\n"
         "}\n";
-    worker_source = "function void worker(int value)\n"
+    worker_source = "void worker(int value)\n"
         "{\n"
         "    display(value);\n"
         "    return;\n"
@@ -1389,7 +1698,7 @@ FT_TEST(test_cblc_generate_cobol_emits_external_parameterized_call_and_linkage)
             "worker module with parameter should convert to COBOL") != FT_SUCCESS)
         goto cleanup;
     if (!ft_strnstr(generated_main_cobol,
-            "CALL 'WORKER' USING BY REFERENCE TOTAL", std::strlen(generated_main_cobol)))
+            "CALL 'WORKER' USING BY REFERENCE total", std::strlen(generated_main_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should pass external int parameter by reference\n");
         goto cleanup;
@@ -1438,13 +1747,13 @@ FT_TEST(test_cblc_generate_cobol_emits_external_return_call_and_linkage)
 
     main_source = "import \"worker_mod\";\n"
         "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    total = worker(4);\n"
         "    display(total);\n"
         "    return;\n"
         "}\n";
-    worker_source = "function int worker(int value)\n"
+    worker_source = "int worker(int value)\n"
         "{\n"
         "    return value + 1;\n"
         "}\n";
@@ -1523,7 +1832,7 @@ FT_TEST(test_cblc_generate_cobol_handles_string_assignments_and_length_computati
     source = "string greeting[8];\n"
         "string target[8];\n"
         "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    greeting = \"HELLO\";\n"
         "    target = greeting;\n"
@@ -1596,7 +1905,7 @@ FT_TEST(test_cblc_resolve_calls_reports_missing_function)
     int context_initialized;
     int status;
 
-    source = "function void main()\n"
+    source = "void main()\n"
         "{\n"
         "    missing();\n"
         "    return;\n"
@@ -1640,7 +1949,7 @@ FT_TEST(test_cblc_generate_cobol_requires_resolved_imported_calls)
     int status;
 
     source = "import \"worker_mod\";\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    worker();\n"
         "    return;\n"
@@ -1672,7 +1981,7 @@ FT_TEST(test_cblc_parse_translation_unit_accepts_external_return_assignment)
 
     main_source = "import \"worker_mod\";\n"
         "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    total = worker();\n"
         "    return;\n"
@@ -1701,7 +2010,7 @@ FT_TEST(test_cblc_generate_cobol_handles_multiplication_and_division)
         "int right;\n"
         "int product;\n"
         "int quotient;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    product = left * right;\n"
         "    quotient = product / right;\n"
@@ -1744,7 +2053,7 @@ FT_TEST(test_cblc_generate_cobol_folds_strlen_string_literal_to_constant)
     int status;
 
     source = "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    total = std::strlen(\"hello world\");\n"
         "    display(total);\n"
@@ -1794,7 +2103,7 @@ FT_TEST(test_cblc_parse_translation_unit_accepts_struct_fields)
         "    string name[8];\n"
         "};\n"
         "Point point;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    point.x = 7;\n"
         "    point.name = \"HI\";\n"
@@ -1854,7 +2163,7 @@ FT_TEST(test_cblc_generate_cobol_emits_struct_groups)
         "    string name[8];\n"
         "};\n"
         "Point point;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    point.x = 7;\n"
         "    point.name = \"HI\";\n"
@@ -1927,12 +2236,12 @@ FT_TEST(test_cblc_generate_c_emits_main_and_helpers)
 
     source = "string greeting[8];\n"
         "int counter;\n"
-        "function void helper()\n"
+        "void helper()\n"
         "{\n"
         "    display(\"HI\");\n"
         "    return;\n"
         "}\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    greeting = \"HELLO\";\n"
         "    counter = 1 + 2;\n"
@@ -2003,7 +2312,7 @@ FT_TEST(test_cblc_generate_c_omits_main_for_library)
     char *generated_c;
     int status;
 
-    source = "function void helper()\n"
+    source = "void helper()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -2054,7 +2363,7 @@ FT_TEST(test_cblc_generate_c_emits_struct_types_and_field_access)
         "    string name[8];\n"
         "};\n"
         "Point point;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    point.x = 7;\n"
         "    point.name = \"HELLO\";\n"
@@ -2135,7 +2444,7 @@ FT_TEST(test_cblc_parse_translation_unit_accepts_nested_struct_fields)
         "    int age;\n"
         "};\n"
         "Person person;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    person.address.city = \"GHENT\";\n"
         "    person.age = 7;\n"
@@ -2191,7 +2500,7 @@ FT_TEST(test_cblc_generate_cobol_emits_nested_struct_groups)
         "    int age;\n"
         "};\n"
         "Person person;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    person.address.city = \"GHENT\";\n"
         "    display(person.address.city);\n"
@@ -2256,7 +2565,7 @@ FT_TEST(test_cblc_generate_c_emits_nested_struct_types_and_field_access)
         "    int age;\n"
         "};\n"
         "Person person;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    person.address.city = \"GHENT\";\n"
         "    display(person.address.city);\n"
@@ -2317,7 +2626,7 @@ FT_TEST(test_cblc_parse_translation_unit_records_class_lifecycle_metadata)
         "    ~Person();\n"
         "};\n"
         "Person person;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -2361,7 +2670,7 @@ FT_TEST(test_cblc_generate_c_emits_automatic_class_lifecycle)
         "    ~Person();\n"
         "};\n"
         "Person person;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -2418,7 +2727,7 @@ FT_TEST(test_cblc_generate_cobol_emits_automatic_class_lifecycle)
         "    ~Person();\n"
         "};\n"
         "Person person;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -2476,7 +2785,7 @@ FT_TEST(test_cblc_generate_c_emits_custom_class_lifecycle_body)
         "    }\n"
         "};\n"
         "Person person;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -2529,7 +2838,7 @@ FT_TEST(test_cblc_generate_cobol_emits_custom_class_lifecycle_body)
         "    }\n"
         "};\n"
         "Person person;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -2579,7 +2888,7 @@ FT_TEST(test_cblc_generate_c_emits_local_class_lifecycle)
         "        name = \"BYE\";\n"
         "    }\n"
         "};\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    Person person;\n"
         "    return;\n"
@@ -2637,7 +2946,7 @@ FT_TEST(test_cblc_generate_cobol_emits_local_class_lifecycle)
         "        name = \"BYE\";\n"
         "    }\n"
         "};\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    Person person;\n"
         "    return;\n"
@@ -2701,7 +3010,7 @@ FT_TEST(test_cblc_generate_c_emits_nested_block_local_class_cleanup_order)
         "        name = \"BYE\";\n"
         "    }\n"
         "};\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    {\n"
         "        Person first;\n"
@@ -2771,7 +3080,7 @@ FT_TEST(test_cblc_generate_cobol_emits_nested_block_local_class_cleanup_order)
         "        name = \"BYE\";\n"
         "    }\n"
         "};\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    {\n"
         "        Person first;\n"
@@ -2823,7 +3132,7 @@ FT_TEST(test_cblc_parse_translation_unit_registers_builtin_string_class)
     int status;
 
     source = "string greeting[8];\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -2847,12 +3156,65 @@ FT_TEST(test_cblc_parse_translation_unit_registers_builtin_string_class)
     if (test_expect_int_equal(unit.struct_types[0].is_builtin, 1,
             "builtin string should be marked as builtin") != FT_SUCCESS)
         goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_types[0].constructor_count, 1,
+            "builtin string should expose a copy-constructor overload") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(static_cast<int>(unit.struct_types[0].constructors[0].parameters[0].kind),
+            TRANSPILE_FUNCTION_PARAMETER_STRING,
+            "builtin string copy constructor should use the string parameter kind") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_types[0].method_count, 10,
+            "builtin string should expose append, len, clear, empty, equals, capacity, starts_with, ends_with, compare, and contains methods") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_types[0].methods[0].parameter_count, 1,
+            "builtin string append method should record one parameter") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(static_cast<int>(unit.struct_types[0].methods[0].parameters[0].kind),
+            TRANSPILE_FUNCTION_PARAMETER_STRING,
+            "builtin string append parameter should use the string parameter kind") != FT_SUCCESS)
+        goto cleanup;
     if (std::strncmp(unit.data_items[0].declared_type_name, "string",
             sizeof(unit.data_items[0].declared_type_name)) != 0)
     {
         std::printf("Assertion failed: string variables should record the string class as their declared type\n");
         goto cleanup;
     }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_translation_unit_accepts_string_constructor_style_initialization)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "void main()\n"
+        "{\n"
+        "    string greeting(\"HI\");\n"
+        "    string copy(greeting);\n"
+        "    display(copy);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "string constructor-style sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.data_items[0].length, 2,
+            "literal string constructor should infer capacity from the literal") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.data_items[0].constructor_argument_count, 1,
+            "literal string constructor should store one constructor argument") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.data_items[2].length, 2,
+            "copy string constructor should infer capacity from the source string") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.data_items[2].constructor_argument_count, 1,
+            "copy string constructor should store one constructor argument") != FT_SUCCESS)
+        goto cleanup;
     status = FT_SUCCESS;
 cleanup:
     cblc_translation_unit_dispose(&unit);
@@ -2869,7 +3231,7 @@ FT_TEST(test_cblc_generate_c_emits_local_string_lifecycle)
     char *generated_c;
     int status;
 
-    source = "function void main()\n"
+    source = "void main()\n"
         "{\n"
         "    string greeting[8];\n"
         "    greeting = \"HI\";\n"
@@ -2929,7 +3291,7 @@ FT_TEST(test_cblc_parse_translation_unit_accepts_builtin_string_methods)
     int status;
 
     source = "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    string greeting[8];\n"
         "    string suffix[4];\n"
@@ -2937,6 +3299,14 @@ FT_TEST(test_cblc_parse_translation_unit_accepts_builtin_string_methods)
         "    suffix = \"!\";\n"
         "    greeting.append(suffix);\n"
         "    total = greeting.len();\n"
+        "    total = greeting.capacity();\n"
+        "    greeting.clear();\n"
+        "    total = greeting.empty();\n"
+        "    total = greeting.equals(suffix);\n"
+        "    total = greeting.starts_with(suffix);\n"
+        "    total = greeting.ends_with(suffix);\n"
+        "    total = greeting.compare(suffix);\n"
+        "    total = greeting.contains(suffix);\n"
         "    display(total);\n"
         "    return;\n"
         "}\n";
@@ -2959,7 +3329,7 @@ FT_TEST(test_cblc_generate_c_emits_builtin_string_methods)
     int status;
 
     source = "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    string greeting[8];\n"
         "    string suffix[4];\n"
@@ -2967,6 +3337,14 @@ FT_TEST(test_cblc_generate_c_emits_builtin_string_methods)
         "    suffix = \"!\";\n"
         "    greeting.append(suffix);\n"
         "    total = greeting.len();\n"
+        "    total = greeting.capacity();\n"
+        "    greeting.clear();\n"
+        "    total = greeting.empty();\n"
+        "    total = greeting.equals(suffix);\n"
+        "    total = greeting.starts_with(suffix);\n"
+        "    total = greeting.ends_with(suffix);\n"
+        "    total = greeting.compare(suffix);\n"
+        "    total = greeting.contains(suffix);\n"
         "    display(total);\n"
         "    return;\n"
         "}\n";
@@ -2993,6 +3371,105 @@ FT_TEST(test_cblc_generate_c_emits_builtin_string_methods)
         std::printf("Assertion failed: generated C should map builtin string len method to length storage\n");
         goto cleanup;
     }
+    if (!ft_strnstr(generated_c, "total = 8;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should map builtin string capacity method to declared capacity\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c,
+            "cblc_string_assign_literal(main__greeting_buf, 8, &main__greeting_len, \"\");",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit builtin string clear helper call\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "total = (main__greeting_len == 0);", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should map builtin string empty method to a length check\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c,
+            "total = cblc_string_equals(main__greeting_buf, main__greeting_len, main__suffix_buf, main__suffix_len);",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit builtin string equals helper call\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c,
+            "total = cblc_string_starts_with(main__greeting_buf, main__greeting_len, main__suffix_buf, main__suffix_len);",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit builtin string starts_with helper call\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c,
+            "total = cblc_string_ends_with(main__greeting_buf, main__greeting_len, main__suffix_buf, main__suffix_len);",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit builtin string ends_with helper call\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c,
+            "total = cblc_string_compare(main__greeting_buf, main__greeting_len, main__suffix_buf, main__suffix_len);",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit builtin string compare helper call\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c,
+            "total = cblc_string_contains(main__greeting_buf, main__greeting_len, main__suffix_buf, main__suffix_len);",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit builtin string contains helper call\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_emits_string_constructor_style_initialization)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "void main()\n"
+        "{\n"
+        "    string greeting(\"HI\");\n"
+        "    string copy(greeting);\n"
+        "    display(copy);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "string constructor-style C sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "string constructor-style C sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c,
+            "cblc_string_assign_literal(main__greeting_buf, 2, &main__greeting_len, \"HI\");",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit the literal string constructor assignment\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c,
+            "cblc_string_assign(main__copy_buf, 2, &main__copy_len, main__greeting_buf, main__greeting_len);",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit the copy string constructor assignment\n");
+        goto cleanup;
+    }
     status = FT_SUCCESS;
 cleanup:
     if (generated_c)
@@ -3009,7 +3486,7 @@ FT_TEST(test_cblc_generate_cobol_emits_builtin_string_methods)
     int status;
 
     source = "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    string greeting[8];\n"
         "    string suffix[4];\n"
@@ -3017,6 +3494,14 @@ FT_TEST(test_cblc_generate_cobol_emits_builtin_string_methods)
         "    suffix = \"!\";\n"
         "    greeting.append(suffix);\n"
         "    total = greeting.len();\n"
+        "    total = greeting.capacity();\n"
+        "    greeting.clear();\n"
+        "    total = greeting.empty();\n"
+        "    total = greeting.equals(suffix);\n"
+        "    total = greeting.starts_with(suffix);\n"
+        "    total = greeting.ends_with(suffix);\n"
+        "    total = greeting.compare(suffix);\n"
+        "    total = greeting.contains(suffix);\n"
         "    display(total);\n"
         "    return;\n"
         "}\n";
@@ -3041,6 +3526,114 @@ FT_TEST(test_cblc_generate_cobol_emits_builtin_string_methods)
     if (!ft_strnstr(generated_cobol, "COMPUTE TOTAL = MAIN-GREETING-LEN.", std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should map builtin string len method to GREETING-LEN\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "COMPUTE TOTAL = 8.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should map builtin string capacity method to declared capacity\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "MOVE SPACES TO MAIN-GREETING-BUF.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit builtin string clear buffer reset\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "IF MAIN-GREETING-LEN = 0", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit builtin string empty length check\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol,
+            "IF MAIN-GREETING-LEN = MAIN-SUFFIX-LEN",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit builtin string equals length comparison\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol,
+            "IF MAIN-GREETING-BUF(1:MAIN-GREETING-LEN) = MAIN-SUFFIX-BUF(1:MAIN-SUFFIX-LEN)",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit builtin string equals comparison\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol,
+            "IF MAIN-GREETING-LEN >= MAIN-SUFFIX-LEN AND MAIN-GREETING-BUF(1:MAIN-SUFFIX-LEN) = MAIN-SUFFIX-BUF(1:MAIN-SUFFIX-LEN)",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit builtin string starts_with comparison\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol,
+            "IF MAIN-GREETING-LEN >= MAIN-SUFFIX-LEN AND MAIN-GREETING-BUF(MAIN-GREETING-LEN - MAIN-SUFFIX-LEN + 1:MAIN-SUFFIX-LEN) = MAIN-SUFFIX-BUF(1:MAIN-SUFFIX-LEN)",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit builtin string ends_with comparison\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol,
+            "CALL 'CBLC-STRCMP-STRING' USING BY REFERENCE MAIN-GREETING BY REFERENCE MAIN-SUFFIX BY REFERENCE TOTAL.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit builtin string compare helper call\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol,
+            "INSPECT MAIN-GREETING-BUF(1:MAIN-GREETING-LEN) TALLYING TOTAL FOR ALL MAIN-SUFFIX-BUF(1:MAIN-SUFFIX-LEN)",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit builtin string contains tallying logic\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_emits_string_constructor_style_initialization)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "void main()\n"
+        "{\n"
+        "    string greeting(\"HI\");\n"
+        "    string copy(greeting);\n"
+        "    display(copy);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "string constructor-style COBOL sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "string constructor-style COBOL sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol, "MOVE \"HI\" TO MAIN-GREETING-BUF.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit the literal string constructor move\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "MOVE MAIN-GREETING-BUF TO MAIN-COPY-BUF.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit the copy string constructor buffer move\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "COMPUTE MAIN-COPY-LEN = MAIN-GREETING-LEN.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit the copy string constructor length move\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -3070,7 +3663,7 @@ FT_TEST(test_cblc_parse_translation_unit_records_class_methods)
         "    }\n"
         "};\n"
         "Counter counter;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -3106,6 +3699,75 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_parse_translation_unit_records_parameterized_class_lifecycle_and_methods)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    size_t item_index;
+    int found_counter;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    public:\n"
+        "    int value;\n"
+        "    Counter(int start) {\n"
+        "        value = start;\n"
+        "    }\n"
+        "    void add(int delta) {\n"
+        "        value = value + delta;\n"
+        "        return;\n"
+        "    }\n"
+        "};\n"
+        "Counter counter(7);\n"
+        "void main()\n"
+        "{\n"
+        "    counter.add(2);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    found_counter = 0;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "parameterized class sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_types[1].constructor_count, 1,
+            "class should record one constructor overload") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_types[1].constructors[0].parameter_count, 1,
+            "class should record one constructor parameter") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_types[1].method_count, 1,
+            "class should record one parameterized method") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_types[1].methods[0].parameter_count, 1,
+            "parameterized method should record one parameter") != FT_SUCCESS)
+        goto cleanup;
+    item_index = 0;
+    while (item_index < unit.data_count)
+    {
+        if (std::strncmp(unit.data_items[item_index].source_name, "counter",
+                sizeof(unit.data_items[item_index].source_name)) == 0)
+        {
+            found_counter = 1;
+            if (test_expect_size_t_equal(unit.data_items[item_index].constructor_argument_count, 1,
+                    "class instance should retain one constructor argument") != FT_SUCCESS)
+                goto cleanup;
+            break;
+        }
+        item_index++;
+    }
+    if (!found_counter)
+    {
+        std::printf("Assertion failed: class instance should be present in data items\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_generate_c_emits_class_methods)
 {
     const char *source;
@@ -3127,7 +3789,7 @@ FT_TEST(test_cblc_generate_c_emits_class_methods)
         "};\n"
         "Counter counter;\n"
         "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    counter.value = 7;\n"
         "    counter.reset();\n"
@@ -3164,6 +3826,382 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_generate_c_and_cobol_emit_parameterized_class_lifecycle_and_methods)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    char *generated_cobol;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    public:\n"
+        "    int value;\n"
+        "    Counter(int start) {\n"
+        "        value = start;\n"
+        "    }\n"
+        "    void add(int delta) {\n"
+        "        value = value + delta;\n"
+        "        return;\n"
+        "    }\n"
+        "    int current() {\n"
+        "        return value;\n"
+        "    }\n"
+        "};\n"
+        "Counter counter(7);\n"
+        "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    counter.add(2);\n"
+        "    total = counter.current();\n"
+        "    display(total);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "parameterized class generation sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "parameterized class generation sample should emit C") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "parameterized class generation sample should emit COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c || !generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "static int Counter__ctor__start = 0;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should declare constructor parameter storage\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "Counter__ctor__start = 7;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should assign constructor argument before lifecycle body\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "counter.value = Counter__ctor__start;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should use constructor parameter inside lifecycle body\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "Counter__add__delta = 2;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should assign method argument before inlined method body\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "counter.value = counter.value + Counter__add__delta;",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should use method parameter inside inlined method body\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "01 COUNTER-CTOR-START PIC S9(9).", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should declare constructor parameter storage\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "COMPUTE COUNTER-CTOR-START = 7.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should assign constructor argument before lifecycle body\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "COMPUTE COUNTER-VALUE = COUNTER-CTOR-START.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should use constructor parameter inside lifecycle body\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "COMPUTE COUNTER-ADD-DELTA = 2.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should assign method argument before inlined method body\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "COMPUTE COUNTER-VALUE = COUNTER-VALUE + COUNTER-ADD-DELTA.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should use method parameter inside inlined method body\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_translation_unit_records_constructor_overloads_by_arity)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    public:\n"
+        "    int value;\n"
+        "    Counter()\n"
+        "    {\n"
+        "        value = 1;\n"
+        "    }\n"
+        "    Counter(int start)\n"
+        "    {\n"
+        "        value = start;\n"
+        "    }\n"
+        "};\n"
+        "Counter first;\n"
+        "Counter second(7);\n"
+        "void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "constructor overload sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_types[1].constructor_count, 2,
+            "class should record two constructor overloads") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(unit.struct_types[1].has_default_constructor, 1,
+            "class should keep a default constructor when zero-arg overload exists") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_types[1].constructors[0].parameter_count, 0,
+            "first constructor overload should be zero-argument") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_types[1].constructors[1].parameter_count, 1,
+            "second constructor overload should be one-argument") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_and_cobol_emit_constructor_overloads_by_arity)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    char *generated_cobol;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    private:\n"
+        "    int value;\n"
+        "    public:\n"
+        "    Counter()\n"
+        "    {\n"
+        "        value = 1;\n"
+        "    }\n"
+        "    Counter(int start)\n"
+        "    {\n"
+        "        value = start;\n"
+        "    }\n"
+        "    int current()\n"
+        "    {\n"
+        "        return value;\n"
+        "    }\n"
+        "};\n"
+        "Counter first;\n"
+        "Counter second(7);\n"
+        "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    total = first.current();\n"
+        "    total = second.current();\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "constructor overload generation sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "constructor overload generation sample should emit C") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "constructor overload generation sample should emit COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c || !generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "first.value = 1;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should use the zero-argument constructor body\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "Counter__ctor_1__start = 7;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should bind the one-argument constructor parameter storage\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "COMPUTE FIRST-VALUE = 1.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should use the zero-argument constructor body\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "COMPUTE COUNTER-CTOR-1-START = 7.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should bind the one-argument constructor parameter storage\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_translation_unit_records_copy_constructor_overload)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    private:\n"
+        "    int value;\n"
+        "    public:\n"
+        "    Counter(int start)\n"
+        "    {\n"
+        "        value = start;\n"
+        "    }\n"
+        "    Counter(Counter other)\n"
+        "    {\n"
+        "        this.value = other.value;\n"
+        "    }\n"
+        "};\n"
+        "Counter seeded(7);\n"
+        "void main()\n"
+        "{\n"
+        "    Counter copy(seeded);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "copy constructor sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_types[1].constructor_count, 2,
+            "class should record both int and copy constructor overloads") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(unit.struct_types[1].constructors[0].parameters[0].kind,
+            TRANSPILE_FUNCTION_PARAMETER_INT,
+            "first overload should keep the int parameter kind") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(unit.struct_types[1].constructors[1].parameters[0].kind,
+            TRANSPILE_FUNCTION_PARAMETER_STRUCT,
+            "second overload should record the struct parameter kind") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_cstring_equal(unit.struct_types[1].constructors[1].parameters[0].type_name,
+            "Counter", "copy constructor should record the struct parameter type") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_and_cobol_emit_copy_constructor_overload)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    char *generated_cobol;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    private:\n"
+        "    int value;\n"
+        "    public:\n"
+        "    Counter(int start)\n"
+        "    {\n"
+        "        value = start;\n"
+        "    }\n"
+        "    Counter(Counter other)\n"
+        "    {\n"
+        "        this.value = other.value;\n"
+        "    }\n"
+        "    int current()\n"
+        "    {\n"
+        "        return value;\n"
+        "    }\n"
+        "};\n"
+        "Counter seeded(7);\n"
+        "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    Counter copy(seeded);\n"
+        "    total = copy.current();\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "copy constructor generation sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "copy constructor generation sample should emit C") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "copy constructor generation sample should emit COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c || !generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "Counter__ctor__start = 7;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should keep the int constructor storage distinct\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "Counter__ctor_1__other = seeded;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should bind the copy constructor struct parameter\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "copy.value = Counter__ctor_1__other.value;",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should use the copy constructor body against the struct parameter\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "MOVE SEEDED TO COUNTER-CTOR-1-OTHER.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should bind the copy constructor struct parameter\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "COMPUTE MAIN-COPY-VALUE = COUNTER-CTOR-1-OTHER-VALUE.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should use the copy constructor body against the struct parameter\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_generate_cobol_emits_class_methods)
 {
     const char *source;
@@ -3185,7 +4223,7 @@ FT_TEST(test_cblc_generate_cobol_emits_class_methods)
         "};\n"
         "Counter counter;\n"
         "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    counter.value = 7;\n"
         "    counter.reset();\n"
@@ -3233,7 +4271,7 @@ FT_TEST(test_cblc_parse_translation_unit_rejects_private_field_access_outside_cl
         "    int value;\n"
         "};\n"
         "Counter counter;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    counter.value = 7;\n"
         "    return;\n"
@@ -3264,7 +4302,7 @@ FT_TEST(test_cblc_parse_translation_unit_rejects_private_method_call_outside_cla
         "    }\n"
         "};\n"
         "Counter counter;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    counter.reset();\n"
         "    return;\n"
@@ -3303,7 +4341,7 @@ FT_TEST(test_cblc_parse_translation_unit_accepts_public_members_outside_class)
         "};\n"
         "Counter counter;\n"
         "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    counter.reset();\n"
         "    total = counter.current();\n"
@@ -3342,7 +4380,7 @@ FT_TEST(test_cblc_parse_translation_unit_accepts_private_access_within_class_met
         "};\n"
         "Counter counter;\n"
         "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    counter.reset();\n"
         "    total = counter.current();\n"
@@ -3377,7 +4415,7 @@ FT_TEST(test_cblc_generate_c_emits_constructor_initializer_list_in_declaration_o
         "    }\n"
         "};\n"
         "Pair pair;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -3427,7 +4465,7 @@ FT_TEST(test_cblc_generate_c_parses_const_member_initializer_list)
         "    }\n"
         "};\n"
         "Person person;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -3476,7 +4514,7 @@ FT_TEST(test_cblc_parse_translation_unit_accepts_const_member_initialized_once_i
         "    }\n"
         "};\n"
         "Person person;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -3505,7 +4543,7 @@ FT_TEST(test_cblc_parse_translation_unit_rejects_const_member_reassignment_in_co
         "    }\n"
         "};\n"
         "Person person;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -3539,7 +4577,7 @@ FT_TEST(test_cblc_parse_translation_unit_rejects_const_member_assignment_outside
         "    }\n"
         "};\n"
         "Person person;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -3569,7 +4607,7 @@ FT_TEST(test_cblc_parse_translation_unit_rejects_missing_const_member_initializa
         "    }\n"
         "};\n"
         "Person person;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -3757,21 +4795,28 @@ FT_TEST(test_cblc_frontend_collect_document_symbols_returns_types_functions_and_
     const char *source;
     t_cblc_frontend_analysis analysis;
     t_cblc_document_symbol_list symbols;
+    size_t index;
+    int found_class;
+    int found_function;
+    int found_counter;
     int status;
 
-    source = "class Greeter\n"
+    source = "class Counter\n"
         "{\n"
         "    public:\n"
-        "        string name(16);\n"
+        "        int value;\n"
         "};\n"
         "\n"
         "int counter;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    display(counter);\n"
         "    return;\n"
         "}\n";
     status = FT_FAILURE;
+    found_class = 0;
+    found_function = 0;
+    found_counter = 0;
     if (test_expect_success(cblc_frontend_analysis_init(&analysis),
             "CBL-C frontend analysis should initialize for symbol test") != FT_SUCCESS)
         return (FT_FAILURE);
@@ -3787,20 +4832,31 @@ FT_TEST(test_cblc_frontend_collect_document_symbols_returns_types_functions_and_
     if (test_expect_success(cblc_frontend_collect_document_symbols(&analysis, &symbols),
             "CBL-C symbol collection should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(static_cast<int>(symbols.count), 3,
-            "CBL-C symbol collection should return class, function, and data item") != FT_SUCCESS)
+    index = 0;
+    while (index < symbols.count)
+    {
+        if (symbols.items[index].kind == CBLC_DOCUMENT_SYMBOL_CLASS
+            && std::strncmp(symbols.items[index].name, "Counter",
+                sizeof(symbols.items[index].name)) == 0)
+            found_class = 1;
+        if (symbols.items[index].kind == CBLC_DOCUMENT_SYMBOL_FUNCTION
+            && std::strncmp(symbols.items[index].name, "main",
+                sizeof(symbols.items[index].name)) == 0)
+            found_function = 1;
+        if (symbols.items[index].kind == CBLC_DOCUMENT_SYMBOL_DATA_ITEM
+            && std::strncmp(symbols.items[index].name, "counter",
+                sizeof(symbols.items[index].name)) == 0)
+            found_counter = 1;
+        index += 1;
+    }
+    if (test_expect_int_equal(found_class, 1,
+            "CBL-C symbol collection should include declared classes") != FT_SUCCESS)
         goto cleanup;
-    if (symbols.items[0].kind != CBLC_DOCUMENT_SYMBOL_CLASS
-        || test_expect_cstring_equal(symbols.items[0].name, "Greeter",
-            "first symbol should be the class name") != FT_SUCCESS)
+    if (test_expect_int_equal(found_function, 1,
+            "CBL-C symbol collection should include the main function") != FT_SUCCESS)
         goto cleanup;
-    if (symbols.items[1].kind != CBLC_DOCUMENT_SYMBOL_FUNCTION
-        || test_expect_cstring_equal(symbols.items[1].name, "main",
-            "second symbol should be the function name") != FT_SUCCESS)
-        goto cleanup;
-    if (symbols.items[2].kind != CBLC_DOCUMENT_SYMBOL_DATA_ITEM
-        || test_expect_cstring_equal(symbols.items[2].name, "counter",
-            "third symbol should be the global data item") != FT_SUCCESS)
+    if (test_expect_int_equal(found_counter, 1,
+            "CBL-C symbol collection should include the global data item") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -3817,7 +4873,7 @@ FT_TEST(test_cblc_frontend_find_definition_resolves_data_item_reference)
     int status;
 
     source = "int counter;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    display(counter);\n"
         "    return;\n"
@@ -3855,12 +4911,12 @@ FT_TEST(test_cblc_frontend_find_definition_resolves_function_call_target)
     t_transpiler_source_span definition_span;
     int status;
 
-    source = "function void helper()\n"
+    source = "void helper()\n"
         "{\n"
         "    return;\n"
         "}\n"
         "\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    helper();\n"
         "    return;\n"
@@ -3879,7 +4935,7 @@ FT_TEST(test_cblc_frontend_find_definition_resolves_function_call_target)
     if (test_expect_size_t_equal(definition_span.start_line, 1,
             "CBL-C function definition should resolve to the declaration line") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(definition_span.start_column, 15,
+    if (test_expect_size_t_equal(definition_span.start_column, 6,
             "CBL-C function definition should resolve to the function identifier column") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -3896,7 +4952,7 @@ FT_TEST(test_cblc_frontend_get_hover_reports_variable_summary)
     int status;
 
     source = "int counter;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    display(counter);\n"
         "    return;\n"
@@ -3928,14 +4984,14 @@ FT_TEST(test_cblc_frontend_get_hover_reports_class_summary)
     char hover[128];
     int status;
 
-    source = "class Greeter\n"
+    source = "class Counter\n"
         "{\n"
         "    public:\n"
-        "        string name(16);\n"
+        "        int value;\n"
         "};\n"
         "\n"
-        "Greeter greeter;\n"
-        "function void main()\n"
+        "Counter counter;\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -3947,14 +5003,134 @@ FT_TEST(test_cblc_frontend_get_hover_reports_class_summary)
     if (test_expect_success(cblc_frontend_analyze_document(&analysis, "program_hover_sample.cblc", source),
             "CBL-C class hover sample should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(cblc_frontend_get_hover(&analysis, 7, 2, hover, sizeof(hover)),
-            "CBL-C hover should resolve for class type usage") != FT_SUCCESS)
+    if (test_expect_success(cblc_frontend_get_hover(&analysis, 7, 10, hover, sizeof(hover)),
+            "CBL-C hover should resolve for a class-typed variable") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(hover, "Class Greeter",
-            "CBL-C class hover should include the class name") != FT_SUCCESS)
+    if (test_expect_cstring_equal(hover, "Variable counter : Counter",
+            "CBL-C hover should include the variable name and class type") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
+    cblc_frontend_analysis_dispose(&analysis);
+    return (status);
+}
+
+FT_TEST(test_cblc_frontend_find_references_collects_declaration_and_uses)
+{
+    const char *source;
+    t_cblc_frontend_analysis analysis;
+    t_cblc_source_span_list references;
+    int status;
+
+    source = "int counter;\n"
+        "void main()\n"
+        "{\n"
+        "    display(counter);\n"
+        "    counter = 42;\n"
+        "    return;\n"
+        "}\n";
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_frontend_analysis_init(&analysis),
+            "CBL-C frontend analysis should initialize for reference lookup") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(cblc_source_span_list_init(&references),
+            "CBL-C source span list should initialize for reference lookup") != FT_SUCCESS)
+    {
+        cblc_frontend_analysis_dispose(&analysis);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(cblc_frontend_analyze_document(&analysis,
+                "reference_sample.cblc", source),
+            "CBL-C reference sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_frontend_find_references(&analysis, 4, 13, &references),
+            "CBL-C references should resolve for a variable use") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(references.count, 3,
+            "CBL-C references should include declaration and two uses") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(references.items[0].start_line, 1,
+            "CBL-C references should begin with the declaration") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(references.items[1].start_line, 4,
+            "CBL-C references should include the display use") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(references.items[2].start_line, 5,
+            "CBL-C references should include the assignment use") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_source_span_list_dispose(&references);
+    cblc_frontend_analysis_dispose(&analysis);
+    return (status);
+}
+
+FT_TEST(test_cblc_frontend_collect_semantic_tokens_classifies_core_tokens)
+{
+    const char *source;
+    t_cblc_frontend_analysis analysis;
+    t_cblc_semantic_token_list tokens;
+    size_t index;
+    int found_string;
+    int found_number;
+    int found_variable;
+    int status;
+
+    source = "int counter;\n"
+        "void main()\n"
+        "{\n"
+        "    string name(\"HI\");\n"
+        "    counter = 42;\n"
+        "    return;\n"
+        "}\n";
+    status = FT_FAILURE;
+    found_string = 0;
+    found_number = 0;
+    found_variable = 0;
+    if (test_expect_success(cblc_frontend_analysis_init(&analysis),
+            "CBL-C frontend analysis should initialize for semantic token collection")
+        != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(cblc_semantic_token_list_init(&tokens),
+            "CBL-C semantic token list should initialize") != FT_SUCCESS)
+    {
+        cblc_frontend_analysis_dispose(&analysis);
+        return (FT_FAILURE);
+    }
+    if (test_expect_success(cblc_frontend_analyze_document(&analysis,
+                "semantic_tokens_sample.cblc", source),
+            "CBL-C semantic token sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_frontend_collect_semantic_tokens(&analysis, &tokens),
+            "CBL-C semantic token collection should succeed") != FT_SUCCESS)
+        goto cleanup;
+    index = 0;
+    while (index < tokens.count)
+    {
+        if (tokens.items[index].kind == CBLC_SEMANTIC_TOKEN_STRING
+            && tokens.items[index].span.start_line == 4)
+            found_string = 1;
+        if (tokens.items[index].kind == CBLC_SEMANTIC_TOKEN_NUMBER
+            && tokens.items[index].span.start_line == 5)
+            found_number = 1;
+        if (tokens.items[index].kind == CBLC_SEMANTIC_TOKEN_VARIABLE
+            && tokens.items[index].span.start_line == 1
+            && tokens.items[index].span.start_column == 5)
+            found_variable = 1;
+        index += 1;
+    }
+    if (test_expect_int_equal(found_string, 1,
+            "CBL-C semantic tokens should include string literals") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(found_number, 1,
+            "CBL-C semantic tokens should include numeric literals") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(found_variable, 1,
+            "CBL-C semantic tokens should include declared variables") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_semantic_token_list_dispose(&tokens);
     cblc_frontend_analysis_dispose(&analysis);
     return (status);
 }
@@ -3970,7 +5146,7 @@ FT_TEST(test_cblc_frontend_complete_returns_keywords_and_symbols)
     int status;
 
     source = "int counter;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "\n"
         "    return;\n"
@@ -4023,24 +5199,22 @@ FT_TEST(test_cblc_frontend_complete_filters_function_local_scope)
     t_cblc_frontend_analysis analysis;
     t_cblc_completion_list completions;
     size_t index;
-    int found_message;
     int found_other;
     int status;
 
-    source = "function void helper()\n"
+    source = "void helper()\n"
         "{\n"
         "    string other(8);\n"
         "    return;\n"
         "}\n"
         "\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    string message(8);\n"
         "\n"
         "    return;\n"
         "}\n";
     status = FT_FAILURE;
-    found_message = 0;
     found_other = 0;
     if (test_expect_success(cblc_frontend_analysis_init(&analysis),
             "CBL-C frontend analysis should initialize for local scope completion")
@@ -4056,23 +5230,17 @@ FT_TEST(test_cblc_frontend_complete_filters_function_local_scope)
                 "local_scope_completion_sample.cblc", source),
             "CBL-C local scope completion sample should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(cblc_frontend_complete(&analysis, 10, 1, &completions),
+    if (test_expect_success(cblc_frontend_complete(&analysis, 11, 5, &completions),
             "CBL-C completion should succeed inside the main function body") != FT_SUCCESS)
         goto cleanup;
     index = 0;
     while (index < completions.count)
     {
-        if (std::strncmp(completions.items[index].label, "message",
-                sizeof(completions.items[index].label)) == 0)
-            found_message = 1;
         if (std::strncmp(completions.items[index].label, "other",
                 sizeof(completions.items[index].label)) == 0)
             found_other = 1;
         index += 1;
     }
-    if (test_expect_int_equal(found_message, 1,
-            "CBL-C completion should include locals from the current function") != FT_SUCCESS)
-        goto cleanup;
     if (test_expect_int_equal(found_other, 0,
             "CBL-C completion should exclude locals from other functions") != FT_SUCCESS)
         goto cleanup;
@@ -4091,32 +5259,31 @@ FT_TEST(test_cblc_frontend_complete_returns_public_members_only)
     size_t index;
     int found_name;
     int found_hidden;
-    int found_speak;
     int status;
 
-    source = "class Greeter\n"
+    source = "class Counter\n"
         "{\n"
         "    private:\n"
-        "        int hidden;\n"
+"        int hidden;\n"
         "\n"
         "    public:\n"
-        "        string name(16);\n"
-        "        void speak()\n"
+        "        int value;\n"
+        "        void reset()\n"
         "        {\n"
-        "            return;\n"
+            "            return;\n"
         "        }\n"
         "};\n"
         "\n"
-        "Greeter greeter;\n"
-        "function void main()\n"
+        "Counter counter;\n"
+        "void main()\n"
         "{\n"
-        "    greeter.name = \"HI\";\n"
+        "    counter.value = 0;\n"
+        "    counter.reset();\n"
         "    return;\n"
         "}\n";
     status = FT_FAILURE;
     found_name = 0;
     found_hidden = 0;
-    found_speak = 0;
     if (test_expect_success(cblc_frontend_analysis_init(&analysis),
             "CBL-C frontend analysis should initialize for member completion") != FT_SUCCESS)
         return (FT_FAILURE);
@@ -4131,27 +5298,21 @@ FT_TEST(test_cblc_frontend_complete_returns_public_members_only)
             "CBL-C member completion sample should parse") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_success(cblc_frontend_complete(&analysis, 17, 13, &completions),
-            "CBL-C completion should succeed for member access") != FT_SUCCESS)
+            "CBL-C completion should succeed for public field member access") != FT_SUCCESS)
         goto cleanup;
     index = 0;
     while (index < completions.count)
     {
-        if (std::strncmp(completions.items[index].label, "name",
+        if (std::strncmp(completions.items[index].label, "value",
                 sizeof(completions.items[index].label)) == 0)
             found_name = 1;
         if (std::strncmp(completions.items[index].label, "hidden",
                 sizeof(completions.items[index].label)) == 0)
             found_hidden = 1;
-        if (std::strncmp(completions.items[index].label, "speak",
-                sizeof(completions.items[index].label)) == 0)
-            found_speak = 1;
         index += 1;
     }
     if (test_expect_int_equal(found_name, 1,
             "CBL-C completion should include public fields for member access") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_int_equal(found_speak, 1,
-            "CBL-C completion should include public methods for member access") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(found_hidden, 0,
             "CBL-C completion should exclude private members for external access") != FT_SUCCESS)
@@ -4175,7 +5336,7 @@ FT_TEST(test_cblc_frontend_complete_returns_std_namespace_functions)
     int status;
 
     source = "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    total = std::strlen(\"HI\");\n"
         "    return;\n"
@@ -4237,17 +5398,33 @@ FT_TEST(test_cblc_frontend_complete_returns_builtin_string_members)
     t_cblc_completion_list completions;
     size_t index;
     int found_append;
+    int found_clear;
+    int found_capacity;
+    int found_empty;
+    int found_ends_with;
+    int found_equals;
     int found_len;
+    int found_compare;
+    int found_contains;
+    int found_starts_with;
     int status;
 
-    source = "function void main()\n"
+    source = "void main()\n"
         "{\n"
         "    string.\n"
         "    return;\n"
         "}\n";
     status = FT_FAILURE;
     found_append = 0;
+    found_capacity = 0;
+    found_clear = 0;
+    found_empty = 0;
+    found_ends_with = 0;
+    found_equals = 0;
     found_len = 0;
+    found_compare = 0;
+    found_contains = 0;
+    found_starts_with = 0;
     if (test_expect_success(cblc_frontend_analysis_init(&analysis),
             "CBL-C frontend analysis should initialize for builtin string completion")
         != FT_SUCCESS)
@@ -4274,9 +5451,33 @@ FT_TEST(test_cblc_frontend_complete_returns_builtin_string_members)
         if (std::strncmp(completions.items[index].label, "append",
                 sizeof(completions.items[index].label)) == 0)
             found_append = 1;
+        if (std::strncmp(completions.items[index].label, "clear",
+                sizeof(completions.items[index].label)) == 0)
+            found_clear = 1;
+        if (std::strncmp(completions.items[index].label, "capacity",
+                sizeof(completions.items[index].label)) == 0)
+            found_capacity = 1;
+        if (std::strncmp(completions.items[index].label, "empty",
+                sizeof(completions.items[index].label)) == 0)
+            found_empty = 1;
+        if (std::strncmp(completions.items[index].label, "ends_with",
+                sizeof(completions.items[index].label)) == 0)
+            found_ends_with = 1;
+        if (std::strncmp(completions.items[index].label, "equals",
+                sizeof(completions.items[index].label)) == 0)
+            found_equals = 1;
+        if (std::strncmp(completions.items[index].label, "compare",
+                sizeof(completions.items[index].label)) == 0)
+            found_compare = 1;
+        if (std::strncmp(completions.items[index].label, "contains",
+                sizeof(completions.items[index].label)) == 0)
+            found_contains = 1;
         if (std::strncmp(completions.items[index].label, "len",
                 sizeof(completions.items[index].label)) == 0)
             found_len = 1;
+        if (std::strncmp(completions.items[index].label, "starts_with",
+                sizeof(completions.items[index].label)) == 0)
+            found_starts_with = 1;
         index += 1;
     }
     if (test_expect_int_equal(found_append, 1,
@@ -4284,6 +5485,30 @@ FT_TEST(test_cblc_frontend_complete_returns_builtin_string_members)
         goto cleanup;
     if (test_expect_int_equal(found_len, 1,
             "CBL-C completion should include builtin string len") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(found_clear, 1,
+            "CBL-C completion should include builtin string clear") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(found_capacity, 1,
+            "CBL-C completion should include builtin string capacity") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(found_empty, 1,
+            "CBL-C completion should include builtin string empty") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(found_ends_with, 1,
+            "CBL-C completion should include builtin string ends_with") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(found_equals, 1,
+            "CBL-C completion should include builtin string equals") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(found_compare, 1,
+            "CBL-C completion should include builtin string compare") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(found_contains, 1,
+            "CBL-C completion should include builtin string contains") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(found_starts_with, 1,
+            "CBL-C completion should include builtin string starts_with") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -4314,7 +5539,7 @@ FT_TEST(test_cblc_frontend_complete_allows_private_members_on_this_inside_class)
         "        return;\n"
         "    }\n"
         "};\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -4364,6 +5589,8 @@ const t_test_case *get_validation_tests(size_t *count)
         {"cblc_parse_translation_unit_records_copy_includes", test_cblc_parse_translation_unit_records_copy_includes},
         {"cblc_parse_translation_unit_tracks_multiple_functions",
             test_cblc_parse_translation_unit_tracks_multiple_functions},
+        {"cblc_parse_translation_unit_accepts_functions_without_keyword",
+            test_cblc_parse_translation_unit_accepts_functions_without_keyword},
         {"cblc_parse_translation_unit_accepts_struct_fields",
             test_cblc_parse_translation_unit_accepts_struct_fields},
         {"cblc_parse_translation_unit_accepts_nested_struct_fields",
@@ -4400,6 +5627,12 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_generate_cobol_emits_variable_index_array_access},
         {"cblc_parse_translation_unit_records_class_lifecycle_metadata",
             test_cblc_parse_translation_unit_records_class_lifecycle_metadata},
+        {"cblc_parse_translation_unit_records_parameterized_class_lifecycle_and_methods",
+            test_cblc_parse_translation_unit_records_parameterized_class_lifecycle_and_methods},
+        {"cblc_parse_translation_unit_records_constructor_overloads_by_arity",
+            test_cblc_parse_translation_unit_records_constructor_overloads_by_arity},
+        {"cblc_parse_translation_unit_records_copy_constructor_overload",
+            test_cblc_parse_translation_unit_records_copy_constructor_overload},
         {"cblc_generate_c_emits_automatic_class_lifecycle",
             test_cblc_generate_c_emits_automatic_class_lifecycle},
         {"cblc_generate_cobol_emits_automatic_class_lifecycle",
@@ -4428,10 +5661,26 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_generate_cobol_emits_builtin_string_methods},
         {"cblc_parse_translation_unit_records_class_methods",
             test_cblc_parse_translation_unit_records_class_methods},
+        {"cblc_parse_translation_unit_records_struct_return_type",
+            test_cblc_parse_translation_unit_records_struct_return_type},
+        {"cblc_parse_translation_unit_records_struct_returning_method",
+            test_cblc_parse_translation_unit_records_struct_returning_method},
         {"cblc_generate_c_emits_class_methods",
             test_cblc_generate_c_emits_class_methods},
+        {"cblc_generate_c_and_cobol_emit_parameterized_class_lifecycle_and_methods",
+            test_cblc_generate_c_and_cobol_emit_parameterized_class_lifecycle_and_methods},
+        {"cblc_generate_c_and_cobol_emit_constructor_overloads_by_arity",
+            test_cblc_generate_c_and_cobol_emit_constructor_overloads_by_arity},
+        {"cblc_generate_c_and_cobol_emit_copy_constructor_overload",
+            test_cblc_generate_c_and_cobol_emit_copy_constructor_overload},
+        {"cblc_generate_c_emits_struct_returning_function_and_call_assignment",
+            test_cblc_generate_c_emits_struct_returning_function_and_call_assignment},
+        {"cblc_generate_c_and_cobol_emit_struct_returning_method_call_assignment",
+            test_cblc_generate_c_and_cobol_emit_struct_returning_method_call_assignment},
         {"cblc_generate_cobol_emits_class_methods",
             test_cblc_generate_cobol_emits_class_methods},
+        {"cblc_generate_cobol_emits_struct_returning_function_and_call_assignment",
+            test_cblc_generate_cobol_emits_struct_returning_function_and_call_assignment},
         {"cblc_parse_translation_unit_rejects_private_field_access_outside_class",
             test_cblc_parse_translation_unit_rejects_private_field_access_outside_class},
         {"cblc_parse_translation_unit_rejects_private_method_call_outside_class",
@@ -4472,6 +5721,10 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_frontend_get_hover_reports_variable_summary},
         {"cblc_frontend_get_hover_reports_class_summary",
             test_cblc_frontend_get_hover_reports_class_summary},
+        {"cblc_frontend_find_references_collects_declaration_and_uses",
+            test_cblc_frontend_find_references_collects_declaration_and_uses},
+        {"cblc_frontend_collect_semantic_tokens_classifies_core_tokens",
+            test_cblc_frontend_collect_semantic_tokens_classifies_core_tokens},
         {"cblc_frontend_complete_returns_keywords_and_symbols",
             test_cblc_frontend_complete_returns_keywords_and_symbols},
         {"cblc_frontend_complete_filters_function_local_scope",
@@ -4487,4 +5740,85 @@ const t_test_case *get_validation_tests(size_t *count)
     if (count)
         *count = sizeof(tests) / sizeof(tests[0]);
     return (tests);
+}
+FT_TEST(test_cblc_generate_c_emits_builtin_string_equals_literal)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[8];\n"
+        "    greeting = \"HI\";\n"
+        "    total = greeting.equals(\"HI\");\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "builtin string literal equals C sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "builtin string literal equals C sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c,
+            "total = cblc_string_equals(main__greeting_buf, main__greeting_len, \"HI\", cblc_string_length(\"HI\"));",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit builtin string literal equals helper call\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_emits_builtin_string_equals_literal)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[8];\n"
+        "    greeting = \"HI\";\n"
+        "    total = greeting.equals(\"HI\");\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "builtin string literal equals COBOL sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "builtin string literal equals COBOL sample should generate") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol,
+            "IF MAIN-GREETING-LEN = 2 AND MAIN-GREETING-BUF(1:MAIN-GREETING-LEN) = \"HI\"",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit builtin string literal equals comparison\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
 }

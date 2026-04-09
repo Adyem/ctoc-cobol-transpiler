@@ -198,7 +198,7 @@ FT_TEST(test_cblc_inline_string_append_translates_to_cobol_and_executes)
 {
     const char *source;
 
-    source = "function void main()\n"
+    source = "void main()\n"
         "{\n"
         "    string greeting[16];\n"
         "    string suffix[8];\n"
@@ -217,7 +217,7 @@ FT_TEST(test_cblc_inline_string_len_translates_to_cobol_and_executes)
     const char *source;
 
     source = "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    string greeting[16];\n"
         "    greeting = \"HELLO!\";\n"
@@ -233,12 +233,678 @@ FT_TEST(test_cblc_inline_string_len_translates_to_cobol_and_executes)
             "inline_string_len_generated", "LEN OK\n"));
 }
 
+FT_TEST(test_cblc_inline_string_clear_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    greeting = \"HELLO\";\n"
+        "    greeting.clear();\n"
+        "    total = greeting.len();\n"
+        "    if (total == 0) {\n"
+        "        display(\"CLEAR OK\");\n"
+        "    } else {\n"
+        "        display(\"CLEAR BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_clear_generated", "CLEAR OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_empty_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    total = greeting.empty();\n"
+        "    if (total == 1) {\n"
+        "        display(\"EMPTY OK\");\n"
+        "    } else {\n"
+        "        display(\"EMPTY BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_empty_generated", "EMPTY OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_equals_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    string other[16];\n"
+        "    greeting = \"HELLO\";\n"
+        "    other = \"HELLO\";\n"
+        "    total = greeting.equals(other);\n"
+        "    if (total == 1) {\n"
+        "        display(\"EQUALS OK\");\n"
+        "    } else {\n"
+        "        display(\"EQUALS BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_equals_generated", "EQUALS OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_equals_literal_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    greeting = \"HELLO\";\n"
+        "    total = greeting.equals(\"HELLO\");\n"
+        "    if (total == 1) {\n"
+        "        display(\"LITERAL OK\");\n"
+        "    } else {\n"
+        "        display(\"LITERAL BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_equals_literal_generated", "LITERAL OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_capacity_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    total = greeting.capacity();\n"
+        "    if (total == 16) {\n"
+        "        display(\"CAPACITY OK\");\n"
+        "    } else {\n"
+        "        display(\"CAPACITY BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_capacity_generated", "CAPACITY OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_starts_with_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    string prefix[8];\n"
+        "    greeting = \"HELLO\";\n"
+        "    prefix = \"HE\";\n"
+        "    total = greeting.starts_with(prefix);\n"
+        "    if (total == 1) {\n"
+        "        display(\"STARTS OK\");\n"
+        "    } else {\n"
+        "        display(\"STARTS BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_starts_with_generated", "STARTS OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_ends_with_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    string suffix[8];\n"
+        "    greeting = \"HELLO\";\n"
+        "    suffix = \"LO\";\n"
+        "    total = greeting.ends_with(suffix);\n"
+        "    if (total == 1) {\n"
+        "        display(\"ENDS OK\");\n"
+        "    } else {\n"
+        "        display(\"ENDS BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_ends_with_generated", "ENDS OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_compare_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    string suffix[8];\n"
+        "    greeting = \"HELLO\";\n"
+        "    suffix = \"HELLO\";\n"
+        "    total = greeting.compare(suffix);\n"
+        "    if (total == 0) {\n"
+        "        display(\"COMPARE OK\");\n"
+        "    } else {\n"
+        "        display(\"COMPARE BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_compare_generated", "COMPARE OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_contains_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    string needle[8];\n"
+        "    greeting = \"HELLO\";\n"
+        "    needle = \"ELL\";\n"
+        "    total = greeting.contains(needle);\n"
+        "    if (total == 1) {\n"
+        "        display(\"CONTAINS OK\");\n"
+        "    } else {\n"
+        "        display(\"CONTAINS BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_contains_generated", "CONTAINS OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_equals_false_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    string other[16];\n"
+        "    greeting = \"HELLO\";\n"
+        "    other = \"WORLD\";\n"
+        "    total = greeting.equals(other);\n"
+        "    if (total == 0) {\n"
+        "        display(\"EQUALS FALSE OK\");\n"
+        "    } else {\n"
+        "        display(\"EQUALS FALSE BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_equals_false_generated", "EQUALS FALSE OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_empty_false_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    greeting = \"HELLO\";\n"
+        "    total = greeting.empty();\n"
+        "    if (total == 0) {\n"
+        "        display(\"EMPTY FALSE OK\");\n"
+        "    } else {\n"
+        "        display(\"EMPTY FALSE BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_empty_false_generated", "EMPTY FALSE OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_starts_with_literal_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    greeting = \"HELLO\";\n"
+        "    total = greeting.starts_with(\"HE\");\n"
+        "    if (total == 1) {\n"
+        "        display(\"STARTS LITERAL OK\");\n"
+        "    } else {\n"
+        "        display(\"STARTS LITERAL BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_starts_with_literal_generated", "STARTS LITERAL OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_ends_with_literal_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    greeting = \"HELLO\";\n"
+        "    total = greeting.ends_with(\"LO\");\n"
+        "    if (total == 1) {\n"
+        "        display(\"ENDS LITERAL OK\");\n"
+        "    } else {\n"
+        "        display(\"ENDS LITERAL BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_ends_with_literal_generated", "ENDS LITERAL OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_compare_less_than_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    string suffix[8];\n"
+        "    greeting = \"ALPHA\";\n"
+        "    suffix = \"BRAVO\";\n"
+        "    total = greeting.compare(suffix);\n"
+        "    if (total == -1) {\n"
+        "        display(\"COMPARE LT OK\");\n"
+        "    } else {\n"
+        "        display(\"COMPARE LT BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_compare_less_generated", "COMPARE LT OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_compare_greater_than_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    string suffix[8];\n"
+        "    greeting = \"BRAVO\";\n"
+        "    suffix = \"ALPHA\";\n"
+        "    total = greeting.compare(suffix);\n"
+        "    if (total == 1) {\n"
+        "        display(\"COMPARE GT OK\");\n"
+        "    } else {\n"
+        "        display(\"COMPARE GT BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_compare_greater_generated", "COMPARE GT OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_compare_literal_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    greeting = \"HELLO\";\n"
+        "    total = greeting.compare(\"HELLO\");\n"
+        "    if (total == 0) {\n"
+        "        display(\"COMPARE LITERAL OK\");\n"
+        "    } else {\n"
+        "        display(\"COMPARE LITERAL BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_compare_literal_generated", "COMPARE LITERAL OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_contains_false_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    string needle[8];\n"
+        "    greeting = \"HELLO\";\n"
+        "    needle = \"XYZ\";\n"
+        "    total = greeting.contains(needle);\n"
+        "    if (total == 0) {\n"
+        "        display(\"CONTAINS FALSE OK\");\n"
+        "    } else {\n"
+        "        display(\"CONTAINS FALSE BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_contains_false_generated", "CONTAINS FALSE OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_contains_empty_literal_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    greeting = \"HELLO\";\n"
+        "    total = greeting.contains(\"\");\n"
+        "    if (total == 1) {\n"
+        "        display(\"CONTAINS EMPTY OK\");\n"
+        "    } else {\n"
+        "        display(\"CONTAINS EMPTY BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_contains_empty_generated", "CONTAINS EMPTY OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_constructor_capacity_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting(\"HELLO\");\n"
+        "    total = greeting.capacity();\n"
+        "    if (total == 5) {\n"
+        "        display(\"CTOR CAPACITY OK\");\n"
+        "    } else {\n"
+        "        display(\"CTOR CAPACITY BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_ctor_capacity_generated", "CTOR CAPACITY OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_append_then_len_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    string suffix[8];\n"
+        "    greeting = \"HELLO\";\n"
+        "    suffix = \"!\";\n"
+        "    greeting.append(suffix);\n"
+        "    total = greeting.len();\n"
+        "    if (total == 6) {\n"
+        "        display(\"APPEND LEN OK\");\n"
+        "    } else {\n"
+        "        display(\"APPEND LEN BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_append_len_generated", "APPEND LEN OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_clear_then_empty_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    greeting = \"HELLO\";\n"
+        "    greeting.clear();\n"
+        "    total = greeting.empty();\n"
+        "    if (total == 1) {\n"
+        "        display(\"CLEAR EMPTY OK\");\n"
+        "    } else {\n"
+        "        display(\"CLEAR EMPTY BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_clear_empty_generated", "CLEAR EMPTY OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_starts_with_false_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    string prefix[8];\n"
+        "    greeting = \"HELLO\";\n"
+        "    prefix = \"EL\";\n"
+        "    total = greeting.starts_with(prefix);\n"
+        "    if (total == 0) {\n"
+        "        display(\"STARTS FALSE OK\");\n"
+        "    } else {\n"
+        "        display(\"STARTS FALSE BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_starts_false_generated", "STARTS FALSE OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_ends_with_false_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    string suffix[8];\n"
+        "    greeting = \"HELLO\";\n"
+        "    suffix = \"HE\";\n"
+        "    total = greeting.ends_with(suffix);\n"
+        "    if (total == 0) {\n"
+        "        display(\"ENDS FALSE OK\");\n"
+        "    } else {\n"
+        "        display(\"ENDS FALSE BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_ends_false_generated", "ENDS FALSE OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_starts_with_empty_literal_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    greeting = \"HELLO\";\n"
+        "    total = greeting.starts_with(\"\");\n"
+        "    if (total == 1) {\n"
+        "        display(\"STARTS EMPTY OK\");\n"
+        "    } else {\n"
+        "        display(\"STARTS EMPTY BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_starts_empty_generated", "STARTS EMPTY OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_ends_with_empty_literal_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    greeting = \"HELLO\";\n"
+        "    total = greeting.ends_with(\"\");\n"
+        "    if (total == 1) {\n"
+        "        display(\"ENDS EMPTY OK\");\n"
+        "    } else {\n"
+        "        display(\"ENDS EMPTY BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_ends_empty_generated", "ENDS EMPTY OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_compare_shorter_prefix_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    string other[16];\n"
+        "    greeting = \"AL\";\n"
+        "    other = \"ALPHA\";\n"
+        "    total = greeting.compare(other);\n"
+        "    if (total == -1) {\n"
+        "        display(\"COMPARE SHORT OK\");\n"
+        "    } else {\n"
+        "        display(\"COMPARE SHORT BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_compare_short_generated", "COMPARE SHORT OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_compare_longer_prefix_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    string other[16];\n"
+        "    greeting = \"ALPHA\";\n"
+        "    other = \"AL\";\n"
+        "    total = greeting.compare(other);\n"
+        "    if (total == 1) {\n"
+        "        display(\"COMPARE LONG OK\");\n"
+        "    } else {\n"
+        "        display(\"COMPARE LONG BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_compare_long_generated", "COMPARE LONG OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_contains_literal_false_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting[16];\n"
+        "    greeting = \"HELLO\";\n"
+        "    total = greeting.contains(\"XYZ\");\n"
+        "    if (total == 0) {\n"
+        "        display(\"CONTAINS LITERAL FALSE OK\");\n"
+        "    } else {\n"
+        "        display(\"CONTAINS LITERAL FALSE BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_contains_literal_false_generated", "CONTAINS LITERAL FALSE OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_copy_constructor_equals_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    string greeting(\"HELLO\");\n"
+        "    string copy(greeting);\n"
+        "    total = copy.equals(greeting);\n"
+        "    if (total == 1) {\n"
+        "        display(\"COPY EQUALS OK\");\n"
+        "    } else {\n"
+        "        display(\"COPY EQUALS BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_copy_equals_generated", "COPY EQUALS OK\n"));
+}
+
+FT_TEST(test_cblc_inline_string_literal_constructor_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "void main()\n"
+        "{\n"
+        "    string greeting(\"HELLO\");\n"
+        "    display(greeting);\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_literal_constructor_generated", "HELLO\n"));
+}
+
+FT_TEST(test_cblc_inline_string_copy_constructor_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "void main()\n"
+        "{\n"
+        "    string greeting(\"HELLO\");\n"
+        "    string copy(greeting);\n"
+        "    display(copy);\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_string_copy_constructor_generated", "HELLO\n"));
+}
+
 FT_TEST(test_cblc_inline_std_strlen_literal_translates_to_cobol_and_executes)
 {
     const char *source;
 
     source = "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    total = std::strlen(\"hello world\");\n"
         "    if (total == 11) {\n"
@@ -271,7 +937,7 @@ FT_TEST(test_cblc_inline_class_methods_translates_to_cobol_and_executes)
         "};\n"
         "Counter counter;\n"
         "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    counter.reset();\n"
         "    total = counter.current();\n"
@@ -292,7 +958,7 @@ FT_TEST(test_cblc_inline_array_access_translates_to_cobol_and_executes)
 
     source = "int numbers[3];\n"
         "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    numbers[0] = 7;\n"
         "    numbers[1] = 5;\n"
@@ -308,13 +974,31 @@ FT_TEST(test_cblc_inline_array_access_translates_to_cobol_and_executes)
             "inline_array_access_generated", "ARRAY OK\n"));
 }
 
+FT_TEST(test_cblc_inline_functions_without_keyword_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "void helper()\n"
+        "{\n"
+        "    display(\"NO KEYWORD OK\");\n"
+        "    return;\n"
+        "}\n"
+        "void main()\n"
+        "{\n"
+        "    helper();\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_functions_without_keyword_generated", "NO KEYWORD OK\n"));
+}
+
 FT_TEST(test_cblc_inline_const_values_translates_to_cobol_and_executes)
 {
     const char *source;
 
     source = "const int answer = 42;\n"
         "const string greeting[12] = \"CONST OK\";\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    if (answer == 42) {\n"
         "        display(greeting);\n"
@@ -337,7 +1021,7 @@ FT_TEST(test_cblc_inline_struct_field_access_translates_to_cobol_and_executes)
         "    string name[8];\n"
         "};\n"
         "Point point;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    point.x = 7;\n"
         "    point.name = \"READY\";\n"
@@ -365,7 +1049,7 @@ FT_TEST(test_cblc_inline_nested_struct_field_access_translates_to_cobol_and_exec
         "    Address address;\n"
         "};\n"
         "Person person;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    person.address.city = \"GHENT\";\n"
         "    display(person.address.city);\n"
@@ -382,7 +1066,7 @@ FT_TEST(test_cblc_inline_variable_index_array_access_translates_to_cobol_and_exe
     source = "int numbers[3];\n"
         "int index;\n"
         "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    index = 1;\n"
         "    numbers[index] = 9;\n"
@@ -419,7 +1103,7 @@ FT_TEST(test_cblc_inline_constructor_initializer_translates_to_cobol_and_execute
         "    }\n"
         "};\n"
         "Person person;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    if (person.current_id() == 7) {\n"
         "        person.speak();\n"
@@ -430,6 +1114,231 @@ FT_TEST(test_cblc_inline_constructor_initializer_translates_to_cobol_and_execute
         "}\n";
     return (run_inline_cblc_to_cobol_execution_test(source,
             "inline_constructor_initializer_generated", "HI\n"));
+}
+
+FT_TEST(test_cblc_inline_parameterized_class_lifecycle_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "class Counter\n"
+        "{\n"
+        "    private:\n"
+        "    int value;\n"
+        "    public:\n"
+        "    Counter(int start)\n"
+        "    {\n"
+        "        value = start;\n"
+        "    }\n"
+        "    void add(int delta)\n"
+        "    {\n"
+        "        value = value + delta;\n"
+        "        return;\n"
+        "    }\n"
+        "    int current()\n"
+        "    {\n"
+        "        return value;\n"
+        "    }\n"
+        "};\n"
+        "Counter counter(7);\n"
+        "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    counter.add(2);\n"
+        "    total = counter.current();\n"
+        "    if (total == 9) {\n"
+        "        display(\"PARAM CTOR OK\");\n"
+        "    } else {\n"
+        "        display(\"PARAM CTOR BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_parameterized_class_lifecycle_generated", "PARAM CTOR OK\n"));
+}
+
+FT_TEST(test_cblc_inline_constructor_overloads_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "class Counter\n"
+        "{\n"
+        "    private:\n"
+        "    int value;\n"
+        "    public:\n"
+        "    Counter()\n"
+        "    {\n"
+        "        value = 1;\n"
+        "    }\n"
+        "    Counter(int start)\n"
+        "    {\n"
+        "        value = start;\n"
+        "    }\n"
+        "    int current()\n"
+        "    {\n"
+        "        return value;\n"
+        "    }\n"
+        "};\n"
+        "Counter first;\n"
+        "Counter second(7);\n"
+        "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    total = first.current() + second.current();\n"
+        "    if (total == 8) {\n"
+        "        display(\"CTOR OVERLOAD OK\");\n"
+        "    } else {\n"
+        "        display(\"CTOR OVERLOAD BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_constructor_overloads_generated", "CTOR OVERLOAD OK\n"));
+}
+
+FT_TEST(test_cblc_inline_copy_constructor_overload_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "class Counter\n"
+        "{\n"
+        "    private:\n"
+        "    int value;\n"
+        "    public:\n"
+        "    Counter(int start)\n"
+        "    {\n"
+        "        value = start;\n"
+        "    }\n"
+        "    Counter(Counter other)\n"
+        "    {\n"
+        "        this.value = other.value;\n"
+        "    }\n"
+        "    int current()\n"
+        "    {\n"
+        "        return value;\n"
+        "    }\n"
+        "};\n"
+        "Counter seeded(7);\n"
+        "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    Counter copy(seeded);\n"
+        "    total = copy.current();\n"
+        "    if (total == 7) {\n"
+        "        display(\"COPY CTOR OK\");\n"
+        "    } else {\n"
+        "        display(\"COPY CTOR BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_copy_constructor_overload_generated", "COPY CTOR OK\n"));
+}
+
+FT_TEST(test_cblc_inline_struct_return_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "struct Point\n"
+        "{\n"
+        "    int x;\n"
+        "    string label[8];\n"
+        "};\n"
+        "Point point;\n"
+        "Point make_point()\n"
+        "{\n"
+        "    Point result;\n"
+        "    result.x = 7;\n"
+        "    result.label = \"POINT\";\n"
+        "    return result;\n"
+        "}\n"
+        "void main()\n"
+        "{\n"
+        "    point = make_point();\n"
+        "    if (point.x == 7) {\n"
+        "        display(point.label);\n"
+        "    } else {\n"
+        "        display(\"STRUCT RET BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_struct_return_generated", "POINT\n"));
+}
+
+FT_TEST(test_cblc_inline_class_return_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "class Counter\n"
+        "{\n"
+        "    private:\n"
+        "    int value;\n"
+        "    public:\n"
+        "    void seed()\n"
+        "    {\n"
+        "        value = 3;\n"
+        "        return;\n"
+        "    }\n"
+        "    int current()\n"
+        "    {\n"
+        "        return value;\n"
+        "    }\n"
+        "};\n"
+        "Counter counter;\n"
+        "int total;\n"
+        "Counter build_counter()\n"
+        "{\n"
+        "    Counter result;\n"
+        "    result.seed();\n"
+        "    return result;\n"
+        "}\n"
+        "void main()\n"
+        "{\n"
+        "    counter = build_counter();\n"
+        "    total = counter.current();\n"
+        "    if (total == 3) {\n"
+        "        display(\"CLASS RET OK\");\n"
+        "    } else {\n"
+        "        display(\"CLASS RET BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_class_return_generated", "CLASS RET OK\n"));
+}
+
+FT_TEST(test_cblc_inline_struct_returning_method_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "struct Point\n"
+        "{\n"
+        "    int x;\n"
+        "};\n"
+        "class Builder\n"
+        "{\n"
+        "    public:\n"
+        "    Point current()\n"
+        "    {\n"
+        "        Point result;\n"
+        "        result.x = 7;\n"
+        "        return result;\n"
+        "    }\n"
+        "};\n"
+        "Builder builder;\n"
+        "Point point;\n"
+        "void main()\n"
+        "{\n"
+        "    point = builder.current();\n"
+        "    if (point.x == 7) {\n"
+        "        display(\"METHOD STRUCT OK\");\n"
+        "    } else {\n"
+        "        display(\"METHOD STRUCT BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_struct_returning_method_generated", "METHOD STRUCT OK\n"));
 }
 
 FT_TEST(test_cblc_filter_prefix_translates_to_cobol_and_executes)
@@ -916,13 +1825,13 @@ FT_TEST(test_cblc_multi_module_parameterized_call_translates_to_cobol_and_execut
     FT_REQUIRE_FORWARD_TRANSLATION();
     main_source = "import \"worker_mod\";\n"
         "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    total = 7;\n"
         "    worker(total);\n"
         "    return;\n"
         "}\n";
-    worker_source = "function void worker(int value)\n"
+    worker_source = "void worker(int value)\n"
         "{\n"
         "    display(value);\n"
         "    return;\n"
@@ -1066,13 +1975,13 @@ FT_TEST(test_cblc_multi_module_return_call_translates_to_cobol_and_executes)
     FT_REQUIRE_FORWARD_TRANSLATION();
     main_source = "import \"worker_mod\";\n"
         "int total;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    total = worker(7);\n"
         "    display(total);\n"
         "    return;\n"
         "}\n";
-    worker_source = "function int worker(int value)\n"
+    worker_source = "int worker(int value)\n"
         "{\n"
         "    return value + 1;\n"
         "}\n";

@@ -2,14 +2,14 @@
 
 This document captures the reference CBL-C snippets that exercise the currently defined surface area of the language. Each
 sample lives in `samples/cblc` and is registered in `samples/cblc/manifest.txt` so automated checks can ensure the examples stay
-in sync with the documentation. Executable statements appear inside named `function` blocks so the transpiler can emit matching
-COBOL paragraphs, and every sample includes a `function void main()` entrypoint that invokes the showcased routine.
+in sync with the documentation. Executable statements appear inside named function blocks so the transpiler can emit matching
+COBOL paragraphs, and every sample includes a `void main()` entrypoint that invokes the showcased routine.
 
 ## Sample Coverage
 
 ### `samples/cblc/minimal_program.cblc`
 - **Purpose:** Mirrors the COBOL minimal program so the reverse pipeline has a trivially round-trippable example.
-- **Constructs:** A single global buffer, `function void MAIN()` entrypoint, literal assignment, and explicit `return;` statement.
+- **Constructs:** A single global buffer, `void MAIN()` entrypoint, literal assignment, and explicit `return;` statement.
 
 ### `samples/cblc/copy_file.cblc`
 - **Purpose:** Demonstrates the baseline file copy loop used throughout the design doc and ensures the runtime string buffer path
@@ -22,7 +22,7 @@ file in "input.txt";
 file out "output.txt";
 char line[256];
 
-function void process_file() {
+void process_file() {
     open(in, "r");
     open(out, "w");
     while (read(in, line)) {
@@ -32,7 +32,7 @@ function void process_file() {
     close(out);
 }
 
-function void main() {
+void main() {
     process_file();
 }
 ```
@@ -48,7 +48,7 @@ file in "input.txt";
 file out "filtered.txt";
 char line[128];
 
-function void filter_prefix() {
+void filter_prefix() {
     open(in, "r");
     open(out, "w");
     while (read(in, line)) {
@@ -60,7 +60,7 @@ function void filter_prefix() {
     close(out);
 }
 
-function void main() {
+void main() {
     filter_prefix();
 }
 ```
@@ -80,7 +80,7 @@ record Person {
 file people "people.dat";
 Person person;
 
-function void write_records() {
+void write_records() {
     person.name = "ALICE";
     person.id = "0001";
 
@@ -89,7 +89,7 @@ function void write_records() {
     close(people);
 }
 
-function void main() {
+void main() {
     write_records();
 }
 ```
@@ -110,7 +110,7 @@ RecordEntry entry;
 int accepted_count;
 int total_amount;
 
-function void summarize_records() {
+void summarize_records() {
     accepted_count = 0;
     total_amount = 0;
 
@@ -124,7 +124,7 @@ function void summarize_records() {
     close(input);
 }
 
-function void main() {
+void main() {
     summarize_records();
 }
 ```
@@ -153,7 +153,7 @@ int accepted_count;
 int rejected_count;
 int total_amount;
 
-function void reset_state() {
+void reset_state() {
     accepted_count = 0;
     rejected_count = 0;
     total_amount = 0;
@@ -161,7 +161,7 @@ function void reset_state() {
     rejected_marker = "REJECTED ENTRY";
 }
 
-function void process_transactions() {
+void process_transactions() {
     reset_state();
     open(transactions, "r");
     open(accepted_log, "w");
@@ -181,7 +181,7 @@ function void process_transactions() {
     close(rejected_log);
 }
 
-function void main() {
+void main() {
     display("INTEGRATION SHOWCASE");
     process_transactions();
     display(accepted_count);
@@ -201,7 +201,7 @@ function void main() {
 bool EOF_FLAG = false;
 char OUTPUT_RECORD[1];
 
-function void MAIN() {
+void MAIN() {
     open(INPUT_FILE, "r");
     while (!(EOF_FLAG == true)) {
         read(INPUT_FILE, OUTPUT_RECORD);
@@ -228,14 +228,14 @@ int RUNNING_TOTAL_VALUE = 5;
 bool STATUS_FLAG = false;
 char SCRATCH_NOTE[12] = "raw value";
 
-function void ENTRY_PARAGRAPH() {
+void ENTRY_PARAGRAPH() {
     SCRATCH_NOTE = "mixED Case value";
     RUNNING_TOTAL_VALUE = 0;
     STATUS_FLAG = true;
     return ;
 }
 
-function void NORMALIZE_VALUES() {
+void NORMALIZE_VALUES() {
     RUNNING_TOTAL_VALUE = 7;
     SCRATCH_NOTE = "done";
     return ;
@@ -262,7 +262,7 @@ int PROGRESS_LIMIT = 10;
 int PROGRESS_INDEX = 0;
 int OUTPUT_VALUE = 0;
 
-function void MAIN() {
+void MAIN() {
     if (!(CONTROL_FLAG == CONTROL_READY)) {
         while (!(PROGRESS_METER > PROGRESS_LIMIT)) {
             PROGRESS_METER = 11;
@@ -279,7 +279,7 @@ function void MAIN() {
     return ;
 }
 
-function void NEXT_PARAGRAPH() {
+void NEXT_PARAGRAPH() {
     CONTROL_FLAG = true;
     return ;
 }
@@ -299,7 +299,7 @@ int BINARY_COUNT = 0;
 int PACKED_TOTAL = 0;
 bool STATUS_IND = false;
 
-function void MAIN() {
+void MAIN() {
     FLOAT_APPROX = 1;
     DOUBLE_APPROX = 100;
     BINARY_COUNT = 10;
@@ -313,7 +313,7 @@ function void MAIN() {
 - **Purpose:** Verifies that reverse translation recovers wide integer `PIC` clauses as `long`/`long long` declarations while
   still mapping fractional scales to `float` and `double`.
 - **Constructs:** Mixed-width numeric scalars initialized through literal `MOVE` statements, canonical literal formatting, and the
-  baseline `function void MAIN()` container emitted for declarative storage programs.
+  baseline `void MAIN()` container emitted for declarative storage programs.
 
 ```cblc
 long LONG_COUNT = 0;
@@ -321,7 +321,7 @@ long long EXTREME_COUNT = 0;
 float FLOAT_RATE = 0;
 double DOUBLE_RATE = 0;
 
-function void MAIN() {
+void MAIN() {
     LONG_COUNT = 100000000000;
     EXTREME_COUNT = 500000000000000000;
     FLOAT_RATE = 1;
@@ -335,14 +335,13 @@ function void MAIN() {
   declaration, mirrors the group variable, and still surfaces each subordinate field as an addressable scalar for existing
   procedure logic.
 - **Constructs:** A generated `record` with alphanumeric and numeric members, the mirrored group variable, standalone scalars
-  (including a retained VALUE clause initializer), and assignments that populate the recovered fields inside `function void
-  MAIN()`.
+  (including a retained VALUE clause initializer), and assignments that populate the recovered fields inside `void MAIN()`.
 
 ### `samples/cblc/reverse_value_defaults.cblc`
 - **Purpose:** Highlights how VALUE clauses on supported WORKING-STORAGE scalars become direct initializers in the generated
   CBL-C so default state matches the COBOL source.
 - **Constructs:** Boolean flag initialization recovered from a single-character literal, integer and floating-point defaults,
-  alphanumeric buffer expansion with a string initializer, and the empty `function void MAIN()` stub emitted for passive
+  alphanumeric buffer expansion with a string initializer, and the empty `void MAIN()` stub emitted for passive
   storage declarations.
 
 ```cblc
@@ -351,7 +350,7 @@ int CUSTOMER_COUNT = 12;
 float DISCOUNT_RATE = 1.25;
 char STATUS_MESSAGE[12] = "READY";
 
-function void MAIN() {
+void MAIN() {
     return ;
 }
 ```
@@ -365,7 +364,7 @@ function void MAIN() {
 ```cblc
 char SHARED_ARG[12];
 
-function void MAIN() {
+void MAIN() {
     SHARED_ARG = "A";
     return ;
 }
@@ -376,14 +375,14 @@ function void MAIN() {
   downstream tools can round-trip includes without relying on the expanded field listings while keeping local data declarations
   alongside the shared working-storage.
 - **Constructs:** `copy` directive referencing the original copybook name, scalar declarations for local state, and an empty
-  `function void MAIN()` body that mirrors the COBOL stub.
+  `void MAIN()` body that mirrors the COBOL stub.
 
 ```cblc
 copy "CUSTOMER-STATUS";
 char STATE_CODE = "A";
 char BUFFER_NAME[8];
 
-function void MAIN() {
+void MAIN() {
     return ;
 }
 ```
@@ -401,7 +400,7 @@ char BUFFER_TEXT[16];
 /* leading comment for flag */
 /* additional buffer comment */
 /* paragraph level note */
-function void MAIN() {
+void MAIN() {
     STATUS_FLAG = false;
     display(STATUS_FLAG);
     /* inline comment after move */
@@ -421,7 +420,7 @@ bool STATUS_FLAG = true;
 
 /* header note before first paragraph */
 /* secondary description for entry point */
-function void MAIN() {
+void MAIN() {
     /* comment before assignment */
     STATUS_FLAG = false;
     /* inline comment for assignment */
@@ -433,7 +432,7 @@ function void MAIN() {
     return ;
 }
 
-function void NEXT_PARAGRAPH() {
+void NEXT_PARAGRAPH() {
     /* comment nested within next paragraph */
     display(STATUS_FLAG);
     return ;
@@ -446,7 +445,7 @@ function void NEXT_PARAGRAPH() {
 ```cblc
 bool CONTROL_FLAG = false;
 
-function void MAIN() {
+void MAIN() {
     /* comment before top-level if */
     if (CONTROL_FLAG == false) {
         /* comment before then display */
@@ -463,19 +462,19 @@ function void MAIN() {
 
 ### `samples/cblc/return_numeric.cblc`
 - **Purpose:** Demonstrates scalar functions that return values through the trailing BY REFERENCE slot with integer arithmetic.
-- **Constructs:** Global integer declarations, a value-returning helper, `return` statements with expressions, and a `function void main()` caller that captures the result.
+- **Constructs:** Global integer declarations, a value-returning helper, `return` statements with expressions, and a `void main()` caller that captures the result.
 
 ```cblc
 int addend_a;
 int addend_b;
 int sum_result;
 
-function int compute_sum() {
+int compute_sum() {
     sum_result = addend_a + addend_b;
     return sum_result;
 }
 
-function void main() {
+void main() {
     addend_a = 12;
     addend_b = 30;
     sum_result = compute_sum();
@@ -485,14 +484,14 @@ function void main() {
 
 ### `samples/cblc/return_boolean.cblc`
 - **Purpose:** Captures boolean return semantics with conditional `return` paths so diagnostics can validate the trailing slot wiring.
-- **Constructs:** Integer and boolean globals, modulo arithmetic, comparisons, boolean literals, and a `function void main()` consumer that branches on the returned value.
+- **Constructs:** Integer and boolean globals, modulo arithmetic, comparisons, boolean literals, and a `void main()` consumer that branches on the returned value.
 
 ```cblc
 int candidate_value;
 int remainder_value;
 bool is_even_result;
 
-function bool is_even() {
+bool is_even() {
     remainder_value = candidate_value % 2;
     if (remainder_value == 0) {
         return true;
@@ -500,7 +499,7 @@ function bool is_even() {
     return false;
 }
 
-function void main() {
+void main() {
     candidate_value = 9;
     is_even_result = is_even();
     if (is_even_result) {
@@ -518,11 +517,11 @@ function void main() {
 ```cblc
 char current_grade;
 
-function char fetch_grade() {
+char fetch_grade() {
     return current_grade;
 }
 
-function void main() {
+void main() {
     current_grade = 'A';
     current_grade = fetch_grade();
     display(current_grade);
@@ -540,7 +539,7 @@ long long threshold;
 float day_ratio;
 double combined_ratio;
 
-function void analyze_precision() {
+void analyze_precision() {
     long deposit;
     long withdrawal;
     long long bonus_pool;
@@ -596,7 +595,7 @@ int net_magnitude;
 double revenue_delta;
 double revenue_magnitude;
 
-function void analyze_inventory() {
+void analyze_inventory() {
     inbound_units = 145;
     outbound_units = 172;
     net_position = inbound_units - outbound_units;
@@ -613,7 +612,7 @@ function void analyze_inventory() {
     display(revenue_magnitude);
 }
 
-function void main() {
+void main() {
     analyze_inventory();
 }
 ```
@@ -627,11 +626,11 @@ import "multi_module_worker.cblc";
 
 int accumulator;
 
-function void add_once() {
+void add_once() {
     accumulator = accumulator + 1;
 }
 
-function void main() {
+void main() {
     accumulator = 0;
     show_banner();
     add_once();
@@ -644,7 +643,7 @@ function void main() {
 - **Constructs:** Standalone helper function definitions, string literals, and console output emitted from a non-entry translation unit.
 
 ```cblc
-function void show_banner() {
+void show_banner() {
     display("WORKER READY");
 }
 ```
@@ -655,7 +654,7 @@ function void show_banner() {
 - **Constructs:** Standard library calls (`std::strcpy`, `std::atoi`, `std::strcmp`), local character buffers, integer accumulation, conditional adjustments, and a non-void return that surfaces the computed total minutes to callers.
 
 ```cblc
-function int load_backlog_minutes()
+int load_backlog_minutes()
 {
     char first_minutes[8];
     char second_minutes[8];
@@ -692,7 +691,7 @@ function int load_backlog_minutes()
 - **Constructs:** Standard library calls (`std::strcpy`, `std::strlen`, `std::fabs`, `std::sqrt`), intermediate double precision scalars, and a non-void helper that other modules reuse.
 
 ```cblc
-function double compute_priority_score(int total_minutes)
+double compute_priority_score(int total_minutes)
 {
     double minutes;
     double baseline;
@@ -733,7 +732,7 @@ int stage_length;
 int total_minutes;
 double score;
 
-function void present_schedule()
+void present_schedule()
 {
     std::strcpy(headline, "Draft Roadmap");
     std::strcpy(detail, "Assemble Budget");
@@ -779,7 +778,7 @@ function void present_schedule()
 ```cblc
 import "project_scheduler_presenter.cblc";
 
-function void main()
+void main()
 {
     present_schedule();
 }
@@ -796,7 +795,7 @@ double yearly_projection;
 double combined_projection;
 bool trending_up;
 
-function void analyze_readings() {
+void analyze_readings() {
     seasonal_average = 21.5;
     current_reading = 24.0;
     yearly_projection = 18.75;
@@ -819,7 +818,7 @@ function void analyze_readings() {
     display(combined_projection);
 }
 
-function void main() {
+void main() {
     analyze_readings();
 }
 ```
@@ -834,7 +833,7 @@ long regional_total;
 long long national_total;
 bool exceeded_limit;
 
-function void track_totals() {
+void track_totals() {
     order_count = 45;
     regional_total = 250000;
     national_total = 5000000000;
@@ -856,7 +855,7 @@ function void track_totals() {
     display(national_total);
 }
 
-function void main() {
+void main() {
     track_totals();
 }
 ```
@@ -871,7 +870,7 @@ char priority_level;
 int pending_orders;
 bool expedite;
 
-function void report_schedule() {
+void report_schedule() {
     warehouse_code = "NW-01";
     priority_level = 'B';
     pending_orders = 18;
@@ -896,7 +895,7 @@ function void report_schedule() {
     display(pending_orders);
 }
 
-function void main() {
+void main() {
     report_schedule();
 }
 ```
@@ -908,7 +907,7 @@ function void main() {
 ```cblc
 char greeting[32];
 
-function void main() {
+void main() {
     greeting = "HELLO FROM CBL-C";
     display(greeting);
     return;

@@ -27,7 +27,6 @@ typedef struct s_cblc_completion_context
 static const t_cblc_completion_keyword g_cblc_completion_keywords[] = {
     {"import"},
     {"copy"},
-    {"function"},
     {"void"},
     {"int"},
     {"char"},
@@ -229,6 +228,9 @@ static int transpiler_source_find_function_name_span(const char *path, const cha
     size_t line_start;
     size_t line_end;
     size_t cursor;
+    size_t open_paren_offset;
+    size_t close_paren_offset;
+    size_t type_end;
 
     if (!path || !text || !name || !span)
         return (FT_FAILURE);
@@ -238,12 +240,31 @@ static int transpiler_source_find_function_name_span(const char *path, const cha
         if (transpiler_source_find_line_bounds(text, name_offset, &line_start, &line_end)
             != FT_SUCCESS)
             return (FT_FAILURE);
-        if (transpiler_source_line_contains_token_before_offset(text, line_start, name_offset,
-                "function")
+        type_end = line_start;
+        while (type_end < name_offset
+            && std::isspace(static_cast<unsigned char>(text[type_end])))
+            type_end += 1;
+        while (type_end < name_offset && transpiler_source_is_identifier_char(text[type_end]))
+            type_end += 1;
+        if (type_end > line_start
             && name_offset + std::strlen(name) < line_end
             && text[name_offset + std::strlen(name)] == '(')
-            return (transpiler_source_make_span(path, text, name_offset,
-                    name_offset + std::strlen(name), span));
+        {
+            open_paren_offset = name_offset + std::strlen(name);
+            close_paren_offset = open_paren_offset;
+            while (close_paren_offset < line_end && text[close_paren_offset] != ')')
+                close_paren_offset += 1;
+            if (close_paren_offset < line_end)
+            {
+                close_paren_offset += 1;
+                while (close_paren_offset < line_end
+                    && std::isspace(static_cast<unsigned char>(text[close_paren_offset])))
+                    close_paren_offset += 1;
+                if (close_paren_offset == line_end || text[close_paren_offset] == '{')
+                    return (transpiler_source_make_span(path, text, name_offset,
+                            name_offset + std::strlen(name), span));
+            }
+        }
         cursor = name_offset + 1;
     }
     return (FT_FAILURE);
@@ -451,6 +472,68 @@ void cblc_document_symbol_list_dispose(t_cblc_document_symbol_list *list)
     ft_bzero(list, sizeof(*list));
 }
 
+static int cblc_source_span_list_reserve(t_cblc_source_span_list *list,
+    size_t desired_capacity)
+{
+    t_transpiler_source_span *new_items;
+    size_t index;
+
+    if (!list)
+        return (FT_FAILURE);
+    if (list->capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    new_items = static_cast<t_transpiler_source_span *>(cma_calloc(desired_capacity,
+            sizeof(*new_items)));
+    if (!new_items)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < list->count)
+    {
+        new_items[index] = list->items[index];
+        index += 1;
+    }
+    if (list->items)
+        cma_free(list->items);
+    list->items = new_items;
+    list->capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
+static int cblc_source_span_list_append(t_cblc_source_span_list *list,
+    const t_transpiler_source_span *span)
+{
+    if (!list || !span)
+        return (FT_FAILURE);
+    if (list->count >= list->capacity)
+    {
+        if (cblc_source_span_list_reserve(list,
+                list->capacity == 0 ? 4 : list->capacity * 2) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    list->items[list->count] = *span;
+    list->count += 1;
+    return (FT_SUCCESS);
+}
+
+int cblc_source_span_list_init(t_cblc_source_span_list *list)
+{
+    if (!list)
+        return (FT_FAILURE);
+    ft_bzero(list, sizeof(*list));
+    return (FT_SUCCESS);
+}
+
+void cblc_source_span_list_dispose(t_cblc_source_span_list *list)
+{
+    if (!list)
+        return ;
+    if (list->items)
+        cma_free(list->items);
+    ft_bzero(list, sizeof(*list));
+}
+
 static int cblc_completion_list_reserve(t_cblc_completion_list *list, size_t desired_capacity)
 {
     t_cblc_completion_item *new_items;
@@ -488,6 +571,73 @@ int cblc_completion_list_init(t_cblc_completion_list *list)
 }
 
 void cblc_completion_list_dispose(t_cblc_completion_list *list)
+{
+    if (!list)
+        return ;
+    if (list->items)
+        cma_free(list->items);
+    ft_bzero(list, sizeof(*list));
+}
+
+static int cblc_semantic_token_list_reserve(t_cblc_semantic_token_list *list,
+    size_t desired_capacity)
+{
+    t_cblc_semantic_token *new_items;
+    size_t index;
+
+    if (!list)
+        return (FT_FAILURE);
+    if (list->capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    new_items = static_cast<t_cblc_semantic_token *>(cma_calloc(desired_capacity,
+            sizeof(*new_items)));
+    if (!new_items)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < list->count)
+    {
+        new_items[index] = list->items[index];
+        index += 1;
+    }
+    if (list->items)
+        cma_free(list->items);
+    list->items = new_items;
+    list->capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
+static int cblc_semantic_token_list_append(t_cblc_semantic_token_list *list,
+    t_cblc_semantic_token_kind kind, const t_transpiler_source_span *span)
+{
+    t_cblc_semantic_token *item;
+
+    if (!list || !span)
+        return (FT_FAILURE);
+    if (list->count >= list->capacity)
+    {
+        if (cblc_semantic_token_list_reserve(list,
+                list->capacity == 0 ? 4 : list->capacity * 2) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    item = &list->items[list->count];
+    ft_bzero(item, sizeof(*item));
+    item->kind = kind;
+    item->span = *span;
+    list->count += 1;
+    return (FT_SUCCESS);
+}
+
+int cblc_semantic_token_list_init(t_cblc_semantic_token_list *list)
+{
+    if (!list)
+        return (FT_FAILURE);
+    ft_bzero(list, sizeof(*list));
+    return (FT_SUCCESS);
+}
+
+void cblc_semantic_token_list_dispose(t_cblc_semantic_token_list *list)
 {
     if (!list)
         return ;
@@ -848,6 +998,83 @@ int cblc_frontend_find_definition(const t_cblc_frontend_analysis *analysis, size
     return (FT_FAILURE);
 }
 
+static int cblc_frontend_find_identifier_occurrences(const t_cblc_frontend_analysis *analysis,
+    const char *identifier, t_cblc_source_span_list *references)
+{
+    size_t cursor;
+    size_t match_offset;
+    t_transpiler_source_span span;
+
+    if (!analysis || !identifier || !references || !analysis->source_text)
+        return (FT_FAILURE);
+    cursor = 0;
+    while (transpiler_source_find_identifier(analysis->source_text, identifier, cursor,
+            &match_offset) == FT_SUCCESS)
+    {
+        if (transpiler_source_make_span(analysis->path, analysis->source_text, match_offset,
+                match_offset + std::strlen(identifier), &span) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_source_span_list_append(references, &span) != FT_SUCCESS)
+            return (FT_FAILURE);
+        cursor = match_offset + std::strlen(identifier);
+    }
+    return (FT_SUCCESS);
+}
+
+int cblc_frontend_find_references(const t_cblc_frontend_analysis *analysis, size_t line,
+    size_t column, t_cblc_source_span_list *references)
+{
+    char identifier[TRANSPILE_IDENTIFIER_MAX];
+    t_transpiler_source_span definition_span;
+
+    if (!analysis || !references || !analysis->source_text)
+        return (FT_FAILURE);
+    cblc_source_span_list_dispose(references);
+    if (cblc_source_span_list_init(references) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (analysis->parse_status != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_frontend_extract_identifier_at_position(analysis->source_text, line, column,
+            identifier, sizeof(identifier)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    transpiler_source_span_reset(&definition_span);
+    if (cblc_frontend_find_data_definition(analysis, identifier, &definition_span) != FT_SUCCESS
+        && cblc_frontend_find_function_definition(analysis, identifier, &definition_span)
+        != FT_SUCCESS
+        && cblc_frontend_find_type_definition(analysis, identifier, &definition_span) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (cblc_frontend_find_identifier_occurrences(analysis, identifier, references));
+}
+
+static int cblc_frontend_identifier_is_valid_name(const char *identifier)
+{
+    size_t index;
+
+    if (!identifier || identifier[0] == '\0')
+        return (0);
+    if ((identifier[0] >= '0' && identifier[0] <= '9') || identifier[0] == ':')
+        return (0);
+    index = 0;
+    while (identifier[index] != '\0')
+    {
+        if (!((identifier[index] >= 'A' && identifier[index] <= 'Z')
+                || (identifier[index] >= 'a' && identifier[index] <= 'z')
+                || (identifier[index] >= '0' && identifier[index] <= '9')
+                || identifier[index] == '_'))
+            return (0);
+        index += 1;
+    }
+    return (1);
+}
+
+int cblc_frontend_prepare_rename(const t_cblc_frontend_analysis *analysis, size_t line,
+    size_t column, const char *new_name, t_cblc_source_span_list *edits)
+{
+    if (!new_name || !cblc_frontend_identifier_is_valid_name(new_name))
+        return (FT_FAILURE);
+    return (cblc_frontend_find_references(analysis, line, column, edits));
+}
+
 static const char *cblc_frontend_data_kind_name(const t_cblc_data_item *item)
 {
     if (!item)
@@ -960,6 +1187,202 @@ int cblc_frontend_get_hover(const t_cblc_frontend_analysis *analysis, size_t lin
     return (FT_FAILURE);
 }
 
+static int cblc_frontend_is_keyword(const char *identifier)
+{
+    size_t index;
+
+    if (!identifier)
+        return (0);
+    index = 0;
+    while (index < sizeof(g_cblc_completion_keywords) / sizeof(g_cblc_completion_keywords[0]))
+    {
+        if (std::strncmp(g_cblc_completion_keywords[index].label, identifier,
+                TRANSPILE_IDENTIFIER_MAX) == 0)
+            return (1);
+        index += 1;
+    }
+    return (0);
+}
+
+static int cblc_frontend_is_builtin_method_name(const char *identifier)
+{
+    if (!identifier)
+        return (0);
+    if (std::strncmp(identifier, "append", TRANSPILE_IDENTIFIER_MAX) == 0)
+        return (1);
+    if (std::strncmp(identifier, "len", TRANSPILE_IDENTIFIER_MAX) == 0)
+        return (1);
+    if (std::strncmp(identifier, "clear", TRANSPILE_IDENTIFIER_MAX) == 0)
+        return (1);
+    if (std::strncmp(identifier, "empty", TRANSPILE_IDENTIFIER_MAX) == 0)
+        return (1);
+    if (std::strncmp(identifier, "equals", TRANSPILE_IDENTIFIER_MAX) == 0)
+        return (1);
+    if (std::strncmp(identifier, "capacity", TRANSPILE_IDENTIFIER_MAX) == 0)
+        return (1);
+    if (std::strncmp(identifier, "starts_with", TRANSPILE_IDENTIFIER_MAX) == 0)
+        return (1);
+    if (std::strncmp(identifier, "ends_with", TRANSPILE_IDENTIFIER_MAX) == 0)
+        return (1);
+    if (std::strncmp(identifier, "compare", TRANSPILE_IDENTIFIER_MAX) == 0)
+        return (1);
+    if (std::strncmp(identifier, "contains", TRANSPILE_IDENTIFIER_MAX) == 0)
+        return (1);
+    return (0);
+}
+
+static t_cblc_semantic_token_kind cblc_frontend_identifier_token_kind(
+    const t_cblc_frontend_analysis *analysis, const char *identifier)
+{
+    const t_transpiler_standard_library_entry *entries;
+    size_t entry_count;
+    size_t index;
+    t_transpiler_source_span span;
+
+    if (!analysis || !identifier)
+        return (CBLC_SEMANTIC_TOKEN_VARIABLE);
+    if (cblc_frontend_is_keyword(identifier))
+        return (CBLC_SEMANTIC_TOKEN_KEYWORD);
+    if (std::strncmp(identifier, "void", TRANSPILE_IDENTIFIER_MAX) == 0
+        || std::strncmp(identifier, "int", TRANSPILE_IDENTIFIER_MAX) == 0
+        || std::strncmp(identifier, "char", TRANSPILE_IDENTIFIER_MAX) == 0
+        || std::strncmp(identifier, "string", TRANSPILE_IDENTIFIER_MAX) == 0)
+        return (CBLC_SEMANTIC_TOKEN_TYPE);
+    transpiler_source_span_reset(&span);
+    if (cblc_frontend_find_type_definition(analysis, identifier, &span) == FT_SUCCESS)
+        return (CBLC_SEMANTIC_TOKEN_TYPE);
+    transpiler_source_span_reset(&span);
+    if (cblc_frontend_find_function_definition(analysis, identifier, &span) == FT_SUCCESS)
+        return (CBLC_SEMANTIC_TOKEN_FUNCTION);
+    if (cblc_frontend_is_builtin_method_name(identifier))
+        return (CBLC_SEMANTIC_TOKEN_FUNCTION);
+    entries = transpiler_standard_library_get_entries(&entry_count);
+    index = 0;
+    while (index < entry_count)
+    {
+        if (std::strncmp(entries[index].qualified_name, identifier, TRANSPILE_IDENTIFIER_MAX) == 0)
+            return (CBLC_SEMANTIC_TOKEN_FUNCTION);
+        index += 1;
+    }
+    transpiler_source_span_reset(&span);
+    if (cblc_frontend_find_data_definition(analysis, identifier, &span) == FT_SUCCESS)
+        return (CBLC_SEMANTIC_TOKEN_VARIABLE);
+    return (CBLC_SEMANTIC_TOKEN_VARIABLE);
+}
+
+static int cblc_frontend_collect_identifier_semantic_token(
+    const t_cblc_frontend_analysis *analysis, const char *identifier,
+    const t_transpiler_source_span *span, t_cblc_semantic_token_list *tokens)
+{
+    t_cblc_semantic_token_kind kind;
+
+    if (!analysis || !identifier || !span || !tokens)
+        return (FT_FAILURE);
+    kind = cblc_frontend_identifier_token_kind(analysis, identifier);
+    return (cblc_semantic_token_list_append(tokens, kind, span));
+}
+
+int cblc_frontend_collect_semantic_tokens(const t_cblc_frontend_analysis *analysis,
+    t_cblc_semantic_token_list *tokens)
+{
+    size_t index;
+    size_t start;
+    size_t end;
+    char identifier[TRANSPILE_IDENTIFIER_MAX];
+    t_transpiler_source_span span;
+    char quote;
+    size_t length;
+
+    if (!analysis || !tokens || !analysis->source_text)
+        return (FT_FAILURE);
+    cblc_semantic_token_list_dispose(tokens);
+    if (cblc_semantic_token_list_init(tokens) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (analysis->parse_status != FT_SUCCESS)
+        return (FT_FAILURE);
+    index = 0;
+    while (analysis->source_text[index] != '\0')
+    {
+        if (analysis->source_text[index] == '/'
+            && analysis->source_text[index + 1] == '/')
+        {
+            start = index;
+            end = index + 2;
+            while (analysis->source_text[end] != '\0'
+                && analysis->source_text[end] != '\n')
+                end += 1;
+            if (transpiler_source_make_span(analysis->path, analysis->source_text, start, end,
+                    &span) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (cblc_semantic_token_list_append(tokens, CBLC_SEMANTIC_TOKEN_COMMENT, &span)
+                != FT_SUCCESS)
+                return (FT_FAILURE);
+            index = end;
+            continue ;
+        }
+        if (analysis->source_text[index] == '"' || analysis->source_text[index] == '\'')
+        {
+            quote = analysis->source_text[index];
+            start = index;
+            end = index + 1;
+            while (analysis->source_text[end] != '\0' && analysis->source_text[end] != quote)
+            {
+                if (analysis->source_text[end] == '\\' && analysis->source_text[end + 1] != '\0')
+                    end += 1;
+                end += 1;
+            }
+            if (analysis->source_text[end] == quote)
+                end += 1;
+            if (transpiler_source_make_span(analysis->path, analysis->source_text, start, end,
+                    &span) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (cblc_semantic_token_list_append(tokens, CBLC_SEMANTIC_TOKEN_STRING, &span)
+                != FT_SUCCESS)
+                return (FT_FAILURE);
+            index = end;
+            continue ;
+        }
+        if (analysis->source_text[index] >= '0' && analysis->source_text[index] <= '9')
+        {
+            start = index;
+            end = index + 1;
+            while ((analysis->source_text[end] >= '0' && analysis->source_text[end] <= '9')
+                || analysis->source_text[end] == '.')
+                end += 1;
+            if (transpiler_source_make_span(analysis->path, analysis->source_text, start, end,
+                    &span) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (cblc_semantic_token_list_append(tokens, CBLC_SEMANTIC_TOKEN_NUMBER, &span)
+                != FT_SUCCESS)
+                return (FT_FAILURE);
+            index = end;
+            continue ;
+        }
+        if (!transpiler_source_is_identifier_char(analysis->source_text[index]))
+        {
+            index += 1;
+            continue ;
+        }
+        start = index;
+        end = index;
+        while (transpiler_source_is_identifier_char(analysis->source_text[end]))
+            end += 1;
+        length = end - start;
+        if (length >= sizeof(identifier))
+            length = sizeof(identifier) - 1;
+        std::memcpy(identifier, analysis->source_text + start, length);
+        identifier[length] = '\0';
+        if (transpiler_source_make_span(analysis->path, analysis->source_text, start, end,
+                &span) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_frontend_collect_identifier_semantic_token(analysis, identifier, &span, tokens)
+            != FT_SUCCESS)
+            return (FT_FAILURE);
+        index = end;
+    }
+    return (FT_SUCCESS);
+}
+
 static int cblc_frontend_extract_completion_context(const char *text, size_t line, size_t column,
     t_cblc_completion_context *context)
 {
@@ -975,6 +1398,22 @@ static int cblc_frontend_extract_completion_context(const char *text, size_t lin
     context->kind = CBLC_COMPLETION_CONTEXT_GENERAL;
     if (transpiler_source_position_to_offset(text, line, column, &offset) != FT_SUCCESS)
         return (FT_FAILURE);
+    if (text[offset] == '.')
+    {
+        context->kind = CBLC_COMPLETION_CONTEXT_MEMBER;
+        receiver_end = offset;
+        receiver_start = receiver_end;
+        while (receiver_start > 0
+            && transpiler_source_is_identifier_char(text[receiver_start - 1]))
+            receiver_start -= 1;
+        length = receiver_end - receiver_start;
+        if (length >= sizeof(context->receiver))
+            length = sizeof(context->receiver) - 1;
+        if (length > 0)
+            std::memcpy(context->receiver, text + receiver_start, length);
+        context->receiver[length] = '\0';
+        return (FT_SUCCESS);
+    }
     start = offset;
     while (start > 0 && transpiler_source_is_identifier_char(text[start - 1]))
         start -= 1;
@@ -1095,11 +1534,6 @@ static int cblc_frontend_find_enclosing_function(const t_cblc_frontend_analysis 
     size_t body_start;
     size_t body_end;
     size_t index;
-    size_t scan_offset;
-    size_t best_offset;
-    size_t name_start;
-    size_t name_length;
-    const char *match;
 
     if (!analysis || !analysis->source_text || !function_name || function_name_size == 0)
         return (FT_FAILURE);
@@ -1123,49 +1557,6 @@ static int cblc_frontend_find_enclosing_function(const t_cblc_frontend_analysis 
         }
         index += 1;
     }
-    best_offset = static_cast<size_t>(-1);
-    scan_offset = 0;
-    while (analysis->source_text[scan_offset] != '\0')
-    {
-        match = std::strstr(analysis->source_text + scan_offset, "function");
-        if (!match)
-            break ;
-        scan_offset = static_cast<size_t>(match - analysis->source_text);
-        if (scan_offset >= cursor_offset)
-            break ;
-        if ((scan_offset == 0
-                || transpiler_source_is_identifier_boundary(analysis->source_text,
-                    scan_offset - 1))
-            && transpiler_source_is_identifier_boundary(analysis->source_text,
-                scan_offset + std::strlen("function")))
-            best_offset = scan_offset;
-        scan_offset += 1;
-    }
-    if (best_offset == static_cast<size_t>(-1))
-        return (FT_FAILURE);
-    scan_offset = best_offset + std::strlen("function");
-    while (analysis->source_text[scan_offset] != '\0'
-        && std::isspace(static_cast<unsigned char>(analysis->source_text[scan_offset])))
-        scan_offset += 1;
-    if (std::strncmp(analysis->source_text + scan_offset, "void", std::strlen("void")) == 0)
-        scan_offset += std::strlen("void");
-    else if (std::strncmp(analysis->source_text + scan_offset, "int", std::strlen("int")) == 0)
-        scan_offset += std::strlen("int");
-    while (analysis->source_text[scan_offset] != '\0'
-        && std::isspace(static_cast<unsigned char>(analysis->source_text[scan_offset])))
-        scan_offset += 1;
-    name_start = scan_offset;
-    while (transpiler_source_is_identifier_char(analysis->source_text[scan_offset]))
-        scan_offset += 1;
-    if (scan_offset <= name_start)
-        return (FT_FAILURE);
-    name_length = scan_offset - name_start;
-    if (name_length >= function_name_size)
-        name_length = function_name_size - 1;
-    std::memcpy(function_name, analysis->source_text + name_start, name_length);
-    function_name[name_length] = '\0';
-    if (function_name[0] == '\0')
-        return (FT_FAILURE);
     return (FT_SUCCESS);
 }
 
@@ -1467,6 +1858,54 @@ static int cblc_frontend_append_string_member_completions(t_cblc_completion_list
     {
         if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
                 "len") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (cblc_completion_matches_prefix("clear", prefix))
+    {
+        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
+                "clear") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (cblc_completion_matches_prefix("empty", prefix))
+    {
+        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
+                "empty") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (cblc_completion_matches_prefix("equals", prefix))
+    {
+        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
+                "equals") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (cblc_completion_matches_prefix("capacity", prefix))
+    {
+        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
+                "capacity") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (cblc_completion_matches_prefix("starts_with", prefix))
+    {
+        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
+                "starts_with") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (cblc_completion_matches_prefix("ends_with", prefix))
+    {
+        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
+                "ends_with") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (cblc_completion_matches_prefix("compare", prefix))
+    {
+        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
+                "compare") != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (cblc_completion_matches_prefix("contains", prefix))
+    {
+        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
+                "contains") != FT_SUCCESS)
             return (FT_FAILURE);
     }
     return (FT_SUCCESS);

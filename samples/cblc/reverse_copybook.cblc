@@ -14,6 +14,6 @@ copy "CUSTOMER-STATUS" replacing ==CUSTOMER-NAME== by ==CLIENT-NAME== word CUSTO
 char STATE_CODE = "A";
 char BUFFER_NAME[8];
 
-function void MAIN() {
+void MAIN() {
     return ;
 }

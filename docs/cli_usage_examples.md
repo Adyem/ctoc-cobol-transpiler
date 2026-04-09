@@ -128,7 +128,7 @@ same deterministic output order regardless of the pool size.
    ```cblc
    char RESULT[3];
 
-   function void MAIN()
+   void MAIN()
    {
        RESULT = "42";
        RESULT = RESULT;

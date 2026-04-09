@@ -5,14 +5,52 @@ const t_test_case *get_compiler_cobol_round_trip_pipeline_tests(size_t *count);
 int test_cblc_copy_file_translates_to_cobol_and_executes(void);
 int test_cblc_inline_string_append_translates_to_cobol_and_executes(void);
 int test_cblc_inline_string_len_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_clear_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_empty_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_equals_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_equals_literal_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_capacity_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_starts_with_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_ends_with_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_compare_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_contains_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_equals_false_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_empty_false_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_starts_with_literal_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_ends_with_literal_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_compare_less_than_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_compare_greater_than_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_compare_literal_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_contains_false_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_contains_empty_literal_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_constructor_capacity_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_append_then_len_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_clear_then_empty_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_starts_with_false_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_ends_with_false_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_starts_with_empty_literal_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_ends_with_empty_literal_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_compare_shorter_prefix_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_compare_longer_prefix_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_contains_literal_false_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_copy_constructor_equals_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_literal_constructor_translates_to_cobol_and_executes(void);
+int test_cblc_inline_string_copy_constructor_translates_to_cobol_and_executes(void);
 int test_cblc_inline_std_strlen_literal_translates_to_cobol_and_executes(void);
 int test_cblc_inline_class_methods_translates_to_cobol_and_executes(void);
 int test_cblc_inline_array_access_translates_to_cobol_and_executes(void);
+int test_cblc_inline_functions_without_keyword_translates_to_cobol_and_executes(void);
 int test_cblc_inline_const_values_translates_to_cobol_and_executes(void);
 int test_cblc_inline_struct_field_access_translates_to_cobol_and_executes(void);
 int test_cblc_inline_nested_struct_field_access_translates_to_cobol_and_executes(void);
 int test_cblc_inline_variable_index_array_access_translates_to_cobol_and_executes(void);
 int test_cblc_inline_constructor_initializer_translates_to_cobol_and_executes(void);
+int test_cblc_inline_parameterized_class_lifecycle_translates_to_cobol_and_executes(void);
+int test_cblc_inline_constructor_overloads_translates_to_cobol_and_executes(void);
+int test_cblc_inline_copy_constructor_overload_translates_to_cobol_and_executes(void);
+int test_cblc_inline_struct_return_translates_to_cobol_and_executes(void);
+int test_cblc_inline_class_return_translates_to_cobol_and_executes(void);
+int test_cblc_inline_struct_returning_method_translates_to_cobol_and_executes(void);
 int test_cblc_filter_prefix_translates_to_cobol_and_executes(void);
 int test_cblc_reverse_control_flow_translates_to_cobol_and_executes(void);
 int test_cblc_integration_showcase_translates_to_cobol_and_executes(void);
@@ -52,12 +90,76 @@ const t_test_case *get_compiler_cobol_round_trip_pipeline_tests(size_t *count)
             test_cblc_inline_string_append_translates_to_cobol_and_executes},
         {"cblc_inline_string_len_translates_to_cobol_and_executes",
             test_cblc_inline_string_len_translates_to_cobol_and_executes},
+        {"cblc_inline_string_clear_translates_to_cobol_and_executes",
+            test_cblc_inline_string_clear_translates_to_cobol_and_executes},
+        {"cblc_inline_string_empty_translates_to_cobol_and_executes",
+            test_cblc_inline_string_empty_translates_to_cobol_and_executes},
+        {"cblc_inline_string_equals_translates_to_cobol_and_executes",
+            test_cblc_inline_string_equals_translates_to_cobol_and_executes},
+        {"cblc_inline_string_equals_literal_translates_to_cobol_and_executes",
+            test_cblc_inline_string_equals_literal_translates_to_cobol_and_executes},
+        {"cblc_inline_string_capacity_translates_to_cobol_and_executes",
+            test_cblc_inline_string_capacity_translates_to_cobol_and_executes},
+        {"cblc_inline_string_starts_with_translates_to_cobol_and_executes",
+            test_cblc_inline_string_starts_with_translates_to_cobol_and_executes},
+        {"cblc_inline_string_ends_with_translates_to_cobol_and_executes",
+            test_cblc_inline_string_ends_with_translates_to_cobol_and_executes},
+        {"cblc_inline_string_compare_translates_to_cobol_and_executes",
+            test_cblc_inline_string_compare_translates_to_cobol_and_executes},
+        {"cblc_inline_string_contains_translates_to_cobol_and_executes",
+            test_cblc_inline_string_contains_translates_to_cobol_and_executes},
+        {"cblc_inline_string_equals_false_translates_to_cobol_and_executes",
+            test_cblc_inline_string_equals_false_translates_to_cobol_and_executes},
+        {"cblc_inline_string_empty_false_translates_to_cobol_and_executes",
+            test_cblc_inline_string_empty_false_translates_to_cobol_and_executes},
+        {"cblc_inline_string_starts_with_literal_translates_to_cobol_and_executes",
+            test_cblc_inline_string_starts_with_literal_translates_to_cobol_and_executes},
+        {"cblc_inline_string_ends_with_literal_translates_to_cobol_and_executes",
+            test_cblc_inline_string_ends_with_literal_translates_to_cobol_and_executes},
+        {"cblc_inline_string_compare_less_than_translates_to_cobol_and_executes",
+            test_cblc_inline_string_compare_less_than_translates_to_cobol_and_executes},
+        {"cblc_inline_string_compare_greater_than_translates_to_cobol_and_executes",
+            test_cblc_inline_string_compare_greater_than_translates_to_cobol_and_executes},
+        {"cblc_inline_string_compare_literal_translates_to_cobol_and_executes",
+            test_cblc_inline_string_compare_literal_translates_to_cobol_and_executes},
+        {"cblc_inline_string_contains_false_translates_to_cobol_and_executes",
+            test_cblc_inline_string_contains_false_translates_to_cobol_and_executes},
+        {"cblc_inline_string_contains_empty_literal_translates_to_cobol_and_executes",
+            test_cblc_inline_string_contains_empty_literal_translates_to_cobol_and_executes},
+        {"cblc_inline_string_constructor_capacity_translates_to_cobol_and_executes",
+            test_cblc_inline_string_constructor_capacity_translates_to_cobol_and_executes},
+        {"cblc_inline_string_append_then_len_translates_to_cobol_and_executes",
+            test_cblc_inline_string_append_then_len_translates_to_cobol_and_executes},
+        {"cblc_inline_string_clear_then_empty_translates_to_cobol_and_executes",
+            test_cblc_inline_string_clear_then_empty_translates_to_cobol_and_executes},
+        {"cblc_inline_string_starts_with_false_translates_to_cobol_and_executes",
+            test_cblc_inline_string_starts_with_false_translates_to_cobol_and_executes},
+        {"cblc_inline_string_ends_with_false_translates_to_cobol_and_executes",
+            test_cblc_inline_string_ends_with_false_translates_to_cobol_and_executes},
+        {"cblc_inline_string_starts_with_empty_literal_translates_to_cobol_and_executes",
+            test_cblc_inline_string_starts_with_empty_literal_translates_to_cobol_and_executes},
+        {"cblc_inline_string_ends_with_empty_literal_translates_to_cobol_and_executes",
+            test_cblc_inline_string_ends_with_empty_literal_translates_to_cobol_and_executes},
+        {"cblc_inline_string_compare_shorter_prefix_translates_to_cobol_and_executes",
+            test_cblc_inline_string_compare_shorter_prefix_translates_to_cobol_and_executes},
+        {"cblc_inline_string_compare_longer_prefix_translates_to_cobol_and_executes",
+            test_cblc_inline_string_compare_longer_prefix_translates_to_cobol_and_executes},
+        {"cblc_inline_string_contains_literal_false_translates_to_cobol_and_executes",
+            test_cblc_inline_string_contains_literal_false_translates_to_cobol_and_executes},
+        {"cblc_inline_string_copy_constructor_equals_translates_to_cobol_and_executes",
+            test_cblc_inline_string_copy_constructor_equals_translates_to_cobol_and_executes},
+        {"cblc_inline_string_literal_constructor_translates_to_cobol_and_executes",
+            test_cblc_inline_string_literal_constructor_translates_to_cobol_and_executes},
+        {"cblc_inline_string_copy_constructor_translates_to_cobol_and_executes",
+            test_cblc_inline_string_copy_constructor_translates_to_cobol_and_executes},
         {"cblc_inline_std_strlen_literal_translates_to_cobol_and_executes",
             test_cblc_inline_std_strlen_literal_translates_to_cobol_and_executes},
         {"cblc_inline_class_methods_translates_to_cobol_and_executes",
             test_cblc_inline_class_methods_translates_to_cobol_and_executes},
         {"cblc_inline_array_access_translates_to_cobol_and_executes",
             test_cblc_inline_array_access_translates_to_cobol_and_executes},
+        {"cblc_inline_functions_without_keyword_translates_to_cobol_and_executes",
+            test_cblc_inline_functions_without_keyword_translates_to_cobol_and_executes},
         {"cblc_inline_const_values_translates_to_cobol_and_executes",
             test_cblc_inline_const_values_translates_to_cobol_and_executes},
         {"cblc_inline_struct_field_access_translates_to_cobol_and_executes",
@@ -68,6 +170,18 @@ const t_test_case *get_compiler_cobol_round_trip_pipeline_tests(size_t *count)
             test_cblc_inline_variable_index_array_access_translates_to_cobol_and_executes},
         {"cblc_inline_constructor_initializer_translates_to_cobol_and_executes",
             test_cblc_inline_constructor_initializer_translates_to_cobol_and_executes},
+        {"cblc_inline_parameterized_class_lifecycle_translates_to_cobol_and_executes",
+            test_cblc_inline_parameterized_class_lifecycle_translates_to_cobol_and_executes},
+        {"cblc_inline_constructor_overloads_translates_to_cobol_and_executes",
+            test_cblc_inline_constructor_overloads_translates_to_cobol_and_executes},
+        {"cblc_inline_copy_constructor_overload_translates_to_cobol_and_executes",
+            test_cblc_inline_copy_constructor_overload_translates_to_cobol_and_executes},
+        {"cblc_inline_struct_return_translates_to_cobol_and_executes",
+            test_cblc_inline_struct_return_translates_to_cobol_and_executes},
+        {"cblc_inline_class_return_translates_to_cobol_and_executes",
+            test_cblc_inline_class_return_translates_to_cobol_and_executes},
+        {"cblc_inline_struct_returning_method_translates_to_cobol_and_executes",
+            test_cblc_inline_struct_returning_method_translates_to_cobol_and_executes},
         {"cblc_filter_prefix_translates_to_cobol_and_executes",
             test_cblc_filter_prefix_translates_to_cobol_and_executes},
         {"cblc_reverse_control_flow_translates_to_cobol_and_executes",

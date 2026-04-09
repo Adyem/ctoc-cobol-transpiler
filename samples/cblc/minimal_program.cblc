@@ -1,6 +1,6 @@
 char result[3];
 
-function void MAIN()
+void MAIN()
 {
     result = "42";
     result = result;

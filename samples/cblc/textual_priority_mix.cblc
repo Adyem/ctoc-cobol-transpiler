@@ -3,7 +3,7 @@ char priority_level;
 int pending_orders;
 bool expedite;
 
-function void report_schedule() {
+void report_schedule() {
     warehouse_code = "NW-01";
     priority_level = 'B';
     pending_orders = 18;
@@ -28,6 +28,6 @@ function void report_schedule() {
     display(pending_orders);
 }
 
-function void main() {
+void main() {
     report_schedule();
 }

@@ -2,11 +2,11 @@ import "multi_module_worker.cblc";
 
 int accumulator;
 
-function void add_once() {
+void add_once() {
     accumulator = accumulator + 1;
 }
 
-function void main() {
+void main() {
     accumulator = 0;
     show_banner();
     add_once();

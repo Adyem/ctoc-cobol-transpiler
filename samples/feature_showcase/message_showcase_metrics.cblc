@@ -43,7 +43,7 @@ int loss_ratio_total;
 int average_claim_total;
 int note_length;
 
-function void main()
+void main()
 {
     string note[32];
 

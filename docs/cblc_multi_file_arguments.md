@@ -2,7 +2,7 @@
 
 The transpiler's module system lets you split a CBL-C program across several
 translation units and wire them together with `import` directives.  Each
-translation unit exposes any `function` it defines, so a caller can pass
+translation unit exposes any function it defines, so a caller can pass
 arguments into helper routines implemented in a different source file.  The
 examples below illustrate common patterns and focus on the way arguments move
 through those boundaries.
@@ -29,7 +29,7 @@ import "metrics_worker.cblc";
 
 int running_total;
 
-function void main() {
+void main() {
     running_total = 0;
 
     running_total = add_sale(running_total, 42);
@@ -42,7 +42,7 @@ function void main() {
 `metrics_worker.cblc`
 
 ```cblc
-function int add_sale(int current_total, int delta) {
+int add_sale(int current_total, int delta) {
     int updated_total;
 
     updated_total = current_total + delta;
@@ -69,7 +69,7 @@ import "inventory_rules.cblc";
 int on_hand;
 bool restock_flag;
 
-function void main() {
+void main() {
     on_hand = 120;
 
     restock_flag = should_restock(on_hand, 150);
@@ -80,7 +80,7 @@ function void main() {
 `inventory_rules.cblc`
 
 ```cblc
-function bool should_restock(int quantity, int target) {
+bool should_restock(int quantity, int target) {
     bool needs_order;
 
     if (quantity < target) {
@@ -91,7 +91,7 @@ function bool should_restock(int quantity, int target) {
     return needs_order;
 }
 
-function void report_status(bool flag) {
+void report_status(bool flag) {
     if (flag) {
         display("REORDER REQUESTED");
     } else {

@@ -10,7 +10,7 @@ int stage_length;
 int total_minutes;
 double score;
 
-function void build_summary_text()
+void build_summary_text()
 {
     summary = "SCHEDULE SUMMARY:";
     std::strcat(summary, " ");
@@ -37,14 +37,14 @@ function void build_summary_text()
     }
 }
 
-function void prepare_source_data()
+void prepare_source_data()
 {
     std::strcpy(headline, "Draft Roadmap");
     std::strcpy(detail, "Assemble Budget");
     std::strcpy(stage, "Schedule Review");
 }
 
-function void present_schedule()
+void present_schedule()
 {
     prepare_source_data();
 

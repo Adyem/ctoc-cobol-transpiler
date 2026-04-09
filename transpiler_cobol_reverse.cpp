@@ -2180,7 +2180,7 @@ static int cobol_reverse_emit_paragraph(t_transpiler_context *context, t_cblc_bu
         if (cobol_reverse_emit_comments_before_line(context, builder, paragraph_line, 0) != FT_SUCCESS)
             return (FT_FAILURE);
     }
-    if (cblc_builder_append_string(builder, "function void ") != FT_SUCCESS)
+    if (cblc_builder_append_string(builder, "void ") != FT_SUCCESS)
         return (FT_FAILURE);
     if (cobol_reverse_append_identifier(builder, &paragraph->token) != FT_SUCCESS)
         return (FT_FAILURE);

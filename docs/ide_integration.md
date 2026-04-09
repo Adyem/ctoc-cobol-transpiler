@@ -35,7 +35,7 @@ For Emacs users, leverage [`tree-sitter-langs`](https://github.com/emacs-tree-si
 ```elisp
 (define-generic-mode 'cblc-mode
   '("//")
-  '("file" "function" "record" "if" "else" "while" "return" "open" "close" "read" "write" "display")
+  '("file" "record" "if" "else" "while" "return" "open" "close" "read" "write" "display")
   '(("\"\\(?:\\\\.\|[^\"]\)*\"" . font-lock-string-face)
     ("\\b[0-9]+\\(?:\\.[0-9]+\\)?\\b" . font-lock-constant-face))
   '("\\.cblc\\'")

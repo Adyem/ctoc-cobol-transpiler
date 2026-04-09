@@ -2,14 +2,14 @@ int RUNNING_TOTAL_VALUE = 5;
 bool STATUS_FLAG = false;
 char SCRATCH_NOTE[12] = "raw value";
 
-function void ENTRY_PARAGRAPH() {
+void ENTRY_PARAGRAPH() {
     SCRATCH_NOTE = "mixED Case value";
     RUNNING_TOTAL_VALUE = 0;
     STATUS_FLAG = true;
     return ;
 }
 
-function void NORMALIZE_VALUES() {
+void NORMALIZE_VALUES() {
     RUNNING_TOTAL_VALUE = 7;
     SCRATCH_NOTE = "done";
     return ;

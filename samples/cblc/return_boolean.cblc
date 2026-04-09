@@ -2,7 +2,7 @@ int candidate_value;
 int remainder_value;
 bool is_even_result;
 
-function bool is_even() {
+bool is_even() {
     remainder_value = candidate_value % 2;
     if (remainder_value == 0) {
         return true;
@@ -10,7 +10,7 @@ function bool is_even() {
     return false;
 }
 
-function void main() {
+void main() {
     candidate_value = 9;
     is_even_result = is_even();
     if (is_even_result) {

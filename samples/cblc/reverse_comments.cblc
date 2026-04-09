@@ -4,7 +4,7 @@ bool STATUS_FLAG = true;
 char BUFFER_TEXT[16];
 
 /* paragraph level note */
-function void MAIN() {
+void MAIN() {
     STATUS_FLAG = false;
     /* inline comment after move */
     /* comment before display */

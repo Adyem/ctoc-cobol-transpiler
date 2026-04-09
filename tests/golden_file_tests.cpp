@@ -18,7 +18,7 @@ FT_TEST(test_cblc_copy_file_matches_golden)
         "file in \"input.txt\";\n"
         "file out \"output.txt\";\n"
         "char line[256];\n\n"
-        "function void process_file() {\n"
+        "void process_file() {\n"
         "    open(in, \"r\");\n"
         "    open(out, \"w\");\n"
         "    while (read(in, line)) {\n"
@@ -27,7 +27,7 @@ FT_TEST(test_cblc_copy_file_matches_golden)
         "    close(in);\n"
         "    close(out);\n"
         "}\n\n"
-        "function void main() {\n"
+        "void main() {\n"
         "    process_file();\n"
         "}\n";
 
@@ -43,7 +43,7 @@ FT_TEST(test_cblc_filter_prefix_matches_golden)
         "file in \"input.txt\";\n"
         "file out \"filtered.txt\";\n"
         "char line[128];\n\n"
-        "function void filter_prefix() {\n"
+        "void filter_prefix() {\n"
         "    open(in, \"r\");\n"
         "    open(out, \"w\");\n"
         "    while (read(in, line)) {\n"
@@ -54,7 +54,7 @@ FT_TEST(test_cblc_filter_prefix_matches_golden)
         "    close(in);\n"
         "    close(out);\n"
         "}\n\n"
-        "function void main() {\n"
+        "void main() {\n"
         "    filter_prefix();\n"
         "}\n";
 
@@ -73,14 +73,14 @@ FT_TEST(test_cblc_record_writer_matches_golden)
         "};\n\n"
         "file people \"people.dat\";\n"
         "Person person;\n\n"
-        "function void write_records() {\n"
+        "void write_records() {\n"
         "    person.name = \"ALICE\";\n"
         "    person.id = \"0001\";\n\n"
         "    open(people, \"w\");\n"
         "    write(people, person);\n"
         "    close(people);\n"
         "}\n\n"
-        "function void main() {\n"
+        "void main() {\n"
         "    write_records();\n"
         "}\n";
 
@@ -101,7 +101,7 @@ FT_TEST(test_cblc_record_summary_matches_golden)
         "RecordEntry entry;\n"
         "int accepted_count;\n"
         "int total_amount;\n\n"
-        "function void summarize_records() {\n"
+        "void summarize_records() {\n"
         "    accepted_count = 0;\n"
         "    total_amount = 0;\n\n"
         "    open(input, \"r\");\n"
@@ -113,7 +113,7 @@ FT_TEST(test_cblc_record_summary_matches_golden)
         "    }\n"
         "    close(input);\n"
         "}\n\n"
-        "function void main() {\n"
+        "void main() {\n"
         "    summarize_records();\n"
         "}\n";
 
@@ -128,7 +128,7 @@ FT_TEST(test_cblc_reverse_constructs_matches_golden)
     static const char expected[] =
         "bool EOF_FLAG = false;\n"
         "char OUTPUT_RECORD[1];\n\n"
-        "function void MAIN() {\n"
+        "void MAIN() {\n"
         "    open(INPUT_FILE, \"r\");\n"
         "    while (!(EOF_FLAG == true)) {\n"
         "        read(INPUT_FILE, OUTPUT_RECORD);\n"
@@ -154,13 +154,13 @@ FT_TEST(test_cblc_reverse_normalization_matches_golden)
         "int RUNNING_TOTAL_VALUE = 5;\n"
         "bool STATUS_FLAG = false;\n"
         "char SCRATCH_NOTE[12] = \"raw value\";\n\n"
-        "function void ENTRY_PARAGRAPH() {\n"
+        "void ENTRY_PARAGRAPH() {\n"
         "    SCRATCH_NOTE = \"mixED Case value\";\n"
         "    RUNNING_TOTAL_VALUE = 0;\n"
         "    STATUS_FLAG = true;\n"
         "    return ;\n"
         "}\n\n"
-        "function void NORMALIZE_VALUES() {\n"
+        "void NORMALIZE_VALUES() {\n"
         "    RUNNING_TOTAL_VALUE = 7;\n"
         "    SCRATCH_NOTE = \"done\";\n"
         "    return ;\n"
@@ -184,7 +184,7 @@ FT_TEST(test_cblc_reverse_control_flow_matches_golden)
         "int PROGRESS_LIMIT = 10;\n"
         "int PROGRESS_INDEX = 0;\n"
         "int OUTPUT_VALUE = 0;\n\n"
-        "function void MAIN() {\n"
+        "void MAIN() {\n"
         "    if (!(CONTROL_FLAG == CONTROL_READY)) {\n"
         "        while (!(PROGRESS_METER > PROGRESS_LIMIT)) {\n"
         "            PROGRESS_METER = 11;\n"
@@ -200,7 +200,7 @@ FT_TEST(test_cblc_reverse_control_flow_matches_golden)
         "    display(OUTPUT_VALUE);\n"
         "    return ;\n"
         "}\n\n"
-        "function void NEXT_PARAGRAPH() {\n"
+        "void NEXT_PARAGRAPH() {\n"
         "    CONTROL_FLAG = true;\n"
         "    return ;\n"
         "}\n";
@@ -219,7 +219,7 @@ FT_TEST(test_cblc_numeric_precision_matches_golden)
         "long long threshold;\n"
         "float day_ratio;\n"
         "double combined_ratio;\n\n"
-        "function void analyze_precision() {\n"
+        "void analyze_precision() {\n"
         "    long deposit;\n"
         "    long withdrawal;\n"
         "    long long bonus_pool;\n"
@@ -490,11 +490,11 @@ FT_TEST(test_cblc_multi_module_main_matches_golden)
         "\n"
         "int accumulator;\n"
         "\n"
-        "function void add_once() {\n"
+        "void add_once() {\n"
         "    accumulator = accumulator + 1;\n"
         "}\n"
         "\n"
-        "function void main() {\n"
+        "void main() {\n"
         "    accumulator = 0;\n"
         "    show_banner();\n"
         "    add_once();\n"
@@ -510,7 +510,7 @@ FT_TEST(test_cblc_multi_module_main_matches_golden)
 FT_TEST(test_cblc_multi_module_worker_matches_golden)
 {
     static const char expected[] =
-        "function void show_banner() {\n"
+        "void show_banner() {\n"
         "    display(\"WORKER READY\");\n"
         "}\n";
 

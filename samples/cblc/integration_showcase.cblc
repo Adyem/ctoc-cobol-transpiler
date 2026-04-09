@@ -14,7 +14,7 @@ int accepted_count;
 int rejected_count;
 int total_amount;
 
-function void reset_state() {
+void reset_state() {
     accepted_count = 0;
     rejected_count = 0;
     total_amount = 0;
@@ -22,7 +22,7 @@ function void reset_state() {
     rejected_marker = "REJECTED ENTRY";
 }
 
-function void process_transactions() {
+void process_transactions() {
     reset_state();
     open(transactions, "r");
     open(accepted_log, "w");
@@ -42,7 +42,7 @@ function void process_transactions() {
     close(rejected_log);
 }
 
-function void main() {
+void main() {
     display("INTEGRATION SHOWCASE");
     process_transactions();
     display(accepted_count);

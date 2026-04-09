@@ -10,8 +10,8 @@ FT_TEST(test_cblc_formatter_formats_function_body)
     const char *expected;
     char *output;
 
-    input = "function void sample(){char value[4];if(value==NULL){return;}else{value[0]='x';}}";
-    expected = "function void sample()\n"
+    input = "void sample(){char value[4];if(value==NULL){return;}else{value[0]='x';}}";
+    expected = "void sample()\n"
         "{\n"
         "    char value[4];\n"
         "    if (value == NULL)\n"
@@ -42,8 +42,8 @@ FT_TEST(test_cblc_formatter_preserves_strings_and_comments)
     const char *expected;
     char *output;
 
-    input = "function void log(){//comment\nwrite(out,\"hello\\n\");}";
-    expected = "function void log()\n"
+    input = "void log(){//comment\nwrite(out,\"hello\\n\");}";
+    expected = "void log()\n"
         "{\n"
         "    //comment\n"
         "    write(out, \"hello\\n\");\n"
@@ -66,7 +66,7 @@ FT_TEST(test_cblc_formatter_passthrough_minimal_mode)
     const char *input;
     char *output;
 
-    input = "function void noop(){}";
+    input = "void noop(){}";
     if (test_expect_success(cblc_formatter_format(input, TRANSPILE_FORMAT_MINIMAL, &output),
             "minimal mode should copy text without formatting") != FT_SUCCESS)
         return (FT_FAILURE);
@@ -86,8 +86,8 @@ FT_TEST(test_transpiler_cblc_apply_layout_normalize)
     const char *expected;
     char *output;
 
-    input = "function void sample(){return;}";
-    expected = "function void sample()\n"
+    input = "void sample(){return;}";
+    expected = "void sample()\n"
         "{\n"
         "    return;\n"
         "}\n";
@@ -110,7 +110,7 @@ FT_TEST(test_transpiler_cblc_apply_layout_preserve)
     const char *input;
     char *output;
 
-    input = "function void sample(){return;}";
+    input = "void sample(){return;}";
     if (test_expect_success(transpiler_cblc_apply_layout(input, TRANSPILE_LAYOUT_PRESERVE,
                 TRANSPILE_FORMAT_PRETTY, &output),
             "preserve layout should copy input") != FT_SUCCESS)

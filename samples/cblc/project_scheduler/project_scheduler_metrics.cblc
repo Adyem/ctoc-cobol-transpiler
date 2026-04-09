@@ -1,4 +1,4 @@
-function double compute_priority_score(int total_minutes)
+double compute_priority_score(int total_minutes)
 {
     double minutes;
     double baseline;

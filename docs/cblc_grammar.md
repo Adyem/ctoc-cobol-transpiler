@@ -22,7 +22,7 @@ global_declaration      ::= file_declaration
                           | record_declaration
                           | scalar_declaration
 function_section        ::= { function_definition }
-function_definition     ::= 'function' function_return_type identifier '(' ')' block
+function_definition     ::= function_return_type identifier '(' ')' block
 function_return_type    ::= 'void' | scalar_type
 block                   ::= '{' { statement } '}'
 scalar_declaration      ::= scalar_type identifier array_suffix ';'

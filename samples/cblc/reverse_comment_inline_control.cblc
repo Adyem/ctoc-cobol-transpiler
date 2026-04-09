@@ -1,6 +1,6 @@
 bool CONTROL_FLAG = false;
 
-function void MAIN() {
+void MAIN() {
     /* comment before top-level if */
     if (CONTROL_FLAG == false) {
         /* comment before then display */

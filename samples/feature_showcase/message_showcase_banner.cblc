@@ -10,7 +10,7 @@ ModuleState reporting_module;
 int module_count;
 int summary_length;
 
-function void main()
+void main()
 {
     string banner[24];
     string summary[32];

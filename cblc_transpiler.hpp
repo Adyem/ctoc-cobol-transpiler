@@ -292,7 +292,9 @@ typedef enum e_transpiler_symbol_visibility
 typedef enum e_transpiler_function_parameter_kind
 {
     TRANSPILE_FUNCTION_PARAMETER_UNKNOWN = 0,
-    TRANSPILE_FUNCTION_PARAMETER_INT
+    TRANSPILE_FUNCTION_PARAMETER_INT,
+    TRANSPILE_FUNCTION_PARAMETER_STRING,
+    TRANSPILE_FUNCTION_PARAMETER_STRUCT
 }   t_transpiler_function_parameter_kind;
 
 typedef struct s_transpiler_function_signature
@@ -927,6 +929,19 @@ int cblc_frontend_collect_document_symbols(const t_cblc_frontend_analysis *analy
     t_cblc_document_symbol_list *symbols);
 int cblc_frontend_find_definition(const t_cblc_frontend_analysis *analysis, size_t line,
     size_t column, t_transpiler_source_span *definition_span);
+typedef struct s_cblc_source_span_list
+{
+    t_transpiler_source_span *items;
+    size_t count;
+    size_t capacity;
+}   t_cblc_source_span_list;
+
+int cblc_source_span_list_init(t_cblc_source_span_list *list);
+void cblc_source_span_list_dispose(t_cblc_source_span_list *list);
+int cblc_frontend_find_references(const t_cblc_frontend_analysis *analysis, size_t line,
+    size_t column, t_cblc_source_span_list *references);
+int cblc_frontend_prepare_rename(const t_cblc_frontend_analysis *analysis, size_t line,
+    size_t column, const char *new_name, t_cblc_source_span_list *edits);
 int cblc_frontend_get_hover(const t_cblc_frontend_analysis *analysis, size_t line,
     size_t column, char *buffer, size_t buffer_size);
 
@@ -957,6 +972,35 @@ int cblc_completion_list_init(t_cblc_completion_list *list);
 void cblc_completion_list_dispose(t_cblc_completion_list *list);
 int cblc_frontend_complete(const t_cblc_frontend_analysis *analysis, size_t line,
     size_t column, t_cblc_completion_list *completions);
+
+typedef enum e_cblc_semantic_token_kind
+{
+    CBLC_SEMANTIC_TOKEN_KEYWORD = 0,
+    CBLC_SEMANTIC_TOKEN_TYPE,
+    CBLC_SEMANTIC_TOKEN_FUNCTION,
+    CBLC_SEMANTIC_TOKEN_VARIABLE,
+    CBLC_SEMANTIC_TOKEN_STRING,
+    CBLC_SEMANTIC_TOKEN_NUMBER,
+    CBLC_SEMANTIC_TOKEN_COMMENT
+}   t_cblc_semantic_token_kind;
+
+typedef struct s_cblc_semantic_token
+{
+    t_cblc_semantic_token_kind kind;
+    t_transpiler_source_span span;
+}   t_cblc_semantic_token;
+
+typedef struct s_cblc_semantic_token_list
+{
+    t_cblc_semantic_token *items;
+    size_t count;
+    size_t capacity;
+}   t_cblc_semantic_token_list;
+
+int cblc_semantic_token_list_init(t_cblc_semantic_token_list *list);
+void cblc_semantic_token_list_dispose(t_cblc_semantic_token_list *list);
+int cblc_frontend_collect_semantic_tokens(const t_cblc_frontend_analysis *analysis,
+    t_cblc_semantic_token_list *tokens);
 
 #define AST_READ_FLAG_NEXT 0x1
 #define AST_READ_FLAG_WITH_LOCK 0x2
@@ -1041,7 +1085,8 @@ typedef enum e_cblc_data_kind
 typedef enum e_cblc_function_return_kind
 {
     CBLC_FUNCTION_RETURN_VOID = 0,
-    CBLC_FUNCTION_RETURN_INT
+    CBLC_FUNCTION_RETURN_INT,
+    CBLC_FUNCTION_RETURN_STRUCT
 }   t_cblc_function_return_kind;
 
 typedef enum e_cblc_member_visibility
@@ -1071,6 +1116,8 @@ typedef struct s_cblc_data_item
     int has_initializer;
     size_t initializer_length;
     char initializer_text[TRANSPILE_STATEMENT_TEXT_MAX];
+    char constructor_arguments[TRANSPILE_STATEMENT_TEXT_MAX];
+    size_t constructor_argument_count;
 }   t_cblc_data_item;
 
 typedef struct s_cblc_struct_field
@@ -1086,16 +1133,37 @@ typedef struct s_cblc_struct_field
     t_cblc_member_visibility visibility;
 }   t_cblc_struct_field;
 
+typedef struct s_cblc_parameter
+{
+    char source_name[TRANSPILE_IDENTIFIER_MAX];
+    char actual_source_name[TRANSPILE_IDENTIFIER_MAX];
+    char cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    char type_name[TRANSPILE_IDENTIFIER_MAX];
+    t_transpiler_function_parameter_kind kind;
+}   t_cblc_parameter;
+
 typedef struct s_cblc_method
 {
     char source_name[TRANSPILE_IDENTIFIER_MAX];
     char cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    t_cblc_parameter parameters[TRANSPILE_FUNCTION_PARAMETER_MAX];
+    size_t parameter_count;
     t_cblc_function_return_kind return_kind;
+    char return_type_name[TRANSPILE_IDENTIFIER_MAX];
     t_cblc_member_visibility visibility;
     t_cblc_statement *statements;
     size_t statement_count;
     size_t statement_capacity;
 }   t_cblc_method;
+
+typedef struct s_cblc_constructor
+{
+    t_cblc_parameter parameters[TRANSPILE_FUNCTION_PARAMETER_MAX];
+    size_t parameter_count;
+    t_cblc_statement *statements;
+    size_t statement_count;
+    size_t statement_capacity;
+}   t_cblc_constructor;
 
 typedef struct s_cblc_struct_type
 {
@@ -1110,10 +1178,10 @@ typedef struct s_cblc_struct_type
     int is_class;
     int is_builtin;
     int has_default_constructor;
+    t_cblc_constructor *constructors;
+    size_t constructor_count;
+    size_t constructor_capacity;
     int has_destructor;
-    t_cblc_statement *constructor_statements;
-    size_t constructor_statement_count;
-    size_t constructor_statement_capacity;
     t_cblc_statement *destructor_statements;
     size_t destructor_statement_count;
     size_t destructor_statement_capacity;
@@ -1155,14 +1223,6 @@ struct s_cblc_statement
     size_t call_argument_count;
 };
 
-typedef struct s_cblc_parameter
-{
-    char source_name[TRANSPILE_IDENTIFIER_MAX];
-    char actual_source_name[TRANSPILE_IDENTIFIER_MAX];
-    char cobol_name[TRANSPILE_IDENTIFIER_MAX];
-    t_transpiler_function_parameter_kind kind;
-}   t_cblc_parameter;
-
 typedef struct s_cblc_function
 {
     char source_name[TRANSPILE_IDENTIFIER_MAX];
@@ -1174,6 +1234,7 @@ typedef struct s_cblc_function
     size_t statement_capacity;
     int saw_return;
     t_cblc_function_return_kind return_kind;
+    char return_type_name[TRANSPILE_IDENTIFIER_MAX];
     int return_item_index;
     char return_cobol_name[TRANSPILE_IDENTIFIER_MAX];
     char return_source_name[TRANSPILE_IDENTIFIER_MAX];

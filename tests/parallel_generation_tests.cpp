@@ -55,13 +55,13 @@ FT_TEST(test_parallel_generate_cobol_emits_outputs_for_multiple_units)
     environment_set = 0;
     status = FT_FAILURE;
     unit_one_source = "int counter;\n"
-        "function void main()\n"
+        "void main()\n"
         "{\n"
         "    counter = 5;\n"
         "    return;\n"
         "}\n";
     unit_two_source = "int shared;\n"
-        "function void helper()\n"
+        "void helper()\n"
         "{\n"
         "    shared = 7;\n"
         "    return;\n"

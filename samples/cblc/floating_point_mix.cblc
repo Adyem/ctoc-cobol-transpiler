@@ -4,7 +4,7 @@ double yearly_projection;
 double combined_projection;
 bool trending_up;
 
-function void analyze_readings() {
+void analyze_readings() {
     seasonal_average = 21.5;
     current_reading = 24.0;
     yearly_projection = 18.75;
@@ -27,6 +27,6 @@ function void analyze_readings() {
     display(combined_projection);
 }
 
-function void main() {
+void main() {
     analyze_readings();
 }

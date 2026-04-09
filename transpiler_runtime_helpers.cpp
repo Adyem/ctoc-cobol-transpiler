@@ -132,6 +132,105 @@ static const char g_runtime_helper_string_append[] =
     "    }\n"
     "}\n";
 
+static const char g_runtime_helper_string_equals[] =
+    "static int cblc_string_equals(const char *left, size_t left_length, const char *right, size_t right_length)\n"
+    "{\n"
+    "    size_t index;\n"
+    "\n"
+    "    if (left_length != right_length)\n"
+    "        return (0);\n"
+    "    index = 0;\n"
+    "    while (index < left_length)\n"
+    "    {\n"
+    "        if (left[index] != right[index])\n"
+    "            return (0);\n"
+    "        index += 1;\n"
+    "    }\n"
+    "    return (1);\n"
+    "}\n";
+
+static const char g_runtime_helper_string_starts_with[] =
+    "static int cblc_string_starts_with(const char *text, size_t text_length, const char *prefix, size_t prefix_length)\n"
+    "{\n"
+    "    size_t index;\n"
+    "\n"
+    "    if (prefix_length > text_length)\n"
+    "        return (0);\n"
+    "    index = 0;\n"
+    "    while (index < prefix_length)\n"
+    "    {\n"
+    "        if (text[index] != prefix[index])\n"
+    "            return (0);\n"
+    "        index += 1;\n"
+    "    }\n"
+    "    return (1);\n"
+    "}\n";
+
+static const char g_runtime_helper_string_ends_with[] =
+    "static int cblc_string_ends_with(const char *text, size_t text_length, const char *suffix, size_t suffix_length)\n"
+    "{\n"
+    "    size_t start;\n"
+    "    size_t index;\n"
+    "\n"
+    "    if (suffix_length > text_length)\n"
+    "        return (0);\n"
+    "    start = text_length - suffix_length;\n"
+    "    index = 0;\n"
+    "    while (index < suffix_length)\n"
+    "    {\n"
+    "        if (text[start + index] != suffix[index])\n"
+    "            return (0);\n"
+    "        index += 1;\n"
+    "    }\n"
+    "    return (1);\n"
+    "}\n";
+
+static const char g_runtime_helper_string_compare[] =
+    "static int cblc_string_compare(const char *left, size_t left_length, const char *right, size_t right_length)\n"
+    "{\n"
+    "    size_t index;\n"
+    "    size_t compare_length;\n"
+    "\n"
+    "    compare_length = cblc_min_size(left_length, right_length);\n"
+    "    index = 0;\n"
+    "    while (index < compare_length)\n"
+    "    {\n"
+    "        if (left[index] < right[index])\n"
+    "            return (-1);\n"
+    "        if (left[index] > right[index])\n"
+    "            return (1);\n"
+    "        index += 1;\n"
+    "    }\n"
+    "    if (left_length < right_length)\n"
+    "        return (-1);\n"
+    "    if (left_length > right_length)\n"
+    "        return (1);\n"
+    "    return (0);\n"
+    "}\n";
+
+static const char g_runtime_helper_string_contains[] =
+    "static int cblc_string_contains(const char *text, size_t text_length, const char *needle, size_t needle_length)\n"
+    "{\n"
+    "    size_t start;\n"
+    "    size_t index;\n"
+    "\n"
+    "    if (needle_length == 0)\n"
+    "        return (1);\n"
+    "    if (needle_length > text_length)\n"
+    "        return (0);\n"
+    "    start = 0;\n"
+    "    while (start + needle_length <= text_length)\n"
+    "    {\n"
+    "        index = 0;\n"
+    "        while (index < needle_length && text[start + index] == needle[index])\n"
+    "            index += 1;\n"
+    "        if (index == needle_length)\n"
+    "            return (1);\n"
+    "        start += 1;\n"
+    "    }\n"
+    "    return (0);\n"
+    "}\n";
+
 static const char g_runtime_helper_char_assign_literal[] =
     "static void cblc_char_assign_literal(char *buffer, size_t capacity, const char *literal)\n"
     "{\n"
@@ -233,6 +332,11 @@ static const t_transpiler_runtime_helper_entry g_runtime_helper_entries[] = {
     {"cblc_string_copy", g_runtime_helper_string_copy},
     {"cblc_string_append_literal", g_runtime_helper_string_append_literal},
     {"cblc_string_append", g_runtime_helper_string_append},
+    {"cblc_string_equals", g_runtime_helper_string_equals},
+    {"cblc_string_starts_with", g_runtime_helper_string_starts_with},
+    {"cblc_string_ends_with", g_runtime_helper_string_ends_with},
+    {"cblc_string_compare", g_runtime_helper_string_compare},
+    {"cblc_string_contains", g_runtime_helper_string_contains},
     {"cblc_char_assign_literal", g_runtime_helper_char_assign_literal},
     {"cblc_char_copy", g_runtime_helper_char_copy},
     {"cblc_display_string", g_runtime_helper_display_string},

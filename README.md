@@ -47,7 +47,7 @@ file in "input.txt";
 file out "filtered.txt";
 char line[128];
 
-function void filter_prefix() {
+void filter_prefix() {
     open(in, "r");
     open(out, "w");
     while (read(in, line)) {
@@ -59,7 +59,7 @@ function void filter_prefix() {
     close(out);
 }
 
-function void main() {
+void main() {
     filter_prefix();
 }
 ```

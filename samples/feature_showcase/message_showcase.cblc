@@ -46,7 +46,7 @@ int investigations_total;
 int loss_ratio_total;
 int claim_delta_total;
 
-function void main()
+void main()
 {
     string title[24];
 

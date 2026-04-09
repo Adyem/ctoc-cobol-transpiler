@@ -6,7 +6,7 @@ int net_magnitude;
 double revenue_delta;
 double revenue_magnitude;
 
-function void analyze_inventory()
+void analyze_inventory()
 {
     inbound_units = 145;
     outbound_units = 172;
@@ -24,7 +24,7 @@ function void analyze_inventory()
     display(revenue_magnitude);
 }
 
-function void main()
+void main()
 {
     analyze_inventory();
 }

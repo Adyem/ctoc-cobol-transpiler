@@ -2,7 +2,7 @@ file in "input.txt";
 file out "output.txt";
 char line[256];
 
-function void process_file() {
+void process_file() {
     open(in, "r");
     open(out, "w");
     while (read(in, line)) {
@@ -12,6 +12,6 @@ function void process_file() {
     close(out);
 }
 
-function void main() {
+void main() {
     process_file();
 }

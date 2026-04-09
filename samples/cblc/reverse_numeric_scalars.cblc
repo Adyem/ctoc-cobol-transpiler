@@ -4,7 +4,7 @@ int BINARY_COUNT = 0;
 int PACKED_TOTAL = 0;
 bool STATUS_IND = false;
 
-function void MAIN() {
+void MAIN() {
     FLOAT_APPROX = 1;
     DOUBLE_APPROX = 100;
     BINARY_COUNT = 10;
