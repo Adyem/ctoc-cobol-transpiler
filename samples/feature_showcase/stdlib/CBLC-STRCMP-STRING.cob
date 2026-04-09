@@ -1,0 +1,55 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CBLC-STRCMP-STRING.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 IDX PIC 9(9) VALUE 000000000.
+       01 FIRST-LIMIT PIC 9(9) VALUE 000000000.
+       01 SECOND-LIMIT PIC 9(9) VALUE 000000000.
+       01 COMPARE-LIMIT PIC 9(9) VALUE 000000000.
+       LINKAGE SECTION.
+       01 LNK-FIRST.
+          05 LNK-FIRST-LEN PIC 9(4) COMP.
+          05 LNK-FIRST-BUF PIC X(255).
+       01 LNK-SECOND.
+          05 LNK-SECOND-LEN PIC 9(4) COMP.
+          05 LNK-SECOND-BUF PIC X(255).
+       01 LNK-RESULT PIC S9(9).
+       PROCEDURE DIVISION USING BY REFERENCE LNK-FIRST
+           BY REFERENCE LNK-SECOND BY REFERENCE LNK-RESULT.
+       MAIN.
+           MOVE 0 TO LNK-RESULT.
+           MOVE LNK-FIRST-LEN TO FIRST-LIMIT.
+           IF FIRST-LIMIT > 255
+               MOVE 255 TO FIRST-LIMIT
+           END-IF.
+           MOVE LNK-SECOND-LEN TO SECOND-LIMIT.
+           IF SECOND-LIMIT > 255
+               MOVE 255 TO SECOND-LIMIT
+           END-IF.
+           MOVE FIRST-LIMIT TO COMPARE-LIMIT.
+           IF SECOND-LIMIT < COMPARE-LIMIT
+               MOVE SECOND-LIMIT TO COMPARE-LIMIT
+           END-IF.
+           MOVE 0 TO IDX.
+           PERFORM VARYING IDX FROM 1 BY 1 UNTIL IDX > COMPARE-LIMIT
+               IF LNK-FIRST-BUF(IDX:1) < LNK-SECOND-BUF(IDX:1)
+                   MOVE -1 TO LNK-RESULT
+                   EXIT PERFORM
+               END-IF
+               IF LNK-FIRST-BUF(IDX:1) > LNK-SECOND-BUF(IDX:1)
+                   MOVE 1 TO LNK-RESULT
+                   EXIT PERFORM
+               END-IF
+           END-PERFORM.
+           IF LNK-RESULT = 0
+               IF FIRST-LIMIT < SECOND-LIMIT
+                   MOVE -1 TO LNK-RESULT
+               END-IF
+           END-IF.
+           IF LNK-RESULT = 0
+               IF FIRST-LIMIT > SECOND-LIMIT
+                   MOVE 1 TO LNK-RESULT
+               END-IF
+           END-IF.
+           GOBACK.
+       END PROGRAM CBLC-STRCMP-STRING.

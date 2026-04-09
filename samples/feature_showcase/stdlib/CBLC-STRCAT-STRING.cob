@@ -1,0 +1,75 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CBLC-STRCAT-STRING.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 IDX PIC 9(9) VALUE 000000000.
+       01 DEST-LIMIT PIC 9(9) VALUE 000000000.
+       01 LEFT-LIMIT PIC 9(9) VALUE 000000000.
+       01 RIGHT-LIMIT PIC 9(9) VALUE 000000000.
+       01 RESULT-LENGTH PIC 9(9) VALUE 000000000.
+       LINKAGE SECTION.
+       01 LNK-DESTINATION.
+          05 LNK-DESTINATION-LEN PIC 9(4) COMP.
+          05 LNK-DESTINATION-BUF PIC X(255).
+       01 LNK-LEFT.
+          05 LNK-LEFT-LEN PIC 9(4) COMP.
+          05 LNK-LEFT-BUF PIC X(255).
+       01 LNK-RIGHT.
+          05 LNK-RIGHT-LEN PIC 9(4) COMP.
+          05 LNK-RIGHT-BUF PIC X(255).
+       01 LNK-STATUS PIC 9(9).
+       PROCEDURE DIVISION USING BY REFERENCE LNK-DESTINATION
+           BY REFERENCE LNK-LEFT BY REFERENCE LNK-RIGHT
+           BY REFERENCE LNK-STATUS.
+       MAIN.
+           MOVE 0 TO LNK-STATUS.
+           MOVE 255 TO DEST-LIMIT.
+           MOVE LNK-DESTINATION-LEN TO RESULT-LENGTH.
+           IF RESULT-LENGTH < 0
+               MOVE 0 TO RESULT-LENGTH
+           END-IF.
+           IF RESULT-LENGTH > DEST-LIMIT
+               MOVE DEST-LIMIT TO RESULT-LENGTH
+           END-IF.
+           MOVE LNK-LEFT-LEN TO LEFT-LIMIT.
+           IF LEFT-LIMIT < 0
+               MOVE 0 TO LEFT-LIMIT
+           END-IF.
+           IF LEFT-LIMIT > 255
+               MOVE 255 TO LEFT-LIMIT
+           END-IF.
+           MOVE LNK-RIGHT-LEN TO RIGHT-LIMIT.
+           IF RIGHT-LIMIT < 0
+               MOVE 0 TO RIGHT-LIMIT
+           END-IF.
+           IF RIGHT-LIMIT > 255
+               MOVE 255 TO RIGHT-LIMIT
+           END-IF.
+           MOVE 0 TO IDX.
+           PERFORM VARYING IDX FROM 1 BY 1 UNTIL IDX > LEFT-LIMIT
+               IF RESULT-LENGTH >= DEST-LIMIT
+                   MOVE 1 TO LNK-STATUS
+                   EXIT PERFORM
+               END-IF
+               ADD 1 TO RESULT-LENGTH
+               MOVE LNK-LEFT-BUF(IDX:1) TO
+                   LNK-DESTINATION-BUF(RESULT-LENGTH:1)
+           END-PERFORM.
+           IF LNK-STATUS = 0
+               MOVE 0 TO IDX
+               PERFORM VARYING IDX FROM 1 BY 1 UNTIL IDX > RIGHT-LIMIT
+                   IF RESULT-LENGTH >= DEST-LIMIT
+                       MOVE 1 TO LNK-STATUS
+                       EXIT PERFORM
+                   END-IF
+                   ADD 1 TO RESULT-LENGTH
+                   MOVE LNK-RIGHT-BUF(IDX:1) TO
+                       LNK-DESTINATION-BUF(RESULT-LENGTH:1)
+               END-PERFORM
+           END-IF.
+           IF RESULT-LENGTH > DEST-LIMIT
+               MOVE DEST-LIMIT TO RESULT-LENGTH
+           END-IF.
+           MOVE RESULT-LENGTH TO LNK-DESTINATION-LEN.
+           GOBACK.
+       END PROGRAM CBLC-STRCAT-STRING.

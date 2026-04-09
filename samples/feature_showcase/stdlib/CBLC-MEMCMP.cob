@@ -1,0 +1,72 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CBLC-MEMCMP.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 IDX PIC 9(9) VALUE 000000000.
+       01 FIRST-LIMIT PIC 9(9) VALUE 000000000.
+       01 SECOND-LIMIT PIC 9(9) VALUE 000000000.
+       01 REQUEST-LIMIT PIC 9(9) VALUE 000000000.
+       01 COMPARE-LIMIT PIC 9(9) VALUE 000000000.
+       LINKAGE SECTION.
+       01 LNK-FIRST PIC X(255).
+       01 LNK-FIRST-LENGTH PIC S9(9) COMP-5.
+       01 LNK-SECOND PIC X(255).
+       01 LNK-SECOND-LENGTH PIC S9(9) COMP-5.
+       01 LNK-COUNT PIC 9(9).
+       01 LNK-RESULT PIC S9(9).
+       PROCEDURE DIVISION USING BY REFERENCE LNK-FIRST
+           BY REFERENCE LNK-FIRST-LENGTH BY REFERENCE LNK-SECOND
+           BY REFERENCE LNK-SECOND-LENGTH BY REFERENCE LNK-COUNT
+           BY REFERENCE LNK-RESULT.
+       MAIN.
+           MOVE 0 TO LNK-RESULT.
+           MOVE LNK-FIRST-LENGTH TO FIRST-LIMIT.
+           IF FIRST-LIMIT > 255
+               MOVE 255 TO FIRST-LIMIT
+           END-IF.
+           MOVE LNK-SECOND-LENGTH TO SECOND-LIMIT.
+           IF SECOND-LIMIT > 255
+               MOVE 255 TO SECOND-LIMIT
+           END-IF.
+           MOVE LNK-COUNT TO REQUEST-LIMIT.
+           IF REQUEST-LIMIT > 255
+               MOVE 255 TO REQUEST-LIMIT
+           END-IF.
+           MOVE FIRST-LIMIT TO COMPARE-LIMIT.
+           IF SECOND-LIMIT < COMPARE-LIMIT
+               MOVE SECOND-LIMIT TO COMPARE-LIMIT
+           END-IF.
+           IF REQUEST-LIMIT < COMPARE-LIMIT
+               MOVE REQUEST-LIMIT TO COMPARE-LIMIT
+           END-IF.
+           MOVE 0 TO IDX.
+           PERFORM VARYING IDX FROM 1 BY 1 UNTIL IDX > COMPARE-LIMIT
+               IF LNK-FIRST(IDX:1) < LNK-SECOND(IDX:1)
+                   MOVE -1 TO LNK-RESULT
+                   EXIT PERFORM
+               END-IF
+               IF LNK-FIRST(IDX:1) > LNK-SECOND(IDX:1)
+                   MOVE 1 TO LNK-RESULT
+                   EXIT PERFORM
+               END-IF
+           END-PERFORM.
+           IF LNK-RESULT = 0
+               IF REQUEST-LIMIT > COMPARE-LIMIT
+                   IF FIRST-LIMIT < SECOND-LIMIT
+                       IF FIRST-LIMIT < REQUEST-LIMIT
+                           MOVE -1 TO LNK-RESULT
+                       END-IF
+                   END-IF
+               END-IF
+           END-IF.
+           IF LNK-RESULT = 0
+               IF REQUEST-LIMIT > COMPARE-LIMIT
+                   IF SECOND-LIMIT < FIRST-LIMIT
+                       IF SECOND-LIMIT < REQUEST-LIMIT
+                           MOVE 1 TO LNK-RESULT
+                       END-IF
+                   END-IF
+               END-IF
+           END-IF.
+           GOBACK.
+       END PROGRAM CBLC-MEMCMP.

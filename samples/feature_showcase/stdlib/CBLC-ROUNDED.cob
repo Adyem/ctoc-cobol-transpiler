@@ -1,0 +1,45 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CBLC-ROUNDED.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-INTEGER USAGE COMP-2 VALUE 0.
+       01 WS-FRACTION USAGE COMP-2 VALUE 0.
+       01 WS-ABS-INTEGER USAGE COMP-2 VALUE 0.
+       01 WS-REMAINDER USAGE COMP-2 VALUE 0.
+       01 WS-HALF USAGE COMP-2 VALUE 0.5.
+       01 WS-TWO USAGE COMP-2 VALUE 2.
+       LINKAGE SECTION.
+       01 LNK-OPERAND USAGE COMP-2.
+       01 LNK-RESULT USAGE COMP-2.
+       01 LNK-STATUS PIC 9.
+       PROCEDURE DIVISION USING BY REFERENCE LNK-OPERAND
+           BY REFERENCE LNK-RESULT BY REFERENCE LNK-STATUS.
+       MAIN.
+           MOVE 0 TO LNK-STATUS.
+           COMPUTE WS-INTEGER = FUNCTION INTEGER-PART(LNK-OPERAND).
+           COMPUTE WS-FRACTION = FUNCTION ABS(LNK-OPERAND - WS-INTEGER).
+           MOVE WS-INTEGER TO LNK-RESULT.
+           IF WS-FRACTION > 0
+               MOVE 1 TO LNK-STATUS
+           END-IF
+           IF WS-FRACTION > WS-HALF
+               IF LNK-OPERAND >= 0
+                   COMPUTE LNK-RESULT = WS-INTEGER + 1
+               ELSE
+                   COMPUTE LNK-RESULT = WS-INTEGER - 1
+               END-IF
+           ELSE
+               IF WS-FRACTION = WS-HALF
+                   COMPUTE WS-ABS-INTEGER = FUNCTION ABS(WS-INTEGER)
+                   COMPUTE WS-REMAINDER = FUNCTION MOD(WS-ABS-INTEGER, WS-TWO)
+                   IF WS-REMAINDER NOT = 0
+                       IF LNK-OPERAND >= 0
+                           COMPUTE LNK-RESULT = WS-INTEGER + 1
+                       ELSE
+                           COMPUTE LNK-RESULT = WS-INTEGER - 1
+                       END-IF
+                   END-IF
+               END-IF
+           END-IF.
+           GOBACK.
+       END PROGRAM CBLC-ROUNDED.
