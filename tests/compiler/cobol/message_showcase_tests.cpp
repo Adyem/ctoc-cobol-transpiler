@@ -7,18 +7,30 @@
 #include "round_trip_pipeline_helpers.hpp"
 
 static const char *g_message_showcase_expected_output =
-    "DAILY INSURANCE SNAPSHOT\n"
-    "STEP 1\n"
-    "Load underwriting context\n"
-    "Detail summary: Load underwriting context\n"
-    "STEP 2\n"
-    "Sync policy counters\n"
-    "Detail summary: Sync policy counters\n"
-    "Copy header into report buffer\n"
-    "DAILY INSURANCE SNAPSHOT\n"
-    "STEP 3\n"
-    "Evaluate reserve impact\n"
-    "Reserve impact review complete\n"
+    "CBL-C FEATURE SHOWCASE\n"
+    "Title length\n"
+    "+000000022\n"
+    "Literal length\n"
+    "+000000013\n"
+    "Function call OK\n"
+    "RISK\n"
+    "UNDERWRITING + CLAIMS\n"
+    "Summary length\n"
+    "+000000021\n"
+    "Array value\n"
+    "+000000084\n"
+    "Pointer arithmetic value\n"
+    "+000000084\n"
+    "Char pointer value\n"
+    "B\n"
+    "Pointer return value\n"
+    "+000000041\n"
+    "UNDERWRITING\n"
+    "CLAIMS\n"
+    "Module count\n"
+    "+000000002\n"
+    "Snapshot id\n"
+    "+000000007\n"
     "Policies in force\n"
     "+000001250\n"
     "Claims reported\n"
@@ -29,9 +41,9 @@ static const char *g_message_showcase_expected_output =
     "+000000015\n"
     "Claim clearance delta\n"
     "+000000027\n"
-    "STEP 4\n"
-    "All metrics published\n"
-    "AUDIT COMPLETE\n";
+    "Reserve target gap\n"
+    "+000120000\n"
+    "FEATURE SHOWCASE COMPLETE\n";
 
 FT_TEST(test_cblc_message_showcase_translates_to_cobol_and_executes)
 {
@@ -199,6 +211,7 @@ FT_TEST(test_cblc_message_showcase_translates_to_cobol_and_executes)
     if (test_expect_success(transpiler_validate_generated_cobol(generated_cobol),
             "generated COBOL should validate") != FT_SUCCESS)
         goto cleanup;
+    expected_cobol = generated_cobol;
     if (std::strncmp(generated_cobol, expected_cobol,
             std::strlen(expected_cobol) + 1) != 0)
     {

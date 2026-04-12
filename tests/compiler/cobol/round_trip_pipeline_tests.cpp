@@ -36,6 +36,12 @@ int test_cblc_inline_string_contains_literal_false_translates_to_cobol_and_execu
 int test_cblc_inline_string_copy_constructor_equals_translates_to_cobol_and_executes(void);
 int test_cblc_inline_string_literal_constructor_translates_to_cobol_and_executes(void);
 int test_cblc_inline_string_copy_constructor_translates_to_cobol_and_executes(void);
+int test_cblc_inline_void_pointer_alloc_free_translates_to_cobol_and_executes(void);
+int test_cblc_inline_int_pointer_index_translates_to_cobol_and_executes(void);
+int test_cblc_inline_char_pointer_index_translates_to_cobol_and_executes(void);
+int test_cblc_inline_pointer_arithmetic_translates_to_cobol_and_executes(void);
+int test_cblc_inline_address_of_scalar_translates_to_cobol_and_executes(void);
+int test_cblc_inline_pointer_return_translates_to_cobol_and_executes(void);
 int test_cblc_inline_std_strlen_literal_translates_to_cobol_and_executes(void);
 int test_cblc_inline_class_methods_translates_to_cobol_and_executes(void);
 int test_cblc_inline_array_access_translates_to_cobol_and_executes(void);
@@ -152,6 +158,18 @@ const t_test_case *get_compiler_cobol_round_trip_pipeline_tests(size_t *count)
             test_cblc_inline_string_literal_constructor_translates_to_cobol_and_executes},
         {"cblc_inline_string_copy_constructor_translates_to_cobol_and_executes",
             test_cblc_inline_string_copy_constructor_translates_to_cobol_and_executes},
+        {"cblc_inline_void_pointer_alloc_free_translates_to_cobol_and_executes",
+            test_cblc_inline_void_pointer_alloc_free_translates_to_cobol_and_executes},
+        {"cblc_inline_int_pointer_index_translates_to_cobol_and_executes",
+            test_cblc_inline_int_pointer_index_translates_to_cobol_and_executes},
+        {"cblc_inline_char_pointer_index_translates_to_cobol_and_executes",
+            test_cblc_inline_char_pointer_index_translates_to_cobol_and_executes},
+        {"cblc_inline_pointer_arithmetic_translates_to_cobol_and_executes",
+            test_cblc_inline_pointer_arithmetic_translates_to_cobol_and_executes},
+        {"cblc_inline_address_of_scalar_translates_to_cobol_and_executes",
+            test_cblc_inline_address_of_scalar_translates_to_cobol_and_executes},
+        {"cblc_inline_pointer_return_translates_to_cobol_and_executes",
+            test_cblc_inline_pointer_return_translates_to_cobol_and_executes},
         {"cblc_inline_std_strlen_literal_translates_to_cobol_and_executes",
             test_cblc_inline_std_strlen_literal_translates_to_cobol_and_executes},
         {"cblc_inline_class_methods_translates_to_cobol_and_executes",

@@ -200,8 +200,8 @@ FT_TEST(test_cblc_inline_string_append_translates_to_cobol_and_executes)
 
     source = "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
-        "    string suffix[8];\n"
+        "    string greeting(16);\n"
+        "    string suffix(8);\n"
         "    greeting = \"HELLO\";\n"
         "    suffix = \"!\";\n"
         "    greeting.append(suffix);\n"
@@ -219,7 +219,7 @@ FT_TEST(test_cblc_inline_string_len_translates_to_cobol_and_executes)
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
+        "    string greeting(16);\n"
         "    greeting = \"HELLO!\";\n"
         "    total = greeting.len();\n"
         "    if (total == 6) {\n"
@@ -240,7 +240,7 @@ FT_TEST(test_cblc_inline_string_clear_translates_to_cobol_and_executes)
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
+        "    string greeting(16);\n"
         "    greeting = \"HELLO\";\n"
         "    greeting.clear();\n"
         "    total = greeting.len();\n"
@@ -262,7 +262,7 @@ FT_TEST(test_cblc_inline_string_empty_translates_to_cobol_and_executes)
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
+        "    string greeting(16);\n"
         "    total = greeting.empty();\n"
         "    if (total == 1) {\n"
         "        display(\"EMPTY OK\");\n"
@@ -282,8 +282,8 @@ FT_TEST(test_cblc_inline_string_equals_translates_to_cobol_and_executes)
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
-        "    string other[16];\n"
+        "    string greeting(16);\n"
+        "    string other(16);\n"
         "    greeting = \"HELLO\";\n"
         "    other = \"HELLO\";\n"
         "    total = greeting.equals(other);\n"
@@ -305,7 +305,7 @@ FT_TEST(test_cblc_inline_string_equals_literal_translates_to_cobol_and_executes)
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
+        "    string greeting(16);\n"
         "    greeting = \"HELLO\";\n"
         "    total = greeting.equals(\"HELLO\");\n"
         "    if (total == 1) {\n"
@@ -326,7 +326,7 @@ FT_TEST(test_cblc_inline_string_capacity_translates_to_cobol_and_executes)
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
+        "    string greeting(16);\n"
         "    total = greeting.capacity();\n"
         "    if (total == 16) {\n"
         "        display(\"CAPACITY OK\");\n"
@@ -346,8 +346,8 @@ FT_TEST(test_cblc_inline_string_starts_with_translates_to_cobol_and_executes)
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
-        "    string prefix[8];\n"
+        "    string greeting(16);\n"
+        "    string prefix(8);\n"
         "    greeting = \"HELLO\";\n"
         "    prefix = \"HE\";\n"
         "    total = greeting.starts_with(prefix);\n"
@@ -369,8 +369,8 @@ FT_TEST(test_cblc_inline_string_ends_with_translates_to_cobol_and_executes)
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
-        "    string suffix[8];\n"
+        "    string greeting(16);\n"
+        "    string suffix(8);\n"
         "    greeting = \"HELLO\";\n"
         "    suffix = \"LO\";\n"
         "    total = greeting.ends_with(suffix);\n"
@@ -392,8 +392,8 @@ FT_TEST(test_cblc_inline_string_compare_translates_to_cobol_and_executes)
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
-        "    string suffix[8];\n"
+        "    string greeting(16);\n"
+        "    string suffix(8);\n"
         "    greeting = \"HELLO\";\n"
         "    suffix = \"HELLO\";\n"
         "    total = greeting.compare(suffix);\n"
@@ -415,8 +415,8 @@ FT_TEST(test_cblc_inline_string_contains_translates_to_cobol_and_executes)
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
-        "    string needle[8];\n"
+        "    string greeting(16);\n"
+        "    string needle(8);\n"
         "    greeting = \"HELLO\";\n"
         "    needle = \"ELL\";\n"
         "    total = greeting.contains(needle);\n"
@@ -438,8 +438,8 @@ FT_TEST(test_cblc_inline_string_equals_false_translates_to_cobol_and_executes)
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
-        "    string other[16];\n"
+        "    string greeting(16);\n"
+        "    string other(16);\n"
         "    greeting = \"HELLO\";\n"
         "    other = \"WORLD\";\n"
         "    total = greeting.equals(other);\n"
@@ -461,7 +461,7 @@ FT_TEST(test_cblc_inline_string_empty_false_translates_to_cobol_and_executes)
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
+        "    string greeting(16);\n"
         "    greeting = \"HELLO\";\n"
         "    total = greeting.empty();\n"
         "    if (total == 0) {\n"
@@ -482,7 +482,7 @@ FT_TEST(test_cblc_inline_string_starts_with_literal_translates_to_cobol_and_exec
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
+        "    string greeting(16);\n"
         "    greeting = \"HELLO\";\n"
         "    total = greeting.starts_with(\"HE\");\n"
         "    if (total == 1) {\n"
@@ -503,7 +503,7 @@ FT_TEST(test_cblc_inline_string_ends_with_literal_translates_to_cobol_and_execut
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
+        "    string greeting(16);\n"
         "    greeting = \"HELLO\";\n"
         "    total = greeting.ends_with(\"LO\");\n"
         "    if (total == 1) {\n"
@@ -524,8 +524,8 @@ FT_TEST(test_cblc_inline_string_compare_less_than_translates_to_cobol_and_execut
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
-        "    string suffix[8];\n"
+        "    string greeting(16);\n"
+        "    string suffix(8);\n"
         "    greeting = \"ALPHA\";\n"
         "    suffix = \"BRAVO\";\n"
         "    total = greeting.compare(suffix);\n"
@@ -547,8 +547,8 @@ FT_TEST(test_cblc_inline_string_compare_greater_than_translates_to_cobol_and_exe
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
-        "    string suffix[8];\n"
+        "    string greeting(16);\n"
+        "    string suffix(8);\n"
         "    greeting = \"BRAVO\";\n"
         "    suffix = \"ALPHA\";\n"
         "    total = greeting.compare(suffix);\n"
@@ -570,7 +570,7 @@ FT_TEST(test_cblc_inline_string_compare_literal_translates_to_cobol_and_executes
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
+        "    string greeting(16);\n"
         "    greeting = \"HELLO\";\n"
         "    total = greeting.compare(\"HELLO\");\n"
         "    if (total == 0) {\n"
@@ -591,8 +591,8 @@ FT_TEST(test_cblc_inline_string_contains_false_translates_to_cobol_and_executes)
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
-        "    string needle[8];\n"
+        "    string greeting(16);\n"
+        "    string needle(8);\n"
         "    greeting = \"HELLO\";\n"
         "    needle = \"XYZ\";\n"
         "    total = greeting.contains(needle);\n"
@@ -614,7 +614,7 @@ FT_TEST(test_cblc_inline_string_contains_empty_literal_translates_to_cobol_and_e
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
+        "    string greeting(16);\n"
         "    greeting = \"HELLO\";\n"
         "    total = greeting.contains(\"\");\n"
         "    if (total == 1) {\n"
@@ -655,8 +655,8 @@ FT_TEST(test_cblc_inline_string_append_then_len_translates_to_cobol_and_executes
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
-        "    string suffix[8];\n"
+        "    string greeting(16);\n"
+        "    string suffix(8);\n"
         "    greeting = \"HELLO\";\n"
         "    suffix = \"!\";\n"
         "    greeting.append(suffix);\n"
@@ -679,7 +679,7 @@ FT_TEST(test_cblc_inline_string_clear_then_empty_translates_to_cobol_and_execute
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
+        "    string greeting(16);\n"
         "    greeting = \"HELLO\";\n"
         "    greeting.clear();\n"
         "    total = greeting.empty();\n"
@@ -701,8 +701,8 @@ FT_TEST(test_cblc_inline_string_starts_with_false_translates_to_cobol_and_execut
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
-        "    string prefix[8];\n"
+        "    string greeting(16);\n"
+        "    string prefix(8);\n"
         "    greeting = \"HELLO\";\n"
         "    prefix = \"EL\";\n"
         "    total = greeting.starts_with(prefix);\n"
@@ -724,8 +724,8 @@ FT_TEST(test_cblc_inline_string_ends_with_false_translates_to_cobol_and_executes
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
-        "    string suffix[8];\n"
+        "    string greeting(16);\n"
+        "    string suffix(8);\n"
         "    greeting = \"HELLO\";\n"
         "    suffix = \"HE\";\n"
         "    total = greeting.ends_with(suffix);\n"
@@ -747,7 +747,7 @@ FT_TEST(test_cblc_inline_string_starts_with_empty_literal_translates_to_cobol_an
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
+        "    string greeting(16);\n"
         "    greeting = \"HELLO\";\n"
         "    total = greeting.starts_with(\"\");\n"
         "    if (total == 1) {\n"
@@ -768,7 +768,7 @@ FT_TEST(test_cblc_inline_string_ends_with_empty_literal_translates_to_cobol_and_
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
+        "    string greeting(16);\n"
         "    greeting = \"HELLO\";\n"
         "    total = greeting.ends_with(\"\");\n"
         "    if (total == 1) {\n"
@@ -789,8 +789,8 @@ FT_TEST(test_cblc_inline_string_compare_shorter_prefix_translates_to_cobol_and_e
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
-        "    string other[16];\n"
+        "    string greeting(16);\n"
+        "    string other(16);\n"
         "    greeting = \"AL\";\n"
         "    other = \"ALPHA\";\n"
         "    total = greeting.compare(other);\n"
@@ -812,8 +812,8 @@ FT_TEST(test_cblc_inline_string_compare_longer_prefix_translates_to_cobol_and_ex
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
-        "    string other[16];\n"
+        "    string greeting(16);\n"
+        "    string other(16);\n"
         "    greeting = \"ALPHA\";\n"
         "    other = \"AL\";\n"
         "    total = greeting.compare(other);\n"
@@ -835,7 +835,7 @@ FT_TEST(test_cblc_inline_string_contains_literal_false_translates_to_cobol_and_e
     source = "int total;\n"
         "void main()\n"
         "{\n"
-        "    string greeting[16];\n"
+        "    string greeting(16);\n"
         "    greeting = \"HELLO\";\n"
         "    total = greeting.contains(\"XYZ\");\n"
         "    if (total == 0) {\n"
@@ -897,6 +897,131 @@ FT_TEST(test_cblc_inline_string_copy_constructor_translates_to_cobol_and_execute
         "}\n";
     return (run_inline_cblc_to_cobol_execution_test(source,
             "inline_string_copy_constructor_generated", "HELLO\n"));
+}
+
+FT_TEST(test_cblc_inline_void_pointer_alloc_free_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "void *raw;\n"
+        "void main()\n"
+        "{\n"
+        "    raw = std::malloc(16);\n"
+        "    std::free(raw);\n"
+        "    display(\"PTR ALLOC OK\");\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_void_pointer_alloc_free_generated", "PTR ALLOC OK\n"));
+}
+
+FT_TEST(test_cblc_inline_int_pointer_index_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int *items;\n"
+        "int result;\n"
+        "int slot;\n"
+        "void main()\n"
+        "{\n"
+        "    items = std::malloc(12);\n"
+        "    slot = 1;\n"
+        "    items[0] = 42;\n"
+        "    items[slot] = 77;\n"
+        "    result = items[slot];\n"
+        "    display(result);\n"
+        "    std::free(items);\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_int_pointer_index_generated", "+000000077\n"));
+}
+
+FT_TEST(test_cblc_inline_char_pointer_index_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "char *buffer;\n"
+        "char letter;\n"
+        "int slot;\n"
+        "void main()\n"
+        "{\n"
+        "    buffer = std::malloc(4);\n"
+        "    slot = 1;\n"
+        "    buffer[slot] = 'B';\n"
+        "    letter = buffer[slot];\n"
+        "    display(letter);\n"
+        "    std::free(buffer);\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_char_pointer_index_generated", "B\n"));
+}
+
+FT_TEST(test_cblc_inline_pointer_arithmetic_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int *items;\n"
+        "int *rover;\n"
+        "int result;\n"
+        "void main()\n"
+        "{\n"
+        "    items = std::malloc(12);\n"
+        "    items[0] = 21;\n"
+        "    items[1] = 84;\n"
+        "    rover = items + 1;\n"
+        "    result = *rover;\n"
+        "    display(result);\n"
+        "    std::free(items);\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_pointer_arithmetic_generated", "+000000084\n"));
+}
+
+FT_TEST(test_cblc_inline_address_of_scalar_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int score;\n"
+        "int result;\n"
+        "int *items;\n"
+        "void main()\n"
+        "{\n"
+        "    score = 52;\n"
+        "    items = &score;\n"
+        "    result = *items;\n"
+        "    display(result);\n"
+        "    *items = 99;\n"
+        "    display(score);\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_address_of_scalar_generated", "+000000052\n+000000099\n"));
+}
+
+FT_TEST(test_cblc_inline_pointer_return_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int score;\n"
+        "int result;\n"
+        "int *items;\n"
+        "int *pick()\n"
+        "{\n"
+        "    return &score;\n"
+        "}\n"
+        "void main()\n"
+        "{\n"
+        "    score = 41;\n"
+        "    items = pick();\n"
+        "    result = *items;\n"
+        "    display(result);\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_pointer_return_generated", "+000000041\n"));
 }
 
 FT_TEST(test_cblc_inline_std_strlen_literal_translates_to_cobol_and_executes)
@@ -997,7 +1122,7 @@ FT_TEST(test_cblc_inline_const_values_translates_to_cobol_and_executes)
     const char *source;
 
     source = "const int answer = 42;\n"
-        "const string greeting[12] = \"CONST OK\";\n"
+        "const string greeting(12) = \"CONST OK\";\n"
         "void main()\n"
         "{\n"
         "    if (answer == 42) {\n"
@@ -1018,7 +1143,7 @@ FT_TEST(test_cblc_inline_struct_field_access_translates_to_cobol_and_executes)
     source = "struct Point\n"
         "{\n"
         "    int x;\n"
-        "    string name[8];\n"
+        "    string name(8);\n"
         "};\n"
         "Point point;\n"
         "void main()\n"
@@ -1042,7 +1167,7 @@ FT_TEST(test_cblc_inline_nested_struct_field_access_translates_to_cobol_and_exec
 
     source = "struct Address\n"
         "{\n"
-        "    string city[16];\n"
+        "    string city(16);\n"
         "};\n"
         "struct Person\n"
         "{\n"
@@ -1090,7 +1215,7 @@ FT_TEST(test_cblc_inline_constructor_initializer_translates_to_cobol_and_execute
         "{\n"
         "    private:\n"
         "    const int id;\n"
-        "    string name[8];\n"
+        "    string name(8);\n"
         "    public:\n"
         "    Person() : name(\"HI\"), id(7) {\n"
         "    }\n"
@@ -1241,7 +1366,7 @@ FT_TEST(test_cblc_inline_struct_return_translates_to_cobol_and_executes)
     source = "struct Point\n"
         "{\n"
         "    int x;\n"
-        "    string label[8];\n"
+        "    string label(8);\n"
         "};\n"
         "Point point;\n"
         "Point make_point()\n"

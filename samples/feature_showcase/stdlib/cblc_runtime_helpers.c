@@ -124,6 +124,100 @@ static void cblc_string_append(char *destination, size_t destination_capacity, s
     }
 }
 
+static int cblc_string_equals(const char *left, size_t left_length, const char *right, size_t right_length)
+{
+    size_t index;
+
+    if (left_length != right_length)
+        return (0);
+    index = 0;
+    while (index < left_length)
+    {
+        if (left[index] != right[index])
+            return (0);
+        index += 1;
+    }
+    return (1);
+}
+
+static int cblc_string_starts_with(const char *text, size_t text_length, const char *prefix, size_t prefix_length)
+{
+    size_t index;
+
+    if (prefix_length > text_length)
+        return (0);
+    index = 0;
+    while (index < prefix_length)
+    {
+        if (text[index] != prefix[index])
+            return (0);
+        index += 1;
+    }
+    return (1);
+}
+
+static int cblc_string_ends_with(const char *text, size_t text_length, const char *suffix, size_t suffix_length)
+{
+    size_t start;
+    size_t index;
+
+    if (suffix_length > text_length)
+        return (0);
+    start = text_length - suffix_length;
+    index = 0;
+    while (index < suffix_length)
+    {
+        if (text[start + index] != suffix[index])
+            return (0);
+        index += 1;
+    }
+    return (1);
+}
+
+static int cblc_string_compare(const char *left, size_t left_length, const char *right, size_t right_length)
+{
+    size_t index;
+    size_t compare_length;
+
+    compare_length = cblc_min_size(left_length, right_length);
+    index = 0;
+    while (index < compare_length)
+    {
+        if (left[index] < right[index])
+            return (-1);
+        if (left[index] > right[index])
+            return (1);
+        index += 1;
+    }
+    if (left_length < right_length)
+        return (-1);
+    if (left_length > right_length)
+        return (1);
+    return (0);
+}
+
+static int cblc_string_contains(const char *text, size_t text_length, const char *needle, size_t needle_length)
+{
+    size_t start;
+    size_t index;
+
+    if (needle_length == 0)
+        return (1);
+    if (needle_length > text_length)
+        return (0);
+    start = 0;
+    while (start + needle_length <= text_length)
+    {
+        index = 0;
+        while (index < needle_length && text[start + index] == needle[index])
+            index += 1;
+        if (index == needle_length)
+            return (1);
+        start += 1;
+    }
+    return (0);
+}
+
 static void cblc_char_assign_literal(char *buffer, size_t capacity, const char *literal)
 {
     size_t literal_length;

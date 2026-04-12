@@ -10,7 +10,7 @@ endif
 TRANSPILER := $(REPO_ROOT)/ctoc_cobol_transpiler$(EXE_EXT)
 COBC ?= cobc
 
-CBLC_PROGRAMS := message_showcase message_showcase_banner message_showcase_metrics
+CBLC_PROGRAMS := message_showcase
 CBLC_SOURCES := $(addsuffix .cblc,$(CBLC_PROGRAMS))
 GENERATED_COB := $(addsuffix .cob,$(CBLC_PROGRAMS))
 EXECUTABLES := $(addsuffix $(EXE_EXT),$(CBLC_PROGRAMS))
@@ -24,11 +24,6 @@ SETUP_SENTINEL := .environment_ready
 ACTUAL_OUTPUT := actual_output.log
 
 RUN_SHOWCASE = ./message_showcase$(EXE_EXT); \
-printf '\n'; \
-./message_showcase_banner$(EXE_EXT); \
-printf '\n'; \
-./message_showcase_metrics$(EXE_EXT); \
-printf '\n'; \
 printf '%s\n' "Standard library functions bundled with the showcase:"; \
 printf '%s\n' $(foreach helper,$(STD_HELPERS),$(STD_DIR)/$(helper).cob $(STD_DIR)/$(helper)$(MODULE_EXT))
 

@@ -1,6 +1,27 @@
-DAILY SNAPSHOT READY
+CBL-C FEATURE SHOWCASE
 Title length
-+000000020
++000000022
+Literal length
++000000013
+Function call OK
+RISK
+UNDERWRITING + CLAIMS
+Summary length
++000000021
+Array value
++000000084
+Pointer arithmetic value
++000000084
+Char pointer value
+B
+Pointer return value
++000000041
+UNDERWRITING
+CLAIMS
+Module count
++000000002
+Snapshot id
++000000007
 Policies in force
 +000001250
 Claims reported
@@ -11,32 +32,9 @@ Loss ratio percent
 +000000015
 Claim clearance delta
 +000000027
-
-RISK MODULES LIVE
-UNDERWRITING + CLAIMS
-Summary length
-+000000021
-UNDERWRITING
-CLAIMS
-REPORTING
-Module count
-+000000003
-
-DAILY RISK METRICS
-Net premium written
-+000480000
-Claim payout total
-+000072000
-Loss ratio percent
-+000000015
 Reserve target gap
 +000120000
-Average paid claim
-+000036000
-Average claim stable
-Note length
-+000000020
-
+FEATURE SHOWCASE COMPLETE
 Standard library functions bundled with the showcase:
 stdlib/CBLC-ABS.cob
 stdlib/CBLC-ABS.so
