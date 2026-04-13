@@ -134,6 +134,7 @@ COMPILE_FLAGS = -Wall -Werror -Wextra -std=c++17 -Wmissing-declarations \
                 -Wfloat-equal -Wconversion -Wodr -Wuseless-cast \
                 -Wzero-as-null-pointer-constant -Wmaybe-uninitialized \
                 -I. $(OPT_FLAGS)
+DEPFLAGS = -MMD -MP
 
 CFLAGS = $(COMPILE_FLAGS)
 
@@ -344,6 +345,7 @@ TEST_SRC    = imported/libft_test_runner.cpp \
 TEST_OBJS   = $(TEST_SRC:%.cpp=$(OBJ_DIR_TEST)/%.o)
 
 TOTAL_TEST_OBJS     := $(words $(TEST_OBJS))
+DEPS        = $(OBJS:.o=.d) $(LSP_OBJ:.o=.d) $(TEST_OBJS:.o=.d)
 
 all: dirs transpiler lsp
 
@@ -389,7 +391,7 @@ $(TEST_NAME): $(TEST_OBJS) $(OBJS_NO_MAIN) $(TARGET)
 	@$(CC) $(CFLAGS) $(TEST_OBJS) $(OBJS_NO_MAIN) -o $@ $(LDFLAGS)
 $(OBJ_DIR)/%.o: %.cpp
 	@-$(MKDIR) $(dir $@)
-	@$(CC) $(CFLAGS) -c $< -o $@
+	@$(CC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 	@if [ $(TOTAL_OBJS) -gt 0 ]; then \
 		built=$$(find $(OBJ_DIR) -type f -name '*.o' | wc -l); \
 		printf '\033[1;36m[CTOC PROGRESS] %s (%d/%d)\033[0m\n' "$<" $$built $(TOTAL_OBJS); \
@@ -397,15 +399,18 @@ $(OBJ_DIR)/%.o: %.cpp
 
 $(OBJ_DIR_TEST)/%.o: %.cpp
 	@-$(MKDIR) $(dir $@)
-	@$(CC) $(CFLAGS) -c $< -o $@
+	@$(CC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 	@if [ $(TOTAL_TEST_OBJS) -gt 0 ]; then \
 		built=$$(find $(OBJ_DIR_TEST) -type f -name '*.o' | wc -l); \
 		printf '\033[1;36m[CTOC TEST PROGRESS] %s (%d/%d)\033[0m\n' "$<" $$built $(TOTAL_TEST_OBJS); \
 	fi
 
+-include $(DEPS)
+
 clean:
 	-$(RM) $(OBJ_DIR)/*.o $(OBJ_DIR_DEBUG)/*.o
 	-$(RM) $(OBJ_DIR_TEST)/*.o $(OBJ_DIR_TEST)/tests/*.o
+	-$(RM) $(DEPS)
 	-$(RM) test_example_compiler.c test_example_compiler.bin test_example_compiler.txt
 	-$(RM) test_example_invalid_compiler.c test_example_invalid_compiler.bin test_example_invalid_compiler.log
 	-$(RM) test_runtime_file.txt
