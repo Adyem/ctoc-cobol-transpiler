@@ -1,201 +1,23 @@
-const int reserve_target = 600000;
-const int net_premium = 480000;
+import "message_showcase_text.cblc";
+import "message_showcase_stage.cblc";
+import "message_showcase_stage_total.cblc";
+import "message_showcase_snapshot.cblc";
+import "message_showcase_portfolio.cblc";
+import "message_showcase_memory.cblc";
 
-struct ModuleState
-{
-    string name(16);
-    int active;
-};
-
-struct Portfolio
-{
-    ModuleState primary;
-    ModuleState secondary;
-};
-
-class Snapshot
-{
-    private:
-        const int identifier;
-        int policies_in_force_value;
-        int claims_reported_value;
-        int open_investigations_value;
-        int claim_payout_value;
-        string label(16);
-
-    public:
-        Snapshot() : label("RISK"), identifier(7)
-        {
-            policies_in_force_value = 0;
-            claims_reported_value = 0;
-            open_investigations_value = 0;
-            claim_payout_value = 0;
-        }
-
-        void load(int policies, int claims, int investigations, int payout)
-        {
-            policies_in_force_value = policies;
-            claims_reported_value = claims;
-            open_investigations_value = investigations;
-            claim_payout_value = payout;
-            return;
-        }
-
-        int policies_in_force()
-        {
-            return policies_in_force_value;
-        }
-
-        int claims_reported()
-        {
-            return claims_reported_value;
-        }
-
-        int open_investigations()
-        {
-            return open_investigations_value;
-        }
-
-        int claim_clearance_delta()
-        {
-            return claims_reported_value - open_investigations_value;
-        }
-
-        int loss_ratio_percent()
-        {
-            return claim_payout_value * 100 / net_premium;
-        }
-
-        int snapshot_id()
-        {
-            return identifier;
-        }
-
-        void print_label()
-        {
-            display(label);
-            return;
-        }
-};
-
-void print_stage()
-{
-    display("Function call OK");
-    return;
-}
-
-Snapshot snapshot;
-Portfolio portfolio;
-int title_length;
-int literal_length;
-int policies_total;
-int claims_total;
-int investigations_total;
-int loss_ratio_total;
-int claim_delta_total;
-int reserve_gap_total;
-int module_count;
-int summary_length;
-int snapshot_id_total;
-int array_value;
-int scores[3];
-int slot;
-int pointer_score;
-int pointer_result;
-int *items;
-int *rover;
-int *score_handle;
-char *buffer;
-char letter;
-void *raw;
-
-int *pick_score()
-{
-    return &pointer_score;
-}
+int stage_left;
+int stage_right;
 
 void main()
 {
-    string title("CBL-C FEATURE SHOWCASE");
-    string summary(32);
-
-    display(title);
-    title_length = title.len();
-    display("Title length");
-    display(title_length);
-    literal_length = std::strlen("pointer-ready");
-    display("Literal length");
-    display(literal_length);
-
+    showcase_text();
     print_stage();
-    snapshot.print_label();
-    snapshot.load(1250, 32, 5, 72000);
-    policies_total = snapshot.policies_in_force();
-    claims_total = snapshot.claims_reported();
-    investigations_total = snapshot.open_investigations();
-    loss_ratio_total = snapshot.loss_ratio_percent();
-    claim_delta_total = snapshot.claim_clearance_delta();
-    reserve_gap_total = reserve_target - net_premium;
-
-    portfolio.primary.name = "UNDERWRITING";
-    portfolio.primary.active = 1;
-    portfolio.secondary.name = "CLAIMS";
-    portfolio.secondary.active = 1;
-    module_count = portfolio.primary.active + portfolio.secondary.active;
-    summary = "UNDERWRITING + CLAIMS";
-    display(summary);
-    display("Summary length");
-    summary_length = summary.len();
-    display(summary_length);
-    scores[0] = 7;
-    slot = 1;
-    scores[slot] = 84;
-    display("Array value");
-    array_value = scores[slot];
-    display(array_value);
-
-    raw = std::malloc(16);
-    std::free(raw);
-    items = std::malloc(12);
-    items[0] = 21;
-    items[1] = 84;
-    rover = items + 1;
-    pointer_result = *rover;
-    display("Pointer arithmetic value");
-    display(pointer_result);
-    std::free(items);
-    buffer = std::malloc(4);
-    slot = 1;
-    buffer[slot] = 'B';
-    letter = buffer[slot];
-    display("Char pointer value");
-    display(letter);
-    std::free(buffer);
-    pointer_score = 41;
-    score_handle = pick_score();
-    pointer_result = *score_handle;
-    display("Pointer return value");
-    display(pointer_result);
-
-    display(portfolio.primary.name);
-    display(portfolio.secondary.name);
-    display("Module count");
-    display(module_count);
-    display("Snapshot id");
-    snapshot_id_total = snapshot.snapshot_id();
-    display(snapshot_id_total);
-    display("Policies in force");
-    display(policies_total);
-    display("Claims reported");
-    display(claims_total);
-    display("Open investigations");
-    display(investigations_total);
-    display("Loss ratio percent");
-    display(loss_ratio_total);
-    display("Claim clearance delta");
-    display(claim_delta_total);
-    display("Reserve target gap");
-    display(reserve_gap_total);
+    stage_left = 19;
+    stage_right = 23;
+    print_stage_total(stage_left, stage_right);
+    showcase_snapshot();
+    showcase_portfolio();
+    showcase_memory();
     display("FEATURE SHOWCASE COMPLETE");
     return;
 }

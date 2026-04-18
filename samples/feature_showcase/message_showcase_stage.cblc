@@ -1,0 +1,5 @@
+void print_stage()
+{
+    display("Function call OK");
+    return;
+}

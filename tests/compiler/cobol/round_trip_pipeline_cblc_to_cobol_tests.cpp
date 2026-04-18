@@ -92,6 +92,145 @@ cleanup:
     return (status);
 }
 
+static int run_two_module_cblc_to_cobol_execution_test(const char *main_source,
+    const char *worker_source, const char *base_name, const char *expected_output)
+{
+    t_cblc_translation_unit main_unit;
+    t_cblc_translation_unit worker_unit;
+    t_transpiler_context context;
+    char directory[256];
+    char main_source_path[256];
+    char worker_source_path[256];
+    char binary_path[256];
+    char compile_log_path[256];
+    char output_path[256];
+    char output_buffer[512];
+    char main_file_name[96];
+    char worker_file_name[96];
+    char binary_file_name[96];
+    char output_file_name[96];
+    char *generated_main_cobol;
+    char *generated_worker_cobol;
+    const char *log_path;
+    int status;
+    int directory_created;
+    int context_initialized;
+
+    FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
+    cblc_translation_unit_init(&main_unit);
+    cblc_translation_unit_init(&worker_unit);
+    generated_main_cobol = NULL;
+    generated_worker_cobol = NULL;
+    directory[0] = '\0';
+    main_source_path[0] = '\0';
+    worker_source_path[0] = '\0';
+    binary_path[0] = '\0';
+    compile_log_path[0] = '\0';
+    output_path[0] = '\0';
+    log_path = NULL;
+    directory_created = 0;
+    context_initialized = 0;
+    status = FT_FAILURE;
+    if (std::snprintf(main_file_name, sizeof(main_file_name), "%s_main.cob", base_name) < 0)
+        goto cleanup;
+    if (std::snprintf(worker_file_name, sizeof(worker_file_name), "%s_worker.cob", base_name) < 0)
+        goto cleanup;
+    if (std::snprintf(binary_file_name, sizeof(binary_file_name), "%s.bin", base_name) < 0)
+        goto cleanup;
+    if (std::snprintf(output_file_name, sizeof(output_file_name), "%s.txt", base_name) < 0)
+        goto cleanup;
+    if (test_expect_success(cblc_parse_translation_unit(main_source, &main_unit),
+            "two-module main source should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_parse_translation_unit(worker_source, &worker_unit),
+            "two-module worker source should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        goto cleanup;
+    context_initialized = 1;
+    if (transpiler_context_register_module(&context, "worker_mod", "worker_mod") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_register_module(&context, "main_mod", "main_mod") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_register_module_import(&context, "main_mod", "worker_mod") != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_register_translation_unit_exports(&context, "worker_mod", &worker_unit) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_register_translation_unit_exports(&context, "main_mod", &main_unit) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_resolve_translation_unit_calls(&context, "main_mod", &main_unit) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&main_unit, &generated_main_cobol),
+            "two-module main source should convert to COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&worker_unit, &generated_worker_cobol),
+            "two-module worker source should convert to COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(transpiler_validate_generated_cobol(generated_main_cobol),
+            "two-module main COBOL should validate") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(transpiler_validate_generated_cobol(generated_worker_cobol),
+            "two-module worker COBOL should validate") != FT_SUCCESS)
+        goto cleanup;
+    if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
+        goto cleanup;
+    directory_created = 1;
+    if (test_join_path(directory, main_file_name, main_source_path,
+            sizeof(main_source_path)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_join_path(directory, worker_file_name, worker_source_path,
+            sizeof(worker_source_path)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_join_path(directory, binary_file_name, binary_path, sizeof(binary_path))
+        != FT_SUCCESS)
+        goto cleanup;
+    if (test_join_path(directory, output_file_name, output_path, sizeof(output_path))
+        != FT_SUCCESS)
+        goto cleanup;
+    if (std::snprintf(compile_log_path, sizeof(compile_log_path), "%s/%s.log", directory,
+            base_name) < 0)
+        goto cleanup;
+    log_path = compile_log_path;
+    if (test_write_text_file(main_source_path, generated_main_cobol) != FT_SUCCESS)
+        goto cleanup;
+    if (test_write_text_file(worker_source_path, generated_worker_cobol) != FT_SUCCESS)
+        goto cleanup;
+    if (compile_generated_cobol_with_module(binary_path, main_source_path,
+            worker_source_path, compile_log_path,
+            "cobc should compile translated two-module program") != FT_SUCCESS)
+        goto cleanup;
+    if (execute_binary(directory, binary_file_name, output_file_name,
+            "translated two-module binary should execute successfully") != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+        goto cleanup;
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
+    {
+        std::printf("Assertion failed: translated two-module binary should emit expected output\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (directory_created)
+    {
+        test_cleanup_example_artifacts_with_log(main_source_path, binary_path,
+            output_path, log_path);
+        if (worker_source_path[0] != '\0')
+            test_remove_file(worker_source_path);
+        test_remove_directory(directory);
+    }
+    if (generated_worker_cobol)
+        cma_free(generated_worker_cobol);
+    if (generated_main_cobol)
+        cma_free(generated_main_cobol);
+    if (context_initialized)
+        transpiler_context_dispose(&context);
+    cblc_translation_unit_dispose(&worker_unit);
+    cblc_translation_unit_dispose(&main_unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_copy_file_translates_to_cobol_and_executes)
 {
     t_cblc_translation_unit unit;
@@ -194,855 +333,10 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_cblc_inline_string_append_translates_to_cobol_and_executes)
-{
-    const char *source;
+#include "round_trip_pipeline_cblc_string_tests.inc"
+#include "round_trip_pipeline_cblc_pointer_tests.inc"
 
-    source = "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    string suffix(8);\n"
-        "    greeting = \"HELLO\";\n"
-        "    suffix = \"!\";\n"
-        "    greeting.append(suffix);\n"
-        "    display(greeting);\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_append_generated", "HELLO!\n"));
-}
-
-FT_TEST(test_cblc_inline_string_len_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    greeting = \"HELLO!\";\n"
-        "    total = greeting.len();\n"
-        "    if (total == 6) {\n"
-        "        display(\"LEN OK\");\n"
-        "    } else {\n"
-        "        display(\"LEN BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_len_generated", "LEN OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_clear_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    greeting = \"HELLO\";\n"
-        "    greeting.clear();\n"
-        "    total = greeting.len();\n"
-        "    if (total == 0) {\n"
-        "        display(\"CLEAR OK\");\n"
-        "    } else {\n"
-        "        display(\"CLEAR BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_clear_generated", "CLEAR OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_empty_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    total = greeting.empty();\n"
-        "    if (total == 1) {\n"
-        "        display(\"EMPTY OK\");\n"
-        "    } else {\n"
-        "        display(\"EMPTY BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_empty_generated", "EMPTY OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_equals_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    string other(16);\n"
-        "    greeting = \"HELLO\";\n"
-        "    other = \"HELLO\";\n"
-        "    total = greeting.equals(other);\n"
-        "    if (total == 1) {\n"
-        "        display(\"EQUALS OK\");\n"
-        "    } else {\n"
-        "        display(\"EQUALS BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_equals_generated", "EQUALS OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_equals_literal_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    greeting = \"HELLO\";\n"
-        "    total = greeting.equals(\"HELLO\");\n"
-        "    if (total == 1) {\n"
-        "        display(\"LITERAL OK\");\n"
-        "    } else {\n"
-        "        display(\"LITERAL BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_equals_literal_generated", "LITERAL OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_capacity_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    total = greeting.capacity();\n"
-        "    if (total == 16) {\n"
-        "        display(\"CAPACITY OK\");\n"
-        "    } else {\n"
-        "        display(\"CAPACITY BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_capacity_generated", "CAPACITY OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_starts_with_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    string prefix(8);\n"
-        "    greeting = \"HELLO\";\n"
-        "    prefix = \"HE\";\n"
-        "    total = greeting.starts_with(prefix);\n"
-        "    if (total == 1) {\n"
-        "        display(\"STARTS OK\");\n"
-        "    } else {\n"
-        "        display(\"STARTS BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_starts_with_generated", "STARTS OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_ends_with_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    string suffix(8);\n"
-        "    greeting = \"HELLO\";\n"
-        "    suffix = \"LO\";\n"
-        "    total = greeting.ends_with(suffix);\n"
-        "    if (total == 1) {\n"
-        "        display(\"ENDS OK\");\n"
-        "    } else {\n"
-        "        display(\"ENDS BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_ends_with_generated", "ENDS OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_compare_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    string suffix(8);\n"
-        "    greeting = \"HELLO\";\n"
-        "    suffix = \"HELLO\";\n"
-        "    total = greeting.compare(suffix);\n"
-        "    if (total == 0) {\n"
-        "        display(\"COMPARE OK\");\n"
-        "    } else {\n"
-        "        display(\"COMPARE BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_compare_generated", "COMPARE OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_contains_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    string needle(8);\n"
-        "    greeting = \"HELLO\";\n"
-        "    needle = \"ELL\";\n"
-        "    total = greeting.contains(needle);\n"
-        "    if (total == 1) {\n"
-        "        display(\"CONTAINS OK\");\n"
-        "    } else {\n"
-        "        display(\"CONTAINS BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_contains_generated", "CONTAINS OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_equals_false_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    string other(16);\n"
-        "    greeting = \"HELLO\";\n"
-        "    other = \"WORLD\";\n"
-        "    total = greeting.equals(other);\n"
-        "    if (total == 0) {\n"
-        "        display(\"EQUALS FALSE OK\");\n"
-        "    } else {\n"
-        "        display(\"EQUALS FALSE BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_equals_false_generated", "EQUALS FALSE OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_empty_false_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    greeting = \"HELLO\";\n"
-        "    total = greeting.empty();\n"
-        "    if (total == 0) {\n"
-        "        display(\"EMPTY FALSE OK\");\n"
-        "    } else {\n"
-        "        display(\"EMPTY FALSE BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_empty_false_generated", "EMPTY FALSE OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_starts_with_literal_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    greeting = \"HELLO\";\n"
-        "    total = greeting.starts_with(\"HE\");\n"
-        "    if (total == 1) {\n"
-        "        display(\"STARTS LITERAL OK\");\n"
-        "    } else {\n"
-        "        display(\"STARTS LITERAL BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_starts_with_literal_generated", "STARTS LITERAL OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_ends_with_literal_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    greeting = \"HELLO\";\n"
-        "    total = greeting.ends_with(\"LO\");\n"
-        "    if (total == 1) {\n"
-        "        display(\"ENDS LITERAL OK\");\n"
-        "    } else {\n"
-        "        display(\"ENDS LITERAL BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_ends_with_literal_generated", "ENDS LITERAL OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_compare_less_than_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    string suffix(8);\n"
-        "    greeting = \"ALPHA\";\n"
-        "    suffix = \"BRAVO\";\n"
-        "    total = greeting.compare(suffix);\n"
-        "    if (total == -1) {\n"
-        "        display(\"COMPARE LT OK\");\n"
-        "    } else {\n"
-        "        display(\"COMPARE LT BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_compare_less_generated", "COMPARE LT OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_compare_greater_than_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    string suffix(8);\n"
-        "    greeting = \"BRAVO\";\n"
-        "    suffix = \"ALPHA\";\n"
-        "    total = greeting.compare(suffix);\n"
-        "    if (total == 1) {\n"
-        "        display(\"COMPARE GT OK\");\n"
-        "    } else {\n"
-        "        display(\"COMPARE GT BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_compare_greater_generated", "COMPARE GT OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_compare_literal_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    greeting = \"HELLO\";\n"
-        "    total = greeting.compare(\"HELLO\");\n"
-        "    if (total == 0) {\n"
-        "        display(\"COMPARE LITERAL OK\");\n"
-        "    } else {\n"
-        "        display(\"COMPARE LITERAL BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_compare_literal_generated", "COMPARE LITERAL OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_contains_false_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    string needle(8);\n"
-        "    greeting = \"HELLO\";\n"
-        "    needle = \"XYZ\";\n"
-        "    total = greeting.contains(needle);\n"
-        "    if (total == 0) {\n"
-        "        display(\"CONTAINS FALSE OK\");\n"
-        "    } else {\n"
-        "        display(\"CONTAINS FALSE BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_contains_false_generated", "CONTAINS FALSE OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_contains_empty_literal_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    greeting = \"HELLO\";\n"
-        "    total = greeting.contains(\"\");\n"
-        "    if (total == 1) {\n"
-        "        display(\"CONTAINS EMPTY OK\");\n"
-        "    } else {\n"
-        "        display(\"CONTAINS EMPTY BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_contains_empty_generated", "CONTAINS EMPTY OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_constructor_capacity_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(\"HELLO\");\n"
-        "    total = greeting.capacity();\n"
-        "    if (total == 5) {\n"
-        "        display(\"CTOR CAPACITY OK\");\n"
-        "    } else {\n"
-        "        display(\"CTOR CAPACITY BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_ctor_capacity_generated", "CTOR CAPACITY OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_append_then_len_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    string suffix(8);\n"
-        "    greeting = \"HELLO\";\n"
-        "    suffix = \"!\";\n"
-        "    greeting.append(suffix);\n"
-        "    total = greeting.len();\n"
-        "    if (total == 6) {\n"
-        "        display(\"APPEND LEN OK\");\n"
-        "    } else {\n"
-        "        display(\"APPEND LEN BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_append_len_generated", "APPEND LEN OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_clear_then_empty_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    greeting = \"HELLO\";\n"
-        "    greeting.clear();\n"
-        "    total = greeting.empty();\n"
-        "    if (total == 1) {\n"
-        "        display(\"CLEAR EMPTY OK\");\n"
-        "    } else {\n"
-        "        display(\"CLEAR EMPTY BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_clear_empty_generated", "CLEAR EMPTY OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_starts_with_false_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    string prefix(8);\n"
-        "    greeting = \"HELLO\";\n"
-        "    prefix = \"EL\";\n"
-        "    total = greeting.starts_with(prefix);\n"
-        "    if (total == 0) {\n"
-        "        display(\"STARTS FALSE OK\");\n"
-        "    } else {\n"
-        "        display(\"STARTS FALSE BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_starts_false_generated", "STARTS FALSE OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_ends_with_false_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    string suffix(8);\n"
-        "    greeting = \"HELLO\";\n"
-        "    suffix = \"HE\";\n"
-        "    total = greeting.ends_with(suffix);\n"
-        "    if (total == 0) {\n"
-        "        display(\"ENDS FALSE OK\");\n"
-        "    } else {\n"
-        "        display(\"ENDS FALSE BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_ends_false_generated", "ENDS FALSE OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_starts_with_empty_literal_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    greeting = \"HELLO\";\n"
-        "    total = greeting.starts_with(\"\");\n"
-        "    if (total == 1) {\n"
-        "        display(\"STARTS EMPTY OK\");\n"
-        "    } else {\n"
-        "        display(\"STARTS EMPTY BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_starts_empty_generated", "STARTS EMPTY OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_ends_with_empty_literal_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    greeting = \"HELLO\";\n"
-        "    total = greeting.ends_with(\"\");\n"
-        "    if (total == 1) {\n"
-        "        display(\"ENDS EMPTY OK\");\n"
-        "    } else {\n"
-        "        display(\"ENDS EMPTY BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_ends_empty_generated", "ENDS EMPTY OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_compare_shorter_prefix_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    string other(16);\n"
-        "    greeting = \"AL\";\n"
-        "    other = \"ALPHA\";\n"
-        "    total = greeting.compare(other);\n"
-        "    if (total == -1) {\n"
-        "        display(\"COMPARE SHORT OK\");\n"
-        "    } else {\n"
-        "        display(\"COMPARE SHORT BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_compare_short_generated", "COMPARE SHORT OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_compare_longer_prefix_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    string other(16);\n"
-        "    greeting = \"ALPHA\";\n"
-        "    other = \"AL\";\n"
-        "    total = greeting.compare(other);\n"
-        "    if (total == 1) {\n"
-        "        display(\"COMPARE LONG OK\");\n"
-        "    } else {\n"
-        "        display(\"COMPARE LONG BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_compare_long_generated", "COMPARE LONG OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_contains_literal_false_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(16);\n"
-        "    greeting = \"HELLO\";\n"
-        "    total = greeting.contains(\"XYZ\");\n"
-        "    if (total == 0) {\n"
-        "        display(\"CONTAINS LITERAL FALSE OK\");\n"
-        "    } else {\n"
-        "        display(\"CONTAINS LITERAL FALSE BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_contains_literal_false_generated", "CONTAINS LITERAL FALSE OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_copy_constructor_equals_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(\"HELLO\");\n"
-        "    string copy(greeting);\n"
-        "    total = copy.equals(greeting);\n"
-        "    if (total == 1) {\n"
-        "        display(\"COPY EQUALS OK\");\n"
-        "    } else {\n"
-        "        display(\"COPY EQUALS BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_copy_equals_generated", "COPY EQUALS OK\n"));
-}
-
-FT_TEST(test_cblc_inline_string_literal_constructor_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "void main()\n"
-        "{\n"
-        "    string greeting(\"HELLO\");\n"
-        "    display(greeting);\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_literal_constructor_generated", "HELLO\n"));
-}
-
-FT_TEST(test_cblc_inline_string_copy_constructor_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "void main()\n"
-        "{\n"
-        "    string greeting(\"HELLO\");\n"
-        "    string copy(greeting);\n"
-        "    display(copy);\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_string_copy_constructor_generated", "HELLO\n"));
-}
-
-FT_TEST(test_cblc_inline_void_pointer_alloc_free_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "void *raw;\n"
-        "void main()\n"
-        "{\n"
-        "    raw = std::malloc(16);\n"
-        "    std::free(raw);\n"
-        "    display(\"PTR ALLOC OK\");\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_void_pointer_alloc_free_generated", "PTR ALLOC OK\n"));
-}
-
-FT_TEST(test_cblc_inline_int_pointer_index_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int *items;\n"
-        "int result;\n"
-        "int slot;\n"
-        "void main()\n"
-        "{\n"
-        "    items = std::malloc(12);\n"
-        "    slot = 1;\n"
-        "    items[0] = 42;\n"
-        "    items[slot] = 77;\n"
-        "    result = items[slot];\n"
-        "    display(result);\n"
-        "    std::free(items);\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_int_pointer_index_generated", "+000000077\n"));
-}
-
-FT_TEST(test_cblc_inline_char_pointer_index_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "char *buffer;\n"
-        "char letter;\n"
-        "int slot;\n"
-        "void main()\n"
-        "{\n"
-        "    buffer = std::malloc(4);\n"
-        "    slot = 1;\n"
-        "    buffer[slot] = 'B';\n"
-        "    letter = buffer[slot];\n"
-        "    display(letter);\n"
-        "    std::free(buffer);\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_char_pointer_index_generated", "B\n"));
-}
-
-FT_TEST(test_cblc_inline_pointer_arithmetic_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int *items;\n"
-        "int *rover;\n"
-        "int result;\n"
-        "void main()\n"
-        "{\n"
-        "    items = std::malloc(12);\n"
-        "    items[0] = 21;\n"
-        "    items[1] = 84;\n"
-        "    rover = items + 1;\n"
-        "    result = *rover;\n"
-        "    display(result);\n"
-        "    std::free(items);\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_pointer_arithmetic_generated", "+000000084\n"));
-}
-
-FT_TEST(test_cblc_inline_address_of_scalar_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int score;\n"
-        "int result;\n"
-        "int *items;\n"
-        "void main()\n"
-        "{\n"
-        "    score = 52;\n"
-        "    items = &score;\n"
-        "    result = *items;\n"
-        "    display(result);\n"
-        "    *items = 99;\n"
-        "    display(score);\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_address_of_scalar_generated", "+000000052\n+000000099\n"));
-}
-
-FT_TEST(test_cblc_inline_pointer_return_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int score;\n"
-        "int result;\n"
-        "int *items;\n"
-        "int *pick()\n"
-        "{\n"
-        "    return &score;\n"
-        "}\n"
-        "void main()\n"
-        "{\n"
-        "    score = 41;\n"
-        "    items = pick();\n"
-        "    result = *items;\n"
-        "    display(result);\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_pointer_return_generated", "+000000041\n"));
-}
-
-FT_TEST(test_cblc_inline_std_strlen_literal_translates_to_cobol_and_executes)
-{
-    const char *source;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    total = std::strlen(\"hello world\");\n"
-        "    if (total == 11) {\n"
-        "        display(\"STRLEN OK\");\n"
-        "    } else {\n"
-        "        display(\"STRLEN BAD\");\n"
-        "    }\n"
-        "    return;\n"
-        "}\n";
-    return (run_inline_cblc_to_cobol_execution_test(source,
-            "inline_std_strlen_generated", "STRLEN OK\n"));
-}
-
+#include "round_trip_pipeline_cblc_inline_feature_tests.inc"
 FT_TEST(test_cblc_inline_class_methods_translates_to_cobol_and_executes)
 {
     const char *source;
@@ -1801,428 +1095,7 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_cblc_multi_module_translates_to_cobol_and_executes)
-{
-    t_cblc_translation_unit main_unit;
-    t_cblc_translation_unit worker_unit;
-    char main_buffer[32768];
-    char worker_buffer[32768];
-    char directory[256];
-    char main_source_path[256];
-    char worker_source_path[256];
-    char binary_path[256];
-    char compile_log_path[256];
-    char output_path[256];
-    char output_buffer[128];
-    char *generated_main_cobol;
-    char *generated_worker_cobol;
-    const char *expected_output;
-    const char *log_path;
-    int status;
-    int directory_created;
-
-    FT_REQUIRE_COBC();
-    FT_REQUIRE_FORWARD_TRANSLATION();
-    cblc_translation_unit_init(&main_unit);
-    cblc_translation_unit_init(&worker_unit);
-    generated_main_cobol = NULL;
-    generated_worker_cobol = NULL;
-    directory[0] = '\0';
-    main_source_path[0] = '\0';
-    worker_source_path[0] = '\0';
-    binary_path[0] = '\0';
-    compile_log_path[0] = '\0';
-    output_path[0] = '\0';
-    log_path = NULL;
-    directory_created = 0;
-    status = FT_FAILURE;
-    expected_output = "WORKER READY\n   1\n";
-    if (test_read_text_file("samples/cblc/multi_module_main.cblc",
-            main_buffer, sizeof(main_buffer)) != FT_SUCCESS)
-        goto cleanup;
-    if (test_read_text_file("samples/cblc/multi_module_worker.cblc",
-            worker_buffer, sizeof(worker_buffer)) != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(cblc_parse_translation_unit(main_buffer, &main_unit),
-            "multi_module_main.cblc should parse") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(cblc_parse_translation_unit(worker_buffer, &worker_unit),
-            "multi_module_worker.cblc should parse") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(cblc_generate_cobol(&main_unit, &generated_main_cobol),
-            "multi_module_main.cblc should convert to COBOL") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(cblc_generate_cobol(&worker_unit,
-                &generated_worker_cobol),
-            "multi_module_worker.cblc should convert to COBOL") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(transpiler_validate_generated_cobol(generated_main_cobol),
-            "generated main COBOL should validate") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(transpiler_validate_generated_cobol(generated_worker_cobol),
-            "generated worker COBOL should validate") != FT_SUCCESS)
-        goto cleanup;
-    if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
-        goto cleanup;
-    directory_created = 1;
-    if (test_join_path(directory, "multi_module_main_generated.cob",
-            main_source_path, sizeof(main_source_path)) != FT_SUCCESS)
-        goto cleanup;
-    if (test_join_path(directory, "multi_module_worker_generated.cob",
-            worker_source_path, sizeof(worker_source_path)) != FT_SUCCESS)
-        goto cleanup;
-    if (test_join_path(directory, "multi_module_generated.bin",
-            binary_path, sizeof(binary_path)) != FT_SUCCESS)
-        goto cleanup;
-    if (test_join_path(directory, "multi_module_generated.log",
-            compile_log_path, sizeof(compile_log_path)) != FT_SUCCESS)
-        goto cleanup;
-    log_path = compile_log_path;
-    if (test_join_path(directory, "multi_module_generated.txt",
-            output_path, sizeof(output_path)) != FT_SUCCESS)
-        goto cleanup;
-    if (test_write_text_file(main_source_path, generated_main_cobol) != FT_SUCCESS)
-        goto cleanup;
-    if (test_write_text_file(worker_source_path, generated_worker_cobol)
-        != FT_SUCCESS)
-        goto cleanup;
-    if (compile_generated_cobol_with_module(binary_path, main_source_path,
-            worker_source_path, compile_log_path,
-            "cobc should compile translated multi_module program")
-        != FT_SUCCESS)
-        goto cleanup;
-    if (execute_binary(directory, "multi_module_generated.bin",
-            "multi_module_generated.txt",
-            "translated multi_module binary should execute successfully")
-        != FT_SUCCESS)
-        goto cleanup;
-    if (test_read_text_file(output_path, output_buffer,
-            sizeof(output_buffer)) != FT_SUCCESS)
-        goto cleanup;
-    if (std::strncmp(output_buffer, expected_output,
-            std::strlen(expected_output) + 1) != 0)
-    {
-        std::printf("Assertion failed: translated multi_module binary should emit expected DISPLAY output\n");
-        goto cleanup;
-    }
-    status = FT_SUCCESS;
-cleanup:
-    if (directory_created)
-    {
-        test_cleanup_example_artifacts_with_log(main_source_path, binary_path,
-            output_path, log_path);
-        if (worker_source_path[0] != '\0')
-            test_remove_file(worker_source_path);
-        test_remove_directory(directory);
-    }
-    if (generated_worker_cobol)
-        cma_free(generated_worker_cobol);
-    if (generated_main_cobol)
-        cma_free(generated_main_cobol);
-    cblc_translation_unit_dispose(&worker_unit);
-    cblc_translation_unit_dispose(&main_unit);
-    return (status);
-}
-
-FT_TEST(test_cblc_multi_module_parameterized_call_translates_to_cobol_and_executes)
-{
-    const char *main_source;
-    const char *worker_source;
-    t_cblc_translation_unit main_unit;
-    t_cblc_translation_unit worker_unit;
-    t_transpiler_context context;
-    char directory[256];
-    char main_source_path[256];
-    char worker_source_path[256];
-    char binary_path[256];
-    char compile_log_path[256];
-    char output_path[256];
-    char output_buffer[128];
-    char *generated_main_cobol;
-    char *generated_worker_cobol;
-    const char *expected_output;
-    const char *log_path;
-    int status;
-    int directory_created;
-    int context_initialized;
-
-    FT_REQUIRE_COBC();
-    FT_REQUIRE_FORWARD_TRANSLATION();
-    main_source = "import \"worker_mod\";\n"
-        "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    total = 7;\n"
-        "    worker(total);\n"
-        "    return;\n"
-        "}\n";
-    worker_source = "void worker(int value)\n"
-        "{\n"
-        "    display(value);\n"
-        "    return;\n"
-        "}\n";
-    cblc_translation_unit_init(&main_unit);
-    cblc_translation_unit_init(&worker_unit);
-    generated_main_cobol = NULL;
-    generated_worker_cobol = NULL;
-    directory[0] = '\0';
-    main_source_path[0] = '\0';
-    worker_source_path[0] = '\0';
-    binary_path[0] = '\0';
-    compile_log_path[0] = '\0';
-    output_path[0] = '\0';
-    log_path = NULL;
-    directory_created = 0;
-    context_initialized = 0;
-    status = FT_FAILURE;
-    expected_output = "   7\n";
-    if (test_expect_success(cblc_parse_translation_unit(main_source, &main_unit),
-            "parameterized multi-module main source should parse") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(cblc_parse_translation_unit(worker_source, &worker_unit),
-            "parameterized multi-module worker source should parse") != FT_SUCCESS)
-        goto cleanup;
-    if (transpiler_context_init(&context) != FT_SUCCESS)
-        goto cleanup;
-    context_initialized = 1;
-    if (transpiler_context_register_module(&context, "worker_mod", "worker_mod") != FT_SUCCESS)
-        goto cleanup;
-    if (transpiler_context_register_module(&context, "main_mod", "main_mod") != FT_SUCCESS)
-        goto cleanup;
-    if (transpiler_context_register_module_import(&context, "main_mod", "worker_mod") != FT_SUCCESS)
-        goto cleanup;
-    if (cblc_register_translation_unit_exports(&context, "worker_mod", &worker_unit) != FT_SUCCESS)
-        goto cleanup;
-    if (cblc_register_translation_unit_exports(&context, "main_mod", &main_unit) != FT_SUCCESS)
-        goto cleanup;
-    if (cblc_resolve_translation_unit_calls(&context, "main_mod", &main_unit) != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(cblc_generate_cobol(&main_unit, &generated_main_cobol),
-            "parameterized multi-module main source should convert to COBOL") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(cblc_generate_cobol(&worker_unit,
-                &generated_worker_cobol),
-            "parameterized multi-module worker source should convert to COBOL") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(transpiler_validate_generated_cobol(generated_main_cobol),
-            "parameterized multi-module generated main COBOL should validate") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(transpiler_validate_generated_cobol(generated_worker_cobol),
-            "parameterized multi-module generated worker COBOL should validate") != FT_SUCCESS)
-        goto cleanup;
-    if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
-        goto cleanup;
-    directory_created = 1;
-    if (test_join_path(directory, "multi_module_param_main_generated.cob",
-            main_source_path, sizeof(main_source_path)) != FT_SUCCESS)
-        goto cleanup;
-    if (test_join_path(directory, "multi_module_param_worker_generated.cob",
-            worker_source_path, sizeof(worker_source_path)) != FT_SUCCESS)
-        goto cleanup;
-    if (test_join_path(directory, "multi_module_param_generated.bin",
-            binary_path, sizeof(binary_path)) != FT_SUCCESS)
-        goto cleanup;
-    if (test_join_path(directory, "multi_module_param_generated.log",
-            compile_log_path, sizeof(compile_log_path)) != FT_SUCCESS)
-        goto cleanup;
-    log_path = compile_log_path;
-    if (test_join_path(directory, "multi_module_param_generated.txt",
-            output_path, sizeof(output_path)) != FT_SUCCESS)
-        goto cleanup;
-    if (test_write_text_file(main_source_path, generated_main_cobol) != FT_SUCCESS)
-        goto cleanup;
-    if (test_write_text_file(worker_source_path, generated_worker_cobol)
-        != FT_SUCCESS)
-        goto cleanup;
-    if (compile_generated_cobol_with_module(binary_path, main_source_path,
-            worker_source_path, compile_log_path,
-            "cobc should compile translated parameterized multi-module program")
-        != FT_SUCCESS)
-        goto cleanup;
-    if (execute_binary(directory, "multi_module_param_generated.bin",
-            "multi_module_param_generated.txt",
-            "translated parameterized multi-module binary should execute successfully")
-        != FT_SUCCESS)
-        goto cleanup;
-    if (test_read_text_file(output_path, output_buffer,
-            sizeof(output_buffer)) != FT_SUCCESS)
-        goto cleanup;
-    if (std::strncmp(output_buffer, expected_output,
-            std::strlen(expected_output) + 1) != 0)
-    {
-        std::printf("Assertion failed: translated parameterized multi-module binary should emit expected DISPLAY output\n");
-        goto cleanup;
-    }
-    status = FT_SUCCESS;
-cleanup:
-    if (directory_created)
-    {
-        test_cleanup_example_artifacts_with_log(main_source_path, binary_path,
-            output_path, log_path);
-        if (worker_source_path[0] != '\0')
-            test_remove_file(worker_source_path);
-        test_remove_directory(directory);
-    }
-    if (generated_worker_cobol)
-        cma_free(generated_worker_cobol);
-    if (generated_main_cobol)
-        cma_free(generated_main_cobol);
-    if (context_initialized)
-        transpiler_context_dispose(&context);
-    cblc_translation_unit_dispose(&worker_unit);
-    cblc_translation_unit_dispose(&main_unit);
-    return (status);
-}
-
-FT_TEST(test_cblc_multi_module_return_call_translates_to_cobol_and_executes)
-{
-    const char *main_source;
-    const char *worker_source;
-    t_cblc_translation_unit main_unit;
-    t_cblc_translation_unit worker_unit;
-    t_transpiler_context context;
-    char directory[256];
-    char main_source_path[256];
-    char worker_source_path[256];
-    char binary_path[256];
-    char compile_log_path[256];
-    char output_path[256];
-    char output_buffer[128];
-    char *generated_main_cobol;
-    char *generated_worker_cobol;
-    const char *expected_output;
-    const char *log_path;
-    int status;
-    int directory_created;
-    int context_initialized;
-
-    FT_REQUIRE_COBC();
-    FT_REQUIRE_FORWARD_TRANSLATION();
-    main_source = "import \"worker_mod\";\n"
-        "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    total = worker(7);\n"
-        "    display(total);\n"
-        "    return;\n"
-        "}\n";
-    worker_source = "int worker(int value)\n"
-        "{\n"
-        "    return value + 1;\n"
-        "}\n";
-    cblc_translation_unit_init(&main_unit);
-    cblc_translation_unit_init(&worker_unit);
-    generated_main_cobol = NULL;
-    generated_worker_cobol = NULL;
-    directory[0] = '\0';
-    main_source_path[0] = '\0';
-    worker_source_path[0] = '\0';
-    binary_path[0] = '\0';
-    compile_log_path[0] = '\0';
-    output_path[0] = '\0';
-    log_path = NULL;
-    directory_created = 0;
-    context_initialized = 0;
-    status = FT_FAILURE;
-    expected_output = "   8\n";
-    if (test_expect_success(cblc_parse_translation_unit(main_source, &main_unit),
-            "returning multi-module main source should parse") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(cblc_parse_translation_unit(worker_source, &worker_unit),
-            "returning multi-module worker source should parse") != FT_SUCCESS)
-        goto cleanup;
-    if (transpiler_context_init(&context) != FT_SUCCESS)
-        goto cleanup;
-    context_initialized = 1;
-    if (transpiler_context_register_module(&context, "worker_mod", "worker_mod") != FT_SUCCESS)
-        goto cleanup;
-    if (transpiler_context_register_module(&context, "main_mod", "main_mod") != FT_SUCCESS)
-        goto cleanup;
-    if (transpiler_context_register_module_import(&context, "main_mod", "worker_mod") != FT_SUCCESS)
-        goto cleanup;
-    if (cblc_register_translation_unit_exports(&context, "worker_mod", &worker_unit) != FT_SUCCESS)
-        goto cleanup;
-    if (cblc_register_translation_unit_exports(&context, "main_mod", &main_unit) != FT_SUCCESS)
-        goto cleanup;
-    if (cblc_resolve_translation_unit_calls(&context, "main_mod", &main_unit) != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(cblc_generate_cobol(&main_unit, &generated_main_cobol),
-            "returning multi-module main source should convert to COBOL") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(cblc_generate_cobol(&worker_unit,
-                &generated_worker_cobol),
-            "returning multi-module worker source should convert to COBOL") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(transpiler_validate_generated_cobol(generated_main_cobol),
-            "returning multi-module generated main COBOL should validate") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(transpiler_validate_generated_cobol(generated_worker_cobol),
-            "returning multi-module generated worker COBOL should validate") != FT_SUCCESS)
-        goto cleanup;
-    if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
-        goto cleanup;
-    directory_created = 1;
-    if (test_join_path(directory, "multi_module_return_main_generated.cob",
-            main_source_path, sizeof(main_source_path)) != FT_SUCCESS)
-        goto cleanup;
-    if (test_join_path(directory, "multi_module_return_worker_generated.cob",
-            worker_source_path, sizeof(worker_source_path)) != FT_SUCCESS)
-        goto cleanup;
-    if (test_join_path(directory, "multi_module_return_generated.bin",
-            binary_path, sizeof(binary_path)) != FT_SUCCESS)
-        goto cleanup;
-    if (test_join_path(directory, "multi_module_return_generated.log",
-            compile_log_path, sizeof(compile_log_path)) != FT_SUCCESS)
-        goto cleanup;
-    log_path = compile_log_path;
-    if (test_join_path(directory, "multi_module_return_generated.txt",
-            output_path, sizeof(output_path)) != FT_SUCCESS)
-        goto cleanup;
-    if (test_write_text_file(main_source_path, generated_main_cobol) != FT_SUCCESS)
-        goto cleanup;
-    if (test_write_text_file(worker_source_path, generated_worker_cobol)
-        != FT_SUCCESS)
-        goto cleanup;
-    if (compile_generated_cobol_with_module(binary_path, main_source_path,
-            worker_source_path, compile_log_path,
-            "cobc should compile translated returning multi-module program")
-        != FT_SUCCESS)
-        goto cleanup;
-    if (execute_binary(directory, "multi_module_return_generated.bin",
-            "multi_module_return_generated.txt",
-            "translated returning multi-module binary should execute successfully")
-        != FT_SUCCESS)
-        goto cleanup;
-    if (test_read_text_file(output_path, output_buffer,
-            sizeof(output_buffer)) != FT_SUCCESS)
-        goto cleanup;
-    if (std::strncmp(output_buffer, expected_output,
-            std::strlen(expected_output) + 1) != 0)
-    {
-        std::printf("Assertion failed: translated returning multi-module binary should emit expected DISPLAY output\n");
-        goto cleanup;
-    }
-    status = FT_SUCCESS;
-cleanup:
-    if (directory_created)
-    {
-        test_cleanup_example_artifacts_with_log(main_source_path, binary_path,
-            output_path, log_path);
-        if (worker_source_path[0] != '\0')
-            test_remove_file(worker_source_path);
-        test_remove_directory(directory);
-    }
-    if (generated_worker_cobol)
-        cma_free(generated_worker_cobol);
-    if (generated_main_cobol)
-        cma_free(generated_main_cobol);
-    if (context_initialized)
-        transpiler_context_dispose(&context);
-    cblc_translation_unit_dispose(&worker_unit);
-    cblc_translation_unit_dispose(&main_unit);
-    return (status);
-}
-
+#include "round_trip_pipeline_cblc_multi_module_tests.inc"
 FT_TEST(test_cblc_numeric_precision_translates_to_cobol_and_executes)
 {
     t_cblc_translation_unit unit;

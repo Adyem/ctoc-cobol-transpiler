@@ -1993,6 +1993,28 @@ static int c_backend_emit_call_assignment(const t_cblc_translation_unit *unit,
             return (FT_FAILURE);
         return (FT_SUCCESS);
     }
+    if (statement->call_is_external)
+    {
+        char arguments[TRANSPILE_STATEMENT_TEXT_MAX];
+
+        if (c_backend_map_identifier_to_c(unit, statement->target, target,
+                sizeof(target)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (statement->call_argument_count > 0)
+        {
+            if (c_backend_build_external_call_arguments(unit, statement, arguments,
+                    sizeof(arguments)) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (c_backend_buffer_append_format_line(buffer, "    %s = %s(%s);",
+                    target, statement->call_identifier, arguments) != FT_SUCCESS)
+                return (FT_FAILURE);
+            return (FT_SUCCESS);
+        }
+        if (c_backend_buffer_append_format_line(buffer, "    %s = %s();", target,
+                statement->call_identifier) != FT_SUCCESS)
+            return (FT_FAILURE);
+        return (FT_SUCCESS);
+    }
     target_function = c_backend_find_function(unit, statement->call_identifier);
     if (!target_function)
         return (FT_FAILURE);
@@ -2277,6 +2299,8 @@ static int c_backend_emit_lifecycle(const t_cblc_translation_unit *unit, const t
         if (c_backend_extract_call_argument(&argument_statement, 0, argument,
                 sizeof(argument)) != FT_SUCCESS)
             return (FT_FAILURE);
+        if (argument[0] >= '0' && argument[0] <= '9')
+            return (FT_SUCCESS);
         if (argument[0] == '"')
         {
             if (c_backend_decode_cobol_literal(argument, decoded, sizeof(decoded)) != FT_SUCCESS)

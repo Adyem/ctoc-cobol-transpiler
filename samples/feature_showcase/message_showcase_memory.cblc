@@ -1,0 +1,44 @@
+int pointer_score;
+int array_value;
+int scores[3];
+int slot;
+int pointer_result;
+int *items;
+int *rover;
+int *score_handle;
+char *buffer;
+char letter;
+void *raw;
+
+void showcase_memory()
+{
+    scores[0] = 7;
+    slot = 1;
+    scores[slot] = 84;
+    display("Array value");
+    array_value = scores[slot];
+    display(array_value);
+    raw = std::malloc(16);
+    std::free(raw);
+    items = std::malloc(12);
+    items[0] = 21;
+    items[1] = 84;
+    rover = items + 1;
+    pointer_result = *rover;
+    display("Pointer arithmetic value");
+    display(pointer_result);
+    std::free(items);
+    buffer = std::malloc(4);
+    slot = 1;
+    buffer[slot] = 'B';
+    letter = buffer[slot];
+    display("Char pointer value");
+    display(letter);
+    std::free(buffer);
+    pointer_score = 41;
+    score_handle = &pointer_score;
+    pointer_result = *score_handle;
+    display("Pointer return value");
+    display(pointer_result);
+    return;
+}

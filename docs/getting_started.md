@@ -53,7 +53,7 @@ Every generated standard-library subprogram now shares the same trailing status 
 | `TRANSPILE_STANDARD_LIBRARY_STATUS_LITERAL_RANGE_ERROR` (`2`) | Range error | The helper detected overflow or a value that could not fit in the target. |
 | `TRANSPILE_STANDARD_LIBRARY_STATUS_LITERAL_DOMAIN_ERROR` (`3`) | Domain error | Mathematical domain checks failed (for example, a negative operand passed to `CBLC-SQRT`). |
 
-The [`docs/abi_spec.md`](abi_spec.md) appendix documents the ABI expectations for these slots, and the individual generator templates in `transpiler_standard_library_*.cpp` import the literals from `t_transpiler_standard_library_status`. When you add a new helper, reuse the shared enum so runtime diagnostics remain consistent.【F:docs/abi_spec.md†L18-L59】【F:cblc_transpiler.hpp†L1017-L1044】
+The [`docs/abi_spec.md`](abi_spec.md) appendix documents the ABI expectations for these slots, and the individual generator templates in `src/standard_library/transpiler_standard_library_*.cpp` import the literals from `t_transpiler_standard_library_status`. When you add a new helper, reuse the shared enum so runtime diagnostics remain consistent.【F:docs/abi_spec.md†L18-L59】【F:cblc_transpiler.hpp†L1017-L1044】
 
 ## New Language and Diagnostics Features
 
@@ -65,7 +65,7 @@ The parser now records recoverable syntax errors and resynchronizes at statement
 
 ### Expanded Numeric Picture Support
 
-The COBOL type descriptor helpers were extended to describe long, long long, float, and double data items with standardized picture clauses and scales.【F:transpiler_cobol_types.cpp†L301-L356】 Generated code can therefore rely on consistent picture formatting across translation units without redefining custom descriptors.
+The COBOL type descriptor helpers were extended to describe long, long long, float, and double data items with standardized picture clauses and scales.【F:src/transpiler/transpiler_cobol_types.cpp†L301-L356】 Generated code can therefore rely on consistent picture formatting across translation units without redefining custom descriptors.
 
 ### String Truncation Diagnostics
 

@@ -10,10 +10,11 @@ endif
 TRANSPILER := $(REPO_ROOT)/ctoc_cobol_transpiler$(EXE_EXT)
 COBC ?= cobc
 
-CBLC_PROGRAMS := message_showcase
-CBLC_SOURCES := $(addsuffix .cblc,$(CBLC_PROGRAMS))
-GENERATED_COB := $(addsuffix .cob,$(CBLC_PROGRAMS))
-EXECUTABLES := $(addsuffix $(EXE_EXT),$(CBLC_PROGRAMS))
+MAIN_PROGRAM := message_showcase
+CBLC_MODULES := message_showcase message_showcase_text message_showcase_stage message_showcase_stage_total message_showcase_snapshot message_showcase_portfolio message_showcase_memory
+CBLC_SOURCES := $(addsuffix .cblc,$(CBLC_MODULES))
+GENERATED_COB := $(addsuffix .cob,$(CBLC_MODULES))
+EXECUTABLES := $(MAIN_PROGRAM)$(EXE_EXT)
 
 STD_DIR := stdlib
 STD_SENTINEL := $(STD_DIR)/.standard_library_built
@@ -23,7 +24,7 @@ STD_MODULES := $(addprefix $(STD_DIR)/,$(addsuffix $(MODULE_EXT),$(STD_HELPERS))
 SETUP_SENTINEL := .environment_ready
 ACTUAL_OUTPUT := actual_output.log
 
-RUN_SHOWCASE = ./message_showcase$(EXE_EXT); \
+RUN_SHOWCASE = ./$(MAIN_PROGRAM)$(EXE_EXT); \
 printf '%s\n' "Standard library functions bundled with the showcase:"; \
 printf '%s\n' $(foreach helper,$(STD_HELPERS),$(STD_DIR)/$(helper).cob $(STD_DIR)/$(helper)$(MODULE_EXT))
 
@@ -48,18 +49,21 @@ verify: $(EXECUTABLES) $(STD_MODULES)
 	{ $(RUN_SHOWCASE); } | sed 's/[[:space:]]*$$//' | tee $(ACTUAL_OUTPUT)
 	@diff -u EXPECTED_OUTPUT.txt $(ACTUAL_OUTPUT)
 
-%$(EXE_EXT): %.cob | ensure_cobc
-	$(COBC) -x -free -o $@ $<
+$(MAIN_PROGRAM)$(EXE_EXT): $(GENERATED_COB) | ensure_cobc
+	$(COBC) -x -free -o $@ $(GENERATED_COB)
 
-%.cob: %.cblc $(TRANSPILER)
+$(GENERATED_COB): $(CBLC_SOURCES) $(TRANSPILER)
 	$(TRANSPILER) --direction cblc-to-cobol \
-		--input $(abspath $<) \
-		--output $(abspath $@) \
+		$(foreach source,$(CBLC_SOURCES),--input $(abspath $(source)) ) \
+		$(foreach output,$(GENERATED_COB),--output $(abspath $(output)) ) \
 		--diagnostics silent
-	@if [ ! -f $@ ]; then \
-		printf 'The transpiler did not emit %s. Check the command output above for diagnostics.\n' "$@"; \
-		exit 1; \
-	fi
+	@set -e; \
+	for output in $(GENERATED_COB); do \
+		if [ ! -f "$$output" ]; then \
+			printf 'The transpiler did not emit %s. Check the command output above for diagnostics.\n' "$$output"; \
+			exit 1; \
+		fi; \
+	done
 
 $(STD_SENTINEL): $(TRANSPILER)
 	mkdir -p $(STD_DIR)

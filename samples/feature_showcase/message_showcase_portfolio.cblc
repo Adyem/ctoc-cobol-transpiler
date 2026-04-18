@@ -1,0 +1,28 @@
+struct ModuleState
+{
+    string name(16);
+    int active;
+};
+
+struct Portfolio
+{
+    ModuleState primary;
+    ModuleState secondary;
+};
+
+Portfolio portfolio;
+int module_count;
+
+void showcase_portfolio()
+{
+    portfolio.primary.name = "UNDERWRITING";
+    portfolio.primary.active = 1;
+    portfolio.secondary.name = "CLAIMS";
+    portfolio.secondary.active = 1;
+    module_count = portfolio.primary.active + portfolio.secondary.active;
+    display(portfolio.primary.name);
+    display(portfolio.secondary.name);
+    display("Module count");
+    display(module_count);
+    return;
+}

@@ -57,8 +57,8 @@ static int runtime_audit_expect_no_forbidden_allocator(const char *path)
 FT_TEST(test_runtime_helpers_use_cma_allocators)
 {
     static const char *runtime_files[] = {
-        "runtime_record.cpp",
-        "runtime_string.cpp"
+        "src/runtime/runtime_record.cpp",
+        "src/runtime/runtime_string.cpp"
     };
     size_t index;
     size_t count;
@@ -99,8 +99,8 @@ static int runtime_audit_expect_cma_include(const char *path)
 FT_TEST(test_runtime_helpers_include_cma_headers)
 {
     static const char *runtime_files[] = {
-        "runtime_record.cpp",
-        "runtime_string.cpp"
+        "src/runtime/runtime_record.cpp",
+        "src/runtime/runtime_string.cpp"
     };
     size_t index;
     size_t count;

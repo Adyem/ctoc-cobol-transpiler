@@ -3,23 +3,13 @@ Title length
 +000000022
 Literal length
 +000000013
-Function call OK
-RISK
 UNDERWRITING + CLAIMS
 Summary length
 +000000021
-Array value
-+000000084
-Pointer arithmetic value
-+000000084
-Char pointer value
-B
-Pointer return value
-+000000041
-UNDERWRITING
-CLAIMS
-Module count
-+000000002
+Function call OK
+Parameterized import value
++000000042
+RISK
 Snapshot id
 +000000007
 Policies in force
@@ -34,6 +24,18 @@ Claim clearance delta
 +000000027
 Reserve target gap
 +000120000
+UNDERWRITING
+CLAIMS
+Module count
++000000002
+Array value
++000000084
+Pointer arithmetic value
++000000084
+Char pointer value
+B
+Pointer return value
++000000041
 FEATURE SHOWCASE COMPLETE
 Standard library functions bundled with the showcase:
 stdlib/CBLC-ABS.cob

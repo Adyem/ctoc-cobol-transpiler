@@ -1087,7 +1087,8 @@ typedef enum e_cblc_data_kind
     CBLC_DATA_KIND_VOID_POINTER,
     CBLC_DATA_KIND_CHAR_POINTER,
     CBLC_DATA_KIND_INT_POINTER,
-    CBLC_DATA_KIND_STRUCT_POINTER
+    CBLC_DATA_KIND_STRUCT_POINTER,
+    CBLC_DATA_KIND_INT_POINTER_POINTER
 }   t_cblc_data_kind;
 
 typedef enum e_cblc_function_return_kind
@@ -1119,6 +1120,7 @@ typedef struct s_cblc_data_item
     char struct_type_name[TRANSPILE_IDENTIFIER_MAX];
     char owner_function_name[TRANSPILE_IDENTIFIER_MAX];
     size_t length;
+    size_t initial_capacity;
     size_t array_count;
     t_cblc_data_kind kind;
     int is_const;

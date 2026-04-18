@@ -1,0 +1,23 @@
+int title_length;
+int literal_length;
+int summary_length;
+
+void showcase_text()
+{
+    string title("CBL-C FEATURE SHOWCASE");
+    string summary(32);
+
+    display(title);
+    title_length = title.len();
+    display("Title length");
+    display(title_length);
+    literal_length = std::strlen("pointer-ready");
+    display("Literal length");
+    display(literal_length);
+    summary = "UNDERWRITING + CLAIMS";
+    display(summary);
+    display("Summary length");
+    summary_length = summary.len();
+    display(summary_length);
+    return;
+}
