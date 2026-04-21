@@ -1,28 +1,125 @@
-struct ModuleState
+const int reserve_target = 600000;
+const int earned_premium = 480000;
+
+struct Desk
 {
     string name(16);
-    int active;
+    int open_items;
+    int closed_items;
 };
 
 struct Portfolio
 {
-    ModuleState primary;
-    ModuleState secondary;
+    Desk underwriting;
+    Desk claims;
 };
 
-Portfolio portfolio;
-int module_count;
+class RenewalReport
+{
+    private:
+        const int identifier;
+        string tag(16);
+        int policy_count;
+        int claim_count;
+        int investigation_count;
+        int paid_claims;
+
+    public:
+        RenewalReport() : tag("RISK"), identifier(7)
+        {
+            policy_count = 0;
+            claim_count = 0;
+            investigation_count = 0;
+            paid_claims = 0;
+        }
+
+        void load(int policies, int claims, int investigations, int paid)
+        {
+            policy_count = policies;
+            claim_count = claims;
+            investigation_count = investigations;
+            paid_claims = paid;
+            return;
+        }
+
+        int id()
+        {
+            return identifier;
+        }
+
+        int policies()
+        {
+            return policy_count;
+        }
+
+        int net_claims()
+        {
+            return claim_count - investigation_count;
+        }
+
+        int loss_ratio_percent()
+        {
+            return paid_claims * 100 / earned_premium;
+        }
+
+        int reserve_gap()
+        {
+            return reserve_target - earned_premium;
+        }
+
+        void print_tag()
+        {
+            display(tag);
+            return;
+        }
+};
+
+Portfolio book;
+RenewalReport risk_review;
+int active_desks;
+int output_report_id;
+int policies_total;
+int net_claims_total;
+int loss_ratio_total;
+int reserve_gap_total;
+int imported_total;
+int underwriting_open;
+int underwriting_closed;
 
 void showcase_portfolio()
 {
-    portfolio.primary.name = "UNDERWRITING";
-    portfolio.primary.active = 1;
-    portfolio.secondary.name = "CLAIMS";
-    portfolio.secondary.active = 1;
-    module_count = portfolio.primary.active + portfolio.secondary.active;
-    display(portfolio.primary.name);
-    display(portfolio.secondary.name);
-    display("Module count");
-    display(module_count);
+    book.underwriting.name = "UNDERWRITING";
+    book.underwriting.open_items = 19;
+    book.underwriting.closed_items = 23;
+    book.claims.name = "CLAIMS";
+    book.claims.open_items = 32;
+    book.claims.closed_items = 27;
+    active_desks = 2;
+    underwriting_open = book.underwriting.open_items;
+    underwriting_closed = book.underwriting.closed_items;
+    risk_review.load(1250, 32, 5, 72000);
+    risk_review.print_tag();
+    output_report_id = risk_review.id();
+    policies_total = risk_review.policies();
+    net_claims_total = risk_review.net_claims();
+    loss_ratio_total = risk_review.loss_ratio_percent();
+    reserve_gap_total = risk_review.reserve_gap();
+    imported_total = underwriting_open + underwriting_closed;
+    display("Report id");
+    display(output_report_id);
+    display("Policies");
+    display(policies_total);
+    display("Net claims");
+    display(net_claims_total);
+    display("Loss ratio");
+    display(loss_ratio_total);
+    display("Reserve gap");
+    display(reserve_gap_total);
+    display(book.underwriting.name);
+    display(book.claims.name);
+    display("Active desks");
+    display(active_desks);
+    display("Imported total");
+    display(imported_total);
     return;
 }

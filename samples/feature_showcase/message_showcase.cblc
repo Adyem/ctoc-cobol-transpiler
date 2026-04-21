@@ -1,23 +1,13 @@
 import "message_showcase_text.cblc";
-import "message_showcase_stage.cblc";
-import "message_showcase_stage_total.cblc";
-import "message_showcase_snapshot.cblc";
 import "message_showcase_portfolio.cblc";
 import "message_showcase_memory.cblc";
 
-int stage_left;
-int stage_right;
-
 void main()
 {
+    display("CBL-C RENEWAL REVIEW");
     showcase_text();
-    print_stage();
-    stage_left = 19;
-    stage_right = 23;
-    print_stage_total(stage_left, stage_right);
-    showcase_snapshot();
     showcase_portfolio();
     showcase_memory();
-    display("FEATURE SHOWCASE COMPLETE");
+    display("REVIEW COMPLETE");
     return;
 }

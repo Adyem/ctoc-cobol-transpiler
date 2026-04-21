@@ -11,7 +11,7 @@ filesystem synchronized. The quick-start example pairs its COBOL artifact with t
 - **Purpose:** Supplies a compact program that exercises the parser and reverse emitter without relying on file I/O constructs.
 - **Constructs:** Minimal division headers, a single WORKING-STORAGE scalar, sequential `MOVE` statements, and a `STOP RUN` terminator.
 
-### `samples/example_project/hello_make_demo.cob`
+### `samples/example_project/cobol/hello_make_demo.cob`
 - **Purpose:** Serves as the COBOL counterpart to the example project greeting demo so both directions of the pipeline share a reference implementation.
 - **Constructs:** WORKING-STORAGE scalar buffer, literal `MOVE`, `DISPLAY`, and `STOP RUN` terminator.
 

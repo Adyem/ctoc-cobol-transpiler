@@ -930,7 +930,6 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
     {
         t_cblc_translation_unit *unit;
         char module_name[TRANSPILE_MODULE_NAME_MAX];
-        size_t import_index;
 
         module_indices[index] = static_cast<size_t>(-1);
         unit = &units[index];
@@ -942,39 +941,6 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
             goto cleanup;
-        }
-        if (cblc_parse_translation_unit(sources[index], unit) != FT_SUCCESS)
-        {
-            if (std::snprintf(message, sizeof(message), "Failed to parse CBL-C source '%s'",
-                    context->source_paths[index]) >= 0)
-                (void)pipeline_emit_error(context, message);
-            status = FT_FAILURE;
-            goto cleanup;
-        }
-        if (unit->function_count == 0)
-        {
-            if (std::snprintf(message, sizeof(message),
-                    "CBL-C source '%s' does not declare any functions;", context->source_paths[index]) >= 0)
-                (void)pipeline_emit_error(context, message);
-            status = FT_FAILURE;
-            goto cleanup;
-        }
-        else
-        {
-            size_t entry_index;
-
-            entry_index = unit->entry_function_index;
-            if (entry_index == static_cast<size_t>(-1) || entry_index >= unit->function_count)
-                entry_index = 0;
-            if (unit->functions[entry_index].return_kind != CBLC_FUNCTION_RETURN_VOID
-                && !unit->functions[entry_index].saw_return)
-            {
-                if (std::snprintf(message, sizeof(message),
-                        "CBL-C source '%s' is missing a terminating return;", context->source_paths[index]) >= 0)
-                    (void)pipeline_emit_error(context, message);
-                status = FT_FAILURE;
-                goto cleanup;
-            }
         }
         pipeline_choose_module_name(context->source_paths[index], unit, module_name,
             sizeof(module_name));
@@ -994,25 +960,99 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
             goto cleanup;
         }
         module_indices[index] = context->module_count - 1;
-        import_index = 0;
-        while (import_index < unit->import_count)
+        if (transpiler_context_scan_imports_for_module(context, module_name,
+                sources[index]) != FT_SUCCESS)
         {
-            if (transpiler_context_register_module_import(context, module_name,
-                    unit->imports[import_index].path) != FT_SUCCESS)
+            if (std::snprintf(message, sizeof(message),
+                    "Failed to scan imports for module '%s'", module_name) >= 0)
+                (void)pipeline_emit_error(context, message);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        index += 1;
+    }
+    if (transpiler_context_compute_module_initialization_order(context) != FT_SUCCESS)
+    {
+        (void)pipeline_emit_error(context, "Unable to compute module initialization order");
+        status = FT_FAILURE;
+        goto cleanup;
+    }
+    order = transpiler_context_get_module_initialization_order(context, &order_count);
+    if (!order || order_count == 0)
+    {
+        status = FT_FAILURE;
+        goto cleanup;
+    }
+    index = 0;
+    while (index < order_count)
+    {
+        size_t module_index;
+        size_t source_index;
+        t_cblc_translation_unit *unit;
+
+        module_index = order[index];
+        source_index = 0;
+        while (source_index < file_count)
+        {
+            if (module_indices[source_index] == module_index)
+                break ;
+            source_index += 1;
+        }
+        if (source_index >= file_count)
+        {
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        unit = &units[source_index];
+        if (cblc_import_translation_unit_type_stubs(context, module_names[source_index],
+                unit) != FT_SUCCESS)
+        {
+            if (std::snprintf(message, sizeof(message),
+                    "Failed to import type stubs for module '%s'", module_names[source_index]) >= 0)
+                (void)pipeline_emit_error(context, message);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        if (cblc_parse_translation_unit(sources[source_index], unit) != FT_SUCCESS)
+        {
+            if (std::snprintf(message, sizeof(message), "Failed to parse CBL-C source '%s'",
+                    context->source_paths[source_index]) >= 0)
+                (void)pipeline_emit_error(context, message);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        if (unit->function_count == 0)
+        {
+            if (std::snprintf(message, sizeof(message),
+                    "CBL-C source '%s' does not declare any functions;",
+                    context->source_paths[source_index]) >= 0)
+                (void)pipeline_emit_error(context, message);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        else
+        {
+            size_t entry_index;
+
+            entry_index = unit->entry_function_index;
+            if (entry_index == static_cast<size_t>(-1) || entry_index >= unit->function_count)
+                entry_index = 0;
+            if (unit->functions[entry_index].return_kind != CBLC_FUNCTION_RETURN_VOID
+                && !unit->functions[entry_index].saw_return)
             {
                 if (std::snprintf(message, sizeof(message),
-                        "Failed to register import '%s' for module '%s'", unit->imports[import_index].path,
-                        module_name) >= 0)
+                        "CBL-C source '%s' is missing a terminating return;",
+                        context->source_paths[source_index]) >= 0)
                     (void)pipeline_emit_error(context, message);
                 status = FT_FAILURE;
                 goto cleanup;
             }
-            import_index += 1;
         }
-        if (cblc_register_translation_unit_exports(context, module_name, unit) != FT_SUCCESS)
+        if (cblc_register_translation_unit_exports(context, module_names[source_index],
+                unit) != FT_SUCCESS)
         {
             if (std::snprintf(message, sizeof(message),
-                    "Failed to register exports for module '%s'", module_name) >= 0)
+                    "Failed to register exports for module '%s'", module_names[source_index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
             goto cleanup;
@@ -1031,18 +1071,6 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
             goto cleanup;
         }
         index += 1;
-    }
-    if (transpiler_context_compute_module_initialization_order(context) != FT_SUCCESS)
-    {
-        (void)pipeline_emit_error(context, "Unable to compute module initialization order");
-        status = FT_FAILURE;
-        goto cleanup;
-    }
-    order = transpiler_context_get_module_initialization_order(context, &order_count);
-    if (!order || order_count == 0)
-    {
-        status = FT_FAILURE;
-        goto cleanup;
     }
     ordered_units = static_cast<const t_cblc_translation_unit **>(cma_calloc(order_count,
         sizeof(*ordered_units)));
@@ -1232,7 +1260,6 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
     {
         t_cblc_translation_unit *unit;
         char module_name[TRANSPILE_MODULE_NAME_MAX];
-        size_t import_index;
 
         module_indices[index] = static_cast<size_t>(-1);
         unit = &units[index];
@@ -1244,39 +1271,6 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
             goto cleanup;
-        }
-        if (cblc_parse_translation_unit(sources[index], unit) != FT_SUCCESS)
-        {
-            if (std::snprintf(message, sizeof(message), "Failed to parse CBL-C source '%s'",
-                    context->source_paths[index]) >= 0)
-                (void)pipeline_emit_error(context, message);
-            status = FT_FAILURE;
-            goto cleanup;
-        }
-        if (unit->function_count == 0)
-        {
-            if (std::snprintf(message, sizeof(message),
-                    "CBL-C source '%s' does not declare any functions;", context->source_paths[index]) >= 0)
-                (void)pipeline_emit_error(context, message);
-            status = FT_FAILURE;
-            goto cleanup;
-        }
-        else
-        {
-            size_t entry_index;
-
-            entry_index = unit->entry_function_index;
-            if (entry_index == static_cast<size_t>(-1) || entry_index >= unit->function_count)
-                entry_index = 0;
-            if (unit->functions[entry_index].return_kind != CBLC_FUNCTION_RETURN_VOID
-                && !unit->functions[entry_index].saw_return)
-            {
-                if (std::snprintf(message, sizeof(message),
-                        "CBL-C source '%s' is missing a terminating return;", context->source_paths[index]) >= 0)
-                    (void)pipeline_emit_error(context, message);
-                status = FT_FAILURE;
-                goto cleanup;
-            }
         }
         pipeline_choose_module_name(context->source_paths[index], unit, module_name,
             sizeof(module_name));
@@ -1296,25 +1290,99 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
             goto cleanup;
         }
         module_indices[index] = context->module_count - 1;
-        import_index = 0;
-        while (import_index < unit->import_count)
+        if (transpiler_context_scan_imports_for_module(context, module_name, sources[index])
+            != FT_SUCCESS)
         {
-            if (transpiler_context_register_module_import(context, module_name,
-                    unit->imports[import_index].path) != FT_SUCCESS)
+            if (std::snprintf(message, sizeof(message),
+                    "Failed to scan imports for module '%s'", module_name) >= 0)
+                (void)pipeline_emit_error(context, message);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        index += 1;
+    }
+    if (transpiler_context_compute_module_initialization_order(context) != FT_SUCCESS)
+    {
+        (void)pipeline_emit_error(context, "Unable to compute module initialization order");
+        status = FT_FAILURE;
+        goto cleanup;
+    }
+    order = transpiler_context_get_module_initialization_order(context, &order_count);
+    if (!order || order_count == 0)
+    {
+        status = FT_FAILURE;
+        goto cleanup;
+    }
+    index = 0;
+    while (index < order_count)
+    {
+        size_t module_index;
+        size_t source_index;
+        t_cblc_translation_unit *unit;
+
+        module_index = order[index];
+        source_index = 0;
+        while (source_index < file_count)
+        {
+            if (module_indices[source_index] == module_index)
+                break ;
+            source_index += 1;
+        }
+        if (source_index >= file_count)
+        {
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        unit = &units[source_index];
+        if (cblc_import_translation_unit_type_stubs(context, module_names[source_index],
+                unit) != FT_SUCCESS)
+        {
+            if (std::snprintf(message, sizeof(message),
+                    "Failed to import type stubs for module '%s'", module_names[source_index]) >= 0)
+                (void)pipeline_emit_error(context, message);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        if (cblc_parse_translation_unit(sources[source_index], unit) != FT_SUCCESS)
+        {
+            if (std::snprintf(message, sizeof(message), "Failed to parse CBL-C source '%s'",
+                    context->source_paths[source_index]) >= 0)
+                (void)pipeline_emit_error(context, message);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        if (unit->function_count == 0)
+        {
+            if (std::snprintf(message, sizeof(message),
+                    "CBL-C source '%s' does not declare any functions;",
+                    context->source_paths[source_index]) >= 0)
+                (void)pipeline_emit_error(context, message);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        else
+        {
+            size_t entry_index;
+
+            entry_index = unit->entry_function_index;
+            if (entry_index == static_cast<size_t>(-1) || entry_index >= unit->function_count)
+                entry_index = 0;
+            if (unit->functions[entry_index].return_kind != CBLC_FUNCTION_RETURN_VOID
+                && !unit->functions[entry_index].saw_return)
             {
                 if (std::snprintf(message, sizeof(message),
-                        "Failed to register import '%s' for module '%s'", unit->imports[import_index].path,
-                        module_name) >= 0)
+                        "CBL-C source '%s' is missing a terminating return;",
+                        context->source_paths[source_index]) >= 0)
                     (void)pipeline_emit_error(context, message);
                 status = FT_FAILURE;
                 goto cleanup;
             }
-            import_index += 1;
         }
-        if (cblc_register_translation_unit_exports(context, module_name, unit) != FT_SUCCESS)
+        if (cblc_register_translation_unit_exports(context, module_names[source_index],
+                unit) != FT_SUCCESS)
         {
             if (std::snprintf(message, sizeof(message),
-                    "Failed to register exports for module '%s'", module_name) >= 0)
+                    "Failed to register exports for module '%s'", module_names[source_index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
             goto cleanup;
@@ -1333,18 +1401,6 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
             goto cleanup;
         }
         index += 1;
-    }
-    if (transpiler_context_compute_module_initialization_order(context) != FT_SUCCESS)
-    {
-        (void)pipeline_emit_error(context, "Unable to compute module initialization order");
-        status = FT_FAILURE;
-        goto cleanup;
-    }
-    order = transpiler_context_get_module_initialization_order(context, &order_count);
-    if (!order || order_count == 0)
-    {
-        status = FT_FAILURE;
-        goto cleanup;
     }
     ordered_units = static_cast<const t_cblc_translation_unit **>(cma_calloc(order_count,
         sizeof(*ordered_units)));

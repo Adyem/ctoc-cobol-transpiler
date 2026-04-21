@@ -19,6 +19,13 @@ int test_transpiler_context_allows_private_access_within_module(void);
 int test_transpiler_context_rejects_private_access_across_modules(void);
 int test_transpiler_context_allows_public_access_across_modules(void);
 int test_transpiler_context_requires_import_for_cross_module_access(void);
+int test_transpiler_context_resolves_imported_public_type(void);
+int test_transpiler_context_requires_import_for_cross_module_type_access(void);
+int test_cblc_register_translation_unit_exports_records_class_type_metadata(void);
+int test_cblc_import_type_stubs_allow_direct_imported_class_declaration(void);
+int test_cblc_import_type_stubs_reject_private_imported_methods(void);
+int test_cblc_import_type_stubs_merge_direct_definition_exports_for_method_calls(void);
+int test_cblc_import_type_stubs_do_not_follow_transitive_imports(void);
 int test_cblc_register_translation_unit_exports_records_entrypoint_and_helpers(void);
 int test_cblc_register_translation_unit_exports_skips_entrypoint_without_main(void);
 int test_cblc_register_translation_unit_exports_reports_duplicate_entrypoint(void);
@@ -87,6 +94,13 @@ const t_test_case *get_transpiler_context_tests(size_t *count)
         {"transpiler_context_rejects_private_access_across_modules", test_transpiler_context_rejects_private_access_across_modules},
         {"transpiler_context_allows_public_access_across_modules", test_transpiler_context_allows_public_access_across_modules},
         {"transpiler_context_requires_import_for_cross_module_access", test_transpiler_context_requires_import_for_cross_module_access},
+        {"transpiler_context_resolves_imported_public_type", test_transpiler_context_resolves_imported_public_type},
+        {"transpiler_context_requires_import_for_cross_module_type_access", test_transpiler_context_requires_import_for_cross_module_type_access},
+        {"cblc_register_translation_unit_exports_records_class_type_metadata", test_cblc_register_translation_unit_exports_records_class_type_metadata},
+        {"cblc_import_type_stubs_allow_direct_imported_class_declaration", test_cblc_import_type_stubs_allow_direct_imported_class_declaration},
+        {"cblc_import_type_stubs_reject_private_imported_methods", test_cblc_import_type_stubs_reject_private_imported_methods},
+        {"cblc_import_type_stubs_merge_direct_definition_exports_for_method_calls", test_cblc_import_type_stubs_merge_direct_definition_exports_for_method_calls},
+        {"cblc_import_type_stubs_do_not_follow_transitive_imports", test_cblc_import_type_stubs_do_not_follow_transitive_imports},
         {"cblc_register_translation_unit_exports_records_entrypoint_and_helpers", test_cblc_register_translation_unit_exports_records_entrypoint_and_helpers},
         {"cblc_register_translation_unit_exports_skips_entrypoint_without_main", test_cblc_register_translation_unit_exports_skips_entrypoint_without_main},
         {"cblc_register_translation_unit_exports_reports_duplicate_entrypoint", test_cblc_register_translation_unit_exports_reports_duplicate_entrypoint},

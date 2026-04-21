@@ -30,4 +30,4 @@ samples/cobol/project_scheduler/project_scheduler_metrics.cob
 samples/cobol/project_scheduler/project_scheduler_presenter.cob
 samples/cobol/project_scheduler/project_scheduler_main.cob
 samples/cobol/minimal_program.cob
-samples/example_project/hello_make_demo.cob
+samples/example_project/cobol/hello_make_demo.cob

@@ -1157,6 +1157,121 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_parse_translation_unit_records_out_of_class_method_definitions)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    public:\n"
+        "    int value;\n"
+        "    void reset();\n"
+        "    int current();\n"
+        "};\n"
+        "void Counter::reset() {\n"
+        "    value = 0;\n"
+        "    return;\n"
+        "}\n"
+        "int Counter::current() {\n"
+        "    return value;\n"
+        "}\n"
+        "Counter counter;\n"
+        "void main()\n"
+        "{\n"
+        "    counter.reset();\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "out-of-class method sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(unit.struct_types[1].method_count, 2,
+            "class should retain declared methods") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(unit.struct_types[1].methods[0].has_definition, 1,
+            "first declared method should gain a later definition") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(unit.struct_types[1].methods[1].has_definition, 1,
+            "second declared method should gain a later definition") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_emits_out_of_class_method_definitions)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    public:\n"
+        "    int value;\n"
+        "    Counter(int start);\n"
+        "    void add(int delta);\n"
+        "    int current();\n"
+        "};\n"
+        "Counter::Counter(int start) {\n"
+        "    value = start;\n"
+        "}\n"
+        "void Counter::add(int delta) {\n"
+        "    value = value + delta;\n"
+        "    return;\n"
+        "}\n"
+        "int Counter::current() {\n"
+        "    return value;\n"
+        "}\n"
+        "Counter counter(7);\n"
+        "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    counter.add(2);\n"
+        "    total = counter.current();\n"
+        "    display(total);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "out-of-class lifecycle sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "out-of-class lifecycle sample should emit C") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "Counter__add__delta = 2;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should assign method argument before out-of-class body execution\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "counter.value = counter.value + Counter__add__delta;",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should inline out-of-class method bodies against receiver\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "total = counter.value;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should inline out-of-class int methods against receiver\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_generate_c_emits_class_methods)
 {
     const char *source;

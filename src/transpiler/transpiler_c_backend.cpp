@@ -574,11 +574,16 @@ static int c_backend_map_identifier_to_c(const t_cblc_translation_unit *unit, co
     char suffix[16];
     char index_expression[TRANSPILE_STATEMENT_TEXT_MAX];
     char translated_index[TRANSPILE_STATEMENT_TEXT_MAX];
+    char token_copy[TRANSPILE_STATEMENT_TEXT_MAX];
     int has_index;
     size_t one_based_index;
 
     if (!unit || !token || !buffer || buffer_size == 0)
         return (FT_FAILURE);
+    if (std::strlen(token) + 1 > sizeof(token_copy))
+        return (FT_FAILURE);
+    std::memcpy(token_copy, token, std::strlen(token) + 1);
+    token = token_copy;
     if (token[0] == '&' || token[0] == '*')
     {
         char mapped[TRANSPILE_STATEMENT_TEXT_MAX];

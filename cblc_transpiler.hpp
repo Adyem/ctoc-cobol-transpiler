@@ -311,6 +311,75 @@ typedef struct s_transpiler_function_signature
     size_t parameter_count;
 }   t_transpiler_function_signature;
 
+typedef enum e_transpiler_type_kind
+{
+    TRANSPILE_TYPE_STRUCT = 0,
+    TRANSPILE_TYPE_CLASS
+}   t_transpiler_type_kind;
+
+typedef struct s_cblc_statement t_cblc_statement;
+
+typedef struct s_transpiler_type_field_signature
+{
+    char name[TRANSPILE_IDENTIFIER_MAX];
+    char declared_type_name[TRANSPILE_IDENTIFIER_MAX];
+    char struct_type_name[TRANSPILE_IDENTIFIER_MAX];
+    size_t length;
+    size_t array_count;
+    int kind;
+    int is_const;
+    t_transpiler_symbol_visibility visibility;
+}   t_transpiler_type_field_signature;
+
+typedef struct s_transpiler_type_method_signature
+{
+    char name[TRANSPILE_IDENTIFIER_MAX];
+    t_transpiler_function_parameter_kind parameter_kinds[TRANSPILE_FUNCTION_PARAMETER_MAX];
+    char parameter_source_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    char parameter_actual_source_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    char parameter_cobol_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    char parameter_type_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    size_t parameter_count;
+    int return_kind;
+    char return_type_name[TRANSPILE_IDENTIFIER_MAX];
+    t_transpiler_symbol_visibility visibility;
+    t_cblc_statement *statements;
+    size_t statement_count;
+    int has_definition;
+}   t_transpiler_type_method_signature;
+
+typedef struct s_transpiler_type_constructor_signature
+{
+    t_transpiler_function_parameter_kind parameter_kinds[TRANSPILE_FUNCTION_PARAMETER_MAX];
+    char parameter_source_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    char parameter_actual_source_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    char parameter_cobol_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    char parameter_type_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    size_t parameter_count;
+    t_cblc_statement *statements;
+    size_t statement_count;
+    int has_definition;
+}   t_transpiler_type_constructor_signature;
+
+typedef struct s_transpiler_type_signature
+{
+    char name[TRANSPILE_IDENTIFIER_MAX];
+    char module[TRANSPILE_MODULE_NAME_MAX];
+    t_transpiler_type_kind kind;
+    t_transpiler_symbol_visibility visibility;
+    t_transpiler_type_field_signature *fields;
+    size_t field_count;
+    t_transpiler_type_method_signature *methods;
+    size_t method_count;
+    t_transpiler_type_constructor_signature *constructors;
+    size_t constructor_count;
+    int has_default_constructor;
+    int has_destructor;
+    t_cblc_statement *destructor_statements;
+    size_t destructor_statement_count;
+    int has_destructor_definition;
+}   t_transpiler_type_signature;
+
 #define TRANSPILE_ERROR_FUNCTION_RETURNS_VALUE 1001
 #define TRANSPILE_ERROR_ENTRYPOINT_INVALID_NAME 1002
 #define TRANSPILE_ERROR_ENTRYPOINT_ARGUMENT_MISMATCH 1003
@@ -331,6 +400,9 @@ typedef struct s_transpiler_function_signature
 #define TRANSPILE_ERROR_FUNCTION_EXTERNAL_RETURN_UNSUPPORTED 1018
 #define TRANSPILE_ERROR_FUNCTION_ARGUMENT_COUNT_MISMATCH 1019
 #define TRANSPILE_ERROR_FUNCTION_EXTERNAL_PARAMETERS_UNSUPPORTED 1020
+#define TRANSPILE_ERROR_TYPE_DUPLICATE_NAME 1021
+#define TRANSPILE_ERROR_TYPE_EXPORT_CONFLICT 1022
+#define TRANSPILE_ERROR_TYPE_PRIVATE_ACCESS 1023
 
 typedef enum e_transpiler_file_role
 {
@@ -535,6 +607,9 @@ typedef struct s_transpiler_context
     t_transpiler_function_signature *functions;
     size_t function_count;
     size_t function_capacity;
+    t_transpiler_type_signature *types;
+    size_t type_count;
+    size_t type_capacity;
     t_transpiler_file_declaration *files;
     size_t file_count;
     size_t file_capacity;
@@ -595,6 +670,8 @@ int transpiler_context_register_module(t_transpiler_context *context, const char
 const t_transpiler_module *transpiler_context_get_modules(const t_transpiler_context *context, size_t *count);
 const t_transpiler_function_signature *transpiler_context_get_functions(const t_transpiler_context *context,
     size_t *count);
+const t_transpiler_type_signature *transpiler_context_get_types(const t_transpiler_context *context,
+    size_t *count);
 int transpiler_context_register_module_import(t_transpiler_context *context, const char *module_name,
     const char *import_path);
 int transpiler_context_scan_imports_for_module(t_transpiler_context *context, const char *module_name,
@@ -610,6 +687,12 @@ int transpiler_context_register_function_signature(t_transpiler_context *context
 const t_transpiler_function_signature *transpiler_context_find_function(const t_transpiler_context *context,
     const char *module_name, const char *name);
 const t_transpiler_function_signature *transpiler_context_resolve_function_access(t_transpiler_context *context,
+    const char *requesting_module, const char *module_name, const char *name);
+int transpiler_context_register_type_signature(t_transpiler_context *context, const char *module_name,
+    const t_transpiler_type_signature *signature);
+const t_transpiler_type_signature *transpiler_context_find_type(const t_transpiler_context *context,
+    const char *module_name, const char *name);
+const t_transpiler_type_signature *transpiler_context_resolve_type_access(t_transpiler_context *context,
     const char *requesting_module, const char *module_name, const char *name);
 int transpiler_context_register_entrypoint(t_transpiler_context *context, const char *module_name, const char *name,
     t_transpiler_function_return_mode return_mode, const char *argc_identifier, const char *argv_identifier);
@@ -1110,8 +1193,6 @@ typedef enum e_cblc_member_visibility
 
 #define TRANSPILE_STATEMENT_TEXT_MAX 256
 
-typedef struct s_cblc_statement t_cblc_statement;
-
 typedef struct s_cblc_data_item
 {
     char source_name[TRANSPILE_IDENTIFIER_MAX];
@@ -1168,6 +1249,7 @@ typedef struct s_cblc_method
     t_cblc_statement *statements;
     size_t statement_count;
     size_t statement_capacity;
+    int has_definition;
 }   t_cblc_method;
 
 typedef struct s_cblc_constructor
@@ -1177,6 +1259,7 @@ typedef struct s_cblc_constructor
     t_cblc_statement *statements;
     size_t statement_count;
     size_t statement_capacity;
+    int has_definition;
 }   t_cblc_constructor;
 
 typedef struct s_cblc_struct_type
@@ -1191,11 +1274,13 @@ typedef struct s_cblc_struct_type
     size_t method_capacity;
     int is_class;
     int is_builtin;
+    int is_imported;
     int has_default_constructor;
     t_cblc_constructor *constructors;
     size_t constructor_count;
     size_t constructor_capacity;
     int has_destructor;
+    int has_destructor_definition;
     t_cblc_statement *destructor_statements;
     size_t destructor_statement_count;
     size_t destructor_statement_capacity;
@@ -1287,6 +1372,8 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text);
 int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text);
 int cblc_register_translation_unit_exports(t_transpiler_context *context, const char *module_name,
     const t_cblc_translation_unit *unit);
+int cblc_import_translation_unit_type_stubs(t_transpiler_context *context, const char *module_name,
+    t_cblc_translation_unit *unit);
 int cblc_resolve_translation_unit_calls(t_transpiler_context *context, const char *module_name,
     t_cblc_translation_unit *unit);
 

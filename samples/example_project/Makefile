@@ -11,7 +11,8 @@ COBC ?= cobc
 SETUP_SENTINEL := .environment_ready
 PROGRAM_NAME := hello_make_demo
 CBLC_SRC := $(abspath $(PROGRAM_NAME).cblc)
-COB_OUTPUT := $(PROGRAM_NAME).cob
+COB_DIR := cobol
+COB_OUTPUT := $(COB_DIR)/$(PROGRAM_NAME).cob
 EXECUTABLE := $(PROGRAM_NAME)$(EXE_EXT)
 
 .PHONY: all clean run transpile compile compiler ensure_environment ensure_cobc
@@ -29,6 +30,7 @@ $(EXECUTABLE): $(COB_OUTPUT) | ensure_cobc
 	$(COBC) -x -o $@ $<
 
 $(COB_OUTPUT): $(CBLC_SRC) $(TRANSPILER)
+	mkdir -p $(COB_DIR)
 	$(TRANSPILER) --direction cblc-to-cobol \
 		--input $(CBLC_SRC) \
 		--output $@ \
@@ -43,7 +45,7 @@ compiler: $(TRANSPILER)
 ensure_environment: $(SETUP_SENTINEL)
 
 $(SETUP_SENTINEL):
-	$(MAKE) -C $(REPO_ROOT) initialize
+	$(MAKE) -C $(REPO_ROOT) all
 	$(MAKE) -C $(REPO_ROOT) install_cobc
 	touch $(SETUP_SENTINEL)
 
@@ -62,3 +64,4 @@ $(TRANSPILER): | $(SETUP_SENTINEL)
 
 clean:
 	rm -f $(COB_OUTPUT) $(EXECUTABLE) $(SETUP_SENTINEL)
+	rmdir $(COB_DIR) 2>/dev/null || true

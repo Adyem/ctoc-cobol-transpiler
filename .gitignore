@@ -5,3 +5,6 @@ imported_test_failures.log
 objs/
 objs_tests/
 samples/example_project/build/
+samples/example_project/.environment_ready
+samples/example_project/hello_make_demo
+samples/feature_showcase/actual_output.log

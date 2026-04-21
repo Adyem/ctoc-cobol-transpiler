@@ -1,42 +1,38 @@
-CBL-C FEATURE SHOWCASE
-Title length
-+000000022
-Literal length
+CBL-C RENEWAL REVIEW
+RENEWAL RISK REVIEW
+Title chars
++000000019
+Literal chars
 +000000013
-UNDERWRITING + CLAIMS
-Summary length
-+000000021
-Function call OK
-Parameterized import value
-+000000042
+FAST PATH
+Note chars
++000000009
 RISK
-Snapshot id
+Report id
 +000000007
-Policies in force
+Policies
 +000001250
-Claims reported
-+000000032
-Open investigations
-+000000005
-Loss ratio percent
-+000000015
-Claim clearance delta
+Net claims
 +000000027
-Reserve target gap
+Loss ratio
++000000015
+Reserve gap
 +000120000
 UNDERWRITING
 CLAIMS
-Module count
+Active desks
 +000000002
-Array value
-+000000084
-Pointer arithmetic value
-+000000084
-Char pointer value
-B
-Pointer return value
-+000000041
-FEATURE SHOWCASE COMPLETE
+Imported total
++000000042
+Selected score
++000000088
+Adjusted score
++000000092
+Grade
+A
+Score by address
++000000088
+REVIEW COMPLETE
 Standard library functions bundled with the showcase:
 stdlib/CBLC-ABS.cob
 stdlib/CBLC-ABS.so

@@ -1210,14 +1210,13 @@ static int cblc_parse_return(const char **cursor, t_cblc_translation_unit *unit,
     }
     else if (function->return_kind == CBLC_FUNCTION_RETURN_STRUCT)
     {
-        if (cblc_parse_identifier(cursor, expression, sizeof(expression)) != FT_SUCCESS)
+        if (cblc_parse_data_reference_text(cursor, unit, &item, NULL, expression,
+                sizeof(expression)) != FT_SUCCESS)
             return (FT_FAILURE);
-        item = cblc_find_data_item(unit, expression);
         if (!item || item->kind != CBLC_DATA_KIND_STRUCT
             || std::strncmp(item->struct_type_name, function->return_type_name,
                 sizeof(item->struct_type_name)) != 0)
             return (FT_FAILURE);
-        ft_strlcpy(expression, item->cobol_name, sizeof(expression));
     }
     else if (function->return_kind == CBLC_FUNCTION_RETURN_VOID_POINTER
         || function->return_kind == CBLC_FUNCTION_RETURN_CHAR_POINTER

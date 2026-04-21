@@ -139,6 +139,8 @@ int test_cblc_inline_string_clear_then_len_translates_to_cobol_and_executes(void
 int test_cblc_inline_class_string_method_chain_translates_to_cobol_and_executes(void);
 int test_cblc_inline_class_method_accepts_struct_argument_translates_to_cobol_and_executes(void);
 int test_cblc_inline_class_method_returns_struct_field_translates_to_cobol_and_executes(void);
+int test_cblc_inline_function_returns_nested_struct_field_translates_to_cobol_and_executes(void);
+int test_cblc_inline_method_returns_nested_struct_field_translates_to_cobol_and_executes(void);
 int test_cblc_inline_void_pointer_parameter_updates_int_translates_to_cobol_and_executes(void);
 int test_cblc_inline_allocated_void_pointer_round_trip_write_translates_to_cobol_and_executes(void);
 int test_cblc_inline_pointer_offset_read_after_reassign_translates_to_cobol_and_executes(void);
@@ -550,6 +552,10 @@ const t_test_case *get_compiler_cobol_round_trip_pipeline_tests(size_t *count)
             test_cblc_inline_class_method_accepts_struct_argument_translates_to_cobol_and_executes},
         {"cblc_inline_class_method_returns_struct_field_translates_to_cobol_and_executes",
             test_cblc_inline_class_method_returns_struct_field_translates_to_cobol_and_executes},
+        {"cblc_inline_function_returns_nested_struct_field_translates_to_cobol_and_executes",
+            test_cblc_inline_function_returns_nested_struct_field_translates_to_cobol_and_executes},
+        {"cblc_inline_method_returns_nested_struct_field_translates_to_cobol_and_executes",
+            test_cblc_inline_method_returns_nested_struct_field_translates_to_cobol_and_executes},
         {"cblc_inline_void_pointer_parameter_updates_int_translates_to_cobol_and_executes",
             test_cblc_inline_void_pointer_parameter_updates_int_translates_to_cobol_and_executes},
         {"cblc_inline_allocated_void_pointer_round_trip_write_translates_to_cobol_and_executes",

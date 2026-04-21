@@ -853,6 +853,69 @@ FT_TEST(test_cblc_inline_class_method_returns_struct_field_translates_to_cobol_a
             "inline_class_method_returns_struct_field_generated", "+000000031\n"));
 }
 
+FT_TEST(test_cblc_inline_function_returns_nested_struct_field_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "struct Point\n"
+        "{\n"
+        "    int x;\n"
+        "};\n"
+        "struct Envelope\n"
+        "{\n"
+        "    Point point;\n"
+        "};\n"
+        "Envelope envelope;\n"
+        "Point point;\n"
+        "Point pick_point()\n"
+        "{\n"
+        "    return envelope.point;\n"
+        "}\n"
+        "void main()\n"
+        "{\n"
+        "    envelope.point.x = 44;\n"
+        "    point = pick_point();\n"
+        "    display(point.x);\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_function_returns_nested_struct_field_generated", "+000000044\n"));
+}
+
+FT_TEST(test_cblc_inline_method_returns_nested_struct_field_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "struct Point\n"
+        "{\n"
+        "    int x;\n"
+        "};\n"
+        "struct Envelope\n"
+        "{\n"
+        "    Point point;\n"
+        "};\n"
+        "class Picker\n"
+        "{\n"
+        "    public:\n"
+        "    Envelope envelope;\n"
+        "    Point current()\n"
+        "    {\n"
+        "        return envelope.point;\n"
+        "    }\n"
+        "};\n"
+        "Picker picker;\n"
+        "Point point;\n"
+        "void main()\n"
+        "{\n"
+        "    picker.envelope.point.x = 57;\n"
+        "    point = picker.current();\n"
+        "    display(point.x);\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_method_returns_nested_struct_field_generated", "+000000057\n"));
+}
+
 FT_TEST(test_cblc_inline_void_pointer_parameter_updates_int_translates_to_cobol_and_executes)
 {
     const char *source;

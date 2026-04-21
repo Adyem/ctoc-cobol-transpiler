@@ -11,9 +11,10 @@ TRANSPILER := $(REPO_ROOT)/ctoc_cobol_transpiler$(EXE_EXT)
 COBC ?= cobc
 
 MAIN_PROGRAM := message_showcase
-CBLC_MODULES := message_showcase message_showcase_text message_showcase_stage message_showcase_stage_total message_showcase_snapshot message_showcase_portfolio message_showcase_memory
+CBLC_MODULES := message_showcase message_showcase_text message_showcase_portfolio message_showcase_memory
 CBLC_SOURCES := $(addsuffix .cblc,$(CBLC_MODULES))
-GENERATED_COB := $(addsuffix .cob,$(CBLC_MODULES))
+COB_DIR := cobol
+GENERATED_COB := $(addprefix $(COB_DIR)/,$(addsuffix .cob,$(CBLC_MODULES)))
 EXECUTABLES := $(MAIN_PROGRAM)$(EXE_EXT)
 
 STD_DIR := stdlib
@@ -53,6 +54,7 @@ $(MAIN_PROGRAM)$(EXE_EXT): $(GENERATED_COB) | ensure_cobc
 	$(COBC) -x -free -o $@ $(GENERATED_COB)
 
 $(GENERATED_COB): $(CBLC_SOURCES) $(TRANSPILER)
+	mkdir -p $(COB_DIR)
 	$(TRANSPILER) --direction cblc-to-cobol \
 		$(foreach source,$(CBLC_SOURCES),--input $(abspath $(source)) ) \
 		$(foreach output,$(GENERATED_COB),--output $(abspath $(output)) ) \
@@ -102,4 +104,5 @@ $(TRANSPILER): | $(SETUP_SENTINEL)
 clean:
 	rm -f $(GENERATED_COB) $(EXECUTABLES) $(SETUP_SENTINEL) $(STD_SENTINEL) $(ACTUAL_OUTPUT)
 	rm -f $(STD_MODULES)
+	rmdir $(COB_DIR) 2>/dev/null || true
 	rm -rf $(STD_DIR)

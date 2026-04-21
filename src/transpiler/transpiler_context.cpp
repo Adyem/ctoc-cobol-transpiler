@@ -853,6 +853,299 @@ static int transpiler_context_functions_reserve(t_transpiler_context *context, s
     return (FT_SUCCESS);
 }
 
+static int transpiler_context_types_reserve(t_transpiler_context *context, size_t desired_capacity)
+{
+    t_transpiler_type_signature *new_types;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    if (context->type_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    new_types = static_cast<t_transpiler_type_signature *>(cma_calloc(desired_capacity,
+        sizeof(t_transpiler_type_signature)));
+    if (!new_types)
+        return (FT_FAILURE);
+    if (context->types)
+    {
+        std::memcpy(new_types, context->types,
+            context->type_count * sizeof(t_transpiler_type_signature));
+        cma_free(context->types);
+    }
+    context->types = new_types;
+    context->type_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
+static void transpiler_context_type_signature_clear(t_transpiler_type_signature *signature)
+{
+    size_t index;
+
+    if (!signature)
+        return ;
+    if (signature->methods)
+    {
+        index = 0;
+        while (index < signature->method_count)
+        {
+            if (signature->methods[index].statements)
+                cma_free(signature->methods[index].statements);
+            index += 1;
+        }
+    }
+    if (signature->constructors)
+    {
+        index = 0;
+        while (index < signature->constructor_count)
+        {
+            if (signature->constructors[index].statements)
+                cma_free(signature->constructors[index].statements);
+            index += 1;
+        }
+    }
+    if (signature->fields)
+        cma_free(signature->fields);
+    if (signature->methods)
+        cma_free(signature->methods);
+    if (signature->constructors)
+        cma_free(signature->constructors);
+    if (signature->destructor_statements)
+        cma_free(signature->destructor_statements);
+    std::memset(signature, 0, sizeof(*signature));
+    return ;
+}
+
+static void transpiler_context_clear_type_signatures(t_transpiler_context *context)
+{
+    size_t index;
+
+    if (!context || !context->types)
+        return ;
+    index = 0;
+    while (index < context->type_count)
+    {
+        transpiler_context_type_signature_clear(&context->types[index]);
+        index += 1;
+    }
+    context->type_count = 0;
+    return ;
+}
+
+static int transpiler_context_type_signature_copy(t_transpiler_type_signature *destination,
+    const t_transpiler_type_signature *source_signature)
+{
+    if (!destination || !source_signature)
+        return (FT_FAILURE);
+    std::memset(destination, 0, sizeof(*destination));
+    *destination = *source_signature;
+    destination->fields = NULL;
+    destination->methods = NULL;
+    destination->constructors = NULL;
+    if (source_signature->field_count > 0 && source_signature->fields)
+    {
+        destination->fields = static_cast<t_transpiler_type_field_signature *>(cma_calloc(
+            source_signature->field_count, sizeof(*destination->fields)));
+        if (!destination->fields)
+            return (FT_FAILURE);
+        std::memcpy(destination->fields, source_signature->fields,
+            source_signature->field_count * sizeof(*destination->fields));
+    }
+    if (source_signature->method_count > 0 && source_signature->methods)
+    {
+        size_t index;
+
+        destination->methods = static_cast<t_transpiler_type_method_signature *>(cma_calloc(
+            source_signature->method_count, sizeof(*destination->methods)));
+        if (!destination->methods)
+        {
+            transpiler_context_type_signature_clear(destination);
+            return (FT_FAILURE);
+        }
+        std::memcpy(destination->methods, source_signature->methods,
+            source_signature->method_count * sizeof(*destination->methods));
+        index = 0;
+        while (index < source_signature->method_count)
+        {
+            destination->methods[index].statements = NULL;
+            if (source_signature->methods[index].statement_count > 0
+                && source_signature->methods[index].statements)
+            {
+                destination->methods[index].statements = static_cast<t_cblc_statement *>(
+                    cma_calloc(source_signature->methods[index].statement_count,
+                        sizeof(*destination->methods[index].statements)));
+                if (!destination->methods[index].statements)
+                {
+                    transpiler_context_type_signature_clear(destination);
+                    return (FT_FAILURE);
+                }
+                std::memcpy(destination->methods[index].statements,
+                    source_signature->methods[index].statements,
+                    source_signature->methods[index].statement_count
+                        * sizeof(*destination->methods[index].statements));
+            }
+            index += 1;
+        }
+    }
+    if (source_signature->constructor_count > 0 && source_signature->constructors)
+    {
+        size_t index;
+
+        destination->constructors = static_cast<t_transpiler_type_constructor_signature *>(
+            cma_calloc(source_signature->constructor_count, sizeof(*destination->constructors)));
+        if (!destination->constructors)
+        {
+            transpiler_context_type_signature_clear(destination);
+            return (FT_FAILURE);
+        }
+        std::memcpy(destination->constructors, source_signature->constructors,
+            source_signature->constructor_count * sizeof(*destination->constructors));
+        index = 0;
+        while (index < source_signature->constructor_count)
+        {
+            destination->constructors[index].statements = NULL;
+            if (source_signature->constructors[index].statement_count > 0
+                && source_signature->constructors[index].statements)
+            {
+                destination->constructors[index].statements = static_cast<t_cblc_statement *>(
+                    cma_calloc(source_signature->constructors[index].statement_count,
+                        sizeof(*destination->constructors[index].statements)));
+                if (!destination->constructors[index].statements)
+                {
+                    transpiler_context_type_signature_clear(destination);
+                    return (FT_FAILURE);
+                }
+                std::memcpy(destination->constructors[index].statements,
+                    source_signature->constructors[index].statements,
+                    source_signature->constructors[index].statement_count
+                        * sizeof(*destination->constructors[index].statements));
+            }
+            index += 1;
+        }
+    }
+    if (source_signature->destructor_statement_count > 0
+        && source_signature->destructor_statements)
+    {
+        destination->destructor_statements = static_cast<t_cblc_statement *>(cma_calloc(
+            source_signature->destructor_statement_count,
+            sizeof(*destination->destructor_statements)));
+        if (!destination->destructor_statements)
+        {
+            transpiler_context_type_signature_clear(destination);
+            return (FT_FAILURE);
+        }
+        std::memcpy(destination->destructor_statements,
+            source_signature->destructor_statements,
+            source_signature->destructor_statement_count
+                * sizeof(*destination->destructor_statements));
+    }
+    return (FT_SUCCESS);
+}
+
+static int transpiler_context_type_method_signatures_compatible(
+    const t_transpiler_type_method_signature *left,
+    const t_transpiler_type_method_signature *right)
+{
+    size_t index;
+
+    if (!left || !right)
+        return (0);
+    if (std::strncmp(left->name, right->name, sizeof(left->name)) != 0
+        || left->parameter_count != right->parameter_count
+        || left->return_kind != right->return_kind
+        || left->visibility != right->visibility
+        || std::strncmp(left->return_type_name, right->return_type_name,
+            sizeof(left->return_type_name)) != 0)
+        return (0);
+    index = 0;
+    while (index < left->parameter_count)
+    {
+        if (left->parameter_kinds[index] != right->parameter_kinds[index]
+            || std::strncmp(left->parameter_type_names[index],
+                right->parameter_type_names[index],
+                sizeof(left->parameter_type_names[index])) != 0)
+            return (0);
+        index += 1;
+    }
+    return (1);
+}
+
+static int transpiler_context_type_constructor_signatures_compatible(
+    const t_transpiler_type_constructor_signature *left,
+    const t_transpiler_type_constructor_signature *right)
+{
+    size_t index;
+
+    if (!left || !right)
+        return (0);
+    if (left->parameter_count != right->parameter_count)
+        return (0);
+    index = 0;
+    while (index < left->parameter_count)
+    {
+        if (left->parameter_kinds[index] != right->parameter_kinds[index]
+            || std::strncmp(left->parameter_type_names[index],
+                right->parameter_type_names[index],
+                sizeof(left->parameter_type_names[index])) != 0)
+            return (0);
+        index += 1;
+    }
+    return (1);
+}
+
+static int transpiler_context_type_signatures_compatible(
+    const t_transpiler_type_signature *left, const t_transpiler_type_signature *right)
+{
+    size_t index;
+
+    if (!left || !right)
+        return (0);
+    if (left->kind != right->kind
+        || std::strncmp(left->name, right->name, sizeof(left->name)) != 0
+        || left->field_count != right->field_count
+        || left->method_count != right->method_count
+        || left->constructor_count != right->constructor_count
+        || left->has_default_constructor != right->has_default_constructor
+        || left->has_destructor != right->has_destructor)
+        return (0);
+    index = 0;
+    while (index < left->field_count)
+    {
+        if (std::strncmp(left->fields[index].name, right->fields[index].name,
+                sizeof(left->fields[index].name)) != 0
+            || std::strncmp(left->fields[index].declared_type_name,
+                right->fields[index].declared_type_name,
+                sizeof(left->fields[index].declared_type_name)) != 0
+            || std::strncmp(left->fields[index].struct_type_name,
+                right->fields[index].struct_type_name,
+                sizeof(left->fields[index].struct_type_name)) != 0
+            || left->fields[index].length != right->fields[index].length
+            || left->fields[index].array_count != right->fields[index].array_count
+            || left->fields[index].kind != right->fields[index].kind
+            || left->fields[index].is_const != right->fields[index].is_const
+            || left->fields[index].visibility != right->fields[index].visibility)
+            return (0);
+        index += 1;
+    }
+    index = 0;
+    while (index < left->method_count)
+    {
+        if (!transpiler_context_type_method_signatures_compatible(&left->methods[index],
+                &right->methods[index]))
+            return (0);
+        index += 1;
+    }
+    index = 0;
+    while (index < left->constructor_count)
+    {
+        if (!transpiler_context_type_constructor_signatures_compatible(
+                &left->constructors[index], &right->constructors[index]))
+            return (0);
+        index += 1;
+    }
+    return (1);
+}
+
 static int transpiler_context_modules_reserve(t_transpiler_context *context, size_t desired_capacity)
 {
     t_transpiler_module *modules;
@@ -1310,6 +1603,9 @@ int transpiler_context_init(t_transpiler_context *context)
     context->functions = NULL;
     context->function_count = 0;
     context->function_capacity = 0;
+    context->types = NULL;
+    context->type_count = 0;
+    context->type_capacity = 0;
     context->files = NULL;
     context->file_count = 0;
     context->file_capacity = 0;
@@ -1512,6 +1808,12 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->functions = NULL;
     context->function_count = 0;
     context->function_capacity = 0;
+    transpiler_context_clear_type_signatures(context);
+    if (context->types)
+        cma_free(context->types);
+    context->types = NULL;
+    context->type_count = 0;
+    context->type_capacity = 0;
     if (context->files)
         cma_free(context->files);
     context->files = NULL;
@@ -1792,6 +2094,7 @@ void transpiler_context_reset_unit_state(t_transpiler_context *context)
     context->active_source_text = NULL;
     context->active_source_length = 0;
     context->function_count = 0;
+    transpiler_context_clear_type_signatures(context);
     context->file_count = 0;
     context->module_order_count = 0;
     ft_bzero(&context->entrypoint, sizeof(context->entrypoint));
@@ -2218,6 +2521,16 @@ const t_transpiler_function_signature *transpiler_context_get_functions(const t_
     return (context->functions);
 }
 
+const t_transpiler_type_signature *transpiler_context_get_types(const t_transpiler_context *context,
+    size_t *count)
+{
+    if (!context)
+        return (NULL);
+    if (count)
+        *count = context->type_count;
+    return (context->types);
+}
+
 int transpiler_context_register_module_import(t_transpiler_context *context, const char *module_name,
     const char *import_path)
 {
@@ -2635,6 +2948,149 @@ const t_transpiler_function_signature *transpiler_context_resolve_function_acces
     transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
         TRANSPILE_ERROR_FUNCTION_PRIVATE_ACCESS, message);
     transpiler_context_record_error(context, TRANSPILE_ERROR_FUNCTION_PRIVATE_ACCESS);
+    return (NULL);
+}
+
+int transpiler_context_register_type_signature(t_transpiler_context *context, const char *module_name,
+    const t_transpiler_type_signature *source_signature)
+{
+    t_transpiler_type_signature *signature;
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    size_t index;
+    int module_index;
+
+    if (!context || !source_signature)
+        return (FT_FAILURE);
+    if (transpiler_context_string_is_blank(module_name)
+        || transpiler_context_string_is_blank(source_signature->name))
+        return (FT_FAILURE);
+    module_index = transpiler_context_find_module_index_by_name(context, module_name);
+    if (module_index < 0)
+    {
+        std::snprintf(message, sizeof(message),
+            "module '%s' not registered", module_name);
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_MODULE_UNKNOWN, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_MODULE_UNKNOWN);
+        return (FT_FAILURE);
+    }
+    index = 0;
+    while (index < context->type_count)
+    {
+        if (std::strncmp(context->types[index].module, module_name, TRANSPILE_MODULE_NAME_MAX) == 0
+            && std::strncmp(context->types[index].name, source_signature->name,
+                TRANSPILE_IDENTIFIER_MAX) == 0)
+        {
+            std::snprintf(message, sizeof(message),
+                "type '%s' already declared in module '%s'", source_signature->name,
+                module_name);
+            transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+                TRANSPILE_ERROR_TYPE_DUPLICATE_NAME, message);
+            transpiler_context_record_error(context, TRANSPILE_ERROR_TYPE_DUPLICATE_NAME);
+            return (FT_FAILURE);
+        }
+        if (source_signature->visibility == TRANSPILE_SYMBOL_PUBLIC
+            && context->types[index].visibility == TRANSPILE_SYMBOL_PUBLIC
+            && std::strncmp(context->types[index].name, source_signature->name,
+                TRANSPILE_IDENTIFIER_MAX) == 0
+            && std::strncmp(context->types[index].module, module_name,
+                TRANSPILE_MODULE_NAME_MAX) != 0)
+        {
+            if (transpiler_context_type_signatures_compatible(&context->types[index],
+                    source_signature))
+            {
+                index += 1;
+                continue ;
+            }
+            std::snprintf(message, sizeof(message),
+                "public type '%s' in module '%s' conflicts with export from module '%s'",
+                source_signature->name, module_name, context->types[index].module);
+            transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+                TRANSPILE_ERROR_TYPE_EXPORT_CONFLICT, message);
+            transpiler_context_record_error(context, TRANSPILE_ERROR_TYPE_EXPORT_CONFLICT);
+            return (FT_FAILURE);
+        }
+        index += 1;
+    }
+    if (context->type_count >= context->type_capacity)
+    {
+        if (transpiler_context_types_reserve(context, context->type_capacity * 2) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    signature = &context->types[context->type_count];
+    if (transpiler_context_type_signature_copy(signature, source_signature) != FT_SUCCESS)
+        return (FT_FAILURE);
+    ft_strlcpy(signature->module, module_name, sizeof(signature->module));
+    context->type_count += 1;
+    (void)module_index;
+    return (FT_SUCCESS);
+}
+
+const t_transpiler_type_signature *transpiler_context_find_type(const t_transpiler_context *context,
+    const char *module_name, const char *name)
+{
+    size_t index;
+
+    if (!context)
+        return (NULL);
+    if (!module_name || !name)
+        return (NULL);
+    index = 0;
+    while (index < context->type_count)
+    {
+        if (std::strncmp(context->types[index].module, module_name, TRANSPILE_MODULE_NAME_MAX) == 0
+            && std::strncmp(context->types[index].name, name, TRANSPILE_IDENTIFIER_MAX) == 0)
+            return (&context->types[index]);
+        index += 1;
+    }
+    return (NULL);
+}
+
+const t_transpiler_type_signature *transpiler_context_resolve_type_access(t_transpiler_context *context,
+    const char *requesting_module, const char *module_name, const char *name)
+{
+    const t_transpiler_type_signature *signature;
+    const char *requester_label;
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    int requester_index;
+    int target_index;
+
+    if (!context)
+        return (NULL);
+    if (transpiler_context_string_is_blank(module_name)
+        || transpiler_context_string_is_blank(name))
+        return (NULL);
+    signature = transpiler_context_find_type(context, module_name, name);
+    if (!signature)
+        return (NULL);
+    if (transpiler_context_string_is_blank(requesting_module))
+        return (signature);
+    if (std::strncmp(requesting_module, module_name, TRANSPILE_MODULE_NAME_MAX) == 0)
+        return (signature);
+    requester_index = transpiler_context_find_module_index(context, requesting_module);
+    target_index = transpiler_context_find_module_index(context, module_name);
+    if (requester_index >= 0 && target_index >= 0
+        && !transpiler_context_module_has_import(context,
+            static_cast<size_t>(requester_index), static_cast<size_t>(target_index)))
+    {
+        requester_label = requesting_module;
+        std::snprintf(message, sizeof(message),
+            "module '%s' must import module '%s' before accessing type '%s'",
+            requester_label, module_name, name);
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_MODULE_IMPORT_REQUIRED, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_MODULE_IMPORT_REQUIRED);
+        return (NULL);
+    }
+    if (signature->visibility == TRANSPILE_SYMBOL_PUBLIC)
+        return (signature);
+    requester_label = requesting_module;
+    std::snprintf(message, sizeof(message),
+        "module '%s' cannot access private type '%s' exported by module '%s'",
+        requester_label, name, module_name);
+    transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+        TRANSPILE_ERROR_TYPE_PRIVATE_ACCESS, message);
+    transpiler_context_record_error(context, TRANSPILE_ERROR_TYPE_PRIVATE_ACCESS);
     return (NULL);
 }
 

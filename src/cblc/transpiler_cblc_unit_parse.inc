@@ -287,6 +287,10 @@ int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit)
                 return (FT_FAILURE);
             continue ;
         }
+        if (cblc_parse_qualified_lifecycle_definition(&cursor, unit) == FT_SUCCESS)
+            continue ;
+        if (cblc_parse_qualified_method_definition(&cursor, unit) == FT_SUCCESS)
+            continue ;
         if (cblc_starts_with_function_declaration(unit, cursor))
         {
             if (cblc_parse_function(&cursor, unit) != FT_SUCCESS)
