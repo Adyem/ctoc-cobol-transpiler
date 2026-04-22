@@ -11,6 +11,14 @@ All platforms require the following components:
 - GnuCOBOL so the test suites can exercise COBOL artifacts with `cobc`.
 - Git with submodule support to fetch `libft` alongside this repository.
 
+If the machine does not allow `sudo`, you can bootstrap a local COBOL toolchain under `/goinfre/$USER/local` with:
+
+```bash
+make install_cobc_goinfre
+```
+
+This installs `m4`, `gmp`, and `GnuCOBOL 3.2` without `sudo`, updates `~/.zshrc` and `~/.bashrc` when those files exist, and configures the local build without Berkeley DB support (`--without-db`).
+
 After installing the prerequisites, clone the repository with submodules and run the bootstrap target once per machine:
 
 ```bash

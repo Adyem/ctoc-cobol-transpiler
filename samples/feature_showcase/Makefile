@@ -9,9 +9,18 @@ endif
 
 TRANSPILER := $(REPO_ROOT)/ctoc_cobol_transpiler$(EXE_EXT)
 COBC ?= cobc
+GOINFRE_LOCAL_PREFIX ?= /goinfre/$(USER)/local
+
+ifneq ($(wildcard $(GOINFRE_LOCAL_PREFIX)/bin/cobc),)
+COBC := $(GOINFRE_LOCAL_PREFIX)/bin/cobc
+export PATH := $(GOINFRE_LOCAL_PREFIX)/bin:$(PATH)
+export LD_LIBRARY_PATH := $(GOINFRE_LOCAL_PREFIX)/lib:$(GOINFRE_LOCAL_PREFIX)/lib64$(if $(LD_LIBRARY_PATH),:$(LD_LIBRARY_PATH))
+export CPATH := $(GOINFRE_LOCAL_PREFIX)/include$(if $(CPATH),:$(CPATH))
+export LIBRARY_PATH := $(GOINFRE_LOCAL_PREFIX)/lib:$(GOINFRE_LOCAL_PREFIX)/lib64$(if $(LIBRARY_PATH),:$(LIBRARY_PATH))
+endif
 
 MAIN_PROGRAM := message_showcase
-CBLC_MODULES := message_showcase message_showcase_text message_showcase_portfolio message_showcase_memory
+CBLC_MODULES := message_showcase message_showcase_text message_showcase_portfolio message_showcase_memory stage_counter stage_counter_impl
 CBLC_SOURCES := $(addsuffix .cblc,$(CBLC_MODULES))
 COB_DIR := cobol
 GENERATED_COB := $(addprefix $(COB_DIR)/,$(addsuffix .cob,$(CBLC_MODULES)))
@@ -85,13 +94,17 @@ ensure_environment: $(SETUP_SENTINEL)
 
 $(SETUP_SENTINEL):
 	$(MAKE) -C $(REPO_ROOT) all
-	$(MAKE) -C $(REPO_ROOT) install_cobc
+	@if [ -x "$(GOINFRE_LOCAL_PREFIX)/bin/cobc" ]; then \
+		printf 'Using existing goinfre cobc at %s\n' "$(GOINFRE_LOCAL_PREFIX)/bin/cobc"; \
+	else \
+		$(MAKE) -C $(REPO_ROOT) install_cobc_goinfre; \
+	fi
 	touch $@
 
 ensure_cobc:
 	@if ! command -v $(COBC) >/dev/null 2>&1; then \
-		printf '\033[1;31m[cobc missing]\033[0m Attempting to install with "make install_cobc"...\n'; \
-		$(MAKE) -C $(REPO_ROOT) install_cobc; \
+		printf '\033[1;31m[cobc missing]\033[0m Attempting to install with "make install_cobc_goinfre"...\n'; \
+		$(MAKE) -C $(REPO_ROOT) install_cobc_goinfre; \
 		if ! command -v $(COBC) >/dev/null 2>&1; then \
 			printf 'Unable to locate "$(COBC)" even after running install_cobc.\n'; \
 			exit 1; \

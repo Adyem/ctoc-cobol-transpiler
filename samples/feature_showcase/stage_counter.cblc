@@ -1,0 +1,6 @@
+class StageCounter
+{
+    public:
+        int value;
+        void add(int delta);
+};

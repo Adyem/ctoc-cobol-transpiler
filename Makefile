@@ -18,6 +18,8 @@ PYTHON          ?= python3
 LINT_SCRIPT      = scripts/lint_sources.py
 FUZZ_SCRIPT      = scripts/fuzz_transpiler.py
 COVERAGE_SCRIPT  = scripts/coverage_report.py
+GOINFRE_GNUCOBOL_SCRIPT = scripts/install_gnucobol_goinfre.sh
+GOINFRE_LOCAL_PREFIX ?= /goinfre/$(USER)/local
 FUZZ_ITERATIONS ?= 50
 FUZZ_MODE ?= all
 FUZZ_ARGS ?=
@@ -370,6 +372,17 @@ install_cobc:
 		printf 'cobc already installed.\n'; \
 	fi
 
+install_cobc_goinfre:
+	@bash $(GOINFRE_GNUCOBOL_SCRIPT)
+
+bootstrap_cobc_goinfre: install_cobc_goinfre
+
+use_cobc_goinfre:
+	@printf 'export PATH=/goinfre/$$USER/local/bin:$$PATH\n'
+	@printf 'export LD_LIBRARY_PATH=/goinfre/$$USER/local/lib:/goinfre/$$USER/local/lib64$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}\n'
+	@printf 'export CPATH=/goinfre/$$USER/local/include$${CPATH:+:$$CPATH}\n'
+	@printf 'export LIBRARY_PATH=/goinfre/$$USER/local/lib:/goinfre/$$USER/local/lib64$${LIBRARY_PATH:+:$$LIBRARY_PATH}\n'
+
 
 tests_with_cobc: install_cobc
 	$(MAKE) tests
@@ -389,11 +402,19 @@ $(LSP_NAME): $(LSP_OBJ) $(OBJS_NO_MAIN)
 $(TEST_NAME): $(TEST_OBJS) $(OBJS_NO_MAIN) $(TARGET)
 	@printf '\033[1;36m[CTOC BUILD] Linking %s\033[0m\n' "$@"
 	@$(CC) $(CFLAGS) $(TEST_OBJS) $(OBJS_NO_MAIN) -o $@ $(LDFLAGS)
+
+$(LSP_OBJ): $(LSP_SRC)
+	@-$(MKDIR) $(dir $@)
+	@$(CC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
+
 $(OBJ_DIR)/%.o: %.cpp
 	@-$(MKDIR) $(dir $@)
 	@$(CC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
-	@if [ $(TOTAL_OBJS) -gt 0 ]; then \
-		built=$$(find $(OBJ_DIR) -type f -name '*.o' | wc -l); \
+	@if [ $(TOTAL_OBJS) -gt 0 ] && [[ " $(OBJS) " == *" $@ "* ]]; then \
+		built=0; \
+		for obj in $(OBJS); do \
+			[ -f "$$obj" ] && built=$$((built + 1)); \
+		done; \
 		printf '\033[1;36m[CTOC PROGRESS] %s (%d/%d)\033[0m\n' "$<" $$built $(TOTAL_OBJS); \
 	fi
 
@@ -408,9 +429,7 @@ $(OBJ_DIR_TEST)/%.o: %.cpp
 -include $(DEPS)
 
 clean:
-	-$(RM) $(OBJ_DIR)/*.o $(OBJ_DIR_DEBUG)/*.o
-	-$(RM) $(OBJ_DIR_TEST)/*.o $(OBJ_DIR_TEST)/tests/*.o
-	-$(RM) $(DEPS)
+	-$(RMDIR) $(OBJ_DIR) $(OBJ_DIR_DEBUG) $(OBJ_DIR_TEST)
 	-$(RM) test_example_compiler.c test_example_compiler.bin test_example_compiler.txt
 	-$(RM) test_example_invalid_compiler.c test_example_invalid_compiler.bin test_example_invalid_compiler.log
 	-$(RM) test_runtime_file.txt
@@ -423,7 +442,15 @@ fclean: clean
 re: fclean all
 
 test: $(TEST_NAME)
-	./$(TEST_NAME)
+	@if [ -x "$(GOINFRE_LOCAL_PREFIX)/bin/cobc" ]; then \
+		PATH="$(GOINFRE_LOCAL_PREFIX)/bin:$$PATH" \
+		LD_LIBRARY_PATH="$(GOINFRE_LOCAL_PREFIX)/lib:$(GOINFRE_LOCAL_PREFIX)/lib64$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}" \
+		CPATH="$(GOINFRE_LOCAL_PREFIX)/include$${CPATH:+:$$CPATH}" \
+		LIBRARY_PATH="$(GOINFRE_LOCAL_PREFIX)/lib:$(GOINFRE_LOCAL_PREFIX)/lib64$${LIBRARY_PATH:+:$$LIBRARY_PATH}" \
+		./$(TEST_NAME); \
+	else \
+		./$(TEST_NAME); \
+	fi
 
 both: all debug
 
@@ -465,4 +492,4 @@ ci:
 	$(MAKE) ci-lint
 	$(MAKE) ci-coverage
 
-.PHONY: all dirs clean fclean re debug both re_both tests test lint fuzz coverage ci-build ci-test ci-lint ci-coverage ci
+.PHONY: all dirs clean fclean re debug both re_both tests test lint fuzz coverage ci-build ci-test ci-lint ci-coverage ci install_cobc_goinfre bootstrap_cobc_goinfre use_cobc_goinfre

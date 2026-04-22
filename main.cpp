@@ -1,3 +1,4 @@
+#include <cctype>
 #include <climits>
 #include <filesystem>
 #include <system_error>
@@ -855,6 +856,8 @@ static int pipeline_stage_cobol_to_cblc(t_transpiler_context *context, void *use
 static void pipeline_extract_module_name(const char *path, char *buffer, size_t buffer_size)
 {
     const char *cursor;
+    const char *extension;
+    size_t length;
 
     if (!buffer || buffer_size == 0)
         return ;
@@ -870,7 +873,21 @@ static void pipeline_extract_module_name(const char *path, char *buffer, size_t 
     }
     if (!*path)
         return ;
-    ft_strlcpy(buffer, path, buffer_size);
+    extension = NULL;
+    cursor = path;
+    while (*cursor != '\0')
+    {
+        if (*cursor == '.')
+            extension = cursor;
+        cursor += 1;
+    }
+    length = std::strlen(path);
+    if (extension && extension != path)
+        length = static_cast<size_t>(extension - path);
+    if (length >= buffer_size)
+        length = buffer_size - 1;
+    std::memcpy(buffer, path, length);
+    buffer[length] = '\0';
 }
 
 static void pipeline_choose_module_name(const char *path, const t_cblc_translation_unit *unit,
@@ -883,6 +900,41 @@ static void pipeline_choose_module_name(const char *path, const t_cblc_translati
         ft_strlcpy(buffer, unit->program_name, buffer_size);
     if (buffer[0] == '\0')
         ft_strlcpy(buffer, "MODULE", buffer_size);
+}
+
+static int pipeline_unit_has_declarations(const t_cblc_translation_unit *unit)
+{
+    if (!unit)
+        return (0);
+    if (unit->function_count > 0)
+        return (1);
+    if (unit->struct_type_count > 0)
+        return (1);
+    if (unit->data_count > 0)
+        return (1);
+    if (unit->copy_include_count > 0)
+        return (1);
+    return (0);
+}
+
+static void pipeline_assign_unit_program_name(t_cblc_translation_unit *unit, const char *module_name)
+{
+    size_t index;
+
+    if (!unit || !module_name || module_name[0] == '\0')
+        return ;
+    if (unit->function_count > 0 && unit->program_name[0] != '\0')
+        return ;
+    ft_strlcpy(unit->program_name, module_name, sizeof(unit->program_name));
+    index = 0;
+    while (unit->program_name[index] != '\0')
+    {
+        if (unit->program_name[index] >= 'a' && unit->program_name[index] <= 'z')
+            unit->program_name[index] = static_cast<char>(unit->program_name[index] - 'a' + 'A');
+        else if (!std::isalnum(static_cast<unsigned char>(unit->program_name[index])))
+            unit->program_name[index] = '-';
+        index += 1;
+    }
 }
 
 static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_data)
@@ -1021,16 +1073,17 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
             status = FT_FAILURE;
             goto cleanup;
         }
-        if (unit->function_count == 0)
+        pipeline_assign_unit_program_name(unit, module_names[source_index]);
+        if (!pipeline_unit_has_declarations(unit))
         {
             if (std::snprintf(message, sizeof(message),
-                    "CBL-C source '%s' does not declare any functions;",
+                    "CBL-C source '%s' does not declare any transpilable content;",
                     context->source_paths[source_index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
             goto cleanup;
         }
-        else
+        else if (unit->function_count > 0)
         {
             size_t entry_index;
 
@@ -1351,16 +1404,17 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
             status = FT_FAILURE;
             goto cleanup;
         }
-        if (unit->function_count == 0)
+        pipeline_assign_unit_program_name(unit, module_names[source_index]);
+        if (!pipeline_unit_has_declarations(unit))
         {
             if (std::snprintf(message, sizeof(message),
-                    "CBL-C source '%s' does not declare any functions;",
+                    "CBL-C source '%s' does not declare any transpilable content;",
                     context->source_paths[source_index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
             goto cleanup;
         }
-        else
+        else if (unit->function_count > 0)
         {
             size_t entry_index;
 

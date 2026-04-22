@@ -1,0 +1,7 @@
+import "stage_counter";
+
+void StageCounter::add(int delta)
+{
+    value = value + delta;
+    return;
+}

@@ -1,13 +1,22 @@
 import "message_showcase_text.cblc";
 import "message_showcase_portfolio.cblc";
 import "message_showcase_memory.cblc";
+import "stage_counter.cblc";
+import "stage_counter_impl.cblc";
+
+StageCounter review_step;
 
 void main()
 {
+    review_step.value = 0;
+    review_step.add(1);
     display("CBL-C RENEWAL REVIEW");
     showcase_text();
+    review_step.add(1);
     showcase_portfolio();
+    review_step.add(1);
     showcase_memory();
+    review_step.add(1);
     display("REVIEW COMPLETE");
     return;
 }

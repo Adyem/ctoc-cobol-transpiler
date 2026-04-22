@@ -214,17 +214,137 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_compiler_c_backend_split_class_across_files_generates_and_runs)
+{
+    const char *declaration_source;
+    const char *implementation_source;
+    const char *main_source;
+    const char *expected_output;
+    char directory[256];
+    char declaration_source_path[256];
+    char implementation_source_path[256];
+    char main_source_path[256];
+    char declaration_output_path[256];
+    char implementation_output_path[256];
+    char main_output_path[256];
+    char binary_path[256];
+    char output_path[256];
+    char command[768];
+    char output_buffer[128];
+    int command_length;
+    int status;
+
+    declaration_source = "class Counter\n"
+        "{\n"
+        "    public:\n"
+        "        int value;\n"
+        "        void add(int delta);\n"
+        "};\n";
+    implementation_source = "import \"counter_decl\";\n"
+        "\n"
+        "void Counter::add(int delta)\n"
+        "{\n"
+        "    value = value + delta;\n"
+        "    return;\n"
+        "}\n";
+    main_source = "import \"counter_decl\";\n"
+        "import \"counter_impl\";\n"
+        "\n"
+        "Counter counter;\n"
+        "\n"
+        "void main()\n"
+        "{\n"
+        "    counter.value = 40;\n"
+        "    counter.add(2);\n"
+        "    display(counter.value);\n"
+        "    return;\n"
+        "}\n";
+    expected_output = "42\n";
+    if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    status = FT_FAILURE;
+    if (test_join_path(directory, "counter_decl.cblc", declaration_source_path,
+            sizeof(declaration_source_path)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_join_path(directory, "counter_impl.cblc", implementation_source_path,
+            sizeof(implementation_source_path)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_join_path(directory, "main_program.cblc", main_source_path,
+            sizeof(main_source_path)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_join_path(directory, "counter_decl.c", declaration_output_path,
+            sizeof(declaration_output_path)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_join_path(directory, "counter_impl.c", implementation_output_path,
+            sizeof(implementation_output_path)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_join_path(directory, "main_program.c", main_output_path,
+            sizeof(main_output_path)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_join_path(directory, "split_class_program.bin", binary_path,
+            sizeof(binary_path)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_join_path(directory, "split_class_program.txt", output_path,
+            sizeof(output_path)) != FT_SUCCESS)
+        goto cleanup;
+    if (test_compiler_c_backend_write_source(declaration_source_path, declaration_source) != FT_SUCCESS)
+        goto cleanup;
+    if (test_compiler_c_backend_write_source(implementation_source_path, implementation_source) != FT_SUCCESS)
+        goto cleanup;
+    if (test_compiler_c_backend_write_source(main_source_path, main_source) != FT_SUCCESS)
+        goto cleanup;
+    command_length = std::snprintf(command, sizeof(command),
+        "./ctoc_cobol_transpiler --direction cblc-to-c --input %s --output %s --input %s --output %s --input %s --output %s",
+        declaration_source_path, declaration_output_path,
+        implementation_source_path, implementation_output_path,
+        main_source_path, main_output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    command_length = std::snprintf(command, sizeof(command),
+        "cc %s %s %s -o %s", declaration_output_path, implementation_output_path,
+        main_output_path, binary_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    command_length = std::snprintf(command, sizeof(command),
+        "%s > %s", binary_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))
+        goto cleanup;
+    if (test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
+        goto cleanup;
+    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    test_remove_file(output_path);
+    test_remove_file(binary_path);
+    test_remove_file(main_output_path);
+    test_remove_file(implementation_output_path);
+    test_remove_file(declaration_output_path);
+    test_remove_file(main_source_path);
+    test_remove_file(implementation_source_path);
+    test_remove_file(declaration_source_path);
+    test_remove_directory(directory);
+    return (status);
+}
+
 const t_test_case *get_compiler_c_multi_module_tests(size_t *count)
 {
     static const t_test_case tests[] = {
         {"compiler_c_backend_multi_module_generates_and_runs",
             test_compiler_c_backend_multi_module_generates_and_runs},
         {"compiler_c_backend_multi_module_call_order_stable",
-            test_compiler_c_backend_multi_module_call_order_stable}
+            test_compiler_c_backend_multi_module_call_order_stable},
+        {"compiler_c_backend_split_class_across_files_generates_and_runs",
+            test_compiler_c_backend_split_class_across_files_generates_and_runs}
     };
 
     if (count)
         *count = sizeof(tests) / sizeof(tests[0]);
     return (tests);
 }
-

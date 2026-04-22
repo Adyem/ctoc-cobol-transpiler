@@ -1564,6 +1564,8 @@ static int cblc_add_parameter_binding(t_cblc_translation_unit *unit,
     char actual_cobol_name[TRANSPILE_IDENTIFIER_MAX];
     t_transpiler_function_parameter_kind parameter_kind;
     const t_cblc_struct_type *struct_type;
+    t_cblc_data_item *actual_item;
+    t_cblc_data_item *alias_item;
 
     if (!unit || !parameters || !parameter_count || !scope_source_name
         || !scope_cobol_name || !parameter_name)
@@ -1581,6 +1583,8 @@ static int cblc_add_parameter_binding(t_cblc_translation_unit *unit,
     cblc_identifier_to_cobol(actual_cobol_source, actual_cobol_name,
         sizeof(actual_cobol_name));
     struct_type = NULL;
+    actual_item = cblc_find_data_item(unit, actual_source_name);
+    alias_item = cblc_find_data_item(unit, parameter_name);
     if (kind == CBLC_DATA_KIND_STRUCT)
     {
         if (!type_name || type_name[0] == '\0')
@@ -1592,14 +1596,18 @@ static int cblc_add_parameter_binding(t_cblc_translation_unit *unit,
             struct_type = cblc_find_struct_type(unit, type_name);
         if (!struct_type)
             return (FT_FAILURE);
-        if (cblc_add_named_data_item(unit, actual_source_name, actual_cobol_name, kind, 0, 0,
-                type_name, owner_function_name, 0, 0, 0) != FT_SUCCESS)
-            return (FT_FAILURE);
-        if (cblc_add_struct_instance_field_items(unit, struct_type, actual_source_name,
-                actual_cobol_name, owner_function_name, 0, 0) != FT_SUCCESS)
-            return (FT_FAILURE);
-        if (cblc_add_local_struct_alias_items(unit, struct_type, parameter_name, actual_cobol_name)
-            != FT_SUCCESS)
+        if (!actual_item)
+        {
+            if (cblc_add_named_data_item(unit, actual_source_name, actual_cobol_name, kind, 0, 0,
+                    type_name, owner_function_name, 0, 0, 0) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (cblc_add_struct_instance_field_items(unit, struct_type, actual_source_name,
+                    actual_cobol_name, owner_function_name, 0, 0) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        if (!alias_item
+            && cblc_add_local_struct_alias_items(unit, struct_type, parameter_name, actual_cobol_name)
+                != FT_SUCCESS)
             return (FT_FAILURE);
     }
     else if (kind == CBLC_DATA_KIND_STRUCT_POINTER)
@@ -1613,20 +1621,24 @@ static int cblc_add_parameter_binding(t_cblc_translation_unit *unit,
             struct_type = cblc_find_struct_type(unit, type_name);
         if (!struct_type)
             return (FT_FAILURE);
-        if (cblc_add_named_data_item(unit, actual_source_name, actual_cobol_name, kind, 0, 0,
-                type_name, owner_function_name, 0, 0, 0) != FT_SUCCESS)
+        if (!actual_item
+            && cblc_add_named_data_item(unit, actual_source_name, actual_cobol_name, kind, 0, 0,
+                    type_name, owner_function_name, 0, 0, 0) != FT_SUCCESS)
             return (FT_FAILURE);
-        if (cblc_add_named_data_item(unit, parameter_name, actual_cobol_name, kind, 0, 0,
-                type_name, NULL, 0, 1, 0) != FT_SUCCESS)
+        if (!alias_item
+            && cblc_add_named_data_item(unit, parameter_name, actual_cobol_name, kind, 0, 0,
+                    type_name, NULL, 0, 1, 0) != FT_SUCCESS)
             return (FT_FAILURE);
     }
     else
     {
-        if (cblc_add_named_data_item(unit, actual_source_name, actual_cobol_name, kind, 0, 0,
-                NULL, owner_function_name, 0, 0, 0) != FT_SUCCESS)
+        if (!actual_item
+            && cblc_add_named_data_item(unit, actual_source_name, actual_cobol_name, kind, 0, 0,
+                    NULL, owner_function_name, 0, 0, 0) != FT_SUCCESS)
             return (FT_FAILURE);
-        if (cblc_add_named_data_item(unit, parameter_name, actual_cobol_name, kind, 0, 0,
-                NULL, NULL, 0, 1, 0) != FT_SUCCESS)
+        if (!alias_item
+            && cblc_add_named_data_item(unit, parameter_name, actual_cobol_name, kind, 0, 0,
+                    NULL, NULL, 0, 1, 0) != FT_SUCCESS)
             return (FT_FAILURE);
     }
     ft_strlcpy(parameters[*parameter_count].source_name, parameter_name,
