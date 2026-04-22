@@ -4,13 +4,12 @@
        DATA DIVISION.
        WORKING-STORAGE SECTION.
        01 TITLE-LENGTH PIC S9(9).
-       01 LITERAL-LENGTH PIC S9(9).
        01 NOTE-LENGTH PIC S9(9).
        01 TITLE.
           05 TITLE-LEN PIC 9(4) COMP VALUE 0.
           05 TITLE-CAP PIC 9(4) COMP VALUE 0.
           05 TITLE-PTR USAGE POINTER VALUE NULL.
-       01 TITLE-BUF BASED PIC X(19).
+       01 TITLE-BUF BASED PIC X(15).
        01 NOTE.
           05 NOTE-LEN PIC 9(4) COMP VALUE 0.
           05 NOTE-CAP PIC 9(4) COMP VALUE 0.
@@ -19,16 +18,16 @@
        PROCEDURE DIVISION.
        SHOWCASE-TEXT.
            MOVE 0 TO TITLE-LEN.
-           IF TITLE-CAP < 19
+           IF TITLE-CAP < 15
                IF TITLE-PTR NOT = NULL
                    FREE TITLE-PTR
                END-IF
-               ALLOCATE 19 CHARACTERS RETURNING TITLE-PTR
+               ALLOCATE 15 CHARACTERS RETURNING TITLE-PTR
                SET ADDRESS OF TITLE-BUF TO TITLE-PTR
-               COMPUTE TITLE-CAP = 19
+               COMPUTE TITLE-CAP = 15
            END-IF.
-           MOVE "RENEWAL RISK REVIEW" TO TITLE-BUF.
-           COMPUTE TITLE-LEN = 19.
+           MOVE "POLICY SNAPSHOT" TO TITLE-BUF.
+           COMPUTE TITLE-LEN = 15.
            MOVE 0 TO NOTE-LEN.
            IF NOTE-CAP < 16
                IF NOTE-PTR NOT = NULL
@@ -39,17 +38,17 @@
                COMPUTE NOTE-CAP = 16
            END-IF.
            MOVE SPACES TO NOTE-BUF.
-           IF NOTE-CAP < 9
+           IF NOTE-CAP < 10
                IF NOTE-PTR NOT = NULL
                    FREE NOTE-PTR
                END-IF
-               ALLOCATE 9 CHARACTERS RETURNING NOTE-PTR
+               ALLOCATE 10 CHARACTERS RETURNING NOTE-PTR
                SET ADDRESS OF NOTE-BUF TO NOTE-PTR
-               COMPUTE NOTE-CAP = 9
+               COMPUTE NOTE-CAP = 10
            END-IF.
            SET ADDRESS OF NOTE-BUF TO NOTE-PTR
-           MOVE "FAST PATH" TO NOTE-BUF.
-           MOVE 9 TO NOTE-LEN.
+           MOVE "clean base" TO NOTE-BUF.
+           MOVE 10 TO NOTE-LEN.
            IF TITLE-CAP < 1
                IF TITLE-PTR NOT = NULL
                    FREE TITLE-PTR
@@ -63,9 +62,6 @@
            COMPUTE TITLE-LENGTH = TITLE-LEN.
            DISPLAY "Title chars".
            DISPLAY TITLE-LENGTH.
-           COMPUTE LITERAL-LENGTH = 13.
-           DISPLAY "Literal chars".
-           DISPLAY LITERAL-LENGTH.
            IF NOTE-CAP < 1
                IF NOTE-PTR NOT = NULL
                    FREE NOTE-PTR

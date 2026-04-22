@@ -1,41 +1,31 @@
-int scores[3];
+int scores[2];
 int slot;
 int selected_score;
-int pointer_score;
-int *score_cursor;
-int *score_heap;
-char *status_buffer;
-char grade;
+int copied_score;
+int *score_ref;
+char *marker_buffer;
+char marker;
 void *scratch;
 
 void showcase_memory()
 {
-    scores[0] = 74;
-    scores[1] = 88;
-    scores[2] = 91;
+    scores[0] = 72;
+    scores[1] = 86;
     slot = 1;
     selected_score = scores[slot];
     display("Selected score");
     display(selected_score);
     scratch = std::malloc(16);
     std::free(scratch);
-    score_heap = std::malloc(12);
-    score_heap[0] = selected_score;
-    score_heap[1] = selected_score + 4;
-    score_cursor = score_heap + 1;
-    pointer_score = *score_cursor;
-    display("Adjusted score");
-    display(pointer_score);
-    std::free(score_heap);
-    status_buffer = std::malloc(4);
-    status_buffer[0] = 'A';
-    grade = status_buffer[0];
-    display("Grade");
-    display(grade);
-    std::free(status_buffer);
-    score_cursor = &selected_score;
-    pointer_score = *score_cursor;
-    display("Score by address");
-    display(pointer_score);
+    score_ref = &selected_score;
+    copied_score = *score_ref;
+    display("Copied score");
+    display(copied_score);
+    marker_buffer = std::malloc(4);
+    marker_buffer[0] = 'A';
+    marker = marker_buffer[0];
+    display("Marker");
+    display(marker);
+    std::free(marker_buffer);
     return;
 }

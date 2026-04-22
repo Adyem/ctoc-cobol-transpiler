@@ -1,13 +1,11 @@
 # CBL-C Feature Showcase
 
 This sample builds one executable, `message_showcase`, from a few imported
-CBL-C source files. It models a small renewal-risk report while exercising the
-current CBL-C features that lower into COBOL cleanly: classes with
-`private` / `public` members, constructors and initializer lists, split class
-declaration and implementation files, `const` values, structs and nested
-fields, imports, arrays, functions without the old `function` keyword, builtin
-`string` construction / assignment / methods, folded `std::strlen(...)` literal
-calls, and scalar pointer allocation / indexing / arithmetic.
+CBL-C source files. It is meant to be a compact, readable starting point for
+the language rather than a long business demo. The sample still exercises the
+core features that lower cleanly into COBOL: imports, structs, classes with
+`private` / `public` members, constructors, split class implementation files,
+builtin `string` values and methods, arrays, and basic pointer access.
 
 ## Layout
 
@@ -16,15 +14,14 @@ calls, and scalar pointer allocation / indexing / arithmetic.
   modules, and builds the single generated executable with the correct
   `COB_LIBRARY_PATH`.
 - `message_showcase.cblc` — the small entrypoint that imports each showcase
-  module and uses a split `StageCounter` class.
-- `message_showcase_text.cblc` — builtin `string` and folded
-  `std::strlen(...)` examples.
-- `message_showcase_portfolio.cblc` — structs, nested fields, classes,
-  constructors, `const`, and imported parameter flow.
+  module and uses a split `StageCounter` class to keep the flow minimal.
+- `message_showcase_text.cblc` — a small `string` example with readable output.
+- `message_showcase_portfolio.cblc` — a simple data model using structs and a
+  small class.
 - `stage_counter.cblc` — split class declaration used by the entrypoint.
 - `stage_counter_impl.cblc` — split class method
   implementation imported separately from the consumer.
-- `message_showcase_memory.cblc` — arrays and pointer allocation/indexing.
+- `message_showcase_memory.cblc` — a short array and pointer example.
 - `EXPECTED_OUTPUT.txt` — the transcript used by `make verify`.
 - `stdlib/` — populated by the `standard-library` CLI direction.
 - `cobol/message_showcase*.cob` — generated COBOL output.

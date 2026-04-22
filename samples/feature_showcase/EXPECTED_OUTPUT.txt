@@ -1,38 +1,26 @@
-CBL-C RENEWAL REVIEW
-RENEWAL RISK REVIEW
+CBL-C STARTER SHOWCASE
+POLICY SNAPSHOT
 Title chars
-+000000019
-Literal chars
-+000000013
-FAST PATH
-Note chars
-+000000009
-RISK
-Report id
-+000000007
-Policies
-+000001250
-Net claims
-+000000027
-Loss ratio
 +000000015
-Reserve gap
-+000120000
+clean base
+Note chars
++000000010
+BASE
 UNDERWRITING
 CLAIMS
-Active desks
-+000000002
-Imported total
-+000000042
+Policies
++000001250
+Snapshot id
++000000003
 Selected score
-+000000088
-Adjusted score
-+000000092
-Grade
++000000086
+Copied score
++000000086
+Marker
 A
-Score by address
-+000000088
-REVIEW COMPLETE
+Modules
++000000003
+SHOWCASE READY
 Standard library functions bundled with the showcase:
 stdlib/CBLC-ABS.cob
 stdlib/CBLC-ABS.so

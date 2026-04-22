@@ -10,13 +10,14 @@ void main()
 {
     review_step.value = 0;
     review_step.add(1);
-    display("CBL-C RENEWAL REVIEW");
+    display("CBL-C STARTER SHOWCASE");
     showcase_text();
     review_step.add(1);
     showcase_portfolio();
     review_step.add(1);
     showcase_memory();
-    review_step.add(1);
-    display("REVIEW COMPLETE");
+    display("Modules");
+    display(review_step.value);
+    display("SHOWCASE READY");
     return;
 }

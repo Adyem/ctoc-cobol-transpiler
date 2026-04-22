@@ -1,19 +1,15 @@
 int title_length;
-int literal_length;
 int note_length;
-string title("RENEWAL RISK REVIEW");
+string title("POLICY SNAPSHOT");
 string note(16);
 
 void showcase_text()
 {
-    note = "FAST PATH";
+    note = "clean base";
     display(title);
     title_length = title.len();
     display("Title chars");
     display(title_length);
-    literal_length = std::strlen("renewal-ready");
-    display("Literal chars");
-    display(literal_length);
     display(note);
     note_length = note.len();
     display("Note chars");

@@ -25,7 +25,7 @@ class RenewalReport
         int paid_claims;
 
     public:
-        RenewalReport() : tag("RISK"), identifier(7)
+        RenewalReport() : tag("BASE"), identifier(3)
         {
             policy_count = 0;
             claim_count = 0;
@@ -76,15 +76,8 @@ class RenewalReport
 
 Portfolio book;
 RenewalReport risk_review;
-int active_desks;
 int output_report_id;
 int policies_total;
-int net_claims_total;
-int loss_ratio_total;
-int reserve_gap_total;
-int imported_total;
-int underwriting_open;
-int underwriting_closed;
 
 void showcase_portfolio()
 {
@@ -94,32 +87,15 @@ void showcase_portfolio()
     book.claims.name = "CLAIMS";
     book.claims.open_items = 32;
     book.claims.closed_items = 27;
-    active_desks = 2;
-    underwriting_open = book.underwriting.open_items;
-    underwriting_closed = book.underwriting.closed_items;
     risk_review.load(1250, 32, 5, 72000);
     risk_review.print_tag();
     output_report_id = risk_review.id();
     policies_total = risk_review.policies();
-    net_claims_total = risk_review.net_claims();
-    loss_ratio_total = risk_review.loss_ratio_percent();
-    reserve_gap_total = risk_review.reserve_gap();
-    imported_total = underwriting_open + underwriting_closed;
-    display("Report id");
-    display(output_report_id);
-    display("Policies");
-    display(policies_total);
-    display("Net claims");
-    display(net_claims_total);
-    display("Loss ratio");
-    display(loss_ratio_total);
-    display("Reserve gap");
-    display(reserve_gap_total);
     display(book.underwriting.name);
     display(book.claims.name);
-    display("Active desks");
-    display(active_desks);
-    display("Imported total");
-    display(imported_total);
+    display("Policies");
+    display(policies_total);
+    display("Snapshot id");
+    display(output_report_id);
     return;
 }
