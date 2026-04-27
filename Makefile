@@ -286,6 +286,10 @@ TEST_SRC    = imported/libft_test_runner.cpp \
              tests/transpiler_context_registration_tests.cpp \
              tests/transpiler_context_copybook_tests.cpp \
              tests/transpiler_context_visibility_tests.cpp \
+             tests/transpiler_context_visibility_signature_metadata_tests.cpp \
+             tests/transpiler_context_visibility_signature_constructor_tests.cpp \
+             tests/transpiler_context_visibility_signature_secondary_metadata_tests.cpp \
+             tests/transpiler_context_visibility_signature_import_tests.cpp \
              tests/cblc_translation_unit_export_tests.cpp \
              tests/transpiler_context_import_tests.cpp \
              tests/transpiler_context_call_metadata_tests.cpp \
