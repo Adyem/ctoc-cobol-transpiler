@@ -2,7 +2,6 @@ import "message_showcase_text.cblc";
 import "message_showcase_portfolio.cblc";
 import "message_showcase_memory.cblc";
 import "stage_counter.cblc";
-import "stage_counter_impl.cblc";
 
 StageCounter review_step;
 

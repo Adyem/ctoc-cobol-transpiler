@@ -72,6 +72,7 @@ int test_cblc_inline_local_char_pointer_declaration_translates_to_cobol_and_exec
 int test_cblc_inline_string_clear_after_assignment_translates_to_cobol_and_executes(void);
 int test_cblc_inline_string_copy_constructor_len_translates_to_cobol_and_executes(void);
 int test_cblc_inline_class_multiple_method_calls_translates_to_cobol_and_executes(void);
+int test_cblc_out_of_class_methods_translates_to_cobol_and_executes(void);
 int test_cblc_inline_class_const_member_arithmetic_translates_to_cobol_and_executes(void);
 int test_cblc_inline_nested_struct_numeric_fields_translates_to_cobol_and_executes(void);
 int test_cblc_inline_function_return_used_in_expression_translates_to_cobol_and_executes(void);
@@ -418,6 +419,8 @@ const t_test_case *get_compiler_cobol_round_trip_pipeline_tests(size_t *count)
             test_cblc_inline_string_copy_constructor_len_translates_to_cobol_and_executes},
         {"cblc_inline_class_multiple_method_calls_translates_to_cobol_and_executes",
             test_cblc_inline_class_multiple_method_calls_translates_to_cobol_and_executes},
+        {"cblc_out_of_class_methods_translates_to_cobol_and_executes",
+            test_cblc_out_of_class_methods_translates_to_cobol_and_executes},
         {"cblc_inline_class_const_member_arithmetic_translates_to_cobol_and_executes",
             test_cblc_inline_class_const_member_arithmetic_translates_to_cobol_and_executes},
         {"cblc_inline_nested_struct_numeric_fields_translates_to_cobol_and_executes",

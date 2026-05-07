@@ -4,3 +4,9 @@ class StageCounter
         int value;
         void add(int delta);
 };
+
+void StageCounter::add(int delta)
+{
+    value = value + delta;
+    return;
+}

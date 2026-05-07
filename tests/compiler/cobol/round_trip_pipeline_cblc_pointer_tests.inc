@@ -708,6 +708,45 @@ FT_TEST(test_cblc_inline_class_multiple_method_calls_translates_to_cobol_and_exe
             "inline_class_multiple_method_calls_generated", "+000000010\n"));
 }
 
+FT_TEST(test_cblc_out_of_class_methods_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "class Counter\n"
+        "{\n"
+        "    private:\n"
+        "    int value;\n"
+        "    public:\n"
+        "    Counter(int start);\n"
+        "    void add(int delta);\n"
+        "    int current();\n"
+        "};\n"
+        "Counter::Counter(int start)\n"
+        "{\n"
+        "    value = start;\n"
+        "}\n"
+        "void Counter::add(int delta)\n"
+        "{\n"
+        "    value = value + delta;\n"
+        "    return;\n"
+        "}\n"
+        "int Counter::current()\n"
+        "{\n"
+        "    return value;\n"
+        "}\n"
+        "Counter counter(7);\n"
+        "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    counter.add(5);\n"
+        "    total = counter.current();\n"
+        "    display(total);\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "out_of_class_methods_generated", "+000000012\n"));
+}
+
 FT_TEST(test_cblc_inline_class_const_member_arithmetic_translates_to_cobol_and_executes)
 {
     const char *source;

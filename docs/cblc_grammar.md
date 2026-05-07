@@ -21,6 +21,8 @@ global_declaration_section ::= { global_declaration }
 global_declaration      ::= file_declaration
                           | record_declaration
                           | scalar_declaration
+                          | class_declaration
+                          | qualified_method_definition
 function_section        ::= { function_definition }
 function_definition     ::= function_return_type identifier '(' ')' block
 function_return_type    ::= 'void' | scalar_type
@@ -29,6 +31,38 @@ scalar_declaration      ::= scalar_type identifier array_suffix ';'
 ```
 
 A source file lists global declarations (files, records, and scalars) followed by any number of functions.  Every function body hosts the executable statements that previously lived in the `procedure_section`.  Function names must be unique within a translation unit so COBOL paragraph generation can map one-to-one onto the declared entry points. One function must be named `main` to provide the program entrypoint and must declare a `void` return type so COBOL callers can pass outputs by reference.
+
+Class method bodies can be placed inline inside the class or defined later in the same translation unit with C++-style qualification:
+
+```cblc
+class Counter
+{
+    private:
+    int value;
+    public:
+    Counter(int start);
+    void add(int delta);
+    int current();
+};
+
+Counter::Counter(int start)
+{
+    value = start;
+}
+
+void Counter::add(int delta)
+{
+    value = value + delta;
+    return;
+}
+
+int Counter::current()
+{
+    return value;
+}
+```
+
+Qualified method and constructor definitions must appear after the class declaration that introduced their signatures.
 
 ---
 
