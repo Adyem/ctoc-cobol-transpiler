@@ -270,6 +270,38 @@ FT_TEST(test_cblc_inline_local_pointer_declaration_translates_to_cobol_and_execu
             "inline_local_pointer_declaration_generated", "+000000058\n"));
 }
 
+FT_TEST(test_cblc_inline_block_local_scalars_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "int total;\n"
+        "char marker;\n"
+        "void main()\n"
+        "{\n"
+        "    {\n"
+        "        int scratch;\n"
+        "        char label;\n"
+        "        scratch = 4;\n"
+        "        label = 'A';\n"
+        "        total = scratch;\n"
+        "        marker = label;\n"
+        "    }\n"
+        "    {\n"
+        "        int scratch;\n"
+        "        char label;\n"
+        "        scratch = 5;\n"
+        "        label = 'B';\n"
+        "        total = total + scratch;\n"
+        "        marker = label;\n"
+        "    }\n"
+        "    display(total);\n"
+        "    display(marker);\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "inline_block_local_scalars_generated", "+000000009\nB\n"));
+}
+
 FT_TEST(test_cblc_inline_pointer_parameter_return_translates_to_cobol_and_executes)
 {
     const char *source;

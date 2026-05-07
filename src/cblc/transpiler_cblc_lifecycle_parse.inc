@@ -98,7 +98,8 @@ static int cblc_parse_statement_block(const char **cursor, t_cblc_translation_un
                 function->local_destructor_count = scope_destructor_base;
             while (scope_data_base < unit->data_count)
             {
-                if (unit->data_items[scope_data_base].is_alias)
+                if (unit->data_items[scope_data_base].is_alias
+                    || unit->data_items[scope_data_base].is_function_local)
                     unit->data_items[scope_data_base].is_active = 0;
                 scope_data_base += 1;
             }
@@ -129,6 +130,8 @@ static int cblc_parse_statement_block(const char **cursor, t_cblc_translation_un
             continue ;
         }
         if (cblc_parse_local_string_declaration(cursor, unit, function) == FT_SUCCESS)
+            continue ;
+        if (cblc_parse_local_scalar_declaration(cursor, unit, function) == FT_SUCCESS)
             continue ;
         if (cblc_parse_local_pointer_declaration(cursor, unit, function) == FT_SUCCESS)
             continue ;
@@ -808,13 +811,170 @@ static int cblc_add_local_struct_alias_items(t_cblc_translation_unit *unit,
     return (FT_SUCCESS);
 }
 
+static int cblc_local_storage_name_exists(const t_cblc_translation_unit *unit,
+    const char *source_name, const char *cobol_name)
+{
+    size_t index;
+
+    if (!unit || !source_name || !cobol_name)
+        return (0);
+    index = 0;
+    while (index < unit->data_count)
+    {
+        if (std::strncmp(unit->data_items[index].source_name, source_name,
+                sizeof(unit->data_items[index].source_name)) == 0
+            || std::strncmp(unit->data_items[index].cobol_name, cobol_name,
+                sizeof(unit->data_items[index].cobol_name)) == 0)
+            return (1);
+        index += 1;
+    }
+    return (0);
+}
+
+static int cblc_build_unique_local_storage_names(const t_cblc_translation_unit *unit,
+    const t_cblc_function *function, const char *local_identifier,
+    char *actual_source_name, size_t actual_source_size,
+    char *actual_cobol_name, size_t actual_cobol_size)
+{
+    char cobol_source[TRANSPILE_IDENTIFIER_MAX];
+    char candidate_source[TRANSPILE_IDENTIFIER_MAX];
+    char candidate_cobol_source[TRANSPILE_IDENTIFIER_MAX];
+    char candidate_cobol[TRANSPILE_IDENTIFIER_MAX];
+    size_t suffix;
+
+    if (!unit || !function || !local_identifier || !actual_source_name
+        || actual_source_size == 0 || !actual_cobol_name || actual_cobol_size == 0)
+        return (FT_FAILURE);
+    if (std::snprintf(candidate_source, sizeof(candidate_source), "%s__%s",
+            function->source_name, local_identifier) < 0)
+        return (FT_FAILURE);
+    if (std::snprintf(cobol_source, sizeof(cobol_source), "%s-%s",
+            function->cobol_name, local_identifier) < 0)
+        return (FT_FAILURE);
+    cblc_identifier_to_cobol(cobol_source, candidate_cobol, sizeof(candidate_cobol));
+    if (!cblc_local_storage_name_exists(unit, candidate_source, candidate_cobol))
+    {
+        ft_strlcpy(actual_source_name, candidate_source, actual_source_size);
+        ft_strlcpy(actual_cobol_name, candidate_cobol, actual_cobol_size);
+        return (FT_SUCCESS);
+    }
+    suffix = 1;
+    while (suffix < 100000)
+    {
+        if (std::snprintf(candidate_source, sizeof(candidate_source), "%s__%s__%zu",
+                function->source_name, local_identifier, suffix) < 0)
+            return (FT_FAILURE);
+        if (std::snprintf(candidate_cobol_source, sizeof(candidate_cobol_source),
+                "%s-%s-%zu", function->cobol_name, local_identifier, suffix) < 0)
+            return (FT_FAILURE);
+        cblc_identifier_to_cobol(candidate_cobol_source, candidate_cobol,
+            sizeof(candidate_cobol));
+        if (!cblc_local_storage_name_exists(unit, candidate_source, candidate_cobol))
+        {
+            ft_strlcpy(actual_source_name, candidate_source, actual_source_size);
+            ft_strlcpy(actual_cobol_name, candidate_cobol, actual_cobol_size);
+            return (FT_SUCCESS);
+        }
+        suffix += 1;
+    }
+    return (FT_FAILURE);
+}
+
+static int cblc_parse_local_scalar_declaration(const char **cursor,
+    t_cblc_translation_unit *unit, t_cblc_function *function)
+{
+    const char *start;
+    char local_identifier[TRANSPILE_IDENTIFIER_MAX];
+    char actual_source_name[TRANSPILE_IDENTIFIER_MAX];
+    char actual_cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    t_cblc_data_kind kind;
+    size_t length;
+    size_t array_count;
+
+    if (!cursor || !*cursor || !unit || !function)
+        return (FT_FAILURE);
+    start = *cursor;
+    length = 0;
+    array_count = 0;
+    if (cblc_match_keyword(cursor, "int"))
+        kind = CBLC_DATA_KIND_INT;
+    else if (cblc_match_keyword(cursor, "char"))
+    {
+        kind = CBLC_DATA_KIND_CHAR;
+        length = 1;
+    }
+    else
+        return (FT_FAILURE);
+    cblc_skip_whitespace(cursor);
+    if (cblc_parse_identifier(cursor, local_identifier, sizeof(local_identifier)) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    cblc_skip_whitespace(cursor);
+    if (**cursor == '[')
+    {
+        if (kind == CBLC_DATA_KIND_INT)
+        {
+            if (cblc_parse_array_count_clause(cursor, &array_count) != FT_SUCCESS)
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+        }
+        else
+        {
+            *cursor += 1;
+            cblc_skip_whitespace(cursor);
+            if (cblc_parse_numeric_literal(cursor, &length) != FT_SUCCESS)
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+            cblc_skip_whitespace(cursor);
+            if (**cursor != ']')
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+            *cursor += 1;
+            cblc_skip_whitespace(cursor);
+        }
+    }
+    if (**cursor != ';')
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    *cursor += 1;
+    if (cblc_build_unique_local_storage_names(unit, function, local_identifier,
+            actual_source_name, sizeof(actual_source_name), actual_cobol_name,
+            sizeof(actual_cobol_name)) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    if (cblc_add_named_data_item(unit, actual_source_name, actual_cobol_name, kind,
+            length, array_count, NULL, function->source_name, 1, 0, 0) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    if (cblc_add_named_data_item(unit, local_identifier, actual_cobol_name, kind,
+            length, array_count, NULL, NULL, 0, 1, 0) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
 static int cblc_parse_local_string_declaration(const char **cursor,
     t_cblc_translation_unit *unit, t_cblc_function *function)
 {
     const char *start;
     char local_identifier[TRANSPILE_IDENTIFIER_MAX];
     char actual_source_name[TRANSPILE_IDENTIFIER_MAX];
-    char actual_cobol_source[TRANSPILE_IDENTIFIER_MAX];
     char actual_cobol_name[TRANSPILE_IDENTIFIER_MAX];
     char constructor_arguments[TRANSPILE_STATEMENT_TEXT_MAX];
     size_t length;
@@ -892,19 +1052,13 @@ static int cblc_parse_local_string_declaration(const char **cursor,
         *cursor = start;
         return (FT_FAILURE);
     }
-    if (std::snprintf(actual_source_name, sizeof(actual_source_name), "%s__%s",
-            function->source_name, local_identifier) < 0)
+    if (cblc_build_unique_local_storage_names(unit, function, local_identifier,
+            actual_source_name, sizeof(actual_source_name), actual_cobol_name,
+            sizeof(actual_cobol_name)) != FT_SUCCESS)
     {
         *cursor = start;
         return (FT_FAILURE);
     }
-    if (std::snprintf(actual_cobol_source, sizeof(actual_cobol_source), "%s-%s",
-            function->cobol_name, local_identifier) < 0)
-    {
-        *cursor = start;
-        return (FT_FAILURE);
-    }
-    cblc_identifier_to_cobol(actual_cobol_source, actual_cobol_name, sizeof(actual_cobol_name));
     if (cblc_add_named_data_item(unit, actual_source_name, actual_cobol_name, CBLC_DATA_KIND_STRING,
             length, 0, NULL, function->source_name, 1, 0, 0) != FT_SUCCESS)
     {
@@ -948,7 +1102,6 @@ static int cblc_parse_local_pointer_declaration(const char **cursor,
     t_cblc_data_kind kind;
     char local_identifier[TRANSPILE_IDENTIFIER_MAX];
     char actual_source_name[TRANSPILE_IDENTIFIER_MAX];
-    char actual_cobol_source[TRANSPILE_IDENTIFIER_MAX];
     char actual_cobol_name[TRANSPILE_IDENTIFIER_MAX];
 
     if (!cursor || !*cursor || !unit || !function)
@@ -976,20 +1129,13 @@ static int cblc_parse_local_pointer_declaration(const char **cursor,
         return (FT_FAILURE);
     }
     *cursor += 1;
-    if (std::snprintf(actual_source_name, sizeof(actual_source_name), "%s__%s",
-            function->source_name, local_identifier) < 0)
+    if (cblc_build_unique_local_storage_names(unit, function, local_identifier,
+            actual_source_name, sizeof(actual_source_name), actual_cobol_name,
+            sizeof(actual_cobol_name)) != FT_SUCCESS)
     {
         *cursor = start;
         return (FT_FAILURE);
     }
-    if (std::snprintf(actual_cobol_source, sizeof(actual_cobol_source), "%s-%s",
-            function->cobol_name, local_identifier) < 0)
-    {
-        *cursor = start;
-        return (FT_FAILURE);
-    }
-    cblc_identifier_to_cobol(actual_cobol_source, actual_cobol_name,
-        sizeof(actual_cobol_name));
     if (cblc_add_named_data_item(unit, actual_source_name, actual_cobol_name, kind, 0, 0,
             NULL, function->source_name, 1, 0, 0) != FT_SUCCESS)
     {
@@ -1013,7 +1159,6 @@ static int cblc_parse_local_struct_pointer_declaration(const char **cursor,
     char type_identifier[TRANSPILE_IDENTIFIER_MAX];
     char local_identifier[TRANSPILE_IDENTIFIER_MAX];
     char actual_source_name[TRANSPILE_IDENTIFIER_MAX];
-    char actual_cobol_source[TRANSPILE_IDENTIFIER_MAX];
     char actual_cobol_name[TRANSPILE_IDENTIFIER_MAX];
 
     if (!cursor || !*cursor || !unit || !function)
@@ -1047,20 +1192,13 @@ static int cblc_parse_local_struct_pointer_declaration(const char **cursor,
         return (FT_FAILURE);
     }
     *cursor += 1;
-    if (std::snprintf(actual_source_name, sizeof(actual_source_name), "%s__%s",
-            function->source_name, local_identifier) < 0)
+    if (cblc_build_unique_local_storage_names(unit, function, local_identifier,
+            actual_source_name, sizeof(actual_source_name), actual_cobol_name,
+            sizeof(actual_cobol_name)) != FT_SUCCESS)
     {
         *cursor = start;
         return (FT_FAILURE);
     }
-    if (std::snprintf(actual_cobol_source, sizeof(actual_cobol_source), "%s-%s",
-            function->cobol_name, local_identifier) < 0)
-    {
-        *cursor = start;
-        return (FT_FAILURE);
-    }
-    cblc_identifier_to_cobol(actual_cobol_source, actual_cobol_name,
-        sizeof(actual_cobol_name));
     if (cblc_add_named_data_item(unit, actual_source_name, actual_cobol_name,
             CBLC_DATA_KIND_STRUCT_POINTER, 0, 0, type->source_name,
             function->source_name, 1, 0, 0) != FT_SUCCESS)
@@ -1089,7 +1227,6 @@ static int cblc_parse_local_struct_instance_declaration(const char **cursor,
     char local_identifier[TRANSPILE_IDENTIFIER_MAX];
     char actual_source_name[TRANSPILE_IDENTIFIER_MAX];
     char actual_cobol_name[TRANSPILE_IDENTIFIER_MAX];
-    char actual_cobol_source[TRANSPILE_IDENTIFIER_MAX];
 
     if (!cursor || !*cursor || !unit || !function)
         return (FT_FAILURE);
@@ -1142,19 +1279,13 @@ static int cblc_parse_local_struct_instance_declaration(const char **cursor,
         *cursor = start;
         return (FT_FAILURE);
     }
-    if (std::snprintf(actual_source_name, sizeof(actual_source_name), "%s__%s",
-            function->source_name, local_identifier) < 0)
+    if (cblc_build_unique_local_storage_names(unit, function, local_identifier,
+            actual_source_name, sizeof(actual_source_name), actual_cobol_name,
+            sizeof(actual_cobol_name)) != FT_SUCCESS)
     {
         *cursor = start;
         return (FT_FAILURE);
     }
-    if (std::snprintf(actual_cobol_source, sizeof(actual_cobol_source), "%s-%s",
-            function->cobol_name, local_identifier) < 0)
-    {
-        *cursor = start;
-        return (FT_FAILURE);
-    }
-    cblc_identifier_to_cobol(actual_cobol_source, actual_cobol_name, sizeof(actual_cobol_name));
     if (cblc_add_named_data_item(unit, actual_source_name, actual_cobol_name, CBLC_DATA_KIND_STRUCT, 0, 0,
             type->source_name, function->source_name, 1, 0, 0) != FT_SUCCESS)
     {

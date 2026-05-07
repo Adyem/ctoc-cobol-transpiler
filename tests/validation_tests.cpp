@@ -1121,6 +1121,89 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_generate_c_emits_unique_block_local_scalar_storage)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    int status;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    {\n"
+        "        int scratch;\n"
+        "        scratch = 4;\n"
+        "        total = scratch;\n"
+        "    }\n"
+        "    {\n"
+        "        int scratch;\n"
+        "        scratch = 5;\n"
+        "        total = total + scratch;\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "block-local scalar sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "block-local scalar sample should generate C") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c)
+        goto cleanup;
+    if (!ft_strnstr(generated_c, "int main__scratch = 0;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit first local scalar backing storage\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "int main__scratch__1 = 0;", std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should emit unique backing storage for redeclared local scalar\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_c, "total = total + main__scratch__1;",
+            std::strlen(generated_c)))
+    {
+        std::printf("Assertion failed: generated C should bind later references to the second local scalar\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_translation_unit_rejects_block_local_after_scope)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    {\n"
+        "        int scratch;\n"
+        "        scratch = 4;\n"
+        "    }\n"
+        "    total = scratch;\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_FAILURE)
+        status = FT_SUCCESS;
+    else
+        std::printf("Assertion failed: parser should reject a block-local scalar after its scope closes\n");
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_generate_c_emits_struct_returning_function_and_call_assignment)
 {
     const char *source;
@@ -3687,6 +3770,10 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_generate_c_emits_variable_index_array_access},
         {"cblc_generate_cobol_emits_variable_index_array_access",
             test_cblc_generate_cobol_emits_variable_index_array_access},
+        {"cblc_generate_c_emits_unique_block_local_scalar_storage",
+            test_cblc_generate_c_emits_unique_block_local_scalar_storage},
+        {"cblc_parse_translation_unit_rejects_block_local_after_scope",
+            test_cblc_parse_translation_unit_rejects_block_local_after_scope},
         {"cblc_parse_translation_unit_records_class_lifecycle_metadata",
             test_cblc_parse_translation_unit_records_class_lifecycle_metadata},
         {"cblc_parse_translation_unit_records_parameterized_class_lifecycle_and_methods",

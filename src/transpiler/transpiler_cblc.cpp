@@ -41,6 +41,8 @@ static int cblc_capture_constructor_body(const char **cursor, t_cblc_translation
     t_cblc_statement **out_statements, size_t *out_count, size_t *out_capacity);
 static int cblc_parse_local_struct_instance_declaration(const char **cursor,
     t_cblc_translation_unit *unit, t_cblc_function *function);
+static int cblc_parse_local_scalar_declaration(const char **cursor,
+    t_cblc_translation_unit *unit, t_cblc_function *function);
 static int cblc_parse_local_string_declaration(const char **cursor,
     t_cblc_translation_unit *unit, t_cblc_function *function);
 static int cblc_parse_local_pointer_declaration(const char **cursor,

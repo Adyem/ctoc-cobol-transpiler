@@ -87,7 +87,7 @@ static int cblc_build_external_call_arguments(const t_cblc_translation_unit *uni
             char cobol_reference[TRANSPILE_STATEMENT_TEXT_MAX];
             const t_cblc_data_item *argument_item;
 
-            argument_item = cblc_find_data_item_const(unit, argument);
+            argument_item = cblc_find_data_item_for_emit_by_source(unit, argument);
             if (argument_item)
                 ft_strlcpy(cobol_reference, argument_item->cobol_name,
                     sizeof(cobol_reference));
@@ -1082,7 +1082,7 @@ static int cblc_emit_method_statement(const t_cblc_translation_unit *unit,
             {
                 const t_cblc_data_item *argument_item;
 
-                argument_item = cblc_find_data_item_const(unit, argument);
+                argument_item = cblc_find_data_item_for_emit_by_source(unit, argument);
                 if (!argument_item || argument_item->kind != CBLC_DATA_KIND_STRING)
                     return (FT_FAILURE);
                 if (std::snprintf(line, sizeof(line),
@@ -1190,7 +1190,7 @@ static int cblc_emit_method_statement(const t_cblc_translation_unit *unit,
             {
                 const t_cblc_data_item *argument_item;
 
-                argument_item = cblc_find_data_item_const(unit, argument);
+                argument_item = cblc_find_data_item_for_emit_by_source(unit, argument);
                 if (!argument_item || argument_item->kind != CBLC_DATA_KIND_STRING)
                     return (FT_FAILURE);
                 if (std::snprintf(line, sizeof(line),
@@ -1241,7 +1241,7 @@ static int cblc_emit_method_statement(const t_cblc_translation_unit *unit,
             {
                 const t_cblc_data_item *argument_item;
 
-                argument_item = cblc_find_data_item_const(unit, argument);
+                argument_item = cblc_find_data_item_for_emit_by_source(unit, argument);
                 if (!argument_item || argument_item->kind != CBLC_DATA_KIND_STRING)
                     return (FT_FAILURE);
                 if (std::snprintf(line, sizeof(line),
@@ -1345,7 +1345,7 @@ static int cblc_emit_method_statement(const t_cblc_translation_unit *unit,
             {
                 const t_cblc_data_item *argument_item;
 
-                argument_item = cblc_find_data_item_const(unit, argument);
+                argument_item = cblc_find_data_item_for_emit_by_source(unit, argument);
                 if (!argument_item || argument_item->kind != CBLC_DATA_KIND_STRING)
                     return (FT_FAILURE);
                 if (std::strncmp(statement->call_identifier, "starts_with",
@@ -1583,7 +1583,7 @@ static int cblc_emit_lifecycle_statement(const t_cblc_translation_unit *unit,
                 return (FT_FAILURE);
             return (cobol_text_builder_append_line(builder, line));
         }
-        source_item = cblc_find_data_item_const(unit, argument);
+        source_item = cblc_find_data_item_for_emit_by_source(unit, argument);
         if (!source_item || source_item->kind != CBLC_DATA_KIND_STRING)
             return (FT_FAILURE);
         if (cblc_emit_dynamic_string_ensure_capacity(item, source_item->length, builder)
@@ -1906,7 +1906,7 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
                     {
                         const t_cblc_data_item *argument_item;
 
-                        argument_item = cblc_find_data_item_const(unit, argument);
+                        argument_item = cblc_find_data_item_for_emit_by_source(unit, argument);
                         if (argument_item)
                             ft_strlcpy(translated_argument, argument_item->cobol_name,
                                 sizeof(translated_argument));

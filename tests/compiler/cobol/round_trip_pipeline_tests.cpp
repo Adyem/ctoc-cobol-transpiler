@@ -51,6 +51,7 @@ int test_cblc_inline_pointer_variable_offset_translates_to_cobol_and_executes(vo
 int test_cblc_inline_char_pointer_dereference_translates_to_cobol_and_executes(void);
 int test_cblc_inline_address_of_char_scalar_translates_to_cobol_and_executes(void);
 int test_cblc_inline_local_pointer_declaration_translates_to_cobol_and_executes(void);
+int test_cblc_inline_block_local_scalars_translates_to_cobol_and_executes(void);
 int test_cblc_inline_pointer_parameter_return_translates_to_cobol_and_executes(void);
 int test_cblc_inline_realloc_pointer_translates_to_cobol_and_executes(void);
 int test_cblc_inline_null_pointer_assignment_translates_to_cobol_and_executes(void);
@@ -377,6 +378,8 @@ const t_test_case *get_compiler_cobol_round_trip_pipeline_tests(size_t *count)
             test_cblc_inline_address_of_char_scalar_translates_to_cobol_and_executes},
         {"cblc_inline_local_pointer_declaration_translates_to_cobol_and_executes",
             test_cblc_inline_local_pointer_declaration_translates_to_cobol_and_executes},
+        {"cblc_inline_block_local_scalars_translates_to_cobol_and_executes",
+            test_cblc_inline_block_local_scalars_translates_to_cobol_and_executes},
         {"cblc_inline_pointer_parameter_return_translates_to_cobol_and_executes",
             test_cblc_inline_pointer_parameter_return_translates_to_cobol_and_executes},
         {"cblc_inline_realloc_pointer_translates_to_cobol_and_executes",

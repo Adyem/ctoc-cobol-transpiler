@@ -13,7 +13,9 @@ static const t_cblc_data_item *cblc_find_data_item_by_cobol(const t_cblc_transla
         if (std::strncmp(unit->data_items[index].cobol_name, identifier,
                 sizeof(unit->data_items[index].cobol_name)) == 0)
         {
-            if (!unit->data_items[index].is_active)
+            if (!unit->data_items[index].is_active
+                && (!unit->data_items[index].is_function_local
+                    || unit->data_items[index].is_alias))
             {
                 index += 1;
                 continue ;
@@ -26,6 +28,28 @@ static const t_cblc_data_item *cblc_find_data_item_by_cobol(const t_cblc_transla
         index += 1;
     }
     return (alias_match);
+}
+
+static const t_cblc_data_item *cblc_find_data_item_for_emit_by_source(
+    const t_cblc_translation_unit *unit, const char *identifier)
+{
+    size_t index;
+
+    if (!unit || !identifier)
+        return (NULL);
+    index = unit->data_count;
+    while (index > 0)
+    {
+        index -= 1;
+        if (!unit->data_items[index].is_active
+            && (!unit->data_items[index].is_function_local
+                || unit->data_items[index].is_alias))
+            continue ;
+        if (std::strncmp(unit->data_items[index].source_name, identifier,
+                sizeof(unit->data_items[index].source_name)) == 0)
+            return (&unit->data_items[index]);
+    }
+    return (NULL);
 }
 
 static const t_cblc_struct_type *cblc_find_struct_type(const t_cblc_translation_unit *unit,

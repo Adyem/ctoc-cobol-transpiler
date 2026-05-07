@@ -218,7 +218,9 @@ static const t_cblc_data_item *c_backend_find_data_item_by_cobol(const t_cblc_tr
         if (std::strncmp(unit->data_items[index].cobol_name, cobol_name,
                 sizeof(unit->data_items[index].cobol_name)) == 0)
         {
-            if (!unit->data_items[index].is_active)
+            if (!unit->data_items[index].is_active
+                && (!unit->data_items[index].is_function_local
+                    || unit->data_items[index].is_alias))
             {
                 index += 1;
                 continue ;
@@ -246,9 +248,15 @@ static const t_cblc_data_item *c_backend_find_data_item(const t_cblc_translation
     while (index < unit->data_count)
     {
         if (std::strncmp(unit->data_items[index].source_name, source_name,
-                sizeof(unit->data_items[index].source_name)) == 0
-            && unit->data_items[index].is_active)
+                sizeof(unit->data_items[index].source_name)) == 0)
         {
+            if (!unit->data_items[index].is_active
+                && (!unit->data_items[index].is_function_local
+                    || unit->data_items[index].is_alias))
+            {
+                index += 1;
+                continue ;
+            }
             if (!unit->data_items[index].is_alias)
                 return (&unit->data_items[index]);
             if (!alias_match)
@@ -292,7 +300,9 @@ static const t_cblc_data_item *c_backend_find_data_item_by_source(
         if (std::strncmp(unit->data_items[index].source_name, source_name,
                 sizeof(unit->data_items[index].source_name)) == 0)
         {
-            if (!unit->data_items[index].is_active)
+            if (!unit->data_items[index].is_active
+                && (!unit->data_items[index].is_function_local
+                    || unit->data_items[index].is_alias))
             {
                 index += 1;
                 continue ;
