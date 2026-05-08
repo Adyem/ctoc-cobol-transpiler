@@ -1,101 +1,212 @@
 # CBL-C ↔ COBOL Transpiler
 
-The CTOC COBOL Transpiler lets you author business logic in a lightweight C-style language called **CBL-C** and emit standard-compliant COBOL that can be compiled with GnuCOBOL. It can also ingest COBOL that falls within the supported dialect and regenerate the equivalent CBL-C so teams can iterate in whichever syntax they prefer.
+`ctoc_cobol_transpiler` is a source-to-source compiler for moving between a small C-style language, **CBL-C**, and COBOL. The project is aimed at COBOL modernization, regression testing, and experiments where business logic should be easier to author while still producing COBOL that can be compiled with GnuCOBOL.
 
-## Key Capabilities
+The tool currently supports four CLI directions:
 
-- Convert between `.cblc` and `.cob` sources while preserving file I/O declarations, record layouts, and procedure structure.
-- Track COBOL picture clauses for integers and floating-point numbers, producing consistent type descriptors across translation units.
-- Recover from parser errors to report multiple syntax issues in one run, and emit semantic diagnostics when alphanumeric data would be truncated or when subprogram bindings narrow parameters.
-- Capture bidirectional source maps so diagnostics and debugging tools can jump between generated COBOL and originating CBL-C statements.
-- Package reusable helpers in separate translation units and share data through explicit function parameters, mirroring the way you would compose modules in C.
+- `cblc-to-cobol`: generate COBOL from CBL-C.
+- `cblc-to-c`: generate portable C from CBL-C for native comparison and debugging.
+- `cobol-to-cblc`: recover CBL-C from the supported COBOL dialect.
+- `standard-library`: emit the bundled COBOL helper programs.
 
 ## Quick Start
 
-1. Prepare the toolchain and bundled runtime:
-   ```
-   make initialize
-   make all
-   make test
-   ```
-2. Transpile a sample COBOL program and inspect the generated CBL-C:
-   ```
-   ./ctoc_cobol_transpiler --direction cobol-to-cblc \
-       --input samples/cobol/minimal_program.cob \
-       --output build/minimal_program.cblc \
-       --diagnostics verbose
-   ```
-   The CLI creates the `build/` directory automatically when it does not already exist, so you can point `--output` at a fresh staging path.
-   Conversion warnings remain enabled by default, but you can tailor diagnostics per run using `-W` flags. Pass `-Werror` to escalate warnings into build failures, use `-Wconversion` / `-Wno-conversion` to toggle implicit-conversion diagnostics, and reach for `-Woverflow`, `-Wstring-trunc`, `-Wshadow`, or `-Wunused` (each with matching `-Wno-` variants) as additional groups come online.
-3. View the emitted CBL-C (or feed it through `cblc_formatter` for pretty-printing):
-   ```
-   cat build/minimal_program.cblc
-   ```
+Build the transpiler and test binary:
 
-Additional walkthroughs live in [`docs/getting_started.md`](docs/getting_started.md), while [`docs/cli_usage_examples.md`](docs/cli_usage_examples.md) catalogues common flag combinations.
+```sh
+make initialize
+make all
+make tests
+```
 
-> **Note:** The CLI now supports the COBOL → CBL-C, CBL-C → COBOL, and CBL-C → C directions. Pick the translation that matches your workflow and pair each `--input` with a matching `--output` path.
+Translate a COBOL sample into CBL-C:
 
-## Example: Filtering Lines in CBL-C
+```sh
+./ctoc_cobol_transpiler --direction cobol-to-cblc \
+    --input samples/cobol/minimal_program.cob \
+    --output build/minimal_program.cblc \
+    --diagnostics verbose
+```
 
-The minimal quick start sample produces a tiny CBL-C entrypoint, but more
-interesting COBOL modules translate cleanly as well. For example, the filter
-pipeline below originates from `samples/cobol/filter_prefix.cob`:
+Translate CBL-C into COBOL:
+
+```sh
+./ctoc_cobol_transpiler --direction cblc-to-cobol \
+    --input samples/cblc/return_numeric.cblc \
+    --output build/return_numeric.cob
+```
+
+Generate C instead of COBOL:
+
+```sh
+./ctoc_cobol_transpiler --direction cblc-to-c \
+    --input samples/cblc/return_numeric.cblc \
+    --output build/return_numeric.c
+```
+
+The CLI creates missing output directories automatically. See [`docs/getting_started.md`](docs/getting_started.md) and [`docs/cli_usage_examples.md`](docs/cli_usage_examples.md) for more command examples.
+
+## What Is Implemented
+
+### CBL-C Language
+
+CBL-C is intentionally C-like, but its data model maps onto COBOL storage and calling conventions. Implemented language features include:
+
+- Global scalar declarations for `int`, `long`, `long long`, `float`, `double`, `bool`, `char`, fixed-size `char[]`, and `string`.
+- Local block storage for scalars, arrays, strings, pointers, and struct/class instances. Block-local aliases stop being visible after the closing brace, while generated backing storage remains unique for COBOL and C emission.
+- Arithmetic, comparison, boolean, assignment, unary, and `ABS` expressions over integral and floating types, with widening and diagnostics for unsafe conversions.
+- `void` and value-returning functions, including parameter passing and generated return slots for COBOL.
+- Multi-file CBL-C builds with repeated `--input` / `--output` pairs and `import "file.cblc"` support.
+- `struct` and `record`-style storage, nested fields, arrays, and generated COBOL group items.
+- `class` declarations with public/private members, constructors, methods, copy-constructor style flows, `const` member enforcement, inline method bodies, and C++-style out-of-class method definitions.
+- Pointer support for `void *`, `char *`, `int *`, struct pointers, pointer indexing, pointer arithmetic, address-of, dereference, casts, `std::malloc`, `std::realloc`, and `std::free`.
+- Built-in `string` behavior including constructor-style initialization, assignment, append, clear, length, capacity, empty, equality, compare, contains, starts-with, and ends-with operations.
+- `display`, `return`, `if` / `else`, `while`, function calls, method calls, and selected file-style syntax used by the reverse pipeline.
+
+The grammar overview lives in [`docs/cblc_grammar.md`](docs/cblc_grammar.md). The samples in [`samples/cblc`](samples/cblc) and [`samples/feature_showcase`](samples/feature_showcase) show larger examples.
+
+### COBOL Generation
+
+The forward backend can emit COBOL for the supported CBL-C subset. Implemented generation includes:
+
+- Working-storage entries for scalar, string, array, pointer, struct, class, and helper state.
+- COBOL procedure generation for functions, methods, constructors, destructors, assignments, arithmetic, calls, displays, conditionals, loops, returns, and lifecycle hooks.
+- Multi-module output with deterministic module initialization and parallel emission.
+- Standard-library calls through generated COBOL subprograms and trailing status / return slots.
+- Source maps and semantic IR dumps for diagnostics and debugging.
+
+Forward file-control generation for arbitrary CBL-C `file` declarations is still a known gap. The reverse pipeline can recover supported file I/O syntax from COBOL, but not every recovered construct has full forward COBOL emission yet.
+
+### C Generation
+
+The `cblc-to-c` backend emits portable C for much of the same CBL-C surface. It is useful for differential tests, quick debugging, and environments where a COBOL compiler is not available. Generated C includes helper routines for strings, display behavior, pointer storage, function calls, class/struct lifecycles, and standard-library-equivalent operations.
+
+### COBOL → CBL-C Reverse Pipeline
+
+The reverse translator supports a practical ANSI-85-oriented subset:
+
+- Identification, data, and procedure structure for supported programs.
+- WORKING-STORAGE scalars and group items, including `PIC X(n)`, `PIC 9(n)`, signed numerics, long / long long widths, and floating patterns.
+- Level 01 group recovery into CBL-C records, with subordinate fields preserved.
+- `COPY` reconstruction as CBL-C `copy` directives when copybook usage can be recovered.
+- `VALUE` defaults for supported scalar declarations.
+- Paragraph bodies for common statements such as `MOVE`, `IF`, `PERFORM`, `READ`, `WRITE`, `DISPLAY`, and `STOP RUN`.
+- Comment preservation and layout modes for normalized or preserved regenerated CBL-C.
+- Copybook dependency graph output for debugging include order.
+
+Unsupported or partial reverse features include `ALTER`, `ENTRY`, `RENAMES`, some `INSPECT` forms, advanced packed decimal cases, deeper legacy control-flow reconstruction, and some complex nested group scenarios. The current dialect notes are in [`docs/cobol_dialect_requirements.md`](docs/cobol_dialect_requirements.md).
+
+### Standard Library And Runtime
+
+The repository includes a generated COBOL standard-library catalog and C/C++ runtime helpers. Implemented helper areas include:
+
+- String and memory helpers: strlen, strnlen, strcmp, strcpy, strncpy, strcat, memcmp, checked memory movement, case conversion, and string-to-number conversion.
+- Math helpers: abs, fabs, floor, ceil, rounded, banker rounding, sqrt, min, max, power, exp, log, sin, cos, and tan.
+- Character classification: isdigit and isalpha.
+- Date helpers: YYYYMMDD validation and date-duration calculation.
+- Runtime services for scalar operations, strings, records, files, CSV, sorting, memory, encoding, collation, and fixed/variable record handling.
+
+The ABI and runtime contracts are documented in [`docs/abi_spec.md`](docs/abi_spec.md) and [`docs/runtime_api_reference.md`](docs/runtime_api_reference.md).
+
+### Diagnostics And Tooling
+
+Implemented tooling includes:
+
+- Parser error recovery that reports multiple syntax errors in one run.
+- Semantic checks for type compatibility, immutable/const writes, private access, string truncation, conversion warnings, overflow, shadowing, unused/uninitialized values, and unreachable code.
+- Warning controls such as `-Wconversion`, `-Woverflow`, `-Wstring-trunc`, `-Wshadow`, `-Wunused`, and `-Werror` / `--warnings-as-errors`.
+- AST graph export with `--dump-ast`.
+- Copybook graph export with `--dump-copybook-graph`.
+- Semantic IR dump support with `--dump-semantic-ir`.
+- A deterministic CBL-C formatter with normalize and preserve layout modes.
+- A CBL-C LSP/editor integration path documented in [`docs/ide_integration.md`](docs/ide_integration.md).
+- Fuzzing, property, differential, stress, round-trip, and integration test suites.
+
+## Example CBL-C
 
 ```cblc
-file in "input.txt";
-file out "filtered.txt";
-char line[128];
+class Counter
+{
+    private:
+    int value;
 
-void filter_prefix() {
-    open(in, "r");
-    open(out, "w");
-    while (read(in, line)) {
-        if (starts_with(line, "ERR")) {
-            write(out, line);
-        }
+    public:
+    Counter(int start);
+    void add(int delta);
+    int current();
+};
+
+Counter::Counter(int start)
+{
+    value = start;
+}
+
+void Counter::add(int delta)
+{
+    {
+        int next;
+        next = value + delta;
+        value = next;
     }
-    close(in);
-    close(out);
+    return;
 }
 
-void main() {
-    filter_prefix();
+int Counter::current()
+{
+    return value;
+}
+
+void main()
+{
+    Counter counter(4);
+    counter.add(5);
+    display(counter.current());
+    return;
 }
 ```
 
-Running the quick start command above generates a CBL-C translation that mirrors the same file I/O and filtering logic so you can continue development in the higher-level syntax.
+This exercises class signatures, out-of-class method bodies, constructor initialization, method calls, return slots, and block-local storage.
 
-## Example: Sharing Helpers Across Files
+## Repository Layout
 
-```text
-ctoc_cobol_transpiler --direction cblc-to-cobol \
-    --input metrics_main.cblc --output build/metrics_main.cob \
-    --input metrics_worker.cblc --output build/metrics_worker.cob
+- [`src`](src): lexer, parser, CBL-C parser/generator pieces, COBOL/C emitters, semantics, runtime helpers, standard-library generators, formatter, and LSP code.
+- [`tests`](tests): unit, integration, round-trip, standard-library, runtime, compiler, stress, fuzz-adjacent, and validation tests.
+- [`samples`](samples): COBOL, CBL-C, multi-module, and feature-showcase programs.
+- [`docs`](docs): language, CLI, ABI, runtime, dialect, CI, onboarding, and editor documentation.
+- [`compiler_feature_tracker.md`](compiler_feature_tracker.md): detailed implementation tracker and remaining work.
+
+## Testing
+
+Build the test binary:
+
+```sh
+make tests
 ```
 
-You can also emit portable C instead of COBOL when you want to run comparisons without a COBOL toolchain:
+Run the full suite:
 
-```text
-ctoc_cobol_transpiler --direction cblc-to-c \
-    --input metrics_main.cblc --output build/metrics_main.c \
-    --input metrics_worker.cblc --output build/metrics_worker.c
+```sh
+./automated_tests
 ```
 
-With the command above you can compile multiple CBL-C translation units in one invocation. A main module can `import "metrics_worker.cblc";` and call helpers like `add_sale(total, amount)` to update running totals while keeping the bookkeeping logic in a dedicated file. See [`docs/cblc_multi_file_arguments.md`](docs/cblc_multi_file_arguments.md) for full listings that pass integers and booleans between modules.
+Other useful targets:
 
-## Explore Further
+```sh
+make test
+make coverage
+make fuzz
+```
 
-- Consult [`design_doc.txt`](design_doc.txt) for architectural goals and the language surface area.
-- Review [`docs/runtime_api_reference.md`](docs/runtime_api_reference.md) when writing CBL-C that interacts with the provided runtime helpers.
-- Study [`docs/abi_spec.md`](docs/abi_spec.md) for the runtime ABI, calling conventions, and linkage layout shared by generated COBOL and native integrations.
-- Use [`compiler_feature_tracker.md`](compiler_feature_tracker.md) to follow the roadmap and discover which capabilities ship next.
-- Explore [`docs/ide_integration.md`](docs/ide_integration.md) for syntax highlighting and editor automation tips that streamline daily workflows.
+Some COBOL execution tests require `cobc` from GnuCOBOL. The test harness auto-detects it where possible; see [`docs/development_environment.md`](docs/development_environment.md) and [`docs/platform_bootstrap.md`](docs/platform_bootstrap.md) for setup details.
 
-Whether you're modernizing existing COBOL or prototyping new workflows in CBL-C, the transpiler provides repeatable builds, actionable diagnostics, and modular composition patterns so you can stay productive in either language.
+## Current Limitations
 
-### Current CBL-C → COBOL Coverage
+The project is active and does not yet cover all COBOL or all C/C++ syntax. Notable gaps include:
 
-The reverse pipeline now recovers top-level WORKING-STORAGE scalars and level 01 group items alongside the procedural skeleton. Items with `PIC X(n)` or `PIC 9(n)` clauses translate into CBL-C declarations—flag-style names (including `-FLAG`, `-SWITCH`, and `-IND` suffixes) become `bool` variables, single-character fields stay as `char` scalars unless their identifiers read like buffers (`RECORD`, `BUFFER`, `TEXT`, `NAME`, etc.), and wider alphanumeric pictures expand into fixed-length `char[]`. Numeric pictures choose between `int`/`long long` or `float`/`double` based on precision, COBOL `COMP-1`/`COMP-2` usage clauses feed the same floating-point recovery, and VALUE clauses on supported scalars become direct initializers in the emitted CBL-C. When a group appears without a PIC clause the emitter now lifts its children into a `record` declaration, mirrors the COBOL group variable, and still surfaces each subordinate field as a standalone scalar so existing procedure bodies remain valid. Registered `COPY` statements reappear as explicit CBL-C `copy` directives that point at the original copybook so shared working-storage stays centralized without duplicating the expanded field declarations. Paragraph bodies continue to lift `MOVE`, `IF`, `PERFORM`, `READ`, `WRITE`, `DISPLAY`, and `STOP` statements into idiomatic control structures so the emitted CBL-C runs immediately.【F:transpiler_cobol_reverse.cpp†L1-L2174】【F:samples/cblc/reverse_group_items.cblc†L1-L19】【F:samples/cblc/reverse_copybook.cblc†L1-L11】【F:samples/cblc/reverse_value_defaults.cblc†L1-L8】
+- Full forward file-control emission for arbitrary CBL-C file declarations.
+- Legacy COBOL constructs such as `ALTER`, `ENTRY`, broad `INSPECT` support, and `RENAMES`.
+- Full packed-decimal and advanced numeric picture coverage beyond the implemented heuristics.
+- All possible COBOL table, report-writer, screen-section, and environment-division variants.
+- General-purpose C++ compatibility; CBL-C only implements the C/C++-like surface needed by the transpiler.
 
-Richer numeric pictures (including COMP-3 and signed packed decimals beyond the current heuristics) still fall back to diagnostics. ENVIRONMENT and FILE sections are skipped entirely today, compound group VALUE defaults are ignored, nested group levels beyond a single tier remain unsupported, and only paragraph-level procedures are generated. Consult the CLI examples for the latest snapshot of supported constructs and plan migrations accordingly.【F:transpiler_cobol_reverse.cpp†L1-L2174】【F:docs/cli_usage_examples.md†L17-L36】
+For the most detailed status, use [`compiler_feature_tracker.md`](compiler_feature_tracker.md).
