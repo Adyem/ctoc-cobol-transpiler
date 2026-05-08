@@ -3,9 +3,10 @@
 This sample builds one executable, `message_showcase`, from a few imported
 CBL-C source files. It is meant to be a compact, readable starting point for
 the language rather than a long business demo. The sample still exercises the
-core features that lower cleanly into COBOL: imports, structs, classes with
-`private` / `public` members, constructors, out-of-class method bodies,
-builtin `string` values and methods, arrays, and basic pointer access.
+core features that lower cleanly into COBOL: imports, structs, a class with
+`private` / `public` members, constructor and destructor lifecycle code,
+out-of-class method bodies, builtin `string` values and methods, arrays, and
+basic pointer access.
 
 ## Layout
 
@@ -14,12 +15,11 @@ builtin `string` values and methods, arrays, and basic pointer access.
   modules, and builds the single generated executable with the correct
   `COB_LIBRARY_PATH`.
 - `message_showcase.cblc` — the small entrypoint that imports each showcase
-  module and uses a `StageCounter` class to keep the flow minimal.
+  module.
 - `message_showcase_text.cblc` — a small `string` example with readable output.
-- `message_showcase_portfolio.cblc` — a simple data model using structs and a
-  small class.
-- `stage_counter.cblc` — class declaration plus C++-style out-of-class method
-  body used by the entrypoint.
+- `message_showcase_ledger.cblc` — the expanded class example. It combines
+  constructor initialization, destructor cleanup, out-of-class methods, structs,
+  strings, and a small malloc/free-backed scoring buffer.
 - `message_showcase_memory.cblc` — a short array and pointer example.
 - `EXPECTED_OUTPUT.txt` — the transcript used by `make verify`.
 - `stdlib/` — populated by the `standard-library` CLI direction.

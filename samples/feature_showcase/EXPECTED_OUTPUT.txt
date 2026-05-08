@@ -6,10 +6,20 @@ clean base
 Note chars
 +000000010
 BASE
+Memory marker
+R
 UNDERWRITING
 CLAIMS
 Policies
 +000001250
+Net claims
++000000027
+Weighted score
++000000023
+Loss ratio
++000000015
+Reserve gap
++000120000
 Snapshot id
 +000000003
 Selected score

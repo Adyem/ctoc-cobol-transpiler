@@ -1,22 +1,18 @@
 import "message_showcase_text.cblc";
-import "message_showcase_portfolio.cblc";
+import "message_showcase_ledger.cblc";
 import "message_showcase_memory.cblc";
-import "stage_counter.cblc";
 
-StageCounter review_step;
+int module_count;
 
 void main()
 {
-    review_step.value = 0;
-    review_step.add(1);
+    module_count = 3;
     display("CBL-C STARTER SHOWCASE");
     showcase_text();
-    review_step.add(1);
     showcase_portfolio();
-    review_step.add(1);
     showcase_memory();
     display("Modules");
-    display(review_step.value);
+    display(module_count);
     display("SHOWCASE READY");
     return;
 }

@@ -20,7 +20,7 @@ export LIBRARY_PATH := $(GOINFRE_LOCAL_PREFIX)/lib:$(GOINFRE_LOCAL_PREFIX)/lib64
 endif
 
 MAIN_PROGRAM := message_showcase
-CBLC_MODULES := message_showcase message_showcase_text message_showcase_portfolio message_showcase_memory stage_counter
+CBLC_MODULES := message_showcase message_showcase_text message_showcase_ledger message_showcase_memory
 CBLC_SOURCES := $(addsuffix .cblc,$(CBLC_MODULES))
 COB_DIR := cobol
 GENERATED_COB := $(addprefix $(COB_DIR)/,$(addsuffix .cob,$(CBLC_MODULES)))

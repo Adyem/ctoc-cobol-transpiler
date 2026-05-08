@@ -1,0 +1,149 @@
+const int reserve_target = 600000;
+const int earned_premium = 480000;
+
+struct Desk
+{
+    string name(16);
+    int open_items;
+    int closed_items;
+};
+
+struct Portfolio
+{
+    Desk underwriting;
+    Desk claims;
+};
+
+char *ledger_marker_buffer;
+char ledger_marker;
+
+class ShowcaseLedger
+{
+    private:
+        const int identifier;
+        string tag(16);
+        int policy_count;
+        int claim_count;
+        int investigation_count;
+        int paid_claims;
+        int weight_seed;
+        int weighted_score;
+
+    public:
+        ShowcaseLedger(int id) : tag("BASE"), identifier(id)
+        {
+            policy_count = 0;
+            claim_count = 0;
+            investigation_count = 0;
+            paid_claims = 0;
+            weight_seed = 23;
+            weighted_score = 0;
+            ledger_marker_buffer = std::malloc(4);
+            ledger_marker_buffer[0] = 'R';
+            ledger_marker = ledger_marker_buffer[0];
+        }
+
+        ~ShowcaseLedger()
+        {
+            std::free(ledger_marker_buffer);
+        }
+
+        void load(int policies, int claims, int investigations, int paid);
+        int id();
+        int policies();
+        int net_claims();
+        int score();
+        int loss_ratio_percent();
+        int reserve_gap();
+        void print_header();
+};
+
+void ShowcaseLedger::load(int policies, int claims, int investigations, int paid)
+{
+    policy_count = policies;
+    claim_count = claims;
+    investigation_count = investigations;
+    paid_claims = paid;
+    weighted_score = policy_count / 250 + weight_seed;
+    return;
+}
+
+int ShowcaseLedger::id()
+{
+    return identifier;
+}
+
+int ShowcaseLedger::policies()
+{
+    return policy_count;
+}
+
+int ShowcaseLedger::net_claims()
+{
+    return claim_count - investigation_count;
+}
+
+int ShowcaseLedger::score()
+{
+    return weighted_score - investigation_count;
+}
+
+int ShowcaseLedger::loss_ratio_percent()
+{
+    return paid_claims * 100 / earned_premium;
+}
+
+int ShowcaseLedger::reserve_gap()
+{
+    return reserve_target - earned_premium;
+}
+
+void ShowcaseLedger::print_header()
+{
+    display(tag);
+    display("Memory marker");
+    display(ledger_marker);
+    return;
+}
+
+Portfolio book;
+int output_report_id;
+int policies_total;
+int claims_net;
+int weighted_total;
+int loss_ratio;
+int reserve_gap_amount;
+
+void showcase_portfolio()
+{
+    ShowcaseLedger risk_review(3);
+    book.underwriting.name = "UNDERWRITING";
+    book.underwriting.open_items = 19;
+    book.underwriting.closed_items = 23;
+    book.claims.name = "CLAIMS";
+    book.claims.open_items = 32;
+    book.claims.closed_items = 27;
+    risk_review.load(1250, 32, 5, 72000);
+    risk_review.print_header();
+    output_report_id = risk_review.id();
+    policies_total = risk_review.policies();
+    claims_net = risk_review.net_claims();
+    weighted_total = risk_review.score();
+    loss_ratio = risk_review.loss_ratio_percent();
+    reserve_gap_amount = risk_review.reserve_gap();
+    display(book.underwriting.name);
+    display(book.claims.name);
+    display("Policies");
+    display(policies_total);
+    display("Net claims");
+    display(claims_net);
+    display("Weighted score");
+    display(weighted_total);
+    display("Loss ratio");
+    display(loss_ratio);
+    display("Reserve gap");
+    display(reserve_gap_amount);
+    display("Snapshot id");
+    display(output_report_id);
+    return;
+}
