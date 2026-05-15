@@ -17,7 +17,7 @@ If the machine does not allow `sudo`, you can bootstrap a local COBOL toolchain 
 make install_cobc_goinfre
 ```
 
-This installs `m4`, `gmp`, and `GnuCOBOL 3.2` without `sudo`, updates `~/.zshrc` and `~/.bashrc` when those files exist, and configures the local build without Berkeley DB support (`--without-db`).
+This installs `m4`, `gmp`, and `GnuCOBOL 3.2` without `sudo` and configures the local build without Berkeley DB support (`--without-db`). It does not edit shell startup files; the project Makefile automatically uses `/goinfre/$USER/local/bin/cobc` when `cobc` is not already available on `PATH`.
 
 After installing the prerequisites, clone the repository with submodules and run the bootstrap target once per machine:
 

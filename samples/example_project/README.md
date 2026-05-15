@@ -20,8 +20,8 @@ COBOL and compiles the result with `cobc`.
    transpiler output.
 2. Run `make` (or `make compile`) inside this directory. The makefile will:
    - initialize the `libft` submodule if it has not been checked out,
-   - attempt to install GnuCOBOL via the root `make install_cobc` target
-     when `cobc` is missing,
+   - use `/goinfre/$USER/local/bin/cobc` automatically when `cobc` is
+     missing from `PATH`,
    - build the transpiler if required, and
    - transpile the sample before compiling it with `cobc`, writing the
      generated program to `cobol/hello_make_demo.cob`.
@@ -31,8 +31,9 @@ COBOL and compiles the result with `cobc`.
 3. Execute `make run` to launch the resulting binary.
 4. Use `make clean` to remove all generated artifacts.
 
-> **Note:** Installing GnuCOBOL requires package manager access. If the
-> automatic installation fails, install it manually and rerun `make`.
+> **Note:** If `cobc` is missing from both `PATH` and `/goinfre/$USER/local/bin`,
+> run `make -C ../.. install_cobc_goinfre` or install GnuCOBOL manually, then
+> rerun `make`.
 
 If the transpiler exits successfully but does not produce the expected
 COBOL file, the makefile aborts with an explanatory message so you can

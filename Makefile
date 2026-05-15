@@ -20,9 +20,24 @@ FUZZ_SCRIPT      = scripts/fuzz_transpiler.py
 COVERAGE_SCRIPT  = scripts/coverage_report.py
 GOINFRE_GNUCOBOL_SCRIPT = scripts/install_gnucobol_goinfre.sh
 GOINFRE_LOCAL_PREFIX ?= /goinfre/$(USER)/local
+COBC ?= cobc
 FUZZ_ITERATIONS ?= 50
 FUZZ_MODE ?= all
 FUZZ_ARGS ?=
+
+COBC_ON_PATH := $(shell command -v $(COBC) 2>/dev/null)
+GOINFRE_COBC := $(GOINFRE_LOCAL_PREFIX)/bin/cobc
+GOINFRE_COBC_AVAILABLE := $(shell test -x "$(GOINFRE_COBC)" && printf yes)
+
+ifeq ($(COBC_ON_PATH),)
+ifeq ($(GOINFRE_COBC_AVAILABLE),yes)
+COBC := $(GOINFRE_COBC)
+export PATH := $(GOINFRE_LOCAL_PREFIX)/bin:$(PATH)
+export LD_LIBRARY_PATH := $(GOINFRE_LOCAL_PREFIX)/lib:$(GOINFRE_LOCAL_PREFIX)/lib64$(if $(LD_LIBRARY_PATH),:$(LD_LIBRARY_PATH))
+export CPATH := $(GOINFRE_LOCAL_PREFIX)/include$(if $(CPATH),:$(CPATH))
+export LIBRARY_PATH := $(GOINFRE_LOCAL_PREFIX)/lib:$(GOINFRE_LOCAL_PREFIX)/lib64$(if $(LIBRARY_PATH),:$(LIBRARY_PATH))
+endif
+endif
 
 SRC         = \
     main.cpp \
@@ -370,10 +385,14 @@ $(BUILD_LOG_DIR):
 	@-$(MKDIR) $(BUILD_LOG_DIR)
 
 install_cobc:
-	@if ! command -v cobc >/dev/null 2>&1; then \
-		apt-get update && apt-get install -y gnucobol; \
+	@if command -v $(COBC) >/dev/null 2>&1; then \
+		printf 'cobc available at %s\n' "$$(command -v $(COBC))"; \
+	elif [ -x "$(GOINFRE_COBC)" ]; then \
+		printf 'cobc available at %s\n' "$(GOINFRE_COBC)"; \
 	else \
-		printf 'cobc already installed.\n'; \
+		printf 'cobc not found on PATH or at %s.\n' "$(GOINFRE_COBC)" >&2; \
+		printf 'Run "make install_cobc_goinfre" to install a local GnuCOBOL toolchain.\n' >&2; \
+		exit 1; \
 	fi
 
 install_cobc_goinfre:
@@ -446,15 +465,7 @@ fclean: clean
 re: fclean all
 
 test: $(TEST_NAME)
-	@if [ -x "$(GOINFRE_LOCAL_PREFIX)/bin/cobc" ]; then \
-		PATH="$(GOINFRE_LOCAL_PREFIX)/bin:$$PATH" \
-		LD_LIBRARY_PATH="$(GOINFRE_LOCAL_PREFIX)/lib:$(GOINFRE_LOCAL_PREFIX)/lib64$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}" \
-		CPATH="$(GOINFRE_LOCAL_PREFIX)/include$${CPATH:+:$$CPATH}" \
-		LIBRARY_PATH="$(GOINFRE_LOCAL_PREFIX)/lib:$(GOINFRE_LOCAL_PREFIX)/lib64$${LIBRARY_PATH:+:$$LIBRARY_PATH}" \
-		./$(TEST_NAME); \
-	else \
-		./$(TEST_NAME); \
-	fi
+	@./$(TEST_NAME)
 
 both: all debug
 
@@ -496,4 +507,4 @@ ci:
 	$(MAKE) ci-lint
 	$(MAKE) ci-coverage
 
-.PHONY: all dirs clean fclean re debug both re_both tests test lint fuzz coverage ci-build ci-test ci-lint ci-coverage ci install_cobc_goinfre bootstrap_cobc_goinfre use_cobc_goinfre
+.PHONY: all dirs clean fclean re debug both re_both tests test lint fuzz coverage ci-build ci-test ci-lint ci-coverage ci install_cobc install_cobc_goinfre bootstrap_cobc_goinfre use_cobc_goinfre tests_with_cobc

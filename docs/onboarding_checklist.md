@@ -10,8 +10,8 @@ This checklist helps new contributors install dependencies, set up the repositor
 ## Test Execution
 - [x] Build the automated test runner with `make tests`.
 - [x] Execute `make test` to run the full suite (requires initialized `libft`).
-- [x] Confirm `cobc` is installed by the toolchain step above or run `make install_cobc` if the binary is missing before executing COBOL-backed tests.
-- [x] Forward CBL-C→COBOL tests run automatically when `cobc` is available; set `FORWARD_TRANSLATION=0` (or export `CTOC_ENABLE_FORWARD_TRANSLATION=0`) to skip the COBOL-backed cases when necessary.
+- [x] Confirm `cobc` is installed by the toolchain step above or run `make install_cobc_goinfre` if the binary is missing before executing COBOL-backed tests.
+- [x] Forward CBL-C→COBOL tests run automatically when `cobc` is available on `PATH` or under `/goinfre/$USER/local/bin`; set `FORWARD_TRANSLATION=0` (or export `CTOC_ENABLE_FORWARD_TRANSLATION=0`) to skip the COBOL-backed cases when necessary.
 - [x] Exercise the new CBL-C→C backend at least once (for example, `./ctoc_cobol_transpiler --direction cblc-to-c --input samples/cblc/minimal_program.cblc --output build/minimal_program.c`) to confirm helper-backed C emits successfully.
 - [x] Investigate and resolve any failing tests before committing changes (current suite passes with `make test`).
 

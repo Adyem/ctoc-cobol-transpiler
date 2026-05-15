@@ -18,9 +18,6 @@ M4_URL="https://ftp.gnu.org/gnu/m4/${M4_TARBALL}"
 GMP_URL="https://ftp.gnu.org/gnu/gmp/${GMP_TARBALL}"
 GNUCOBOL_URL="https://ftp.gnu.org/gnu/gnucobol/${GNUCOBOL_TARBALL}"
 
-PROFILE_MARKER_BEGIN="# >>> ctoc gnucobol goinfre >>>"
-PROFILE_MARKER_END="# <<< ctoc gnucobol goinfre <<<"
-
 ensure_command() {
     if ! command -v "$1" >/dev/null 2>&1; then
         printf 'Missing required command: %s\n' "$1" >&2
@@ -46,43 +43,6 @@ extract_tarball() {
         printf '[ctoc] extracting %s\n' "${file_name}"
         tar -xf "${LOCAL_SRC}/${file_name}" -C "${LOCAL_SRC}"
     fi
-}
-
-profile_block() {
-    cat <<EOF
-${PROFILE_MARKER_BEGIN}
-export CTOC_GNUCOBOL_PREFIX="${LOCAL_PREFIX}"
-export PATH="\${CTOC_GNUCOBOL_PREFIX}/bin:\$PATH"
-export LD_LIBRARY_PATH="\${CTOC_GNUCOBOL_PREFIX}/lib:\${CTOC_GNUCOBOL_PREFIX}/lib64\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}"
-export CPATH="\${CTOC_GNUCOBOL_PREFIX}/include\${CPATH:+:\$CPATH}"
-export LIBRARY_PATH="\${CTOC_GNUCOBOL_PREFIX}/lib:\${CTOC_GNUCOBOL_PREFIX}/lib64\${LIBRARY_PATH:+:\$LIBRARY_PATH}"
-alias cobc="\${CTOC_GNUCOBOL_PREFIX}/bin/cobc"
-alias cobcrun="\${CTOC_GNUCOBOL_PREFIX}/bin/cobcrun"
-alias cob-config="\${CTOC_GNUCOBOL_PREFIX}/bin/cob-config"
-${PROFILE_MARKER_END}
-EOF
-}
-
-update_profile() {
-    local profile_path="$1"
-    local temp_file
-
-    [ -f "${profile_path}" ] || return 0
-    temp_file="$(mktemp)"
-    awk -v begin="${PROFILE_MARKER_BEGIN}" -v end="${PROFILE_MARKER_END}" '
-        $0 == begin { skip = 1; next }
-        $0 == end { skip = 0; next }
-        skip != 1 { print }
-    ' "${profile_path}" > "${temp_file}"
-    {
-        cat "${temp_file}"
-        if [ -s "${temp_file}" ]; then
-            printf '\n'
-        fi
-        profile_block
-    } > "${profile_path}"
-    rm -f "${temp_file}"
-    printf '[ctoc] updated %s\n' "${profile_path}"
 }
 
 build_m4() {
@@ -139,10 +99,9 @@ main() {
     export PATH="${LOCAL_PREFIX}/bin:${PATH}"
     build_gmp
     build_gnucobol
-    update_profile "${HOME}/.zshrc"
-    update_profile "${HOME}/.bashrc"
     printf '\n[ctoc] installed local toolchain in %s\n' "${LOCAL_PREFIX}"
-    printf '[ctoc] open a new shell or run:\n'
+    printf '[ctoc] make will use this toolchain automatically when cobc is not on PATH.\n'
+    printf '[ctoc] for manual use in this shell, run:\n'
     printf '  export PATH=%q/bin:$PATH\n' "${LOCAL_PREFIX}"
     printf '  export LD_LIBRARY_PATH=%q/lib:%q/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\n' "${LOCAL_PREFIX}" "${LOCAL_PREFIX}"
     printf '  export CPATH=%q/include${CPATH:+:$CPATH}\n' "${LOCAL_PREFIX}"

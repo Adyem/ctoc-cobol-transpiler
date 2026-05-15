@@ -7,6 +7,21 @@ endif
 
 TRANSPILER := $(REPO_ROOT)/ctoc_cobol_transpiler$(EXE_EXT)
 COBC ?= cobc
+GOINFRE_LOCAL_PREFIX ?= /goinfre/$(USER)/local
+
+COBC_ON_PATH := $(shell command -v $(COBC) 2>/dev/null)
+GOINFRE_COBC := $(GOINFRE_LOCAL_PREFIX)/bin/cobc
+GOINFRE_COBC_AVAILABLE := $(shell test -x "$(GOINFRE_COBC)" && printf yes)
+
+ifeq ($(COBC_ON_PATH),)
+ifeq ($(GOINFRE_COBC_AVAILABLE),yes)
+COBC := $(GOINFRE_COBC)
+export PATH := $(GOINFRE_LOCAL_PREFIX)/bin:$(PATH)
+export LD_LIBRARY_PATH := $(GOINFRE_LOCAL_PREFIX)/lib:$(GOINFRE_LOCAL_PREFIX)/lib64$(if $(LD_LIBRARY_PATH),:$(LD_LIBRARY_PATH))
+export CPATH := $(GOINFRE_LOCAL_PREFIX)/include$(if $(CPATH),:$(CPATH))
+export LIBRARY_PATH := $(GOINFRE_LOCAL_PREFIX)/lib:$(GOINFRE_LOCAL_PREFIX)/lib64$(if $(LIBRARY_PATH),:$(LIBRARY_PATH))
+endif
+endif
 
 SETUP_SENTINEL := .environment_ready
 PROGRAM_NAME := hello_make_demo
@@ -51,12 +66,9 @@ $(SETUP_SENTINEL):
 
 ensure_cobc:
 	@if ! command -v $(COBC) >/dev/null 2>&1; then \
-		printf '\033[1;31m[cobc missing]\033[0m Attempting to install with "make install_cobc"...\n'; \
-		$(MAKE) -C $(REPO_ROOT) install_cobc; \
-		if ! command -v $(COBC) >/dev/null 2>&1; then \
-			printf 'Unable to locate "$(COBC)" even after running install_cobc.\n'; \
-			exit 1; \
-		fi; \
+		printf 'Unable to locate "$(COBC)" on PATH or at "$(GOINFRE_COBC)".\n' >&2; \
+		printf 'Run "make -C $(REPO_ROOT) install_cobc_goinfre" to install it locally.\n' >&2; \
+		exit 1; \
 	fi
 
 $(TRANSPILER): | $(SETUP_SENTINEL)
