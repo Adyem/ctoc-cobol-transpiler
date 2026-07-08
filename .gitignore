@@ -1,10 +1,15 @@
 build_logs/
 automated_tests
 ctoc_cobol_transpiler
+ctoc_cobol_transpiler_debug
 imported_test_failures.log
 objs/
 objs_tests/
+*.o
+*.so
+*.exe
 samples/example_project/build/
 samples/example_project/.environment_ready
 samples/example_project/hello_make_demo
 samples/feature_showcase/actual_output.log
+samples/feature_showcase/message_showcase
