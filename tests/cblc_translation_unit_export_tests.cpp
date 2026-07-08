@@ -115,6 +115,107 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_register_translation_unit_exports_and_imports_public_data)
+{
+    t_transpiler_context context;
+    t_cblc_translation_unit provider_unit;
+    t_cblc_translation_unit consumer_unit;
+    const t_transpiler_data_signature *data_signatures;
+    const char *provider_source;
+    const char *consumer_source;
+    size_t data_count;
+    int status;
+
+    provider_source = "const int reserve_target = 600000;\n"
+        "const int earned_premium = 480000;\n"
+        "string title(\"POLICY SNAPSHOT\");\n"
+        "string note(16);\n"
+        "int title_length;\n"
+        "int note_length;\n";
+    consumer_source = "import \"provider_mod\";\n"
+        "void main()\n"
+        "{\n"
+        "    display(reserve_target);\n"
+        "    display(title);\n"
+        "    display(note_length);\n"
+        "    return;\n"
+        "}\n";
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    cblc_translation_unit_init(&provider_unit);
+    cblc_translation_unit_init(&consumer_unit);
+    if (test_expect_success(transpiler_context_register_module(&context, "provider_mod", NULL),
+            "provider module registration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(transpiler_context_register_module(&context, "consumer_mod", NULL),
+            "consumer module registration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(transpiler_context_register_module_import(&context, "consumer_mod",
+                "provider_mod"), "consumer import registration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_parse_translation_unit(provider_source, &provider_unit),
+            "provider module should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_register_translation_unit_exports(&context, "provider_mod",
+                &provider_unit), "provider exports should register") != FT_SUCCESS)
+        goto cleanup;
+    data_signatures = transpiler_context_get_data_signatures(&context, &data_count);
+    if (test_expect_size_t_equal(data_count, 6,
+            "provider should export six top-level data items") != FT_SUCCESS)
+        goto cleanup;
+    if (!data_signatures || std::strncmp(data_signatures[0].name, "reserve_target",
+            sizeof(data_signatures[0].name)) != 0)
+    {
+        std::printf("Assertion failed: first exported data item should be reserve_target\n");
+        goto cleanup;
+    }
+    if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "consumer_mod",
+                &consumer_unit), "consumer should import public data stubs") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_parse_translation_unit(consumer_source, &consumer_unit),
+            "consumer should parse imported data references") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_size_t_equal(consumer_unit.data_count, 6,
+            "consumer should receive imported data declarations") != FT_SUCCESS)
+        goto cleanup;
+    {
+        int saw_reserve_target;
+        int saw_title;
+        int saw_note_length;
+        size_t index;
+
+        saw_reserve_target = 0;
+        saw_title = 0;
+        saw_note_length = 0;
+        index = 0;
+        while (index < consumer_unit.data_count)
+        {
+            if (std::strncmp(consumer_unit.data_items[index].source_name, "reserve_target",
+                    sizeof(consumer_unit.data_items[index].source_name)) == 0)
+                saw_reserve_target = 1;
+            if (std::strncmp(consumer_unit.data_items[index].source_name, "title",
+                    sizeof(consumer_unit.data_items[index].source_name)) == 0)
+                saw_title = 1;
+            if (std::strncmp(consumer_unit.data_items[index].source_name, "note_length",
+                    sizeof(consumer_unit.data_items[index].source_name)) == 0)
+                saw_note_length = 1;
+            index += 1;
+        }
+        if (!saw_reserve_target || !saw_title || !saw_note_length)
+        {
+            std::printf("Assertion failed: imported data declarations should be visible in consumer\n");
+            goto cleanup;
+        }
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&provider_unit);
+    cblc_translation_unit_dispose(&consumer_unit);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
 FT_TEST(test_cblc_register_translation_unit_exports_reports_duplicate_entrypoint)
 {
     t_transpiler_context context;
@@ -171,4 +272,3 @@ cleanup:
     transpiler_context_dispose(&context);
     return (status);
 }
-

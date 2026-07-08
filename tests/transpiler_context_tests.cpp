@@ -107,6 +107,7 @@ int test_cblc_import_type_stubs_register_struct_method_parameter_storage_from_si
 int test_cblc_import_type_stubs_do_not_follow_transitive_imports(void);
 int test_cblc_register_translation_unit_exports_records_entrypoint_and_helpers(void);
 int test_cblc_register_translation_unit_exports_skips_entrypoint_without_main(void);
+int test_cblc_register_translation_unit_exports_and_imports_public_data(void);
 int test_cblc_register_translation_unit_exports_reports_duplicate_entrypoint(void);
 int test_transpiler_context_scans_imports_and_orders_modules(void);
 int test_transpiler_context_orders_modules_deterministically(void);
@@ -261,6 +262,7 @@ const t_test_case *get_transpiler_context_tests(size_t *count)
         {"cblc_import_type_stubs_do_not_follow_transitive_imports", test_cblc_import_type_stubs_do_not_follow_transitive_imports},
         {"cblc_register_translation_unit_exports_records_entrypoint_and_helpers", test_cblc_register_translation_unit_exports_records_entrypoint_and_helpers},
         {"cblc_register_translation_unit_exports_skips_entrypoint_without_main", test_cblc_register_translation_unit_exports_skips_entrypoint_without_main},
+        {"cblc_register_translation_unit_exports_and_imports_public_data", test_cblc_register_translation_unit_exports_and_imports_public_data},
         {"cblc_register_translation_unit_exports_reports_duplicate_entrypoint", test_cblc_register_translation_unit_exports_reports_duplicate_entrypoint},
         {"transpiler_context_scans_imports_and_orders_modules", test_transpiler_context_scans_imports_and_orders_modules},
         {"transpiler_context_orders_modules_deterministically", test_transpiler_context_orders_modules_deterministically},

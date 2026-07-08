@@ -380,6 +380,26 @@ typedef struct s_transpiler_type_signature
     int has_destructor_definition;
 }   t_transpiler_type_signature;
 
+#define TRANSPILE_DATA_SIGNATURE_TEXT_MAX 256
+
+typedef struct s_transpiler_data_signature
+{
+    char name[TRANSPILE_IDENTIFIER_MAX];
+    char module[TRANSPILE_MODULE_NAME_MAX];
+    char declared_type_name[TRANSPILE_IDENTIFIER_MAX];
+    char struct_type_name[TRANSPILE_IDENTIFIER_MAX];
+    size_t length;
+    size_t array_count;
+    int kind;
+    int is_const;
+    int has_initializer;
+    size_t initializer_length;
+    char initializer_text[TRANSPILE_DATA_SIGNATURE_TEXT_MAX];
+    char constructor_arguments[TRANSPILE_DATA_SIGNATURE_TEXT_MAX];
+    size_t constructor_argument_count;
+    t_transpiler_symbol_visibility visibility;
+}   t_transpiler_data_signature;
+
 #define TRANSPILE_ERROR_FUNCTION_RETURNS_VALUE 1001
 #define TRANSPILE_ERROR_ENTRYPOINT_INVALID_NAME 1002
 #define TRANSPILE_ERROR_ENTRYPOINT_ARGUMENT_MISMATCH 1003
@@ -610,6 +630,9 @@ typedef struct s_transpiler_context
     t_transpiler_type_signature *types;
     size_t type_count;
     size_t type_capacity;
+    t_transpiler_data_signature *data_signatures;
+    size_t data_signature_count;
+    size_t data_signature_capacity;
     t_transpiler_file_declaration *files;
     size_t file_count;
     size_t file_capacity;
@@ -672,6 +695,8 @@ const t_transpiler_function_signature *transpiler_context_get_functions(const t_
     size_t *count);
 const t_transpiler_type_signature *transpiler_context_get_types(const t_transpiler_context *context,
     size_t *count);
+const t_transpiler_data_signature *transpiler_context_get_data_signatures(const t_transpiler_context *context,
+    size_t *count);
 int transpiler_context_register_module_import(t_transpiler_context *context, const char *module_name,
     const char *import_path);
 int transpiler_context_scan_imports_for_module(t_transpiler_context *context, const char *module_name,
@@ -690,6 +715,8 @@ const t_transpiler_function_signature *transpiler_context_resolve_function_acces
     const char *requesting_module, const char *module_name, const char *name);
 int transpiler_context_register_type_signature(t_transpiler_context *context, const char *module_name,
     const t_transpiler_type_signature *signature);
+int transpiler_context_register_data_signature(t_transpiler_context *context, const char *module_name,
+    const t_transpiler_data_signature *signature);
 const t_transpiler_type_signature *transpiler_context_find_type(const t_transpiler_context *context,
     const char *module_name, const char *name);
 const t_transpiler_type_signature *transpiler_context_resolve_type_access(t_transpiler_context *context,
@@ -1208,6 +1235,7 @@ typedef struct s_cblc_data_item
     int is_function_local;
     int is_alias;
     int is_active;
+    int is_imported;
     int has_initializer;
     size_t initializer_length;
     char initializer_text[TRANSPILE_STATEMENT_TEXT_MAX];

@@ -520,7 +520,7 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
             type->methods[index].has_definition = signature->methods[index].has_definition;
             if (cblc_register_imported_parameter_storage(unit,
                     type->methods[index].parameters,
-                    type->methods[index].parameter_count) != FT_SUCCESS)
+                    type->methods[index].parameter_count, 1) != FT_SUCCESS)
                 return (FT_FAILURE);
             index += 1;
         }
@@ -582,7 +582,7 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
                 signature->constructors[index].has_definition;
             if (cblc_register_imported_parameter_storage(unit,
                     type->constructors[index].parameters,
-                    type->constructors[index].parameter_count) != FT_SUCCESS)
+                    type->constructors[index].parameter_count, 1) != FT_SUCCESS)
                 return (FT_FAILURE);
             index += 1;
         }
@@ -609,7 +609,7 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
 }
 
 static int cblc_register_imported_parameter_storage(t_cblc_translation_unit *unit,
-    const t_cblc_parameter *parameters, size_t parameter_count)
+    const t_cblc_parameter *parameters, size_t parameter_count, int is_imported)
 {
     size_t index;
 
@@ -644,6 +644,7 @@ static int cblc_register_imported_parameter_storage(t_cblc_translation_unit *uni
                     parameters[index].cobol_name, kind, 0, 0, parameters[index].type_name,
                     NULL, 0, 0, 0) != FT_SUCCESS)
                 return (FT_FAILURE);
+            unit->data_items[unit->data_count - 1].is_imported = is_imported;
             if (cblc_add_struct_instance_field_items(unit, type,
                     parameters[index].actual_source_name, parameters[index].cobol_name,
                     NULL, 0, 0) != FT_SUCCESS)
@@ -655,9 +656,46 @@ static int cblc_register_imported_parameter_storage(t_cblc_translation_unit *uni
                     parameters[index].cobol_name, kind, 0, 0, parameters[index].type_name,
                     NULL, 0, 0, 0) != FT_SUCCESS)
                 return (FT_FAILURE);
+            unit->data_items[unit->data_count - 1].is_imported = is_imported;
         }
         index += 1;
     }
+    return (FT_SUCCESS);
+}
+
+static int cblc_register_imported_data_stub(t_cblc_translation_unit *unit,
+    const t_transpiler_data_signature *signature)
+{
+    t_cblc_data_item *item;
+    char source_name[TRANSPILE_IDENTIFIER_MAX];
+    char cobol_name[TRANSPILE_IDENTIFIER_MAX];
+
+    if (!unit || !signature || signature->name[0] == '\0')
+        return (FT_FAILURE);
+    std::memset(source_name, 0, sizeof(source_name));
+    std::memset(cobol_name, 0, sizeof(cobol_name));
+    ft_strlcpy(source_name, signature->name, sizeof(source_name));
+    cblc_identifier_to_cobol(source_name, cobol_name, sizeof(cobol_name));
+    if (cblc_add_named_data_item(unit, signature->name, cobol_name,
+            static_cast<t_cblc_data_kind>(signature->kind), signature->length,
+            signature->array_count, signature->struct_type_name, NULL, 0, 0,
+            signature->is_const) != FT_SUCCESS)
+        return (FT_FAILURE);
+    item = &unit->data_items[unit->data_count - 1];
+    item->is_imported = 1;
+    if (signature->declared_type_name[0] != '\0')
+        ft_strlcpy(item->declared_type_name, signature->declared_type_name,
+            sizeof(item->declared_type_name));
+    if (signature->struct_type_name[0] != '\0')
+        ft_strlcpy(item->struct_type_name, signature->struct_type_name,
+            sizeof(item->struct_type_name));
+    item->has_initializer = signature->has_initializer;
+    item->initializer_length = signature->initializer_length;
+    ft_strlcpy(item->initializer_text, signature->initializer_text,
+        sizeof(item->initializer_text));
+    ft_strlcpy(item->constructor_arguments, signature->constructor_arguments,
+        sizeof(item->constructor_arguments));
+    item->constructor_argument_count = signature->constructor_argument_count;
     return (FT_SUCCESS);
 }
 

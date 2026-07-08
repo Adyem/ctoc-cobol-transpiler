@@ -878,6 +878,32 @@ static int transpiler_context_types_reserve(t_transpiler_context *context, size_
     return (FT_SUCCESS);
 }
 
+static int transpiler_context_data_signatures_reserve(t_transpiler_context *context,
+    size_t desired_capacity)
+{
+    t_transpiler_data_signature *new_signatures;
+
+    if (!context)
+        return (FT_FAILURE);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    if (context->data_signature_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    new_signatures = static_cast<t_transpiler_data_signature *>(cma_calloc(desired_capacity,
+        sizeof(t_transpiler_data_signature)));
+    if (!new_signatures)
+        return (FT_FAILURE);
+    if (context->data_signatures)
+    {
+        std::memcpy(new_signatures, context->data_signatures,
+            context->data_signature_count * sizeof(t_transpiler_data_signature));
+        cma_free(context->data_signatures);
+    }
+    context->data_signatures = new_signatures;
+    context->data_signature_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
 static void transpiler_context_type_signature_clear(t_transpiler_type_signature *signature)
 {
     size_t index;
@@ -1606,6 +1632,9 @@ int transpiler_context_init(t_transpiler_context *context)
     context->types = NULL;
     context->type_count = 0;
     context->type_capacity = 0;
+    context->data_signatures = NULL;
+    context->data_signature_count = 0;
+    context->data_signature_capacity = 0;
     context->files = NULL;
     context->file_count = 0;
     context->file_capacity = 0;
@@ -1814,6 +1843,11 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->types = NULL;
     context->type_count = 0;
     context->type_capacity = 0;
+    if (context->data_signatures)
+        cma_free(context->data_signatures);
+    context->data_signatures = NULL;
+    context->data_signature_count = 0;
+    context->data_signature_capacity = 0;
     if (context->files)
         cma_free(context->files);
     context->files = NULL;
@@ -2139,6 +2173,7 @@ void transpiler_context_reset_module_registry(t_transpiler_context *context)
     }
     context->module_count = 0;
     context->module_order_count = 0;
+    context->data_signature_count = 0;
 }
 
 void transpiler_context_record_error(t_transpiler_context *context, int error_code)
@@ -2529,6 +2564,16 @@ const t_transpiler_type_signature *transpiler_context_get_types(const t_transpil
     if (count)
         *count = context->type_count;
     return (context->types);
+}
+
+const t_transpiler_data_signature *transpiler_context_get_data_signatures(const t_transpiler_context *context,
+    size_t *count)
+{
+    if (!context)
+        return (NULL);
+    if (count)
+        *count = context->data_signature_count;
+    return (context->data_signatures);
 }
 
 int transpiler_context_register_module_import(t_transpiler_context *context, const char *module_name,
@@ -3022,6 +3067,96 @@ int transpiler_context_register_type_signature(t_transpiler_context *context, co
         return (FT_FAILURE);
     ft_strlcpy(signature->module, module_name, sizeof(signature->module));
     context->type_count += 1;
+    (void)module_index;
+    return (FT_SUCCESS);
+}
+
+int transpiler_context_register_data_signature(t_transpiler_context *context, const char *module_name,
+    const t_transpiler_data_signature *source_signature)
+{
+    t_transpiler_data_signature *signature;
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    size_t index;
+    int module_index;
+
+    if (!context || !source_signature)
+        return (FT_FAILURE);
+    if (transpiler_context_string_is_blank(module_name)
+        || transpiler_context_string_is_blank(source_signature->name))
+        return (FT_FAILURE);
+    module_index = transpiler_context_find_module_index_by_name(context, module_name);
+    if (module_index < 0)
+    {
+        std::snprintf(message, sizeof(message),
+            "module '%s' not registered", module_name);
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_MODULE_UNKNOWN, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_MODULE_UNKNOWN);
+        return (FT_FAILURE);
+    }
+    index = 0;
+    while (index < context->data_signature_count)
+    {
+        if (std::strncmp(context->data_signatures[index].module, module_name,
+                TRANSPILE_MODULE_NAME_MAX) == 0
+            && std::strncmp(context->data_signatures[index].name, source_signature->name,
+                TRANSPILE_IDENTIFIER_MAX) == 0)
+        {
+            std::snprintf(message, sizeof(message),
+                "data item '%s' already declared in module '%s'", source_signature->name,
+                module_name);
+            transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+                TRANSPILE_ERROR_FUNCTION_DUPLICATE_NAME, message);
+            transpiler_context_record_error(context, TRANSPILE_ERROR_FUNCTION_DUPLICATE_NAME);
+            return (FT_FAILURE);
+        }
+        if (source_signature->visibility == TRANSPILE_SYMBOL_PUBLIC
+            && context->data_signatures[index].visibility == TRANSPILE_SYMBOL_PUBLIC
+            && std::strncmp(context->data_signatures[index].name, source_signature->name,
+                TRANSPILE_IDENTIFIER_MAX) == 0
+            && std::strncmp(context->data_signatures[index].module, module_name,
+                TRANSPILE_MODULE_NAME_MAX) != 0)
+        {
+            std::snprintf(message, sizeof(message),
+                "public data item '%s' in module '%s' conflicts with export from module '%s'",
+                source_signature->name, module_name, context->data_signatures[index].module);
+            transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+                TRANSPILE_ERROR_FUNCTION_EXPORT_CONFLICT, message);
+            transpiler_context_record_error(context, TRANSPILE_ERROR_FUNCTION_EXPORT_CONFLICT);
+            return (FT_FAILURE);
+        }
+        index += 1;
+    }
+    if (context->data_signature_count >= context->data_signature_capacity)
+    {
+        size_t desired_capacity;
+
+        desired_capacity = context->data_signature_capacity == 0 ? 4
+            : context->data_signature_capacity * 2;
+        if (transpiler_context_data_signatures_reserve(context, desired_capacity) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    signature = &context->data_signatures[context->data_signature_count];
+    ft_bzero(signature, sizeof(*signature));
+    ft_strlcpy(signature->name, source_signature->name, sizeof(signature->name));
+    ft_strlcpy(signature->module, module_name, sizeof(signature->module));
+    ft_strlcpy(signature->declared_type_name, source_signature->declared_type_name,
+        sizeof(signature->declared_type_name));
+    ft_strlcpy(signature->struct_type_name, source_signature->struct_type_name,
+        sizeof(signature->struct_type_name));
+    signature->length = source_signature->length;
+    signature->array_count = source_signature->array_count;
+    signature->kind = source_signature->kind;
+    signature->is_const = source_signature->is_const;
+    signature->has_initializer = source_signature->has_initializer;
+    signature->initializer_length = source_signature->initializer_length;
+    ft_strlcpy(signature->initializer_text, source_signature->initializer_text,
+        sizeof(signature->initializer_text));
+    ft_strlcpy(signature->constructor_arguments, source_signature->constructor_arguments,
+        sizeof(signature->constructor_arguments));
+    signature->constructor_argument_count = source_signature->constructor_argument_count;
+    signature->visibility = source_signature->visibility;
+    context->data_signature_count += 1;
     (void)module_index;
     return (FT_SUCCESS);
 }

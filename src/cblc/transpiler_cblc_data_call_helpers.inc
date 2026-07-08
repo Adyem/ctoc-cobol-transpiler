@@ -409,6 +409,7 @@ static int cblc_add_named_data_item(t_cblc_translation_unit *unit, const char *s
     item->is_function_local = is_function_local;
     item->is_alias = is_alias;
     item->is_active = 1;
+    item->is_imported = 0;
     unit->data_count += 1;
     return (FT_SUCCESS);
 }

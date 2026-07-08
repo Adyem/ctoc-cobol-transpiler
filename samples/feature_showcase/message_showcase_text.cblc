@@ -1,7 +1,4 @@
-int title_length;
-int note_length;
-string title("POLICY SNAPSHOT");
-string note(16);
+import "message_showcase_constants.cblc";
 
 void showcase_text()
 {

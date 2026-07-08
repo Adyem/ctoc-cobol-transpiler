@@ -110,7 +110,7 @@ static int cblc_add_struct_instance_field_items(t_cblc_translation_unit *unit,
     const char *instance_cobol_name, const char *owner_function_name,
     int is_function_local, int is_alias);
 static int cblc_register_imported_parameter_storage(t_cblc_translation_unit *unit,
-    const t_cblc_parameter *parameters, size_t parameter_count);
+    const t_cblc_parameter *parameters, size_t parameter_count, int is_imported);
 static int cblc_add_temp_alias_item(t_cblc_translation_unit *unit, const char *source_name,
     const char *cobol_name, t_cblc_data_kind kind, size_t length, size_t array_count,
     const char *struct_type_name, int is_const);

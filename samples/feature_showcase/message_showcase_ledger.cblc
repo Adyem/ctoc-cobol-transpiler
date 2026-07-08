@@ -1,5 +1,4 @@
-const int reserve_target = 600000;
-const int earned_premium = 480000;
+import "message_showcase_constants.cblc";
 
 struct Desk
 {

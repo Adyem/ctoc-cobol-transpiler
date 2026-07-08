@@ -46,7 +46,9 @@ static int cblc_context_module_imports_module(const t_transpiler_context *contex
 int cblc_import_translation_unit_type_stubs(t_transpiler_context *context, const char *module_name,
     t_cblc_translation_unit *unit)
 {
+    const t_transpiler_data_signature *data_signatures;
     const t_transpiler_type_signature *types;
+    size_t data_count;
     size_t type_count;
     size_t index;
 
@@ -61,6 +63,20 @@ int cblc_import_translation_unit_type_stubs(t_transpiler_context *context, const
             && cblc_context_module_imports_module(context, module_name, types[index].module))
         {
             if (cblc_register_imported_type_stub(unit, &types[index]) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        index += 1;
+    }
+    data_signatures = transpiler_context_get_data_signatures(context, &data_count);
+    index = 0;
+    while (index < data_count)
+    {
+        if (std::strncmp(data_signatures[index].module, module_name, TRANSPILE_MODULE_NAME_MAX) != 0
+            && data_signatures[index].visibility == TRANSPILE_SYMBOL_PUBLIC
+            && cblc_context_module_imports_module(context, module_name,
+                data_signatures[index].module))
+        {
+            if (cblc_register_imported_data_stub(unit, &data_signatures[index]) != FT_SUCCESS)
                 return (FT_FAILURE);
         }
         index += 1;
@@ -513,6 +529,7 @@ int cblc_register_translation_unit_exports(t_transpiler_context *context, const 
 {
     size_t entry_index;
     size_t index;
+    t_transpiler_data_signature data_signature;
 
     if (!context || !module_name || !unit)
         return (FT_FAILURE);
@@ -547,6 +564,42 @@ int cblc_register_translation_unit_exports(t_transpiler_context *context, const 
             }
             cblc_export_type_signature_clear(&signature);
         }
+        index += 1;
+    }
+    index = 0;
+    while (index < unit->data_count)
+    {
+        const t_cblc_data_item *item;
+
+        item = &unit->data_items[index];
+        if (item->is_alias || item->is_function_local || item->is_imported
+            || item->owner_function_name[0] != '\0'
+            || std::strchr(item->source_name, '.')
+            || std::strstr(item->source_name, "->"))
+        {
+            index += 1;
+            continue ;
+        }
+        std::memset(&data_signature, 0, sizeof(data_signature));
+        ft_strlcpy(data_signature.name, item->source_name, sizeof(data_signature.name));
+        ft_strlcpy(data_signature.declared_type_name, item->declared_type_name,
+            sizeof(data_signature.declared_type_name));
+        ft_strlcpy(data_signature.struct_type_name, item->struct_type_name,
+            sizeof(data_signature.struct_type_name));
+        data_signature.length = item->length;
+        data_signature.array_count = item->array_count;
+        data_signature.kind = item->kind;
+        data_signature.is_const = item->is_const;
+        data_signature.has_initializer = item->has_initializer;
+        data_signature.initializer_length = item->initializer_length;
+        ft_strlcpy(data_signature.initializer_text, item->initializer_text,
+            sizeof(data_signature.initializer_text));
+        ft_strlcpy(data_signature.constructor_arguments, item->constructor_arguments,
+            sizeof(data_signature.constructor_arguments));
+        data_signature.constructor_argument_count = item->constructor_argument_count;
+        data_signature.visibility = TRANSPILE_SYMBOL_PUBLIC;
+        if (transpiler_context_register_data_signature(context, module_name, &data_signature) != FT_SUCCESS)
+            return (FT_FAILURE);
         index += 1;
     }
     if (unit->function_count == 0)

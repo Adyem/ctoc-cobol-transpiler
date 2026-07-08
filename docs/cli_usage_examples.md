@@ -136,4 +136,4 @@ same deterministic output order regardless of the pool size.
    }
    ```
 
-Refer to `design_doc.txt` §6 for architectural notes on the CLI and related tooling expectations.
+Refer to `design_doc.txt` §14 for the implementation standard behind the CLI and related tooling expectations.
