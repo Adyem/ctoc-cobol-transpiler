@@ -227,6 +227,21 @@ are completed; keep completed items grouped separately from the remaining work t
     - [x] Publish an initial VS Code TextMate grammar and cross-editor setup guide so contributors can enable highlighting quickly.
 - [x] Prototype visualization tooling for pipeline stages and intermediate representations (Graphviz AST dumps via `--dump-ast`).
 
+## Remaining Implementation TODOs
+
+- [ ] **Parameterized COBOL intrinsic ABI (`CBLC-TODO-INTRINSIC-ABI`)**
+    - [ ] Define stable paragraph names, argument storage, copy/move rules, result slots, and collision handling for parameterized intrinsics.
+    - [ ] Implement reusable COBOL paragraphs for `append`, `equals`, `starts_with`, `ends_with`, `compare`, and `contains`.
+    - [ ] Route call sites through `PERFORM` plus argument/result plumbing without duplicating intrinsic bodies.
+    - [ ] Add arity/type, aliasing, capacity/truncation, multi-call, and executable COBOL regression tests.
+    - [ ] Update the intrinsic registry, ABI documentation, and conformance matrix when complete.
+- [ ] **Selective C runtime extraction (`CBLC-TODO-C-RUNTIME`)**
+    - [ ] Assign stable artifact IDs to runtime helpers and declare helper-to-helper dependencies.
+    - [ ] Collect helper references from semantic lowering and generated call sites, then compute a deterministic transitive closure.
+    - [ ] Emit only required helper definitions while retaining an explicit preinstalled/shared-runtime mode.
+    - [ ] Record helper IDs and dependency edges in manifests and reject missing or cyclic contracts deterministically.
+    - [ ] Add empty, single-helper, transitive, duplicate, unsupported-helper, and generated C compile/link tests.
+
 ### Known Bugs / Diagnostics
 These issues track regressions uncovered in recent round-trip suites.
 

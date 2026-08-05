@@ -842,6 +842,33 @@ repository has implementation or documentation work remaining. They must not
 be described as fully implemented until the evidence requirements in section 17
 are met.
 
+### 19.1 Remaining implementation TODOs
+
+The following work items are the next release-gated tasks for completing the
+remaining intrinsic and runtime artifact contracts:
+
+- [ ] **Parameterized COBOL intrinsic ABI (`CBLC-TODO-INTRINSIC-ABI`).**
+  Define one stable ABI for every registered intrinsic with arguments:
+  receiver-specific paragraph naming, explicit `USING`/linkage or equivalent
+  parameter storage, argument copy/move rules, result slots, arity and type
+  validation, and collision-safe names. Implement reusable COBOL paragraphs
+  for `append`, `equals`, `starts_with`, `ends_with`, `compare`, and
+  `contains` (and any newly registered parameterized operation) so call sites
+  emit only `PERFORM`/argument/result plumbing. Add generated-source,
+  multi-call, aliasing, capacity/truncation, and executable COBOL tests for
+  each operation. Update the intrinsic registry and this ABI section together
+  whenever an operation is added.
+- [ ] **Selective C runtime extraction (`CBLC-TODO-C-RUNTIME`).** Replace the
+  current whole-runtime C helper bundle with dependency-closed extraction.
+  Give every runtime helper a stable artifact ID, declare helper-to-helper
+  dependencies, collect helper references from semantic lowering and generated
+  call sites, compute a transitive closure, and emit only the required helper
+  definitions in deterministic order. Record the exact helper IDs and edges in
+  the manifest, preserve a shared-runtime mode for preinstalled runtimes, and
+  reject missing or cyclic contracts with deterministic diagnostics. Add tests
+  for empty, single-helper, transitive, duplicate, and unsupported-helper
+  requests plus generated C compile/link coverage.
+
 | Area | Current status | Required hardening |
 | --- | --- | --- |
 | exact grammar | **partial** | Keep accepted syntax examples and parser tests synchronized with this document. |
