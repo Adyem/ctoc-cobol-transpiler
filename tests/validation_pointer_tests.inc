@@ -2157,16 +2157,16 @@ FT_TEST(test_cblc_generate_c_emits_pointer_receiver_method_call)
         goto cleanup;
     if (!generated_c)
         goto cleanup;
-    if (!ft_strnstr(generated_c, "total = current_counter->value;",
+    if (!ft_strnstr(generated_c, "total = cblc_method_Counter_current(current_counter);",
             std::strlen(generated_c)))
     {
-        std::printf("Assertion failed: generated C should read through pointer receiver methods\n");
+        std::printf("Assertion failed: generated C should call reusable methods through pointer receivers\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_c, "current_counter->value = 0;",
+    if (!ft_strnstr(generated_c, "cblc_method_Counter_reset(current_counter);",
             std::strlen(generated_c)))
     {
-        std::printf("Assertion failed: generated C should write through pointer receiver methods\n");
+        std::printf("Assertion failed: generated C should call reusable mutating methods through pointer receivers\n");
         goto cleanup;
     }
     status = FT_SUCCESS;

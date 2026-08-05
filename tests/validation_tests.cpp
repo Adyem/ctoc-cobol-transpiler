@@ -2,6 +2,49 @@
 
 #include "compatibility/memory_compat.hpp"
 
+FT_TEST(test_cblc_intrinsic_registry_is_complete_for_builtin_string_methods)
+{
+    static const char *expected_names[] = {
+        "append", "len", "clear", "empty", "equals", "capacity",
+        "starts_with", "ends_with", "compare", "contains"
+    };
+    size_t count;
+    const t_cblc_intrinsic_entry *entries;
+    size_t index;
+
+    entries = cblc_intrinsic_get_entries(&count);
+    if (!entries || count != sizeof(expected_names) / sizeof(expected_names[0]))
+    {
+        std::printf("Assertion failed: intrinsic registry should expose all builtin string methods\n");
+        return (FT_FAILURE);
+    }
+    index = 0;
+    while (index < count)
+    {
+        if (std::strcmp(entries[index].name, expected_names[index]) != 0
+            || cblc_intrinsic_lookup(expected_names[index]) != &entries[index])
+        {
+            std::printf("Assertion failed: intrinsic registry order and lookup should agree\n");
+            return (FT_FAILURE);
+        }
+        index += 1;
+    }
+    if (cblc_intrinsic_lookup("not_an_intrinsic") != NULL)
+    {
+        std::printf("Assertion failed: unknown intrinsic should not resolve\n");
+        return (FT_FAILURE);
+    }
+    if (!cblc_intrinsic_accepts_argument_count(&entries[0], 1)
+        || cblc_intrinsic_accepts_argument_count(&entries[0], 0)
+        || !cblc_intrinsic_accepts_argument_count(&entries[1], 0)
+        || cblc_intrinsic_accepts_argument_count(&entries[1], 1))
+    {
+        std::printf("Assertion failed: intrinsic argument metadata should be enforced\n");
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_transpiler_validation_accepts_valid_cblc)
 {
     const char *source;
@@ -1467,14 +1510,22 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_struct_returning_method_call_assignm
         goto cleanup;
     if (!generated_c || !generated_cobol)
         goto cleanup;
-    if (!ft_strnstr(generated_c, "point = builder.value;", std::strlen(generated_c)))
+    if (!ft_strnstr(generated_c, "point = cblc_method_Builder_current(&builder);",
+            std::strlen(generated_c)))
     {
         std::printf("Assertion failed: generated C should assign the returned struct method value into the target\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "MOVE BUILDER-VALUE TO POINT.", std::strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "PERFORM CBLC-METHOD-BUILDER-CURRENT.",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol,
+            "MOVE BUILDER-VALUE TO CBLC-RESULT-BUILDER-CURRENT.",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol,
+            "MOVE CBLC-RESULT-BUILDER-CURRENT TO POINT.",
+            std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: generated COBOL should move the returned struct method value into the target\n");
+        std::printf("Assertion failed: generated COBOL should reuse struct-returning method paragraphs and result slots\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -3699,6 +3750,8 @@ cleanup:
 const t_test_case *get_validation_tests(size_t *count)
 {
     static const t_test_case tests[] = {
+        {"cblc_intrinsic_registry_is_complete_for_builtin_string_methods",
+            test_cblc_intrinsic_registry_is_complete_for_builtin_string_methods},
         {"transpiler_validation_accepts_valid_cblc", test_transpiler_validation_accepts_valid_cblc},
         {"transpiler_validation_rejects_cblc_without_return", test_transpiler_validation_rejects_cblc_without_return},
         {"transpiler_validation_accepts_string_declaration", test_transpiler_validation_accepts_string_declaration},
@@ -3822,6 +3875,10 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_generate_c_emits_out_of_class_method_definitions},
         {"cblc_generate_c_and_cobol_emit_parameterized_class_lifecycle_and_methods",
             test_cblc_generate_c_and_cobol_emit_parameterized_class_lifecycle_and_methods},
+        {"cblc_generate_c_reuses_string_parameter_method_body",
+            test_cblc_generate_c_reuses_string_parameter_method_body},
+        {"cblc_generate_c_reuses_string_constructor_parameter_body",
+            test_cblc_generate_c_reuses_string_constructor_parameter_body},
         {"cblc_generate_c_and_cobol_emit_constructor_overloads_by_arity",
             test_cblc_generate_c_and_cobol_emit_constructor_overloads_by_arity},
         {"cblc_generate_c_and_cobol_emit_copy_constructor_overload",

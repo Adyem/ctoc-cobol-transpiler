@@ -12,7 +12,7 @@ COBOL paragraphs, and every sample includes a `void main()` entrypoint that invo
 - **Constructs:** A single global buffer, `void MAIN()` entrypoint, literal assignment, and explicit `return;` statement.
 
 ### `samples/cblc/copy_file.cblc`
-- **Purpose:** Demonstrates the baseline file copy loop used throughout the design doc and ensures the runtime string buffer path
+- **Purpose:** Demonstrates the baseline file copy loop used throughout the CBL-C language standard and ensures the runtime string buffer path
   is represented in fixtures.
 - **Constructs:** `file` declarations, scalar `char` buffers, `function` definitions (`process_file`, `main`), `open`/`close`
   pairs, `while` loops, `read`/`write` built-ins, and string literals.

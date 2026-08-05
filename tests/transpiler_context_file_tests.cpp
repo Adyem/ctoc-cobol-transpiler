@@ -1,5 +1,7 @@
 #include "test_suites.hpp"
 
+#include <cstring>
+
 FT_TEST(test_transpiler_context_records_read_only_flag)
 {
     t_transpiler_context context;
@@ -140,6 +142,107 @@ FT_TEST(test_transpiler_context_tracks_record_length_hint)
     }
     transpiler_context_dispose(&context);
     return (FT_SUCCESS);
+}
+
+static int test_file_configuration_rejection(t_transpiler_file_organization organization,
+    const char *record_key, const char *alternate_key, t_transpiler_file_lock_mode lock_mode,
+    int test_lock_mode)
+{
+    t_transpiler_context context;
+    int result;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_file(&context, "configured", TRANSPILE_FILE_ROLE_DATA,
+                "configured.dat", 0), "file registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (organization != TRANSPILE_FILE_ORGANIZATION_LINE_SEQUENTIAL)
+        transpiler_context_configure_file_organization(&context, "configured", organization);
+    result = test_lock_mode
+        ? transpiler_context_configure_file_lock_mode(&context, "configured", lock_mode)
+        : transpiler_context_configure_file_keys(&context, "configured", record_key, alternate_key);
+    if (result == FT_SUCCESS || context.diagnostics.count == 0
+        || context.diagnostics.items[0].code != TRANSPILE_ERROR_FILE_CONFIGURATION)
+    {
+        transpiler_context_dispose(&context);
+        std::printf("Assertion failed: invalid file configuration should be rejected\n");
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_rejects_file_keys_for_line_sequential)
+{
+    return (test_file_configuration_rejection(TRANSPILE_FILE_ORGANIZATION_LINE_SEQUENTIAL,
+            "record-key", NULL, TRANSPILE_FILE_LOCK_MODE_NONE, 0));
+}
+
+FT_TEST(test_transpiler_context_rejects_alternate_key_for_relative)
+{
+    t_transpiler_context context;
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_file(&context, "configured", TRANSPILE_FILE_ROLE_DATA,
+                "configured.dat", 0), "file registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    transpiler_context_configure_file_organization(&context, "configured", TRANSPILE_FILE_ORGANIZATION_RELATIVE);
+    if (transpiler_context_configure_file_keys(&context, "configured", "record-key", "alternate-key") == FT_SUCCESS
+        || context.diagnostics.count == 0
+        || context.diagnostics.items[0].code != TRANSPILE_ERROR_FILE_CONFIGURATION)
+    {
+        transpiler_context_dispose(&context);
+        std::printf("Assertion failed: relative alternate key should be rejected\n");
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_rejects_invalid_file_organization)
+{
+    t_transpiler_context context;
+    t_transpiler_file_organization invalid_organization;
+    unsigned int raw_value = 99;
+
+    std::memcpy(&invalid_organization, &raw_value, sizeof(invalid_organization));
+
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_success(transpiler_context_register_file(&context, "configured", TRANSPILE_FILE_ROLE_DATA,
+                "configured.dat", 0), "file registration should succeed") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_configure_file_organization(&context, "configured",
+            invalid_organization) == FT_SUCCESS
+        || context.diagnostics.count == 0
+        || context.diagnostics.items[0].code != TRANSPILE_ERROR_FILE_CONFIGURATION)
+    {
+        transpiler_context_dispose(&context);
+        std::printf("Assertion failed: invalid organization should be rejected\n");
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_context_rejects_invalid_file_lock_mode)
+{
+    t_transpiler_file_lock_mode invalid_lock_mode;
+    unsigned int raw_value = 99;
+
+    std::memcpy(&invalid_lock_mode, &raw_value, sizeof(invalid_lock_mode));
+    return (test_file_configuration_rejection(TRANSPILE_FILE_ORGANIZATION_LINE_SEQUENTIAL,
+            NULL, NULL, invalid_lock_mode, 1));
 }
 
 FT_TEST(test_transpiler_context_configures_indexed_file_metadata)
@@ -321,4 +424,3 @@ FT_TEST(test_transpiler_context_rejects_mismatched_io_paths)
     transpiler_context_dispose(&context);
     return (FT_SUCCESS);
 }
-

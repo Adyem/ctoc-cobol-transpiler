@@ -95,15 +95,15 @@ FT_TEST(test_cli_usage_mentions_environment_variable)
     return (FT_SUCCESS);
 }
 
-FT_TEST(test_design_doc_references_cli_usage_document)
+FT_TEST(test_language_standard_references_cli_usage_document)
 {
     FILE *file;
     char line[1024];
 
-    file = std::fopen("design_doc.txt", "r");
+    file = std::fopen("docs/cblc_language_standard.md", "r");
     if (!file)
     {
-        std::printf("Assertion failed: design_doc.txt should be readable\n");
+        std::printf("Assertion failed: docs/cblc_language_standard.md should be readable\n");
         return (FT_FAILURE);
     }
     while (std::fgets(line, sizeof(line), file))
@@ -115,7 +115,7 @@ FT_TEST(test_design_doc_references_cli_usage_document)
         }
     }
     std::fclose(file);
-    std::printf("Assertion failed: design_doc.txt should reference docs/cli_usage_examples.md\n");
+    std::printf("Assertion failed: docs/cblc_language_standard.md should reference docs/cli_usage_examples.md\n");
     return (FT_FAILURE);
 }
 
@@ -125,7 +125,7 @@ const t_test_case *get_cli_doc_tests(size_t *count)
         {"cli_usage_document_exists", test_cli_usage_document_exists},
         {"cli_usage_lists_supported_flags", test_cli_usage_lists_supported_flags},
         {"cli_usage_mentions_environment_variable", test_cli_usage_mentions_environment_variable},
-        {"design_doc_references_cli_usage_document", test_design_doc_references_cli_usage_document}
+        {"language_standard_references_cli_usage_document", test_language_standard_references_cli_usage_document}
     };
 
     if (count)

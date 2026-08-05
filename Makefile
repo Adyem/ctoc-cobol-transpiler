@@ -60,6 +60,7 @@ SRC         = \
     src/transpiler/transpiler_pipeline.cpp \
     src/transpiler/transpiler_parallel.cpp \
     src/transpiler/transpiler_cblc.cpp \
+    src/transpiler/transpiler_cblc_intrinsics.cpp \
     src/transpiler/transpiler_c_backend.cpp \
     src/transpiler/transpiler_cli.cpp \
     src/formatter/cblc_formatter.cpp \

@@ -95,15 +95,15 @@ FT_TEST(test_runtime_doc_mentions_cma)
     return (FT_SUCCESS);
 }
 
-FT_TEST(test_design_doc_references_runtime_doc)
+FT_TEST(test_language_standard_references_runtime_doc)
 {
     FILE *file;
     char line[1024];
 
-    file = std::fopen("design_doc.txt", "r");
+    file = std::fopen("docs/cblc_language_standard.md", "r");
     if (!file)
     {
-        std::printf("Assertion failed: design_doc.txt should be readable\n");
+        std::printf("Assertion failed: docs/cblc_language_standard.md should be readable\n");
         return (FT_FAILURE);
     }
     while (std::fgets(line, sizeof(line), file))
@@ -115,7 +115,7 @@ FT_TEST(test_design_doc_references_runtime_doc)
         }
     }
     std::fclose(file);
-    std::printf("Assertion failed: design_doc.txt should reference docs/runtime_api_reference.md\n");
+    std::printf("Assertion failed: docs/cblc_language_standard.md should reference docs/runtime_api_reference.md\n");
     return (FT_FAILURE);
 }
 
@@ -125,7 +125,7 @@ const t_test_case *get_runtime_doc_tests(size_t *count)
         {"runtime_doc_exists", test_runtime_doc_exists},
         {"runtime_doc_lists_modules", test_runtime_doc_lists_modules},
         {"runtime_doc_mentions_cma", test_runtime_doc_mentions_cma},
-        {"design_doc_references_runtime_doc", test_design_doc_references_runtime_doc}
+        {"language_standard_references_runtime_doc", test_language_standard_references_runtime_doc}
     };
 
     if (count)

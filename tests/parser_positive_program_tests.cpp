@@ -33,7 +33,6 @@ FT_TEST(test_parser_parses_minimal_program)
     program = NULL;
     if (parser_parse_program(&parser, &program) != FT_SUCCESS)
     {
-        std::fprintf(stderr, "Debug: parser_parse_program failed in declaratives test\n");
         parser_dispose(&parser);
         return (FT_FAILURE);
     }

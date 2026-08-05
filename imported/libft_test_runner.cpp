@@ -1,6 +1,7 @@
 #include "test_runner.hpp"
 
 #include <csignal>
+#include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <execinfo.h>
@@ -126,6 +127,8 @@ int imported_test_run_registered(void)
     int output_is_terminal;
     int index;
     int passed;
+    int selected;
+    const char *filter;
 
     log_file = std::fopen("imported_test_failures.log", "w");
     if (log_file)
@@ -136,11 +139,31 @@ int imported_test_run_registered(void)
     tests = imported_test_get_cases();
     test_count = imported_test_get_count();
     total_tests = *test_count;
+    filter = getenv("CTOC_TEST_NAME_FILTER");
+    selected = 0;
+    if (filter && filter[0] != '\0')
+    {
+        index = 0;
+        while (index < total_tests)
+        {
+            if (std::strstr(tests[index].description, filter))
+                selected += 1;
+            index += 1;
+        }
+    }
+    else
+        selected = total_tests;
     output_is_terminal = isatty(STDOUT_FILENO);
     index = 0;
     passed = 0;
     while (index < total_tests)
     {
+        if (filter && filter[0] != '\0'
+            && !std::strstr(tests[index].description, filter))
+        {
+            index += 1;
+            continue ;
+        }
         if (output_is_terminal)
             std::printf("Running test %d \"%s\"", index + 1, tests[index].description);
         else
@@ -165,9 +188,9 @@ int imported_test_run_registered(void)
         }
         index += 1;
     }
-    std::printf("%d/%d tests passed\n", passed, total_tests);
+    std::printf("%d/%d tests passed\n", passed, selected);
     std::fflush(stdout);
-    if (passed != total_tests)
+    if (passed != selected)
         return (1);
     return (0);
 }

@@ -423,6 +423,7 @@ typedef struct s_transpiler_data_signature
 #define TRANSPILE_ERROR_TYPE_DUPLICATE_NAME 1021
 #define TRANSPILE_ERROR_TYPE_EXPORT_CONFLICT 1022
 #define TRANSPILE_ERROR_TYPE_PRIVATE_ACCESS 1023
+#define TRANSPILE_ERROR_FILE_CONFIGURATION 1024
 
 typedef enum e_transpiler_file_role
 {
@@ -1200,6 +1201,22 @@ typedef enum e_cblc_data_kind
     CBLC_DATA_KIND_STRUCT_POINTER,
     CBLC_DATA_KIND_INT_POINTER_POINTER
 }   t_cblc_data_kind;
+
+typedef struct s_cblc_intrinsic_entry
+{
+    const char *name;
+    const char *c_helper_name;
+    const char *cobol_program_name;
+    size_t minimum_arguments;
+    size_t maximum_arguments;
+    int returns_value;
+    int mutates_receiver;
+}   t_cblc_intrinsic_entry;
+
+const t_cblc_intrinsic_entry *cblc_intrinsic_get_entries(size_t *count);
+const t_cblc_intrinsic_entry *cblc_intrinsic_lookup(const char *name);
+int cblc_intrinsic_accepts_argument_count(const t_cblc_intrinsic_entry *entry,
+    size_t argument_count);
 
 typedef enum e_cblc_function_return_kind
 {

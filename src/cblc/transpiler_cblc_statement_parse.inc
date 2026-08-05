@@ -292,6 +292,9 @@ static int cblc_parse_builtin_string_append_call(const char **cursor,
         }
         statement = &function->statements[function->statement_count - 1];
         ft_strlcpy(statement->call_identifier, method_name, sizeof(statement->call_identifier));
+        ft_strlcpy(statement->call_arguments, source_item->cobol_name,
+            sizeof(statement->call_arguments));
+        statement->call_argument_count = 1;
         return (FT_SUCCESS);
     }
     if (cblc_parse_data_reference(cursor, unit, &argument_item, NULL) != FT_SUCCESS
@@ -329,6 +332,9 @@ static int cblc_parse_builtin_string_append_call(const char **cursor,
     }
     statement = &function->statements[function->statement_count - 1];
     ft_strlcpy(statement->call_identifier, method_name, sizeof(statement->call_identifier));
+    ft_strlcpy(statement->call_arguments, source_cobol_name,
+        sizeof(statement->call_arguments));
+    statement->call_argument_count = 1;
     return (FT_SUCCESS);
 }
 

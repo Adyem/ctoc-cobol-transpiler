@@ -127,6 +127,12 @@ int cblc_resolve_translation_unit_calls(t_transpiler_context *context, const cha
                     statement_index += 1;
                     continue ;
                 }
+                if (transpiler_standard_library_lookup(statement->call_identifier))
+                {
+                    statement->call_is_external = 1;
+                    statement_index += 1;
+                    continue ;
+                }
                 const t_cblc_function *local_target;
 
                 local_target = cblc_find_function_in_unit(unit, statement->call_identifier);

@@ -58,19 +58,19 @@ CBL-C is intentionally C-like, but its data model maps onto COBOL storage and ca
 - `void` and value-returning functions, including parameter passing and generated return slots for COBOL.
 - Multi-file CBL-C builds with repeated `--input` / `--output` pairs and `import "file.cblc"` support.
 - `struct` and `record`-style storage, nested fields, arrays, and generated COBOL group items.
-- `class` declarations with public/private members, constructors, methods, copy-constructor style flows, `const` member enforcement, inline method bodies, and C++-style out-of-class method definitions.
+- `class` declarations with public/private members, constructors, methods, copy-constructor style flows, `const` member enforcement, reusable C method lowering, receiver-specialized COBOL void-method paragraphs, and C++-style out-of-class method definitions.
 - Pointer support for `void *`, `char *`, `int *`, struct pointers, pointer indexing, pointer arithmetic, address-of, dereference, casts, `std::malloc`, `std::realloc`, and `std::free`.
 - Built-in `string` behavior including constructor-style initialization, assignment, append, clear, length, capacity, empty, equality, compare, contains, starts-with, and ends-with operations.
 - `display`, `return`, `if` / `else`, `while`, function calls, method calls, and selected file-style syntax used by the reverse pipeline.
 
-The grammar overview lives in [`docs/cblc_grammar.md`](docs/cblc_grammar.md). The samples in [`samples/cblc`](samples/cblc) and [`samples/feature_showcase`](samples/feature_showcase) show larger examples.
+The authoritative language and compiler-behavior standard is [`docs/cblc_language_standard.md`](docs/cblc_language_standard.md). The samples in [`samples/cblc`](samples/cblc) and [`samples/feature_showcase`](samples/feature_showcase) show larger examples.
 
 ### COBOL Generation
 
 The forward backend can emit COBOL for the supported CBL-C subset. Implemented generation includes:
 
 - Working-storage entries for scalar, string, array, pointer, struct, class, and helper state.
-- COBOL procedure generation for functions, methods, constructors, destructors, assignments, arithmetic, calls, displays, conditionals, loops, returns, and lifecycle hooks.
+- COBOL procedure generation for functions, methods, constructors, destructors, assignments, arithmetic, calls, displays, conditionals, loops, returns, and lifecycle hooks; supported void, integer-returning, and struct-returning user methods (including parameterized methods) are emitted as reusable receiver-specialized paragraphs.
 - Multi-module output with deterministic module initialization and parallel emission.
 - Standard-library calls through generated COBOL subprograms and trailing status / return slots.
 - Source maps and semantic IR dumps for diagnostics and debugging.
@@ -209,4 +209,4 @@ The project is active and does not yet cover all COBOL or all C/C++ syntax. Nota
 - All possible COBOL table, report-writer, screen-section, and environment-division variants.
 - General-purpose C++ compatibility; CBL-C only implements the C/C++-like surface needed by the transpiler.
 
-For the most detailed status, use [`compiler_feature_tracker.md`](compiler_feature_tracker.md).
+For the normative language rules, use [`docs/cblc_language_standard.md`](docs/cblc_language_standard.md). For implementation progress and open work, use [`compiler_feature_tracker.md`](compiler_feature_tracker.md).

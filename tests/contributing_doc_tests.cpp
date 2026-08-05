@@ -80,15 +80,15 @@ FT_TEST(test_contributing_doc_mentions_testing_policy)
     return (FT_SUCCESS);
 }
 
-FT_TEST(test_design_doc_references_contributing_doc)
+FT_TEST(test_language_standard_references_contributing_doc)
 {
     FILE *file;
     char line[1024];
 
-    file = std::fopen("design_doc.txt", "r");
+    file = std::fopen("docs/cblc_language_standard.md", "r");
     if (!file)
     {
-        std::printf("Assertion failed: design_doc.txt should be readable\n");
+        std::printf("Assertion failed: docs/cblc_language_standard.md should be readable\n");
         return (FT_FAILURE);
     }
     while (std::fgets(line, sizeof(line), file))
@@ -100,7 +100,7 @@ FT_TEST(test_design_doc_references_contributing_doc)
         }
     }
     std::fclose(file);
-    std::printf("Assertion failed: design_doc.txt should reference docs/contributing.md\n");
+    std::printf("Assertion failed: docs/cblc_language_standard.md should reference docs/contributing.md\n");
     return (FT_FAILURE);
 }
 
@@ -110,7 +110,7 @@ const t_test_case *get_contributing_doc_tests(size_t *count)
         {"contributing_doc_exists", test_contributing_doc_exists},
         {"contributing_doc_spells_out_coding_standards", test_contributing_doc_spells_out_coding_standards},
         {"contributing_doc_mentions_testing_policy", test_contributing_doc_mentions_testing_policy},
-        {"design_doc_references_contributing_doc", test_design_doc_references_contributing_doc}
+        {"language_standard_references_contributing_doc", test_language_standard_references_contributing_doc}
     };
 
     if (count)

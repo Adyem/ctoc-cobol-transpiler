@@ -24,6 +24,11 @@ ctoc_cobol_transpiler --direction cobol-to-cblc \
 
 The tool rejects mismatched counts to ensure every generated COBOL file has a designated destination.
 
+Both forward CBL-C translation modes also emit `cblc.manifest.json` beside the
+requested outputs. It records generated target paths and stable content hashes;
+C output declares its runtime helpers as embedded, while COBOL output emits and
+records only the standard-library programs referenced by the generated targets.
+
 To emit portable C instead of COBOL, switch the direction while keeping the same input/output pairing:
 
 ```
@@ -48,6 +53,7 @@ ctoc_cobol_transpiler --direction cobol-to-cblc --input samples/cobol/copy_file.
 ```
 
 * `--output-dir` overrides the directory that hosts generated files. When omitted, the tool writes next to the provided `--output` path.
+* `standard-library` mode also emits `cblc.manifest.json`, containing the catalog entries, artifact paths, and content hashes for the generated COBOL programs and `cblc_runtime_helpers.c`.
 * `--format` accepts `default`, `minimal`, or `pretty` to toggle whitespace and alignment policies for COBOL emission. `pretty` feeds generated COBOL through the canonical formatter so braces, indentation, and operator spacing remain consistent across runs.
 * `--layout` accepts `normalize` or `preserve` to control the regenerated CBL-C layout when translating from COBOL. `normalize` routes output through the formatter, while `preserve` copies the recovered structure verbatim so existing spacing can be reviewed without modification.
 
@@ -136,4 +142,6 @@ same deterministic output order regardless of the pool size.
    }
    ```
 
-Refer to `design_doc.txt` §14 for the implementation standard behind the CLI and related tooling expectations.
+Refer to [`cblc_language_standard.md`](cblc_language_standard.md) §§2, 13, 14,
+and 16 for the compiler pipeline, diagnostics, target behavior, and extension
+requirements behind the CLI and related tooling expectations.

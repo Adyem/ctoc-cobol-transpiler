@@ -124,6 +124,10 @@ int test_transpiler_context_rejects_narrower_callee_length(void);
 int test_transpiler_context_records_read_only_flag(void);
 int test_transpiler_context_registers_file_declaration(void);
 int test_transpiler_context_tracks_record_length_hint(void);
+int test_transpiler_context_rejects_file_keys_for_line_sequential(void);
+int test_transpiler_context_rejects_alternate_key_for_relative(void);
+int test_transpiler_context_rejects_invalid_file_organization(void);
+int test_transpiler_context_rejects_invalid_file_lock_mode(void);
 int test_transpiler_context_records_multiple_io_paths(void);
 int test_transpiler_context_rejects_mismatched_io_paths(void);
 int test_transpiler_context_records_source_map_entry(void);
@@ -279,6 +283,10 @@ const t_test_case *get_transpiler_context_tests(size_t *count)
         {"transpiler_context_records_read_only_flag", test_transpiler_context_records_read_only_flag},
         {"transpiler_context_registers_file_declaration", test_transpiler_context_registers_file_declaration},
         {"transpiler_context_tracks_record_length_hint", test_transpiler_context_tracks_record_length_hint},
+        {"transpiler_context_rejects_file_keys_for_line_sequential", test_transpiler_context_rejects_file_keys_for_line_sequential},
+        {"transpiler_context_rejects_alternate_key_for_relative", test_transpiler_context_rejects_alternate_key_for_relative},
+        {"transpiler_context_rejects_invalid_file_organization", test_transpiler_context_rejects_invalid_file_organization},
+        {"transpiler_context_rejects_invalid_file_lock_mode", test_transpiler_context_rejects_invalid_file_lock_mode},
         {"transpiler_context_records_multiple_io_paths", test_transpiler_context_records_multiple_io_paths},
         {"transpiler_context_rejects_mismatched_io_paths", test_transpiler_context_rejects_mismatched_io_paths},
         {"transpiler_context_records_source_map_entry", test_transpiler_context_records_source_map_entry},

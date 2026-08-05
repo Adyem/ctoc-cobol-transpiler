@@ -79,15 +79,15 @@ FT_TEST(test_cobol_dialect_doc_lists_constraints)
     return (FT_SUCCESS);
 }
 
-FT_TEST(test_design_doc_references_cobol_dialect_doc)
+FT_TEST(test_language_standard_references_cobol_dialect_doc)
 {
     char line[1024];
     FILE *file;
 
-    file = std::fopen("design_doc.txt", "r");
+    file = std::fopen("docs/cblc_language_standard.md", "r");
     if (!file)
     {
-        std::printf("Assertion failed: design_doc.txt should be readable\n");
+        std::printf("Assertion failed: docs/cblc_language_standard.md should be readable\n");
         return (FT_FAILURE);
     }
     while (std::fgets(line, sizeof(line), file))
@@ -99,7 +99,7 @@ FT_TEST(test_design_doc_references_cobol_dialect_doc)
         }
     }
     std::fclose(file);
-    std::printf("Assertion failed: design_doc.txt should reference docs/cobol_dialect_requirements.md\n");
+    std::printf("Assertion failed: docs/cblc_language_standard.md should reference docs/cobol_dialect_requirements.md\n");
     return (FT_FAILURE);
 }
 
@@ -108,7 +108,7 @@ const t_test_case *get_cobol_doc_tests(size_t *count)
     static const t_test_case tests[] = {
         {"cobol_dialect_doc_exists", test_cobol_dialect_doc_exists},
         {"cobol_dialect_doc_lists_constraints", test_cobol_dialect_doc_lists_constraints},
-        {"design_doc_references_cobol_dialect_doc", test_design_doc_references_cobol_dialect_doc}
+        {"language_standard_references_cobol_dialect_doc", test_language_standard_references_cobol_dialect_doc}
     };
 
     if (count)

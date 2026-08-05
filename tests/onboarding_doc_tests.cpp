@@ -84,15 +84,15 @@ FT_TEST(test_onboarding_doc_highlights_testing_steps)
     return (FT_SUCCESS);
 }
 
-FT_TEST(test_design_doc_links_onboarding_checklist)
+FT_TEST(test_language_standard_links_onboarding_checklist)
 {
     FILE *file;
     char line[1024];
 
-    file = std::fopen("design_doc.txt", "r");
+    file = std::fopen("docs/cblc_language_standard.md", "r");
     if (!file)
     {
-        std::printf("Assertion failed: design_doc.txt should be readable\n");
+        std::printf("Assertion failed: docs/cblc_language_standard.md should be readable\n");
         return (FT_FAILURE);
     }
     while (std::fgets(line, sizeof(line), file))
@@ -104,7 +104,7 @@ FT_TEST(test_design_doc_links_onboarding_checklist)
         }
     }
     std::fclose(file);
-    std::printf("Assertion failed: design_doc.txt should reference docs/onboarding_checklist.md\n");
+    std::printf("Assertion failed: docs/cblc_language_standard.md should reference docs/onboarding_checklist.md\n");
     return (FT_FAILURE);
 }
 
@@ -114,7 +114,7 @@ const t_test_case *get_onboarding_doc_tests(size_t *count)
         {"onboarding_doc_exists", test_onboarding_doc_exists},
         {"onboarding_doc_covers_local_build", test_onboarding_doc_covers_local_build},
         {"onboarding_doc_highlights_testing_steps", test_onboarding_doc_highlights_testing_steps},
-        {"design_doc_links_onboarding_checklist", test_design_doc_links_onboarding_checklist}
+        {"language_standard_links_onboarding_checklist", test_language_standard_links_onboarding_checklist}
     };
 
     if (count)

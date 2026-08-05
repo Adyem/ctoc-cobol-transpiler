@@ -87,7 +87,7 @@ Source maps now capture the relationship between generated CBL-C output and the 
 
 * `docs/runtime_api_reference.md` documents the libft-backed runtime helpers that generated programs link against.
 * `docs/cobol_dialect_requirements.md` captures the supported COBOL subset.
-* `design_doc.txt` describes the language standard, lowering rules, and implementation contract for the current surface area.
+* [`cblc_language_standard.md`](cblc_language_standard.md) is the authoritative language standard, compiler-behavior contract, and extension framework.
 * `docs/ide_integration.md` explains how to wire editor support (VS Code, Vim, Emacs) into daily workflows using the bundled grammar and automation tips.
 
 Keeping these documents up to date ensures users understand the toolchain and the protections added in recent iterations.

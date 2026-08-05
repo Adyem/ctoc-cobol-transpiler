@@ -145,15 +145,15 @@ FT_TEST(test_ci_document_mentions_reproducible_flag)
     return (FT_SUCCESS);
 }
 
-FT_TEST(test_ci_document_referenced_by_design_doc)
+FT_TEST(test_ci_document_referenced_by_language_standard)
 {
     FILE *file;
     char line[1024];
 
-    file = std::fopen("design_doc.txt", "r");
+    file = std::fopen("docs/cblc_language_standard.md", "r");
     if (!file)
     {
-        std::printf("Assertion failed: design_doc.txt should be readable\n");
+        std::printf("Assertion failed: docs/cblc_language_standard.md should be readable\n");
         return (FT_FAILURE);
     }
     while (std::fgets(line, sizeof(line), file))
@@ -165,7 +165,7 @@ FT_TEST(test_ci_document_referenced_by_design_doc)
         }
     }
     std::fclose(file);
-    std::printf("Assertion failed: design_doc.txt should reference docs/ci_pipeline.md\n");
+    std::printf("Assertion failed: docs/cblc_language_standard.md should reference docs/ci_pipeline.md\n");
     return (FT_FAILURE);
 }
 
@@ -177,7 +177,7 @@ const t_test_case *get_ci_tests(size_t *count)
         {"ci_document_lists_targets", test_ci_document_lists_targets},
         {"ci_document_mentions_lint_script", test_ci_document_mentions_lint_script},
         {"ci_document_mentions_reproducible_flag", test_ci_document_mentions_reproducible_flag},
-        {"ci_document_referenced_by_design_doc", test_ci_document_referenced_by_design_doc}
+        {"ci_document_referenced_by_language_standard", test_ci_document_referenced_by_language_standard}
     };
 
     if (count)

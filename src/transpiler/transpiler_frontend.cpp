@@ -1206,29 +1206,7 @@ static int cblc_frontend_is_keyword(const char *identifier)
 
 static int cblc_frontend_is_builtin_method_name(const char *identifier)
 {
-    if (!identifier)
-        return (0);
-    if (std::strncmp(identifier, "append", TRANSPILE_IDENTIFIER_MAX) == 0)
-        return (1);
-    if (std::strncmp(identifier, "len", TRANSPILE_IDENTIFIER_MAX) == 0)
-        return (1);
-    if (std::strncmp(identifier, "clear", TRANSPILE_IDENTIFIER_MAX) == 0)
-        return (1);
-    if (std::strncmp(identifier, "empty", TRANSPILE_IDENTIFIER_MAX) == 0)
-        return (1);
-    if (std::strncmp(identifier, "equals", TRANSPILE_IDENTIFIER_MAX) == 0)
-        return (1);
-    if (std::strncmp(identifier, "capacity", TRANSPILE_IDENTIFIER_MAX) == 0)
-        return (1);
-    if (std::strncmp(identifier, "starts_with", TRANSPILE_IDENTIFIER_MAX) == 0)
-        return (1);
-    if (std::strncmp(identifier, "ends_with", TRANSPILE_IDENTIFIER_MAX) == 0)
-        return (1);
-    if (std::strncmp(identifier, "compare", TRANSPILE_IDENTIFIER_MAX) == 0)
-        return (1);
-    if (std::strncmp(identifier, "contains", TRANSPILE_IDENTIFIER_MAX) == 0)
-        return (1);
-    return (0);
+    return (cblc_intrinsic_lookup(identifier) != NULL);
 }
 
 static t_cblc_semantic_token_kind cblc_frontend_identifier_token_kind(
@@ -1848,65 +1826,19 @@ static int cblc_frontend_append_stdlib_completions(t_cblc_completion_list *compl
 static int cblc_frontend_append_string_member_completions(t_cblc_completion_list *completions,
     const char *prefix)
 {
-    if (cblc_completion_matches_prefix("append", prefix))
+    const t_cblc_intrinsic_entry *entries;
+    size_t count;
+    size_t index;
+
+    entries = cblc_intrinsic_get_entries(&count);
+    index = 0;
+    while (index < count)
     {
-        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
-                "append") != FT_SUCCESS)
+        if (cblc_completion_matches_prefix(entries[index].name, prefix)
+            && cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
+                entries[index].name) != FT_SUCCESS)
             return (FT_FAILURE);
-    }
-    if (cblc_completion_matches_prefix("len", prefix))
-    {
-        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
-                "len") != FT_SUCCESS)
-            return (FT_FAILURE);
-    }
-    if (cblc_completion_matches_prefix("clear", prefix))
-    {
-        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
-                "clear") != FT_SUCCESS)
-            return (FT_FAILURE);
-    }
-    if (cblc_completion_matches_prefix("empty", prefix))
-    {
-        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
-                "empty") != FT_SUCCESS)
-            return (FT_FAILURE);
-    }
-    if (cblc_completion_matches_prefix("equals", prefix))
-    {
-        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
-                "equals") != FT_SUCCESS)
-            return (FT_FAILURE);
-    }
-    if (cblc_completion_matches_prefix("capacity", prefix))
-    {
-        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
-                "capacity") != FT_SUCCESS)
-            return (FT_FAILURE);
-    }
-    if (cblc_completion_matches_prefix("starts_with", prefix))
-    {
-        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
-                "starts_with") != FT_SUCCESS)
-            return (FT_FAILURE);
-    }
-    if (cblc_completion_matches_prefix("ends_with", prefix))
-    {
-        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
-                "ends_with") != FT_SUCCESS)
-            return (FT_FAILURE);
-    }
-    if (cblc_completion_matches_prefix("compare", prefix))
-    {
-        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
-                "compare") != FT_SUCCESS)
-            return (FT_FAILURE);
-    }
-    if (cblc_completion_matches_prefix("contains", prefix))
-    {
-        if (cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
-                "contains") != FT_SUCCESS)
-            return (FT_FAILURE);
+        index += 1;
     }
     return (FT_SUCCESS);
 }

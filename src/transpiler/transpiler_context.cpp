@@ -3433,6 +3433,27 @@ int transpiler_context_configure_file_organization(t_transpiler_context *context
         transpiler_context_record_error(context, TRANSPILE_ERROR_FILE_UNKNOWN);
         return (FT_FAILURE);
     }
+    if (organization < TRANSPILE_FILE_ORGANIZATION_LINE_SEQUENTIAL
+        || organization > TRANSPILE_FILE_ORGANIZATION_RELATIVE)
+    {
+        std::snprintf(message, sizeof(message),
+            "file '%s' has an unsupported organization value", name ? name : "");
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_FILE_CONFIGURATION, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_FILE_CONFIGURATION);
+        return (FT_FAILURE);
+    }
+    if (organization != TRANSPILE_FILE_ORGANIZATION_INDEXED
+        && file->alternate_key[0] != '\0')
+    {
+        std::snprintf(message, sizeof(message),
+            "file '%s' cannot retain an alternate key outside indexed organization",
+            name ? name : "");
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_FILE_CONFIGURATION, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_FILE_CONFIGURATION);
+        return (FT_FAILURE);
+    }
     file->organization = organization;
     return (FT_SUCCESS);
 }
@@ -3453,6 +3474,28 @@ int transpiler_context_configure_file_keys(t_transpiler_context *context, const 
         transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
             TRANSPILE_ERROR_FILE_UNKNOWN, message);
         transpiler_context_record_error(context, TRANSPILE_ERROR_FILE_UNKNOWN);
+        return (FT_FAILURE);
+    }
+    if (((record_key && record_key[0] != '\0')
+            || (alternate_key && alternate_key[0] != '\0'))
+        && file->organization != TRANSPILE_FILE_ORGANIZATION_INDEXED
+        && file->organization != TRANSPILE_FILE_ORGANIZATION_RELATIVE)
+    {
+        std::snprintf(message, sizeof(message),
+            "file '%s' keys require indexed or relative organization", name ? name : "");
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_FILE_CONFIGURATION, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_FILE_CONFIGURATION);
+        return (FT_FAILURE);
+    }
+    if (alternate_key && alternate_key[0] != '\0'
+        && file->organization != TRANSPILE_FILE_ORGANIZATION_INDEXED)
+    {
+        std::snprintf(message, sizeof(message),
+            "file '%s' alternate keys require indexed organization", name ? name : "");
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_FILE_CONFIGURATION, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_FILE_CONFIGURATION);
         return (FT_FAILURE);
     }
     if (record_key)
@@ -3482,6 +3525,16 @@ int transpiler_context_configure_file_lock_mode(t_transpiler_context *context, c
         transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
             TRANSPILE_ERROR_FILE_UNKNOWN, message);
         transpiler_context_record_error(context, TRANSPILE_ERROR_FILE_UNKNOWN);
+        return (FT_FAILURE);
+    }
+    if (lock_mode < TRANSPILE_FILE_LOCK_MODE_NONE
+        || lock_mode > TRANSPILE_FILE_LOCK_MODE_AUTOMATIC)
+    {
+        std::snprintf(message, sizeof(message),
+            "file '%s' has an unsupported lock mode", name ? name : "");
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_FILE_CONFIGURATION, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_FILE_CONFIGURATION);
         return (FT_FAILURE);
     }
     file->lock_mode = lock_mode;

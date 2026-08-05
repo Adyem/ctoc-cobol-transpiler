@@ -1,3 +1,366 @@
+static int cblc_emit_reusable_method_paragraphs(const t_cblc_translation_unit *unit,
+    t_cobol_text_builder *builder)
+{
+    size_t data_index;
+
+    if (!unit || !builder)
+        return (FT_FAILURE);
+    data_index = 0;
+    while (data_index < unit->data_count)
+    {
+        const t_cblc_data_item *receiver;
+        const t_cblc_struct_type *type;
+        size_t method_index;
+
+        receiver = &unit->data_items[data_index];
+        if (receiver->is_alias || receiver->kind != CBLC_DATA_KIND_STRUCT)
+        {
+            data_index += 1;
+            continue ;
+        }
+        type = cblc_find_struct_type(unit, receiver->struct_type_name);
+        if (!type || type->is_builtin)
+        {
+            data_index += 1;
+            continue ;
+        }
+        method_index = 0;
+        while (method_index < type->method_count)
+        {
+            const t_cblc_method *method;
+            char paragraph_name[TRANSPILE_IDENTIFIER_MAX];
+            char line[TRANSPILE_STATEMENT_TEXT_MAX];
+
+            method = &type->methods[method_index];
+            if (!cblc_method_is_reusable(method))
+            {
+                method_index += 1;
+                continue ;
+            }
+            if (cblc_method_paragraph_name(receiver, method, paragraph_name,
+                    sizeof(paragraph_name)) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (std::snprintf(line, sizeof(line), "       %s.", paragraph_name) < 0
+                || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                return (FT_FAILURE);
+            {
+                char result_name[TRANSPILE_IDENTIFIER_MAX];
+                const char *assign_target;
+
+                assign_target = NULL;
+                if (method->return_kind != CBLC_FUNCTION_RETURN_VOID)
+                {
+                    if (cblc_method_result_name(receiver, method, result_name,
+                            sizeof(result_name)) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    assign_target = result_name;
+                }
+                if (cblc_emit_method_body(unit, receiver, method, assign_target,
+                        builder) != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            if (cobol_text_builder_append_line(builder, "           EXIT.") != FT_SUCCESS
+                || cobol_text_builder_append_line(builder, "") != FT_SUCCESS)
+                return (FT_FAILURE);
+            method_index += 1;
+        }
+        data_index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+static int cblc_emit_reusable_lifecycle_paragraphs(const t_cblc_translation_unit *unit,
+    t_cobol_text_builder *builder)
+{
+    size_t data_index;
+
+    if (!unit || !builder)
+        return (FT_FAILURE);
+    data_index = 0;
+    while (data_index < unit->data_count)
+    {
+        const t_cblc_data_item *receiver;
+        const t_cblc_struct_type *type;
+        size_t constructor_index;
+
+        receiver = &unit->data_items[data_index];
+        if (receiver->is_alias || receiver->kind != CBLC_DATA_KIND_STRUCT)
+        {
+            data_index += 1;
+            continue ;
+        }
+        type = cblc_find_struct_type(unit, receiver->struct_type_name);
+        if (!type || type->is_builtin)
+        {
+            data_index += 1;
+            continue ;
+        }
+        constructor_index = 0;
+        while (constructor_index < type->constructor_count)
+        {
+            const t_cblc_constructor *constructor;
+            char paragraph_name[TRANSPILE_IDENTIFIER_MAX];
+            char line[TRANSPILE_STATEMENT_TEXT_MAX];
+            size_t statement_index;
+
+            constructor = &type->constructors[constructor_index];
+            if (!constructor->has_definition || constructor->statement_count == 0)
+            {
+                constructor_index += 1;
+                continue ;
+            }
+            if (cblc_constructor_paragraph_name(receiver, constructor_index,
+                    paragraph_name, sizeof(paragraph_name)) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (std::snprintf(line, sizeof(line), "       %s.", paragraph_name) < 0
+                || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                return (FT_FAILURE);
+            statement_index = 0;
+            while (statement_index < constructor->statement_count)
+            {
+                if (cblc_emit_substituted_statement(unit, NULL,
+                        &constructor->statements[statement_index], receiver->cobol_name,
+                        builder) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                statement_index += 1;
+            }
+            if (cobol_text_builder_append_line(builder, "           EXIT.") != FT_SUCCESS
+                || cobol_text_builder_append_line(builder, "") != FT_SUCCESS)
+                return (FT_FAILURE);
+            constructor_index += 1;
+        }
+        if (type->destructor_statement_count > 0)
+        {
+            char paragraph_name[TRANSPILE_IDENTIFIER_MAX];
+            char line[TRANSPILE_STATEMENT_TEXT_MAX];
+            size_t statement_index;
+
+            if (cblc_destructor_paragraph_name(receiver, paragraph_name,
+                    sizeof(paragraph_name)) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (std::snprintf(line, sizeof(line), "       %s.", paragraph_name) < 0
+                || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                return (FT_FAILURE);
+            statement_index = 0;
+            while (statement_index < type->destructor_statement_count)
+            {
+                if (cblc_emit_substituted_statement(unit, NULL,
+                        &type->destructor_statements[statement_index], receiver->cobol_name,
+                        builder) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                statement_index += 1;
+            }
+            if (cobol_text_builder_append_line(builder, "           EXIT.") != FT_SUCCESS
+                || cobol_text_builder_append_line(builder, "") != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        data_index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+static int cblc_emit_reusable_method_results(const t_cblc_translation_unit *unit,
+    t_cobol_text_builder *builder)
+{
+    size_t data_index;
+
+    if (!unit || !builder)
+        return (FT_FAILURE);
+    data_index = 0;
+    while (data_index < unit->data_count)
+    {
+        const t_cblc_data_item *receiver;
+        const t_cblc_struct_type *type;
+        size_t method_index;
+
+        receiver = &unit->data_items[data_index];
+        if (receiver->is_alias || receiver->kind != CBLC_DATA_KIND_STRUCT)
+        {
+            data_index += 1;
+            continue ;
+        }
+        type = cblc_find_struct_type(unit, receiver->struct_type_name);
+        if (!type || type->is_builtin)
+        {
+            data_index += 1;
+            continue ;
+        }
+        method_index = 0;
+        while (method_index < type->method_count)
+        {
+            const t_cblc_method *method;
+            char result_name[TRANSPILE_IDENTIFIER_MAX];
+            char line[256];
+
+            method = &type->methods[method_index];
+            if (!cblc_method_is_reusable(method)
+                || method->return_kind == CBLC_FUNCTION_RETURN_VOID)
+            {
+                method_index += 1;
+                continue ;
+            }
+            if (cblc_method_result_name(receiver, method, result_name,
+                    sizeof(result_name)) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (method->return_kind == CBLC_FUNCTION_RETURN_INT)
+            {
+                if (std::snprintf(line, sizeof(line),
+                        "       01 %s PIC S9(9) VALUE 0.", result_name) < 0)
+                    return (FT_FAILURE);
+                if (cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            else
+            {
+                t_cblc_data_item result_item;
+
+                std::memset(&result_item, 0, sizeof(result_item));
+                result_item.kind = CBLC_DATA_KIND_STRUCT;
+                ft_strlcpy(result_item.struct_type_name, method->return_type_name,
+                    sizeof(result_item.struct_type_name));
+                ft_strlcpy(result_item.cobol_name, result_name,
+                    sizeof(result_item.cobol_name));
+                if (cblc_emit_struct_instance(unit, &result_item, builder) != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            method_index += 1;
+        }
+        data_index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+static int cblc_emit_reusable_string_intrinsic_results(
+    const t_cblc_translation_unit *unit, t_cobol_text_builder *builder)
+{
+    size_t data_index;
+
+    if (!unit || !builder)
+        return (FT_FAILURE);
+    data_index = 0;
+    while (data_index < unit->data_count)
+    {
+        const t_cblc_data_item *item;
+        const char *names[] = {"len", "capacity", "empty"};
+        size_t name_index;
+
+        item = &unit->data_items[data_index];
+        if (item->is_alias || item->kind != CBLC_DATA_KIND_STRING
+            || item->array_count > 0)
+        {
+            data_index += 1;
+            continue ;
+        }
+        name_index = 0;
+        while (name_index < sizeof(names) / sizeof(names[0]))
+        {
+            char result_name[TRANSPILE_IDENTIFIER_MAX];
+            char line[256];
+
+            if (cblc_intrinsic_result_name(item, names[name_index], result_name,
+                    sizeof(result_name)) != FT_SUCCESS
+                || std::snprintf(line, sizeof(line), "       01 %s PIC S9(9) VALUE 0.",
+                    result_name) < 0
+                || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                return (FT_FAILURE);
+            name_index += 1;
+        }
+        data_index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+static int cblc_emit_reusable_string_intrinsic_paragraphs(
+    const t_cblc_translation_unit *unit, t_cobol_text_builder *builder)
+{
+    size_t data_index;
+
+    if (!unit || !builder)
+        return (FT_FAILURE);
+    data_index = 0;
+    while (data_index < unit->data_count)
+    {
+        const t_cblc_data_item *item;
+        const char *names[] = {"len", "capacity", "empty", "clear"};
+        size_t name_index;
+
+        item = &unit->data_items[data_index];
+        if (item->is_alias || item->kind != CBLC_DATA_KIND_STRING
+            || item->array_count > 0)
+        {
+            data_index += 1;
+            continue ;
+        }
+        name_index = 0;
+        while (name_index < sizeof(names) / sizeof(names[0]))
+        {
+            char paragraph_name[TRANSPILE_IDENTIFIER_MAX];
+            char result_name[TRANSPILE_IDENTIFIER_MAX];
+            char line[256];
+
+            if (cblc_intrinsic_paragraph_name(item, names[name_index], paragraph_name,
+                    sizeof(paragraph_name)) != FT_SUCCESS
+                || std::snprintf(line, sizeof(line), "       %s.", paragraph_name) < 0
+                || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (std::strcmp(names[name_index], "len") == 0)
+            {
+                if (cblc_intrinsic_result_name(item, names[name_index], result_name,
+                        sizeof(result_name)) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "           COMPUTE %s = %s-LEN.",
+                        result_name, item->cobol_name) < 0)
+                    return (FT_FAILURE);
+            }
+            else if (std::strcmp(names[name_index], "capacity") == 0)
+            {
+                if (cblc_intrinsic_result_name(item, names[name_index], result_name,
+                        sizeof(result_name)) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "           COMPUTE %s = %zu.",
+                        result_name, item->length) < 0)
+                    return (FT_FAILURE);
+            }
+            else if (std::strcmp(names[name_index], "empty") == 0)
+            {
+                if (cblc_intrinsic_result_name(item, names[name_index], result_name,
+                        sizeof(result_name)) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "           COMPUTE %s = 0.",
+                        result_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "           IF %s-LEN = 0",
+                        item->cobol_name) < 0)
+                    return (FT_FAILURE);
+                if (cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "               COMPUTE %s = 1",
+                        result_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || cobol_text_builder_append_line(builder, "           END-IF.") != FT_SUCCESS)
+                    return (FT_FAILURE);
+                if (cobol_text_builder_append_line(builder, "           EXIT.") != FT_SUCCESS
+                    || cobol_text_builder_append_line(builder, "") != FT_SUCCESS)
+                    return (FT_FAILURE);
+                name_index += 1;
+                continue ;
+            }
+            else
+            {
+                if (std::snprintf(line, sizeof(line), "           MOVE SPACES TO %s-BUF.",
+                        item->cobol_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "           COMPUTE %s-LEN = 0.",
+                        item->cobol_name) < 0)
+                    return (FT_FAILURE);
+            }
+            if (cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                || cobol_text_builder_append_line(builder, "           EXIT.") != FT_SUCCESS
+                || cobol_text_builder_append_line(builder, "") != FT_SUCCESS)
+                return (FT_FAILURE);
+            name_index += 1;
+        }
+        data_index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
 int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
 {
     t_cobol_text_builder builder;
@@ -229,6 +592,10 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
             goto cleanup;
         index += 1;
     }
+    if (cblc_emit_reusable_method_results(unit, &builder) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_emit_reusable_string_intrinsic_results(unit, &builder) != FT_SUCCESS)
+        goto cleanup;
     if (cblc_unit_has_pointer_data(unit))
     {
         if (cobol_text_builder_append_line(&builder,
@@ -392,6 +759,12 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
         if (cobol_text_builder_append_line(&builder, "") != FT_SUCCESS)
             goto cleanup;
     }
+    if (cblc_emit_reusable_method_paragraphs(unit, &builder) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_emit_reusable_string_intrinsic_paragraphs(unit, &builder) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_emit_reusable_lifecycle_paragraphs(unit, &builder) != FT_SUCCESS)
+        goto cleanup;
     if (std::snprintf(line, sizeof(line), "       END PROGRAM %s.",
             unit->program_name) < 0)
         goto cleanup;

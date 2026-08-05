@@ -32,7 +32,7 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Capture `void main()` entrypoint metadata and track argument mirroring requirements for COBOL.
 - [x] Provide semantic analysis for type checking, scope resolution, and file/record validation.
 - [x] Surface semantic diagnostics through the existing diagnostics subsystem.
-- [x] Package CLI usage examples and documentation for the design doc.
+- [x] Package CLI usage examples and documentation for the authoritative CBL-C language standard.
 - [ ] Map file declarations to ENVIRONMENT/DATA DIVISION blocks with inferred record sizes.
 - [x] Encode data type mappings and formatting helpers for elementary items and groups.
 - [ ] Emit procedural COBOL for control flow (IF, PERFORM UNTIL, PERFORM VARYING) matching CBL-C semantics.

@@ -753,8 +753,12 @@ FT_TEST(test_cblc_import_type_stubs_merge_direct_definition_exports_for_method_c
             "consumer unit should generate C with imported method body") != FT_SUCCESS)
         goto cleanup;
     if (!generated_c
-        || !ft_strnstr(generated_c, "Counter__add__delta = 2;", std::strlen(generated_c))
-        || !ft_strnstr(generated_c, "counter.value = counter.value + Counter__add__delta;",
+        || !ft_strnstr(generated_c,
+            "void cblc_method_Counter_add(t_Counter *receiver, int Counter__add__delta)",
+            std::strlen(generated_c))
+        || !ft_strnstr(generated_c, "cblc_method_Counter_add(&counter, 2);",
+            std::strlen(generated_c))
+        || !ft_strnstr(generated_c, "receiver->value = receiver->value + Counter__add__delta;",
             std::strlen(generated_c)))
     {
         std::printf("Assertion failed: direct declaration and implementation imports should merge imported method bodies\n");
@@ -1108,7 +1112,12 @@ FT_TEST(test_cblc_import_type_stubs_merge_direct_definition_exports_for_method_r
             "consumer unit should generate C with imported return method body") != FT_SUCCESS)
         goto cleanup;
     if (!generated_c
-        || !ft_strnstr(generated_c, "total = counter.value;", std::strlen(generated_c)))
+        || !ft_strnstr(generated_c,
+            "int cblc_method_Counter_current(t_Counter *receiver)",
+            std::strlen(generated_c))
+        || !ft_strnstr(generated_c, "return (receiver->value);", std::strlen(generated_c))
+        || !ft_strnstr(generated_c, "total = cblc_method_Counter_current(&counter);",
+            std::strlen(generated_c)))
     {
         std::printf("Assertion failed: direct declaration and implementation imports should merge imported return method bodies\n");
         goto cleanup;
@@ -1210,8 +1219,13 @@ FT_TEST(test_cblc_import_type_stubs_merge_direct_definition_exports_for_construc
             "consumer unit should generate C with imported constructor body") != FT_SUCCESS)
         goto cleanup;
     if (!generated_c
-        || !ft_strnstr(generated_c, "Counter__ctor__start = 7;", std::strlen(generated_c))
-        || !ft_strnstr(generated_c, "counter.value = Counter__ctor__start;", std::strlen(generated_c)))
+        || !ft_strnstr(generated_c,
+            "void cblc_constructor_Counter_0(t_Counter *receiver, int Counter__ctor__start)",
+            std::strlen(generated_c))
+        || !ft_strnstr(generated_c, "cblc_constructor_Counter_0(&counter, 7);",
+            std::strlen(generated_c))
+        || !ft_strnstr(generated_c, "receiver->value = Counter__ctor__start;",
+            std::strlen(generated_c)))
     {
         std::printf("Assertion failed: direct declaration and implementation imports should merge imported constructor bodies\n");
         goto cleanup;
@@ -1504,4 +1518,3 @@ failure:
     transpiler_context_dispose(&context);
     return (FT_FAILURE);
 }
-

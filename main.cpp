@@ -1,6 +1,7 @@
 #include <cctype>
 #include <climits>
 #include <filesystem>
+#include <string>
 #include <system_error>
 
 #include "cblc_transpiler.hpp"
@@ -282,6 +283,201 @@ static int pipeline_write_file(const char *path, const char *text)
     }
     if (runtime_file_close(&file) != FT_SUCCESS)
         return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static std::string pipeline_json_escape(const char *text)
+{
+    std::string escaped;
+
+    if (!text)
+        return (escaped);
+    while (*text != '\0')
+    {
+        unsigned char value;
+
+        value = static_cast<unsigned char>(*text);
+        if (value == '\\')
+            escaped += "\\\\";
+        else if (value == '"')
+            escaped += "\\\"";
+        else if (value == '\n')
+            escaped += "\\n";
+        else if (value == '\r')
+            escaped += "\\r";
+        else if (value == '\t')
+            escaped += "\\t";
+        else if (value < 0x20)
+            escaped += '?';
+        else
+            escaped += static_cast<char>(value);
+        text += 1;
+    }
+    return (escaped);
+}
+
+static unsigned long long pipeline_hash_text(const char *text)
+{
+    unsigned long long hash;
+
+    hash = 1469598103934665603ULL;
+    if (!text)
+        return (hash);
+    while (*text != '\0')
+    {
+        hash ^= static_cast<unsigned char>(*text);
+        hash *= 1099511628211ULL;
+        text += 1;
+    }
+    return (hash);
+}
+
+static int pipeline_resolve_output_path(const t_transpiler_context *context,
+    const char *target_path, char *buffer, size_t buffer_size);
+
+static int pipeline_write_translation_manifest(const t_transpiler_context *context,
+    const char *mode, const std::string &manifest)
+{
+    char manifest_path[TRANSPILE_FILE_PATH_MAX];
+
+    if (!context || !mode)
+        return (FT_FAILURE);
+    if (pipeline_resolve_output_path(context, "cblc.manifest.json", manifest_path,
+            sizeof(manifest_path)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (pipeline_write_file(manifest_path, manifest.c_str()));
+}
+
+static int pipeline_manifest_contains_id(const std::string &manifest, const char *identifier)
+{
+    std::string needle;
+
+    if (!identifier)
+        return (0);
+    needle = "\"id\": \"";
+    needle += pipeline_json_escape(identifier);
+    needle += "\"";
+    return (manifest.find(needle) != std::string::npos);
+}
+
+static std::string pipeline_manifest_dependencies(const char *generated_text,
+    const char *self_id)
+{
+    const t_transpiler_standard_library_entry *entries;
+    size_t entry_count;
+    size_t index;
+    int has_dependency;
+    std::string dependencies;
+
+    dependencies = "[";
+    has_dependency = 0;
+    if (!generated_text)
+        return (dependencies + "]");
+    entries = transpiler_standard_library_get_entries(&entry_count);
+    index = 0;
+    while (index < entry_count)
+    {
+        if ((!self_id || std::strcmp(entries[index].program_name, self_id) != 0)
+            && std::strstr(generated_text, entries[index].program_name))
+        {
+            if (has_dependency)
+                dependencies += ", ";
+            dependencies += "\"";
+            dependencies += pipeline_json_escape(entries[index].program_name);
+            dependencies += "\"";
+            has_dependency = 1;
+        }
+        index += 1;
+    }
+    dependencies += "]";
+    return (dependencies);
+}
+
+static int pipeline_emit_required_standard_library(t_transpiler_context *context,
+    const char *generated_text, std::string &manifest, int *manifest_has_artifact)
+{
+    const t_transpiler_standard_library_entry *entries;
+    std::string dependency_text;
+    size_t entry_count;
+    size_t index;
+
+    if (!context || !generated_text || !manifest_has_artifact)
+        return (FT_FAILURE);
+    dependency_text = generated_text;
+    entries = transpiler_standard_library_get_entries(&entry_count);
+    index = 0;
+    while (index < entry_count)
+    {
+        char filename[TRANSPILE_FILE_PATH_MAX];
+        char resolved_path[TRANSPILE_FILE_PATH_MAX];
+        char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+        char *program_text;
+
+        if (dependency_text.find(entries[index].program_name) == std::string::npos
+            || pipeline_manifest_contains_id(manifest, entries[index].program_name))
+        {
+            index += 1;
+            continue ;
+        }
+        if (std::snprintf(filename, sizeof(filename), "%s.cob", entries[index].program_name) < 0)
+            return (FT_FAILURE);
+        program_text = NULL;
+        if (entries[index].generator(&program_text) != FT_SUCCESS || !program_text)
+        {
+            if (std::snprintf(message, sizeof(message),
+                    "Unable to generate required standard library program '%s'",
+                    entries[index].program_name) >= 0)
+                (void)pipeline_emit_error(context, message);
+            if (program_text)
+                cma_free(program_text);
+            return (FT_FAILURE);
+        }
+        /* A generated standard-library program may call another generated
+         * program. Keep its source in the dependency scan so the same pass
+         * computes the transitive closure instead of only the target's direct
+         * references. */
+        dependency_text += "\n";
+        dependency_text += program_text;
+        if (pipeline_resolve_output_path(context, filename, resolved_path,
+                sizeof(resolved_path)) != FT_SUCCESS
+            || pipeline_write_file(resolved_path, program_text) != FT_SUCCESS)
+        {
+            if (std::snprintf(message, sizeof(message),
+                    "Unable to write required standard library program '%s'",
+                    entries[index].program_name) >= 0)
+                (void)pipeline_emit_error(context, message);
+            cma_free(program_text);
+            return (FT_FAILURE);
+        }
+        if (*manifest_has_artifact)
+            manifest += ",\n";
+        manifest += "    {\n      \"kind\": \"standard-library\",\n      \"id\": \"";
+        manifest += pipeline_json_escape(entries[index].program_name);
+        manifest += "\",\n      \"qualified_name\": \"";
+        manifest += pipeline_json_escape(entries[index].qualified_name);
+        manifest += "\",\n      \"path\": \"";
+        manifest += pipeline_json_escape(filename);
+        manifest += "\",\n      \"hash\": \"fnv1a64:";
+        {
+            char hash_text[32];
+
+            if (std::snprintf(hash_text, sizeof(hash_text), "%016llx",
+                    pipeline_hash_text(program_text)) < 0)
+            {
+                cma_free(program_text);
+                return (FT_FAILURE);
+            }
+            manifest += hash_text;
+        }
+        manifest += "\",\n      \"dependencies\": ";
+        manifest += pipeline_manifest_dependencies(program_text, entries[index].program_name);
+        manifest += "\n    }";
+        *manifest_has_artifact = 1;
+        cma_free(program_text);
+        /* Restart the catalog so dependencies that appear before this entry
+         * are discovered as well. Manifest membership guarantees termination. */
+        index = 0;
+    }
     return (FT_SUCCESS);
 }
 
@@ -708,14 +904,18 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
 {
     const t_transpiler_standard_library_entry *entries;
     char *helper_source;
+    std::string manifest;
     size_t entry_count;
     size_t index;
+    int manifest_has_artifact;
 
     (void)user_data;
     if (!context)
         return (FT_FAILURE);
     helper_source = NULL;
     entries = transpiler_standard_library_get_entries(&entry_count);
+    manifest = "{\n  \"schema_version\": 1,\n  \"mode\": \"standard-library\",\n  \"artifacts\": [\n";
+    manifest_has_artifact = 0;
     index = 0;
     while (index < entry_count)
     {
@@ -770,6 +970,30 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
             cma_free(program_text);
             return (FT_FAILURE);
         }
+        if (manifest_has_artifact)
+            manifest += ",\n";
+        manifest += "    {\n      \"kind\": \"standard-library\",\n      \"id\": \"";
+        manifest += pipeline_json_escape(entries[index].program_name);
+        manifest += "\",\n      \"qualified_name\": \"";
+        manifest += pipeline_json_escape(entries[index].qualified_name);
+        manifest += "\",\n      \"path\": \"";
+        manifest += pipeline_json_escape(filename);
+        manifest += "\",\n      \"hash\": \"fnv1a64:";
+        {
+            char hash_text[32];
+
+            if (std::snprintf(hash_text, sizeof(hash_text), "%016llx",
+                    pipeline_hash_text(program_text)) < 0)
+            {
+                cma_free(program_text);
+                return (FT_FAILURE);
+            }
+            manifest += hash_text;
+        }
+        manifest += "\",\n      \"dependencies\": ";
+        manifest += pipeline_manifest_dependencies(program_text, entries[index].program_name);
+        manifest += "\n    }";
+        manifest_has_artifact = 1;
         cma_free(program_text);
         index += 1;
     }
@@ -830,8 +1054,46 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
             cma_free(helper_source);
             return (FT_FAILURE);
         }
+        if (manifest_has_artifact)
+            manifest += ",\n";
+        manifest += "    {\n      \"kind\": \"runtime-helper\",\n      \"id\": \"cblc-runtime-helpers\",\n      \"path\": \"cblc_runtime_helpers.c\",\n      \"hash\": \"fnv1a64:";
+        {
+            char hash_text[32];
+
+            if (std::snprintf(hash_text, sizeof(hash_text), "%016llx",
+                    pipeline_hash_text(prefixed_source)) < 0)
+            {
+                cma_free(prefixed_source);
+                cma_free(helper_source);
+                return (FT_FAILURE);
+            }
+            manifest += hash_text;
+        }
+        manifest += "\",\n      \"dependencies\": []\n    }";
+        manifest_has_artifact = 1;
         cma_free(prefixed_source);
         cma_free(helper_source);
+    }
+    manifest += "\n  ]\n}\n";
+    {
+        char manifest_path[TRANSPILE_FILE_PATH_MAX];
+        char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+        if (pipeline_resolve_output_path(context, "cblc.manifest.json", manifest_path,
+                sizeof(manifest_path)) != FT_SUCCESS)
+        {
+            if (std::snprintf(message, sizeof(message),
+                    "Unable to resolve standard-library manifest output path") >= 0)
+                (void)pipeline_emit_error(context, message);
+            return (FT_FAILURE);
+        }
+        if (pipeline_write_file(manifest_path, manifest.c_str()) != FT_SUCCESS)
+        {
+            if (std::snprintf(message, sizeof(message),
+                    "Unable to write standard-library manifest to '%s'", manifest_path) >= 0)
+                (void)pipeline_emit_error(context, message);
+            return (FT_FAILURE);
+        }
     }
     return (FT_SUCCESS);
 }
@@ -951,6 +1213,8 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
     size_t order_count;
     size_t file_count;
     size_t index;
+    std::string manifest;
+    int manifest_has_artifact;
     int status;
 
     (void)user_data;
@@ -959,6 +1223,8 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
     file_count = context->source_count;
     if (file_count == 0)
         return (FT_SUCCESS);
+    manifest = "{\n  \"schema_version\": 1,\n  \"mode\": \"cblc-to-c\",\n  \"runtime\": \"embedded\",\n  \"artifacts\": [\n";
+    manifest_has_artifact = 0;
     transpiler_context_reset_module_registry(context);
     transpiler_context_reset_unit_state(context);
     units = static_cast<t_cblc_translation_unit *>(cma_calloc(file_count,
@@ -1222,10 +1488,41 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
             status = FT_FAILURE;
             goto cleanup;
         }
+        if (manifest_has_artifact)
+            manifest += ",\n";
+        manifest += "    {\n      \"kind\": \"target\",\n      \"id\": \"";
+        manifest += pipeline_json_escape(ordered_units[index]->program_name);
+        manifest += "\",\n      \"path\": \"";
+        manifest += pipeline_json_escape(context->target_paths[source_index]);
+        manifest += "\",\n      \"hash\": \"fnv1a64:";
+        {
+            char hash_text[32];
+
+            if (std::snprintf(hash_text, sizeof(hash_text), "%016llx",
+                    pipeline_hash_text(generated_text)) < 0)
+            {
+                cma_free(generated_text);
+                status = FT_FAILURE;
+                goto cleanup;
+            }
+            manifest += hash_text;
+        }
+        manifest += "\",\n      \"dependencies\": ";
+        manifest += pipeline_manifest_dependencies(generated_text,
+            ordered_units[index]->program_name);
+        manifest += "\n    }";
+        manifest_has_artifact = 1;
         if (generated_text)
             cma_free(generated_text);
         module_indices[source_index] = static_cast<size_t>(-1);
         index += 1;
+    }
+    manifest += "\n  ]\n}\n";
+    if (pipeline_write_translation_manifest(context, "cblc-to-c", manifest) != FT_SUCCESS)
+    {
+        (void)pipeline_emit_error(context, "Failed to write C translation manifest");
+        status = FT_FAILURE;
+        goto cleanup;
     }
     status = FT_SUCCESS;
 cleanup:
@@ -1279,6 +1576,8 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
     size_t order_count;
     size_t file_count;
     size_t index;
+    std::string manifest;
+    int manifest_has_artifact;
     int status;
 
     (void)user_data;
@@ -1287,6 +1586,8 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
     file_count = context->source_count;
     if (file_count == 0)
         return (FT_SUCCESS);
+    manifest = "{\n  \"schema_version\": 1,\n  \"mode\": \"cblc-to-cobol\",\n  \"runtime\": \"external-standard-library\",\n  \"artifacts\": [\n";
+    manifest_has_artifact = 0;
     transpiler_context_reset_module_registry(context);
     transpiler_context_reset_unit_state(context);
     units = static_cast<t_cblc_translation_unit *>(cma_calloc(file_count,
@@ -1564,6 +1865,35 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
             status = FT_FAILURE;
             goto cleanup;
         }
+        if (pipeline_emit_required_standard_library(context, parallel_results[index].text,
+                manifest, &manifest_has_artifact) != FT_SUCCESS)
+        {
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        if (manifest_has_artifact)
+            manifest += ",\n";
+        manifest += "    {\n      \"kind\": \"target\",\n      \"id\": \"";
+        manifest += pipeline_json_escape(ordered_units[index]->program_name);
+        manifest += "\",\n      \"path\": \"";
+        manifest += pipeline_json_escape(context->target_paths[source_index]);
+        manifest += "\",\n      \"hash\": \"fnv1a64:";
+        {
+            char hash_text[32];
+
+            if (std::snprintf(hash_text, sizeof(hash_text), "%016llx",
+                    pipeline_hash_text(parallel_results[index].text)) < 0)
+            {
+                status = FT_FAILURE;
+                goto cleanup;
+            }
+            manifest += hash_text;
+        }
+        manifest += "\",\n      \"dependencies\": ";
+        manifest += pipeline_manifest_dependencies(parallel_results[index].text,
+            ordered_units[index]->program_name);
+        manifest += "\n    }";
+        manifest_has_artifact = 1;
         if (parallel_results[index].text)
         {
             cma_free(parallel_results[index].text);
@@ -1571,6 +1901,13 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
         }
         module_indices[source_index] = static_cast<size_t>(-1);
         index += 1;
+    }
+    manifest += "\n  ]\n}\n";
+    if (pipeline_write_translation_manifest(context, "cblc-to-cobol", manifest) != FT_SUCCESS)
+    {
+        (void)pipeline_emit_error(context, "Failed to write COBOL translation manifest");
+        status = FT_FAILURE;
+        goto cleanup;
     }
     if (generation_status != FT_SUCCESS)
     {
