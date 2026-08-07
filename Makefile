@@ -61,12 +61,10 @@ SRC         = \
     src/transpiler/transpiler_parallel.cpp \
     src/transpiler/transpiler_cblc.cpp \
     src/transpiler/transpiler_cblc_intrinsics.cpp \
-    src/transpiler/transpiler_c_backend.cpp \
     src/transpiler/transpiler_cli.cpp \
     src/formatter/cblc_formatter.cpp \
     src/transpiler/transpiler_logging.cpp \
     src/transpiler/transpiler_incremental_cache.cpp \
-    src/transpiler/transpiler_runtime_helpers.cpp \
     src/transpiler/transpiler_validation.cpp \
     src/transpiler/transpiler_ast_visualizer.cpp \
     src/transpiler/transpiler_copybook_graph.cpp \
@@ -228,6 +226,8 @@ LSP_OBJ     = $(LSP_SRC:%.cpp=$(OBJ_DIR)/%.o)
 TOTAL_OBJS          := $(words $(OBJS))
 
 TEST_SRC    = imported/libft_test_runner.cpp \
+             src/transpiler/transpiler_c_backend.cpp \
+             src/transpiler/transpiler_runtime_helpers.cpp \
               tests/test_main.cpp \
               tests/test_support.cpp \
               tests/ast_tests.cpp \
