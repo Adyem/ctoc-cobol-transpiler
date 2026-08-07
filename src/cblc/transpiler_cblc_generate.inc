@@ -772,9 +772,50 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
         goto cleanup;
     if (cobol_text_builder_append_line(&builder, "       ENVIRONMENT DIVISION.") != FT_SUCCESS)
         goto cleanup;
+    if (unit->file_count > 0)
+    {
+        if (cobol_text_builder_append_line(&builder, "       INPUT-OUTPUT SECTION.") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder, "       FILE-CONTROL.") != FT_SUCCESS)
+            goto cleanup;
+        index = 0;
+        while (index < unit->file_count)
+        {
+            if (std::snprintf(line, sizeof(line), "           SELECT %s ASSIGN TO \"%s\".",
+                    unit->files[index].cobol_name, unit->files[index].path) < 0
+                || cobol_text_builder_append_line(&builder, line) != FT_SUCCESS)
+                goto cleanup;
+            index += 1;
+        }
+    }
     if (cobol_text_builder_append_line(&builder, "       DATA DIVISION.") != FT_SUCCESS)
         goto cleanup;
+    if (unit->file_count > 0)
+    {
+        if (cobol_text_builder_append_line(&builder, "       FILE SECTION.") != FT_SUCCESS)
+            goto cleanup;
+        index = 0;
+        while (index < unit->file_count)
+        {
+            size_t record_length;
+
+            record_length = unit->files[index].record_length;
+            if (record_length == 0)
+                record_length = 256;
+            if (std::snprintf(line, sizeof(line), "       FD %s.",
+                    unit->files[index].cobol_name) < 0
+                || cobol_text_builder_append_line(&builder, line) != FT_SUCCESS
+                || std::snprintf(line, sizeof(line), "       01 %s-RECORD PIC X(%zu).",
+                    unit->files[index].cobol_name, record_length) < 0
+                || cobol_text_builder_append_line(&builder, line) != FT_SUCCESS)
+                goto cleanup;
+            index += 1;
+        }
+    }
     if (cobol_text_builder_append_line(&builder, "       WORKING-STORAGE SECTION.") != FT_SUCCESS)
+        goto cleanup;
+    if (unit->file_count > 0
+        && cobol_text_builder_append_line(&builder,
+            "       01 CBLC-EOF-FLAG PIC X VALUE 'N'.") != FT_SUCCESS)
         goto cleanup;
     index = 0;
     while (index < unit->copy_include_count)

@@ -2137,6 +2137,63 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
             }
             }
         }
+        else if (statement->type == CBLC_STATEMENT_FILE_OPEN
+            || statement->type == CBLC_STATEMENT_FILE_CLOSE
+            || statement->type == CBLC_STATEMENT_FILE_READ
+            || statement->type == CBLC_STATEMENT_FILE_WRITE)
+        {
+            t_cblc_file_declaration *file;
+            const t_cblc_data_item *record;
+
+            file = cblc_find_file(const_cast<t_cblc_translation_unit *>(unit), statement->target);
+            if (!file)
+                return (FT_FAILURE);
+            if (statement->type == CBLC_STATEMENT_FILE_OPEN)
+            {
+                const char *verb;
+
+                verb = std::strncmp(statement->source, "r", sizeof(statement->source)) == 0
+                    ? "INPUT" : (std::strncmp(statement->source, "a", sizeof(statement->source)) == 0
+                        ? "EXTEND" : "OUTPUT");
+                if (std::snprintf(line, sizeof(line), "           OPEN %s %s",
+                        verb, file->cobol_name) < 0)
+                    return (FT_FAILURE);
+            }
+            else if (statement->type == CBLC_STATEMENT_FILE_CLOSE)
+            {
+                if (std::snprintf(line, sizeof(line), "           CLOSE %s",
+                        file->cobol_name) < 0)
+                    return (FT_FAILURE);
+            }
+            else
+            {
+                record = cblc_find_data_item_for_emit_by_source(unit, statement->source);
+                if (!record || file->record_length == 0)
+                    return (FT_FAILURE);
+                if (statement->type == CBLC_STATEMENT_FILE_WRITE)
+                {
+                    if (std::snprintf(line, sizeof(line), "           MOVE %s TO %s-RECORD.",
+                            record->cobol_name, file->cobol_name) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line), "           WRITE %s-RECORD.",
+                            file->cobol_name) < 0)
+                        return (FT_FAILURE);
+                }
+                else
+                {
+                    if (std::snprintf(line, sizeof(line), "           READ %s INTO %s",
+                            file->cobol_name, record->cobol_name) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || cobol_text_builder_append_line(builder,
+                            "               AT END MOVE 'Y' TO CBLC-EOF-FLAG") != FT_SUCCESS
+                        || cobol_text_builder_append_line(builder, "           END-READ.") != FT_SUCCESS)
+                        return (FT_FAILURE);
+                }
+            }
+            if (statement->type == CBLC_STATEMENT_FILE_READ
+                || statement->type == CBLC_STATEMENT_FILE_WRITE)
+                skip_append = 1;
+        }
         else if (statement->type == CBLC_STATEMENT_COMPUTE)
         {
             char source_text[TRANSPILE_STATEMENT_TEXT_MAX];

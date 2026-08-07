@@ -129,6 +129,8 @@ static int cblc_parse_statement_block(const char **cursor, t_cblc_translation_un
                 return (FT_FAILURE);
             continue ;
         }
+        if (cblc_parse_file_statement(cursor, unit, function) == FT_SUCCESS)
+            continue ;
         if (cblc_parse_local_string_declaration(cursor, unit, function) == FT_SUCCESS)
             continue ;
         if (cblc_parse_local_scalar_declaration(cursor, unit, function) == FT_SUCCESS)

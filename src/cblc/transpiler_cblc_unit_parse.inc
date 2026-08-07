@@ -126,6 +126,109 @@ static int cblc_starts_with_function_declaration(const t_cblc_translation_unit *
     return (1);
 }
 
+static int cblc_translation_unit_ensure_file_capacity(t_cblc_translation_unit *unit,
+    size_t desired_capacity)
+{
+    t_cblc_file_declaration *files;
+
+    if (!unit)
+        return (FT_FAILURE);
+    if (desired_capacity <= unit->file_capacity)
+        return (FT_SUCCESS);
+    files = static_cast<t_cblc_file_declaration *>(cma_calloc(desired_capacity,
+            sizeof(*files)));
+    if (!files)
+        return (FT_FAILURE);
+    if (unit->files)
+    {
+        std::memcpy(files, unit->files, unit->file_count * sizeof(*files));
+        cma_free(unit->files);
+    }
+    unit->files = files;
+    unit->file_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
+static t_cblc_file_declaration *cblc_find_file(t_cblc_translation_unit *unit,
+    const char *source_name)
+{
+    size_t index;
+
+    if (!unit || !source_name)
+        return (NULL);
+    index = 0;
+    while (index < unit->file_count)
+    {
+        if (std::strncmp(unit->files[index].source_name, source_name,
+                sizeof(unit->files[index].source_name)) == 0)
+            return (&unit->files[index]);
+        index += 1;
+    }
+    return (NULL);
+}
+
+static int cblc_parse_file_declaration(const char **cursor, t_cblc_translation_unit *unit)
+{
+    char first[TRANSPILE_IDENTIFIER_MAX];
+    char second[TRANSPILE_IDENTIFIER_MAX];
+    char path[TRANSPILE_FILE_PATH_MAX];
+    const char *lookahead;
+    t_cblc_file_declaration *file;
+
+    if (!cursor || !*cursor || !unit)
+        return (FT_FAILURE);
+    lookahead = *cursor;
+    if (!cblc_match_keyword(&lookahead, "file"))
+        return (FT_FAILURE);
+    *cursor = lookahead;
+    cblc_skip_whitespace(cursor);
+    if (cblc_parse_identifier(cursor, first, sizeof(first)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    cblc_skip_whitespace(cursor);
+    second[0] = '\0';
+    lookahead = *cursor;
+    if (cblc_parse_identifier(&lookahead, second, sizeof(second)) == FT_SUCCESS)
+    {
+        *cursor = lookahead;
+        cblc_skip_whitespace(cursor);
+    }
+    if (**cursor != '"' || cblc_parse_string_literal(cursor, path, sizeof(path)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    cblc_skip_whitespace(cursor);
+    if (**cursor != ';')
+        return (FT_FAILURE);
+    *cursor += 1;
+    if (cblc_find_file(unit, second[0] ? second : first))
+        return (FT_FAILURE);
+    if (unit->file_count >= unit->file_capacity
+        && cblc_translation_unit_ensure_file_capacity(unit,
+            unit->file_capacity == 0 ? 4 : unit->file_capacity * 2) != FT_SUCCESS)
+        return (FT_FAILURE);
+    file = &unit->files[unit->file_count++];
+    std::memset(file, 0, sizeof(*file));
+    if (second[0])
+    {
+        ft_strlcpy(file->source_name, second, sizeof(file->source_name));
+        if (std::strncmp(first, "input", sizeof(first)) == 0)
+            file->role = TRANSPILE_FILE_ROLE_INPUT;
+        else if (std::strncmp(first, "output", sizeof(first)) == 0)
+            file->role = TRANSPILE_FILE_ROLE_OUTPUT;
+        else if (std::strncmp(first, "data", sizeof(first)) == 0)
+            file->role = TRANSPILE_FILE_ROLE_DATA;
+        else
+            return (FT_FAILURE);
+    }
+    else
+    {
+        ft_strlcpy(file->source_name, first, sizeof(file->source_name));
+        file->role = TRANSPILE_FILE_ROLE_DATA;
+    }
+    cblc_identifier_to_cobol(file->source_name, file->cobol_name,
+        sizeof(file->cobol_name));
+    ft_strlcpy(file->path, path, sizeof(file->path));
+    return (FT_SUCCESS);
+}
+
 void cblc_translation_unit_init(t_cblc_translation_unit *unit)
 {
     if (!unit)
@@ -142,6 +245,9 @@ void cblc_translation_unit_init(t_cblc_translation_unit *unit)
     unit->copy_includes = NULL;
     unit->copy_include_count = 0;
     unit->copy_include_capacity = 0;
+    unit->files = NULL;
+    unit->file_count = 0;
+    unit->file_capacity = 0;
     unit->functions = NULL;
     unit->function_count = 0;
     unit->function_capacity = 0;
@@ -215,6 +321,8 @@ void cblc_translation_unit_dispose(t_cblc_translation_unit *unit)
         cma_free(unit->imports);
     if (unit->copy_includes)
         cma_free(unit->copy_includes);
+    if (unit->files)
+        cma_free(unit->files);
     if (unit->functions)
     {
         size_t index;
@@ -248,6 +356,9 @@ void cblc_translation_unit_dispose(t_cblc_translation_unit *unit)
     unit->copy_includes = NULL;
     unit->copy_include_count = 0;
     unit->copy_include_capacity = 0;
+    unit->files = NULL;
+    unit->file_count = 0;
+    unit->file_capacity = 0;
     unit->functions = NULL;
     unit->function_count = 0;
     unit->function_capacity = 0;
@@ -284,6 +395,13 @@ int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit)
         {
             cursor -= std::strlen("import");
             if (cblc_parse_import(&cursor, unit) != FT_SUCCESS)
+                return (FT_FAILURE);
+            continue ;
+        }
+        if (cblc_match_keyword(&cursor, "file"))
+        {
+            cursor -= std::strlen("file");
+            if (cblc_parse_file_declaration(&cursor, unit) != FT_SUCCESS)
                 return (FT_FAILURE);
             continue ;
         }

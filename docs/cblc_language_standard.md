@@ -505,7 +505,8 @@ exceptions, or user-defined control-flow operators.
 
 ## 11. File and record I/O
 
-The source surface includes supported file declarations and calls such as:
+The forward compiler supports line-sequential file declarations and the basic
+open/read/write/close statement contract:
 
 ```cblc
 file input input "input.txt";
@@ -516,14 +517,20 @@ write(output, record_value);
 close(input);
 ```
 
-Line-sequential text and fixed-length sequential record workflows are supported
-by the runtime model. File operation results and end-of-file behavior must be
-handled through the supported status/result conventions.
+The declaration may use an explicit role and name (`file input input ...`) or
+the compact form used by samples (`file input ...`). The first open mode binds
+an unqualified declaration as input (`"r"`) or output (`"w"`/`"a"`). Records
+are currently fixed-length `char` arrays; the first read/write establishes the
+COBOL FD record length. A generated read includes an `AT END` action that sets
+the shared EOF flag.
 
-Full forward file-control emission for every possible `file` declaration is
-**partial**. Indexed/relative organization, report-writer features, advanced
-COBOL file clauses, and arbitrary file-control layouts are outside this version.
-The compiler must not imply that reverse recovery of a file operation guarantees
+Loop syntax and boolean read expressions are not yet part of this forward
+statement subset, so a complete copy loop such as `while (read(...))` remains
+pending even though the individual file operations now have a defined lowering.
+
+Indexed/relative organization, report-writer features, advanced COBOL file
+clauses, and arbitrary file-control layouts are outside this version. The
+compiler must not imply that reverse recovery of a file operation guarantees
 forward emission of every recovered form.
 
 ## 12. Standard library and runtime

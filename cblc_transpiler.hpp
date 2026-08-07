@@ -1341,6 +1341,16 @@ typedef struct s_cblc_copy_include
     char name[TRANSPILE_IDENTIFIER_MAX];
 }   t_cblc_copy_include;
 
+typedef struct s_cblc_file_declaration
+{
+    char source_name[TRANSPILE_IDENTIFIER_MAX];
+    char cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    t_transpiler_file_role role;
+    char path[TRANSPILE_FILE_PATH_MAX];
+    size_t record_length;
+    char record_source_name[TRANSPILE_IDENTIFIER_MAX];
+}   t_cblc_file_declaration;
+
 typedef enum e_cblc_statement_type
 {
     CBLC_STATEMENT_ASSIGNMENT,
@@ -1352,7 +1362,11 @@ typedef enum e_cblc_statement_type
     CBLC_STATEMENT_DEFAULT_CONSTRUCT,
     CBLC_STATEMENT_DESTRUCT,
     CBLC_STATEMENT_METHOD_CALL,
-    CBLC_STATEMENT_METHOD_CALL_ASSIGN
+    CBLC_STATEMENT_METHOD_CALL_ASSIGN,
+    CBLC_STATEMENT_FILE_OPEN,
+    CBLC_STATEMENT_FILE_READ,
+    CBLC_STATEMENT_FILE_WRITE,
+    CBLC_STATEMENT_FILE_CLOSE
 }   t_cblc_statement_type;
 
 struct s_cblc_statement
@@ -1401,6 +1415,9 @@ struct s_cblc_translation_unit
     t_cblc_copy_include *copy_includes;
     size_t copy_include_count;
     size_t copy_include_capacity;
+    t_cblc_file_declaration *files;
+    size_t file_count;
+    size_t file_capacity;
     t_cblc_function *functions;
     size_t function_count;
     size_t function_capacity;

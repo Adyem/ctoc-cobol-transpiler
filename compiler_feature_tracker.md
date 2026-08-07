@@ -106,7 +106,8 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Condition names (`LEVEL 88`): surface boolean enumerations when translating COBOL back to CBL-C so VALUE clauses and SET/IF checks round-trip without manual rewrites.
 - [x] OCCURS DEPENDING ON: thread runtime upper bounds through layout analysis so both emitters size tables correctly and flag missing controlling values.
 - [ ] RENAMES groups: retain alias relationships during semantic lowering so reverse translation can recover original DATA DIVISION overlays.
-- [ ] Forward file I/O: parse CBL-C `file` declarations and `open`/`read`/`write` statements, emit COBOL file-control and data-division structures, and translate loop/end-of-file handling so samples like `copy_file.cblc` execute.
+- [x] Forward file I/O foundation: parse CBL-C file declarations and basic `open`/`read`/`write`/`close` statements, and emit COBOL FILE-CONTROL, FILE SECTION, fixed records, and AT END EOF handling.
+- [ ] Forward file I/O completion: add loop/read-expression lowering so samples like `copy_file.cblc` execute, then extend the model for indexed/relative organizations and advanced COBOL clauses.
 
 ### Core Language Frontend
 - [ ] Parse COBOL `ALTER` and `ENTRY` statements and lower them into structured equivalents in the shared IR so legacy flow control can round-trip.

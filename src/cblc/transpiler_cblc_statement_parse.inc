@@ -1,3 +1,94 @@
+static int cblc_parse_file_statement(const char **cursor, t_cblc_translation_unit *unit,
+    t_cblc_function *function)
+{
+    const char *start;
+    char operation[TRANSPILE_IDENTIFIER_MAX];
+    char file_name[TRANSPILE_IDENTIFIER_MAX];
+    char record_name[TRANSPILE_IDENTIFIER_MAX];
+    char mode[8];
+    t_cblc_file_declaration *file;
+    t_cblc_data_item *record;
+
+    if (!cursor || !*cursor || !unit || !function)
+        return (FT_FAILURE);
+    start = *cursor;
+    if (cblc_parse_identifier(cursor, operation, sizeof(operation)) != FT_SUCCESS
+        || (std::strncmp(operation, "open", sizeof(operation)) != 0
+            && std::strncmp(operation, "read", sizeof(operation)) != 0
+            && std::strncmp(operation, "write", sizeof(operation)) != 0
+            && std::strncmp(operation, "close", sizeof(operation)) != 0))
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    cblc_skip_whitespace(cursor);
+    if (**cursor != '(')
+        goto fail;
+    *cursor += 1;
+    cblc_skip_whitespace(cursor);
+    if (cblc_parse_identifier(cursor, file_name, sizeof(file_name)) != FT_SUCCESS)
+        goto fail;
+    file = cblc_find_file(unit, file_name);
+    if (!file)
+        goto fail;
+    cblc_skip_whitespace(cursor);
+    if (std::strncmp(operation, "open", sizeof(operation)) == 0)
+    {
+        if (**cursor != ',')
+            goto fail;
+        *cursor += 1;
+        cblc_skip_whitespace(cursor);
+        if (cblc_parse_string_literal(cursor, mode, sizeof(mode)) != FT_SUCCESS
+            || (std::strncmp(mode, "r", sizeof(mode)) != 0
+                && std::strncmp(mode, "w", sizeof(mode)) != 0
+                && std::strncmp(mode, "a", sizeof(mode)) != 0))
+            goto fail;
+        if (std::strncmp(mode, "r", sizeof(mode)) == 0)
+            file->role = TRANSPILE_FILE_ROLE_INPUT;
+        else if (std::strncmp(mode, "w", sizeof(mode)) == 0)
+            file->role = TRANSPILE_FILE_ROLE_OUTPUT;
+        else
+            file->role = TRANSPILE_FILE_ROLE_OUTPUT;
+        cblc_skip_whitespace(cursor);
+        if (**cursor != ')' || ( ++(*cursor), cblc_skip_whitespace(cursor), **cursor != ';'))
+            goto fail;
+        *cursor += 1;
+        return (cblc_append_statement(function, CBLC_STATEMENT_FILE_OPEN,
+            file_name, mode, 1));
+    }
+    if (std::strncmp(operation, "close", sizeof(operation)) == 0)
+    {
+        cblc_skip_whitespace(cursor);
+        if (**cursor != ')' || ( ++(*cursor), cblc_skip_whitespace(cursor), **cursor != ';'))
+            goto fail;
+        *cursor += 1;
+        return (cblc_append_statement(function, CBLC_STATEMENT_FILE_CLOSE,
+            file_name, NULL, 0));
+    }
+    if (**cursor != ',')
+        goto fail;
+    *cursor += 1;
+    cblc_skip_whitespace(cursor);
+    if (cblc_parse_identifier(cursor, record_name, sizeof(record_name)) != FT_SUCCESS)
+        goto fail;
+    record = cblc_find_data_item(unit, record_name);
+    if (!record || record->kind != CBLC_DATA_KIND_CHAR || record->array_count != 0)
+        goto fail;
+    file->record_length = record->length;
+    ft_strlcpy(file->record_source_name, record_name, sizeof(file->record_source_name));
+    cblc_skip_whitespace(cursor);
+    if (**cursor != ')' || ( ++(*cursor), cblc_skip_whitespace(cursor), **cursor != ';'))
+        goto fail;
+    *cursor += 1;
+    return (cblc_append_statement(function,
+        std::strncmp(operation, "read", sizeof(operation)) == 0
+            ? CBLC_STATEMENT_FILE_READ : CBLC_STATEMENT_FILE_WRITE,
+        file_name, record_name, 0));
+fail:
+    *cursor = start;
+    return (FT_FAILURE);
+}
+
 static int cblc_parse_std_strcpy(const char **cursor, t_cblc_translation_unit *unit,
     t_cblc_function *function)
 {

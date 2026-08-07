@@ -4081,3 +4081,45 @@ cleanup:
     cblc_translation_unit_dispose(&unit);
     return (status);
 }
+
+FT_TEST(test_cblc_generate_cobol_emits_sequential_file_io)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "file input input \"input.txt\";\n"
+        "char record[16];\n"
+        "void main() {\n"
+        "    open(input, \"r\");\n"
+        "    read(input, record);\n"
+        "    close(input);\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "sequential file source should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "sequential file source should generate COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol
+        || !ft_strnstr(generated_cobol, "SELECT INPUT ASSIGN TO \"input.txt\".",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "FD INPUT.", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "OPEN INPUT INPUT.", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "READ INPUT INTO RECORD", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "CLOSE INPUT.", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should contain sequential file I/O\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}

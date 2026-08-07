@@ -27,6 +27,8 @@ static int cblc_parse_assignment(const char **cursor, t_cblc_translation_unit *u
     t_cblc_function *function);
 static int cblc_parse_display(const char **cursor, t_cblc_translation_unit *unit,
     t_cblc_function *function);
+static int cblc_parse_file_statement(const char **cursor, t_cblc_translation_unit *unit,
+    t_cblc_function *function);
 static int cblc_parse_call(const char **cursor, t_cblc_translation_unit *unit,
     t_cblc_function *function);
 static int cblc_parse_method_call(const char **cursor, t_cblc_translation_unit *unit,
@@ -96,6 +98,8 @@ static const t_cblc_struct_type *cblc_find_receiver_type(const t_cblc_translatio
     const t_cblc_data_item *item);
 static t_cblc_data_item *cblc_find_data_item(t_cblc_translation_unit *unit,
     const char *identifier);
+static t_cblc_file_declaration *cblc_find_file(t_cblc_translation_unit *unit,
+    const char *source_name);
 static const t_cblc_data_item *cblc_find_data_item_by_cobol(
     const t_cblc_translation_unit *unit, const char *identifier);
 static int cblc_parse_data_reference_text(const char **cursor, t_cblc_translation_unit *unit,
