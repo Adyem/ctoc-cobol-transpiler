@@ -621,7 +621,10 @@ static int cblc_parse_data_reference_text(const char **cursor, t_cblc_translatio
         return (FT_FAILURE);
     item = cblc_find_data_item(unit, identifier);
     if (!item)
+    {
+        cblc_record_scope_violation(unit, identifier);
         return (FT_FAILURE);
+    }
     ft_strlcpy(reference_text, item->cobol_name, sizeof(reference_text));
     has_index = 0;
     array_index = 0;

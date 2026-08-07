@@ -2351,11 +2351,14 @@ static int cblc_add_struct_instance_field_items(t_cblc_translation_unit *unit,
         item->length = type->fields[index].length;
         item->initial_capacity = type->fields[index].length;
         item->array_count = type->fields[index].array_count;
-        item->kind = type->fields[index].kind;
-        item->is_const = type->fields[index].is_const;
-        item->is_function_local = is_function_local;
-        item->is_alias = is_alias;
-        item->is_active = 1;
+    item->kind = type->fields[index].kind;
+    item->is_const = type->fields[index].is_const;
+    item->is_function_local = is_function_local;
+    item->is_alias = is_alias;
+    item->is_active = 1;
+    item->scope_id = unit->active_scope_id;
+    item->scope_depth = unit->scopes && unit->active_scope_id < unit->scope_count
+        ? unit->scopes[unit->active_scope_id].depth : 0;
         if (type->fields[index].kind == CBLC_DATA_KIND_STRUCT)
         {
             const t_cblc_struct_type *field_type;
@@ -2522,6 +2525,9 @@ static int cblc_parse_struct_instance_declaration(const char **cursor,
     item->kind = CBLC_DATA_KIND_STRUCT;
     item->array_count = array_count;
     item->is_active = 1;
+    item->scope_id = unit->active_scope_id;
+    item->scope_depth = unit->scopes && unit->active_scope_id < unit->scope_count
+        ? unit->scopes[unit->active_scope_id].depth : 0;
     unit->data_count += 1;
     if (cblc_add_struct_instance_field_items(unit, type, item->source_name, item->cobol_name,
             NULL, 0, 0)
@@ -2559,6 +2565,9 @@ static t_cblc_data_item *cblc_add_generated_char_item(t_cblc_translation_unit *u
     item->owner_function_name[0] = '\0';
     item->length = length;
     item->kind = CBLC_DATA_KIND_CHAR;
+    item->scope_id = unit->active_scope_id;
+    item->scope_depth = unit->scopes && unit->active_scope_id < unit->scope_count
+        ? unit->scopes[unit->active_scope_id].depth : 0;
     unit->data_count += 1;
     return (item);
 }
@@ -2586,6 +2595,9 @@ static t_cblc_data_item *cblc_add_generated_int_item(t_cblc_translation_unit *un
     item->owner_function_name[0] = '\0';
     item->length = 0;
     item->kind = CBLC_DATA_KIND_INT;
+    item->scope_id = unit->active_scope_id;
+    item->scope_depth = unit->scopes && unit->active_scope_id < unit->scope_count
+        ? unit->scopes[unit->active_scope_id].depth : 0;
     unit->data_count += 1;
     return (item);
 }

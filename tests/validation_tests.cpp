@@ -2712,10 +2712,96 @@ FT_TEST(test_cblc_parse_translation_unit_rejects_block_local_after_scope)
         "}\n";
     cblc_translation_unit_init(&unit);
     status = FT_FAILURE;
-    if (cblc_parse_translation_unit(source, &unit) == FT_FAILURE)
+    if (cblc_parse_translation_unit(source, &unit) == FT_FAILURE
+        && unit.parse_error_code == TRANSPILE_ERROR_SEMANTIC_SCOPE_VIOLATION)
         status = FT_SUCCESS;
     else
-        std::printf("Assertion failed: parser should reject a block-local scalar after its scope closes\n");
+        std::printf("Assertion failed: parser should report a lexical scope violation for a closed block-local scalar\n");
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_scope_metadata_tracks_lexical_ownership)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    size_t index;
+    size_t local_scope_id;
+    size_t nested_scope_id;
+    int local_count;
+    int status;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    int outer;\n"
+        "    {\n"
+        "        int inner;\n"
+        "        inner = outer;\n"
+        "    }\n"
+        "    total = outer;\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    local_scope_id = static_cast<size_t>(-1);
+    nested_scope_id = static_cast<size_t>(-1);
+    local_count = 0;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "scope metadata sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (unit.active_scope_id != 0 || unit.scope_count < 4)
+    {
+        std::printf("Assertion failed: parser should restore the root scope and retain nested scope records\n");
+        goto cleanup;
+    }
+    index = 0;
+    while (index < unit.scope_count)
+    {
+        const t_cblc_scope *scope;
+
+        scope = &unit.scopes[index];
+        if (index == 0)
+        {
+            if (scope->parent_id != static_cast<size_t>(-1) || scope->depth != 0)
+            {
+                std::printf("Assertion failed: root scope should have no parent and depth zero\n");
+                goto cleanup;
+            }
+        }
+        else if (scope->parent_id >= unit.scope_count
+            || scope->depth != unit.scopes[scope->parent_id].depth + 1)
+        {
+            std::printf("Assertion failed: every non-root scope should have a consistent parent depth\n");
+            goto cleanup;
+        }
+        index += 1;
+    }
+    index = 0;
+    while (index < unit.data_count)
+    {
+        const t_cblc_data_item *item;
+
+        item = &unit.data_items[index];
+        if (item->is_function_local && !item->is_alias)
+        {
+            if (local_scope_id == static_cast<size_t>(-1))
+                local_scope_id = item->scope_id;
+            else if (item->scope_id != local_scope_id)
+                nested_scope_id = item->scope_id;
+            local_count += 1;
+        }
+        index += 1;
+    }
+    if (local_count < 2 || local_scope_id == static_cast<size_t>(-1)
+        || nested_scope_id == static_cast<size_t>(-1)
+        || unit.scopes[nested_scope_id].depth <= unit.scopes[local_scope_id].depth)
+    {
+        std::printf("Assertion failed: local bindings should record distinct lexical ownership scopes\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
     cblc_translation_unit_dispose(&unit);
     return (status);
 }
@@ -5358,6 +5444,8 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_generate_c_emits_unique_block_local_scalar_storage},
         {"cblc_parse_translation_unit_rejects_block_local_after_scope",
             test_cblc_parse_translation_unit_rejects_block_local_after_scope},
+        {"cblc_scope_metadata_tracks_lexical_ownership",
+            test_cblc_scope_metadata_tracks_lexical_ownership},
         {"cblc_parse_translation_unit_records_class_lifecycle_metadata",
             test_cblc_parse_translation_unit_records_class_lifecycle_metadata},
         {"cblc_parse_translation_unit_records_parameterized_class_lifecycle_and_methods",

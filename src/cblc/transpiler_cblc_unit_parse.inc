@@ -7,6 +7,8 @@ static int cblc_parse_function(const char **cursor, t_cblc_translation_unit *uni
     char return_type_name[TRANSPILE_IDENTIFIER_MAX];
     size_t index;
     size_t parameter_scope_base;
+    size_t saved_scope_id;
+    size_t function_scope_id;
 
     if (!cursor || !*cursor || !unit)
         return (FT_FAILURE);
@@ -46,6 +48,12 @@ static int cblc_parse_function(const char **cursor, t_cblc_translation_unit *uni
     function->cobol_name[0] = '\0';
     ft_strlcpy(function->source_name, identifier, sizeof(function->source_name));
     cblc_identifier_to_cobol(identifier, function->cobol_name, sizeof(function->cobol_name));
+    saved_scope_id = unit->active_scope_id;
+    if (cblc_register_scope(unit, saved_scope_id, function->source_name,
+            &function_scope_id) != FT_SUCCESS)
+        return (FT_FAILURE);
+    function->scope_id = function_scope_id;
+    unit->active_scope_id = function_scope_id;
     if (return_kind == CBLC_FUNCTION_RETURN_STRUCT
         || return_kind == CBLC_FUNCTION_RETURN_STRUCT_POINTER)
         ft_strlcpy(function->return_type_name, return_type_name,
@@ -94,6 +102,7 @@ static int cblc_parse_function(const char **cursor, t_cblc_translation_unit *uni
     function = &unit->functions[index];
     if (cblc_parse_statement_block(cursor, unit, function, 1) != FT_SUCCESS)
         return (FT_FAILURE);
+    unit->active_scope_id = saved_scope_id;
     while (parameter_scope_base < unit->data_count)
     {
         if (unit->data_items[parameter_scope_base].is_alias)
@@ -248,6 +257,16 @@ void cblc_translation_unit_init(t_cblc_translation_unit *unit)
     unit->data_items = NULL;
     unit->data_count = 0;
     unit->data_capacity = 0;
+    unit->scopes = static_cast<t_cblc_scope *>(cma_calloc(1, sizeof(t_cblc_scope)));
+    unit->scope_count = unit->scopes ? 1 : 0;
+    unit->scope_capacity = unit->scopes ? 1 : 0;
+    if (unit->scopes)
+    {
+        unit->scopes[0].id = 0;
+        unit->scopes[0].parent_id = static_cast<size_t>(-1);
+        unit->scopes[0].depth = 0;
+        unit->scopes[0].owner_function_name[0] = '\0';
+    }
     unit->struct_types = NULL;
     unit->struct_type_count = 0;
     unit->struct_type_capacity = 0;
@@ -288,6 +307,7 @@ void cblc_translation_unit_init(t_cblc_translation_unit *unit)
     unit->helper_literal_counter = 0;
     unit->helper_status_index = -1;
     unit->program_name[0] = '\0';
+    unit->active_scope_id = 0;
     cblc_register_builtin_string_type(unit);
 }
 
@@ -297,6 +317,8 @@ void cblc_translation_unit_dispose(t_cblc_translation_unit *unit)
         return ;
     if (unit->data_items)
         cma_free(unit->data_items);
+    if (unit->scopes)
+        cma_free(unit->scopes);
     if (unit->struct_types)
     {
         size_t index;
@@ -389,6 +411,9 @@ void cblc_translation_unit_dispose(t_cblc_translation_unit *unit)
     unit->source_text = NULL;
     unit->data_count = 0;
     unit->data_capacity = 0;
+    unit->scopes = NULL;
+    unit->scope_count = 0;
+    unit->scope_capacity = 0;
     unit->struct_types = NULL;
     unit->struct_type_count = 0;
     unit->struct_type_capacity = 0;
@@ -429,6 +454,7 @@ void cblc_translation_unit_dispose(t_cblc_translation_unit *unit)
     unit->helper_literal_counter = 0;
     unit->helper_status_index = -1;
     unit->program_name[0] = '\0';
+    unit->active_scope_id = 0;
 }
 
 int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit)

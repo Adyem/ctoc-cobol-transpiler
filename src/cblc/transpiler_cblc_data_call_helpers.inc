@@ -1,3 +1,70 @@
+static int cblc_scope_is_visible(const t_cblc_translation_unit *unit, size_t item_scope_id)
+{
+    size_t scope_id;
+
+    if (!unit || item_scope_id >= unit->scope_count
+        || unit->active_scope_id >= unit->scope_count)
+        return (0);
+    scope_id = unit->active_scope_id;
+    while (scope_id != static_cast<size_t>(-1))
+    {
+        if (scope_id == item_scope_id)
+            return (1);
+        scope_id = unit->scopes[scope_id].parent_id;
+    }
+    return (0);
+}
+
+static void cblc_record_scope_violation(t_cblc_translation_unit *unit,
+    const char *identifier)
+{
+    size_t index;
+
+    if (!unit || !identifier || unit->parse_error_code != 0)
+        return ;
+    index = 0;
+    while (index < unit->data_count)
+    {
+        const t_cblc_data_item *item;
+
+        item = &unit->data_items[index];
+        if (!item->is_active
+            && std::strncmp(item->source_name, identifier,
+                sizeof(item->source_name)) == 0)
+        {
+            unit->parse_error_code = TRANSPILE_ERROR_SEMANTIC_SCOPE_VIOLATION;
+            std::snprintf(unit->parse_error_message, sizeof(unit->parse_error_message),
+                "identifier '%s' is referenced outside its lexical scope", identifier);
+            return ;
+        }
+        index += 1;
+    }
+}
+
+static int cblc_binding_shadows_visible_item(const t_cblc_translation_unit *unit,
+    const char *source_name)
+{
+    size_t index;
+
+    if (!unit || !source_name)
+        return (0);
+    index = unit->data_count;
+    while (index > 0)
+    {
+        const t_cblc_data_item *item;
+
+        index -= 1;
+        item = &unit->data_items[index];
+        if (item->is_active && item->is_alias
+            && item->scope_id != unit->active_scope_id
+            && cblc_scope_is_visible(unit, item->scope_id)
+            && std::strncmp(item->source_name, source_name,
+                sizeof(item->source_name)) == 0)
+            return (1);
+    }
+    return (0);
+}
+
 static t_cblc_data_item *cblc_find_data_item(t_cblc_translation_unit *unit, const char *identifier)
 {
     size_t index;
@@ -8,7 +75,8 @@ static t_cblc_data_item *cblc_find_data_item(t_cblc_translation_unit *unit, cons
     while (index > 0)
     {
         index -= 1;
-        if (!unit->data_items[index].is_active)
+        if (!unit->data_items[index].is_active
+            || !cblc_scope_is_visible(unit, unit->data_items[index].scope_id))
             continue ;
         if (std::strncmp(unit->data_items[index].source_name, identifier,
                 sizeof(unit->data_items[index].source_name)) == 0)
@@ -28,7 +96,8 @@ static const t_cblc_data_item *cblc_find_data_item_const(
     while (index > 0)
     {
         index -= 1;
-        if (!unit->data_items[index].is_active)
+        if (!unit->data_items[index].is_active
+            || !cblc_scope_is_visible(unit, unit->data_items[index].scope_id))
             continue ;
         if (std::strncmp(unit->data_items[index].source_name, identifier,
                 sizeof(unit->data_items[index].source_name)) == 0)
@@ -418,6 +487,9 @@ static int cblc_add_temp_alias_item(t_cblc_translation_unit *unit, const char *s
     item->kind = kind;
     item->is_const = is_const;
     item->is_active = 1;
+    item->scope_id = unit->active_scope_id;
+    item->scope_depth = unit->scopes && unit->active_scope_id < unit->scope_count
+        ? unit->scopes[unit->active_scope_id].depth : 0;
     unit->data_count += 1;
     return (FT_SUCCESS);
 }
@@ -457,6 +529,10 @@ static int cblc_add_named_data_item(t_cblc_translation_unit *unit, const char *s
     item->is_alias = is_alias;
     item->is_active = 1;
     item->is_imported = 0;
+    item->is_shadowed = cblc_binding_shadows_visible_item(unit, source_name);
+    item->scope_id = unit->active_scope_id;
+    item->scope_depth = unit->scopes && unit->active_scope_id < unit->scope_count
+        ? unit->scopes[unit->active_scope_id].depth : 0;
     unit->data_count += 1;
     return (FT_SUCCESS);
 }

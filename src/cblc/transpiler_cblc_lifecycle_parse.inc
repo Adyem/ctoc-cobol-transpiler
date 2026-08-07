@@ -62,11 +62,49 @@ static void cblc_unbind_lifecycle_scope(t_cblc_translation_unit *unit, size_t sa
         unit->data_count = saved_data_count;
 }
 
+static int cblc_register_scope(t_cblc_translation_unit *unit, size_t parent_id,
+    const char *owner_function_name, size_t *out_scope_id)
+{
+    t_cblc_scope *scopes;
+    t_cblc_scope *scope;
+    size_t capacity;
+
+    if (!unit || !out_scope_id || parent_id >= unit->scope_count)
+        return (FT_FAILURE);
+    if (unit->scope_count >= unit->scope_capacity)
+    {
+        capacity = unit->scope_capacity == 0 ? 4 : unit->scope_capacity * 2;
+        scopes = static_cast<t_cblc_scope *>(cma_calloc(capacity, sizeof(*scopes)));
+        if (!scopes)
+            return (FT_FAILURE);
+        if (unit->scopes)
+        {
+            std::memcpy(scopes, unit->scopes, unit->scope_count * sizeof(*scopes));
+            cma_free(unit->scopes);
+        }
+        unit->scopes = scopes;
+        unit->scope_capacity = capacity;
+    }
+    scope = &unit->scopes[unit->scope_count];
+    std::memset(scope, 0, sizeof(*scope));
+    scope->id = unit->scope_count;
+    scope->parent_id = parent_id;
+    scope->depth = unit->scopes[parent_id].depth + 1;
+    if (owner_function_name)
+        ft_strlcpy(scope->owner_function_name, owner_function_name,
+            sizeof(scope->owner_function_name));
+    *out_scope_id = scope->id;
+    unit->scope_count += 1;
+    return (FT_SUCCESS);
+}
+
 static int cblc_parse_statement_block(const char **cursor, t_cblc_translation_unit *unit,
     t_cblc_function *function, int allow_return)
 {
     size_t scope_destructor_base;
     size_t scope_data_base;
+    size_t parent_scope_id;
+    size_t scope_id;
     int saw_return_in_block;
 
     if (!cursor || !*cursor || !unit || !function)
@@ -74,6 +112,11 @@ static int cblc_parse_statement_block(const char **cursor, t_cblc_translation_un
     cblc_skip_whitespace(cursor);
     if (**cursor != '{')
         return (FT_FAILURE);
+    parent_scope_id = unit->active_scope_id;
+    if (cblc_register_scope(unit, parent_scope_id, function->source_name, &scope_id)
+        != FT_SUCCESS)
+        return (FT_FAILURE);
+    unit->active_scope_id = scope_id;
     scope_destructor_base = function->local_destructor_count;
     scope_data_base = unit->data_count;
     saw_return_in_block = 0;
@@ -104,6 +147,7 @@ static int cblc_parse_statement_block(const char **cursor, t_cblc_translation_un
                 scope_data_base += 1;
             }
             *cursor += 1;
+            unit->active_scope_id = parent_scope_id;
             return (FT_SUCCESS);
         }
         if (**cursor == '{')

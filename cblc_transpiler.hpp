@@ -1205,6 +1205,7 @@ void transpiler_pipeline_reset(t_transpiler_pipeline *pipeline);
 #define TRANSPILE_ERROR_SEMANTIC_NUMERIC_OVERFLOW 2011
 #define TRANSPILE_ERROR_SEMANTIC_FLOATING_TRUNCATION 2012
 #define TRANSPILE_ERROR_SEMANTIC_DECIMAL_SCALE_MISMATCH 2013
+#define TRANSPILE_ERROR_SEMANTIC_SCOPE_VIOLATION 2014
 
 #define TRANSPILE_WARNING_SEMANTIC_FLOAT_TO_DOUBLE 3001
 #define TRANSPILE_WARNING_SEMANTIC_DOUBLE_TO_FLOAT 3002
@@ -1219,6 +1220,7 @@ void transpiler_pipeline_reset(t_transpiler_pipeline *pipeline);
 #define TRANSPILE_WARNING_SEMANTIC_WRITE_ONLY_DATA_ITEM 3011
 #define TRANSPILE_WARNING_SEMANTIC_READ_WITHOUT_WRITE 3012
 #define TRANSPILE_WARNING_SEMANTIC_DUPLICATE_COPYBOOK_INCLUDE 3013
+#define TRANSPILE_WARNING_SEMANTIC_SHADOWED_DATA_ITEM 3014
 
 int transpiler_semantics_analyze_program(t_transpiler_context *context, const t_ast_node *program);
 
@@ -1320,12 +1322,23 @@ typedef struct s_cblc_data_item
     int is_active;
     int is_imported;
     int is_template_item;
+    int is_shadowed;
     int has_initializer;
     size_t initializer_length;
     char initializer_text[TRANSPILE_STATEMENT_TEXT_MAX];
     char constructor_arguments[TRANSPILE_STATEMENT_TEXT_MAX];
     size_t constructor_argument_count;
+    size_t scope_id;
+    size_t scope_depth;
 }   t_cblc_data_item;
+
+typedef struct s_cblc_scope
+{
+    size_t id;
+    size_t parent_id;
+    size_t depth;
+    char owner_function_name[TRANSPILE_IDENTIFIER_MAX];
+}   t_cblc_scope;
 
 typedef struct s_cblc_struct_field
 {
@@ -1531,6 +1544,7 @@ typedef struct s_cblc_function
     char (*local_destructor_targets)[TRANSPILE_IDENTIFIER_MAX];
     size_t local_destructor_count;
     size_t local_destructor_capacity;
+    size_t scope_id;
 }   t_cblc_function;
 
 struct s_cblc_translation_unit
@@ -1539,6 +1553,9 @@ struct s_cblc_translation_unit
     t_cblc_data_item *data_items;
     size_t data_count;
     size_t data_capacity;
+    t_cblc_scope *scopes;
+    size_t scope_count;
+    size_t scope_capacity;
     t_cblc_struct_type *struct_types;
     size_t struct_type_count;
     size_t struct_type_capacity;
@@ -1579,6 +1596,7 @@ struct s_cblc_translation_unit
     size_t helper_literal_counter;
     int helper_status_index;
     char program_name[TRANSPILE_IDENTIFIER_MAX];
+    size_t active_scope_id;
 };
 
 void cblc_translation_unit_init(t_cblc_translation_unit *unit);

@@ -533,9 +533,17 @@ operation's semantics in each caller.
 ## 7. Declarations and scope
 
 Global data is visible according to translation-unit and import rules. Local
-data belongs to the function/block scope where it is declared. A nested block
-may shadow an outer binding only where the semantic rules permit it; ambiguous
-or prohibited shadowing is diagnosed.
+data belongs to the function/block scope where it is declared. The compiler
+maintains an explicit lexical scope tree: the translation unit is the root,
+each function owns a child scope, and each statement block owns a child of the
+currently active scope. Every binding records its owning scope and depth.
+
+Name lookup searches the active scope first and then walks its parent chain.
+Bindings in unrelated functions or closed blocks are never visible. A nested
+block may shadow an outer binding; the binding remains distinct storage and is
+marked as shadowing metadata for warning and tooling layers. A reference to a
+binding after its block closes is rejected with the stable semantic scope
+violation diagnostic rather than being rebound to stale local storage.
 
 Local storage is scoped to the source block. In the generated target, backing
 storage may be allocated in a broader working area to satisfy COBOL layout, but
