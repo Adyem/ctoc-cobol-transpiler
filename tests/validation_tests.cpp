@@ -2806,6 +2806,84 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_scope_metadata_marks_shadowed_bindings)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    size_t index;
+    int shadowed_count;
+    int status;
+
+    source = "int value;\n"
+        "void main()\n"
+        "{\n"
+        "    int value;\n"
+        "    {\n"
+        "        int value;\n"
+        "        value = 3;\n"
+        "    }\n"
+        "    value = 2;\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    shadowed_count = 0;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "shadowing sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    index = 0;
+    while (index < unit.data_count)
+    {
+        const t_cblc_data_item *item;
+
+        item = &unit.data_items[index];
+        if (item->is_alias && std::strncmp(item->source_name, "value",
+                sizeof(item->source_name)) == 0 && item->is_shadowed)
+            shadowed_count += 1;
+        index += 1;
+    }
+    if (shadowed_count < 2)
+    {
+        std::printf("Assertion failed: nested declarations should retain shadowing metadata\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_scope_resolution_rejects_cross_function_local_reference)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "void helper()\n"
+        "{\n"
+        "    int private_value;\n"
+        "    private_value = 1;\n"
+        "    return;\n"
+        "}\n"
+        "void main()\n"
+        "{\n"
+        "    private_value = 2;\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_FAILURE
+        && unit.parse_error_code == TRANSPILE_ERROR_SEMANTIC_SCOPE_VIOLATION
+        && std::strncmp(unit.parse_error_message,
+            "identifier 'private_value' is referenced outside its lexical scope",
+            sizeof(unit.parse_error_message)) == 0)
+        status = FT_SUCCESS;
+    else
+        std::printf("Assertion failed: a local from another function should produce a scope violation\n");
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_generate_c_emits_struct_returning_function_and_call_assignment)
 {
     const char *source;
@@ -5446,6 +5524,10 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_parse_translation_unit_rejects_block_local_after_scope},
         {"cblc_scope_metadata_tracks_lexical_ownership",
             test_cblc_scope_metadata_tracks_lexical_ownership},
+        {"cblc_scope_metadata_marks_shadowed_bindings",
+            test_cblc_scope_metadata_marks_shadowed_bindings},
+        {"cblc_scope_resolution_rejects_cross_function_local_reference",
+            test_cblc_scope_resolution_rejects_cross_function_local_reference},
         {"cblc_parse_translation_unit_records_class_lifecycle_metadata",
             test_cblc_parse_translation_unit_records_class_lifecycle_metadata},
         {"cblc_parse_translation_unit_records_parameterized_class_lifecycle_and_methods",

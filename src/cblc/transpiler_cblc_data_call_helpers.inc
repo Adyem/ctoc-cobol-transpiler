@@ -55,7 +55,7 @@ static int cblc_binding_shadows_visible_item(const t_cblc_translation_unit *unit
 
         index -= 1;
         item = &unit->data_items[index];
-        if (item->is_active && item->is_alias
+        if (item->is_active
             && item->scope_id != unit->active_scope_id
             && cblc_scope_is_visible(unit, item->scope_id)
             && std::strncmp(item->source_name, source_name,
