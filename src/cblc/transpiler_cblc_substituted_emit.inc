@@ -34,6 +34,88 @@ static int cblc_replace_this_prefix(const char *input, const char *replacement, 
 }
 
 static int cblc_emit_substituted_statement(const t_cblc_translation_unit *unit,
+    const t_cblc_function *function, const t_cblc_statement *statement,
+    const char *replacement, t_cobol_text_builder *builder);
+
+static int cblc_replace_this_prefix_for_array_element(const char *input,
+    const char *replacement, size_t element_index, char *output, size_t output_size)
+{
+    const char *cursor;
+    size_t out_length;
+    const size_t needle_length = std::strlen("CBLC-THIS");
+
+    if (!input || !replacement || !output || output_size == 0 || element_index == 0)
+        return (FT_FAILURE);
+    cursor = input;
+    out_length = 0;
+    while (*cursor != '\0')
+    {
+        if (std::strncmp(cursor, "CBLC-THIS", needle_length) == 0)
+        {
+            const char *suffix_start;
+            const char *suffix_end;
+            size_t replacement_length;
+            size_t suffix_length;
+            char index_text[32];
+
+            replacement_length = std::strlen(replacement);
+            if (out_length + replacement_length >= output_size)
+                return (FT_FAILURE);
+            std::memcpy(output + out_length, replacement, replacement_length);
+            out_length += replacement_length;
+            suffix_start = cursor + needle_length;
+            suffix_end = suffix_start;
+            while (*suffix_end == '-' || (*suffix_end >= 'A' && *suffix_end <= 'Z')
+                || (*suffix_end >= '0' && *suffix_end <= '9') || *suffix_end == '_')
+                suffix_end += 1;
+            suffix_length = static_cast<size_t>(suffix_end - suffix_start);
+            if (std::snprintf(index_text, sizeof(index_text), "(%zu)", element_index) < 0
+                || out_length + suffix_length + std::strlen(index_text) >= output_size)
+                return (FT_FAILURE);
+            if (suffix_length > 0)
+            {
+                std::memcpy(output + out_length, suffix_start, suffix_length);
+                out_length += suffix_length;
+                std::memcpy(output + out_length, index_text, std::strlen(index_text));
+                out_length += std::strlen(index_text);
+            }
+            cursor = suffix_end;
+            continue ;
+        }
+        if (out_length + 1 >= output_size)
+            return (FT_FAILURE);
+        output[out_length] = *cursor;
+        out_length += 1;
+        cursor += 1;
+    }
+    output[out_length] = '\0';
+    return (FT_SUCCESS);
+}
+
+static int cblc_emit_array_element_constructor_statement(
+    const t_cblc_translation_unit *unit, const t_cblc_statement *statement,
+    const char *receiver, size_t element_index, t_cobol_text_builder *builder)
+{
+    t_cblc_statement substituted;
+
+    if (!unit || !statement || !receiver || element_index == 0 || !builder)
+        return (FT_FAILURE);
+    if (statement->type == CBLC_STATEMENT_DEFAULT_CONSTRUCT
+        && std::strcmp(statement->target, "CBLC-THIS-VALUE") == 0)
+        return (FT_SUCCESS);
+    substituted = *statement;
+    if (cblc_replace_this_prefix_for_array_element(statement->target, receiver,
+            element_index, substituted.target, sizeof(substituted.target)) != FT_SUCCESS
+        || cblc_replace_this_prefix_for_array_element(statement->source, receiver,
+            element_index, substituted.source, sizeof(substituted.source)) != FT_SUCCESS
+        || cblc_replace_this_prefix_for_array_element(statement->call_arguments, receiver,
+            element_index, substituted.call_arguments,
+            sizeof(substituted.call_arguments)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (cblc_emit_substituted_statement(unit, NULL, &substituted, "", builder));
+}
+
+static int cblc_emit_substituted_statement(const t_cblc_translation_unit *unit,
     const t_cblc_function *function, const t_cblc_statement *statement, const char *replacement,
     t_cobol_text_builder *builder)
 {

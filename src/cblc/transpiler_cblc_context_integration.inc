@@ -152,6 +152,10 @@ int cblc_import_translation_unit_function_stubs(t_transpiler_context *context,
             && parameter_index < TRANSPILE_FUNCTION_PARAMETER_MAX)
         {
             function->parameters[parameter_index].kind = signature->parameter_kinds[parameter_index];
+            function->parameters[parameter_index].array_count =
+                signature->parameter_array_counts[parameter_index];
+            function->parameters[parameter_index].length =
+                signature->parameter_lengths[parameter_index];
             ft_strlcpy(function->parameters[parameter_index].source_name,
                 signature->parameter_source_names[parameter_index],
                 sizeof(function->parameters[parameter_index].source_name));
@@ -335,6 +339,8 @@ int cblc_resolve_translation_unit_calls(t_transpiler_context *context, const cha
 
                         std::memset(&parameter, 0, sizeof(parameter));
                         parameter.kind = signature->parameter_kinds[index];
+                        parameter.array_count = signature->parameter_array_counts[index];
+                        parameter.length = signature->parameter_lengths[index];
                         if (parameter.kind != TRANSPILE_FUNCTION_PARAMETER_STRUCT
                             && parameter.kind != TRANSPILE_FUNCTION_PARAMETER_STRUCT_POINTER
                             && (cblc_extract_call_argument(statement, index, argument,
@@ -430,6 +436,7 @@ static int cblc_export_type_fields(t_transpiler_type_signature *signature,
         signature->fields[index].array_count = type->fields[index].array_count;
         signature->fields[index].kind = static_cast<int>(type->fields[index].kind);
         signature->fields[index].is_const = type->fields[index].is_const;
+        signature->fields[index].is_borrowed = type->fields[index].is_borrowed;
         signature->fields[index].is_template_parameter =
             type->fields[index].is_template_parameter;
         ft_strlcpy(signature->fields[index].template_parameter_name,
@@ -474,6 +481,10 @@ static int cblc_export_type_methods(t_transpiler_type_signature *signature,
         {
             signature->methods[index].parameter_kinds[parameter_index] =
                 type->methods[index].parameters[parameter_index].kind;
+            signature->methods[index].parameter_array_counts[parameter_index] =
+                type->methods[index].parameters[parameter_index].array_count;
+            signature->methods[index].parameter_lengths[parameter_index] =
+                type->methods[index].parameters[parameter_index].length;
             ft_strlcpy(signature->methods[index].parameter_source_names[parameter_index],
                 type->methods[index].parameters[parameter_index].source_name,
                 sizeof(signature->methods[index].parameter_source_names[parameter_index]));
@@ -532,6 +543,10 @@ static int cblc_export_type_constructors(t_transpiler_type_signature *signature,
         {
             signature->constructors[index].parameter_kinds[parameter_index] =
                 type->constructors[index].parameters[parameter_index].kind;
+            signature->constructors[index].parameter_array_counts[parameter_index] =
+                type->constructors[index].parameters[parameter_index].array_count;
+            signature->constructors[index].parameter_lengths[parameter_index] =
+                type->constructors[index].parameters[parameter_index].length;
             ft_strlcpy(signature->constructors[index].parameter_source_names[parameter_index],
                 type->constructors[index].parameters[parameter_index].source_name,
                 sizeof(signature->constructors[index].parameter_source_names[parameter_index]));
@@ -678,6 +693,8 @@ int cblc_register_translation_unit_exports(t_transpiler_context *context, const 
             ft_strlcpy(signature.template_parameter_name,
                 unit->struct_types[index].template_parameter_name,
                 sizeof(signature.template_parameter_name));
+            signature.layout_fingerprint = cblc_struct_layout_fingerprint(
+                unit, &unit->struct_types[index], 0);
             if (cblc_export_type_signature_fill(&signature, &unit->struct_types[index])
                 != FT_SUCCESS)
                 return (FT_FAILURE);
@@ -799,6 +816,10 @@ int cblc_register_translation_unit_exports(t_transpiler_context *context, const 
             {
                 signature.parameter_kinds[parameter_index] =
                     unit->functions[index].parameters[parameter_index].kind;
+                signature.parameter_array_counts[parameter_index] =
+                    unit->functions[index].parameters[parameter_index].array_count;
+                signature.parameter_lengths[parameter_index] =
+                    unit->functions[index].parameters[parameter_index].length;
                 ft_strlcpy(signature.parameter_source_names[parameter_index],
                     unit->functions[index].parameters[parameter_index].source_name,
                     sizeof(signature.parameter_source_names[parameter_index]));

@@ -1,7 +1,7 @@
 # CBL-C Language Standard and Compiler Behavior
 
 **Status:** authoritative repository specification
-**Version:** 0.3 (bounded template subset)
+**Version:** 0.6 (bounded template subset and versioned fixed-array function ABIs)
 **Last reviewed:** 2026-08-07
 
 This document is the normative reference for CBL-C as implemented by this
@@ -386,6 +386,12 @@ box<int[3]> fixed_values;
 pair_value<int, char> pair;
 ```
 
+Struct fields may use the explicit borrowed-pointer form for the supported
+pointer kinds, for example `borrowed int *ptr;` or `borrowed Node *next;`.
+This annotation is required for pointer fields participating in a supported
+struct-array ABI; an unannotated or owning pointer field is not implicitly
+treated as borrowed.
+
 Nested applications are permitted when each inner application resolves to a
 concrete type. The supported argument shapes are the existing CBL-C scalar,
 string, struct/class, pointer, and fixed-array shapes. Pointer depth and the
@@ -398,6 +404,14 @@ struct identity, pointer shape, and fixed-array count. A template definition is
 immutable, and repeated requests for the same ordered canonical argument list
 must reuse one concrete instantiation.
 
+For concrete struct and class arguments, struct identity includes a versioned
+layout fingerprint (`CBLC-LAYOUT@1`). The fingerprint covers field order and
+names, storage kinds, lengths, array bounds, constness, declared and nested
+type identities, and whether the enclosing type is a class. Exported module
+metadata carries the fingerprint, and importing a same-named type with a
+different fingerprint is rejected; an imported definition must never silently
+overwrite a local or previously imported layout.
+
 Free-function applications may be explicit, for example
 `identity<int>(value)`. The current deduction subset also permits exact
 one-parameter deduction for supported concrete arguments. Deduction must not
@@ -409,12 +423,62 @@ punctuation used for pointer and array shape must not be copied directly into a
 COBOL identifier. The generated COBOL program must contain only concrete
 paragraphs, groups, and calls, with no unresolved `T` or `typename`.
 
-The current template feature is partial. Array arguments in function parameter
-positions have no independent array ABI yet and are rejected until the calling
-convention is specified. The same applies to unsupported return/storage shapes.
+The current template feature is partial. Fixed-array arguments are supported in
+function parameter positions for integer, explicitly-capacitated string, and
+trivially-copyable concrete struct element arrays. Integer arrays use an
+exact-shape, by-value-copy ABI: the
+caller must pass a named `int[N]` item and the callee receives an independent
+`OCCURS N TIMES` item. String arrays use the form `string(C)[N]`; both `C` and
+`N` are part of type identity, the caller must pass a named array with exactly
+the same capacity and count, and each element's length and active buffer are
+copied into callee-owned storage. No array-to-pointer decay, implicit bounds
+conversion, dynamic-pointer transfer, or truncation is permitted. Trivially
+copyable struct arrays use exact concrete struct identity and per-element group
+copies of scalar fields, including fixed character buffers. Mutable string
+fields are deep-copied per element: the callee receives independent `PTR`,
+`CAP`, `LEN`, and buffer storage, and the generated lifecycle releases every
+callee allocation. Structs containing pointer fields are accepted in this
+array ABI only when the field is explicitly declared `borrowed`; those fields
+are copied shallowly and the callee does not free or otherwise own the pointee.
+Owning pointer fields remain rejected. Indexed expressions, literals, mismatched
+capacities/bounds, and unsupported return/storage shapes remain rejected until
+their ABI is specified. Within a struct array, a
+`const string(C)` field is represented as a fixed character buffer and copied
+by value. A null mutable source element produces a null destination element;
+non-null elements preserve the source capacity and active length.
+Struct arrays may provide constructor arguments using `Type[N](arguments)`.
+The selected constructor is applied independently to every element in index
+order after the element's storage is initialized. Constructor parameters use
+the ordinary by-value/by-reference ABI, and constructor receiver fields are
+lowered with the active OCCURS subscript. A constructor must be valid for the
+supplied arguments; array construction without arguments still requires a
+default constructor when the type has user-declared constructors.
 Adding any new template form requires updating this section, the feature
 registry, diagnostics, formatter/tooling behavior, and both direct and
 GnuCOBOL-backed tests.
+
+The string-array ABI is versioned separately from the integer ABI. Its
+capacity-bearing type identity prevents a smaller callee buffer from silently
+truncating a source element. Dynamic source pointers remain owned by the
+caller; the callee allocates and cleans up its own element storage. The
+enabled struct-array subset carries concrete struct identity and element count
+and copies each complete element group. The current layout fingerprint crosses
+the module metadata boundary so imported struct identities cannot silently
+drift. Borrowed pointer values must remain valid for the complete callee use;
+the compiler does not extend their lifetime or detect dangling aliases. Nested
+owning pointer fields, richer layout-version migration beyond `CBLC-LAYOUT@1`,
+and other
+non-trivial ownership forms remain deferred extensions.
+
+Template instantiation failures retain their stable diagnostic code and message
+and also record structured context for frontend and tooling consumers. When
+available, that context contains the template's source name, the canonical
+ordered argument key, the template definition offset, and the failing use
+offset. An unavailable offset is represented by the invalid-offset sentinel;
+consumers must not infer a source location from the diagnostic message. The
+canonical argument key is the same key used for cache identity and generated
+names, so diagnostics and artifacts cannot disagree about which specialization
+failed.
 
 ### 6.6 Pointers
 
@@ -652,6 +716,11 @@ include the feature ID, source span, primary symbol, and actionable related
 span. Recovery diagnostics must not allow emission of an artifact that semantic
 analysis has declared invalid.
 
+For template diagnostics, the primary diagnostic remains backward-compatible;
+structured definition/use context is carried separately from human-readable
+wording. This allows tooling to add related spans, instantiation traces, and
+machine-readable argument displays later without making message text an ABI.
+
 ## 14. Target behavior
 
 ### 14.1 CBL-C to COBOL
@@ -691,7 +760,7 @@ source functions. The compiler must distinguish these artifact classes:
 | translated module | User program/module output | Written to the matching `--output` path. |
 | target runtime helper | Shared COBOL implementation support | COBOL standard-library programs and shared generated paragraphs provide the target support; no C runtime artifact is emitted. |
 | standard-library subprogram | External callable helper with a stable ABI | `standard-library` mode currently emits every registered helper as its own `.cob`. |
-| metadata/manifest | Dependency and build description | Both standard-library and normal translation modes emit `cblc.manifest.json`; COBOL output records the transitive standard-library closure referenced by generated targets. Target entries record direct source hashes and imported module source hashes in `module_dependencies`. The manifest also records `template_contract: CBLC-TEMPLATE-TYPE-SUBSTITUTION@1`; consumers must reject or invalidate artifacts from an unknown template contract. |
+| metadata/manifest | Dependency and build description | Both standard-library and normal translation modes emit `cblc.manifest.json`; COBOL output records the transitive standard-library closure referenced by generated targets. Target entries record direct source hashes and imported module source hashes in `module_dependencies`. The manifest also records `template_contract: CBLC-TEMPLATE-TYPE-SUBSTITUTION@6`; consumers must reject or invalidate artifacts from an unknown template contract. |
 
 The current `standard-library` command is therefore a packaging operation:
 

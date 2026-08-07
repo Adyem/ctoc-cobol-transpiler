@@ -265,6 +265,10 @@ void cblc_translation_unit_init(t_cblc_translation_unit *unit)
     unit->function_instantiation_capacity = 0;
     unit->parse_error_code = 0;
     unit->parse_error_message[0] = '\0';
+    unit->template_error_name[0] = '\0';
+    unit->template_error_arguments[0] = '\0';
+    unit->template_error_definition_offset = static_cast<size_t>(-1);
+    unit->template_error_use_offset = static_cast<size_t>(-1);
     unit->template_max_instantiations = 1024;
     unit->template_max_instantiation_depth = 32;
     unit->template_instantiation_depth = 0;
@@ -402,6 +406,10 @@ void cblc_translation_unit_dispose(t_cblc_translation_unit *unit)
     unit->function_instantiation_capacity = 0;
     unit->parse_error_code = 0;
     unit->parse_error_message[0] = '\0';
+    unit->template_error_name[0] = '\0';
+    unit->template_error_arguments[0] = '\0';
+    unit->template_error_definition_offset = static_cast<size_t>(-1);
+    unit->template_error_use_offset = static_cast<size_t>(-1);
     unit->template_max_instantiations = 1024;
     unit->template_max_instantiation_depth = 32;
     unit->template_instantiation_depth = 0;

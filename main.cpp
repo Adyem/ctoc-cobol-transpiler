@@ -436,6 +436,84 @@ static std::string pipeline_manifest_dependencies(const char *generated_text,
     return (dependencies);
 }
 
+/* Standard-library programs are deployment artifacts, so an existing file
+ * must never be replaced merely because a second compilation generated it.
+ * Generated character-buffer variants are compatible when the existing
+ * declaration is at least as wide as the new one.  Keeping the wider file
+ * makes a shared deployment directory safe to populate from several builds.
+ */
+static size_t pipeline_standard_library_max_char_width(const char *text)
+{
+    size_t maximum;
+
+    maximum = 0;
+    if (!text)
+        return (maximum);
+    while (*text != '\0')
+    {
+        const char *marker;
+        const char *cursor;
+        size_t value;
+
+        marker = std::strstr(text, "PIC X(");
+        if (!marker)
+            break ;
+        cursor = marker + std::strlen("PIC X(");
+        value = 0;
+        while (std::isdigit(static_cast<unsigned char>(*cursor)))
+        {
+            value = value * 10 + static_cast<size_t>(*cursor - '0');
+            cursor += 1;
+        }
+        if (*cursor == ')' && value > maximum)
+            maximum = value;
+        text = marker + 1;
+    }
+    return (maximum);
+}
+
+static int pipeline_write_standard_library_artifact(t_transpiler_context *context,
+    const t_transpiler_standard_library_entry *entry, const char *resolved_path,
+    char *generated_text, char **selected_text)
+{
+    std::error_code error;
+    char *existing_text;
+    size_t existing_width;
+    size_t generated_width;
+    char expected_program[TRANSPILE_IDENTIFIER_MAX];
+
+    if (!context || !entry || !resolved_path || !generated_text || !selected_text)
+        return (FT_FAILURE);
+    *selected_text = generated_text;
+    existing_text = NULL;
+    if (std::filesystem::exists(std::filesystem::path(resolved_path), error))
+    {
+        if (error || pipeline_read_file(resolved_path, &existing_text) != FT_SUCCESS
+            || !existing_text)
+            return (FT_FAILURE);
+        if (std::snprintf(expected_program, sizeof(expected_program),
+                "PROGRAM-ID. %s.", entry->program_name) < 0
+            || !std::strstr(existing_text, expected_program))
+        {
+            cma_free(existing_text);
+            (void)pipeline_emit_error(context,
+                "Refusing to overwrite a non-standard-library file with a standard-library artifact");
+            return (FT_FAILURE);
+        }
+        existing_width = pipeline_standard_library_max_char_width(existing_text);
+        generated_width = pipeline_standard_library_max_char_width(generated_text);
+        if (existing_width >= generated_width)
+        {
+            *selected_text = existing_text;
+            return (FT_SUCCESS);
+        }
+        cma_free(existing_text);
+    }
+    if (pipeline_write_file(resolved_path, generated_text) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 static int pipeline_emit_required_standard_library(t_transpiler_context *context,
     const char *generated_text, std::string &manifest, int *manifest_has_artifact)
 {
@@ -456,7 +534,8 @@ static int pipeline_emit_required_standard_library(t_transpiler_context *context
         char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
         char *program_text;
 
-        if (dependency_text.find(entries[index].program_name) == std::string::npos
+        if ((!context->emit_all_standard_library
+                && dependency_text.find(entries[index].program_name) == std::string::npos)
             || pipeline_manifest_contains_id(manifest, entries[index].program_name))
         {
             index += 1;
@@ -481,16 +560,30 @@ static int pipeline_emit_required_standard_library(t_transpiler_context *context
          * references. */
         dependency_text += "\n";
         dependency_text += program_text;
-        if (pipeline_resolve_output_path(context, filename, resolved_path,
-                sizeof(resolved_path)) != FT_SUCCESS
-            || pipeline_write_file(resolved_path, program_text) != FT_SUCCESS)
         {
-            if (std::snprintf(message, sizeof(message),
-                    "Unable to write required standard library program '%s'",
-                    entries[index].program_name) >= 0)
-                (void)pipeline_emit_error(context, message);
-            cma_free(program_text);
-            return (FT_FAILURE);
+            char *selected_text;
+
+            selected_text = NULL;
+            if (pipeline_resolve_output_path(context, filename, resolved_path,
+                    sizeof(resolved_path)) != FT_SUCCESS
+                || pipeline_write_standard_library_artifact(context, &entries[index],
+                    resolved_path, program_text, &selected_text) != FT_SUCCESS)
+            {
+                if (selected_text && selected_text != program_text)
+                    cma_free(selected_text);
+                if (std::snprintf(message, sizeof(message),
+                        "Unable to write required standard library program '%s'",
+                        entries[index].program_name) >= 0)
+                    (void)pipeline_emit_error(context, message);
+                if (selected_text != program_text && program_text)
+                    cma_free(program_text);
+                return (FT_FAILURE);
+            }
+            if (selected_text != program_text)
+            {
+                cma_free(program_text);
+                program_text = selected_text;
+            }
         }
         if (*manifest_has_artifact)
             manifest += ",\n";
@@ -775,7 +868,7 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
         should_skip = 0;
         if (transpiler_incremental_cache_should_skip(&g_incremental_cache, input_path, resolved_path,
                 copybook_signature,
-                pipeline_hash_text("CBLC-TEMPLATE-TYPE-SUBSTITUTION@1"), &should_skip)
+                pipeline_hash_text("CBLC-TEMPLATE-TYPE-SUBSTITUTION@6"), &should_skip)
             != FT_SUCCESS)
         {
             if (std::snprintf(message, sizeof(message), "Unable to query incremental cache for '%s'", input_path) >= 0)
@@ -920,7 +1013,7 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
         copybook_signature = transpiler_context_compute_copybook_signature(context);
         if (transpiler_incremental_cache_record(&g_incremental_cache, input_path, resolved_path, record_ast_path,
                 copybook_signature,
-                pipeline_hash_text("CBLC-TEMPLATE-TYPE-SUBSTITUTION@1"))
+            pipeline_hash_text("CBLC-TEMPLATE-TYPE-SUBSTITUTION@6"))
             != FT_SUCCESS)
         {
             if (std::snprintf(message, sizeof(message), "Failed to update incremental cache for '%s'", input_path) >= 0)
@@ -957,7 +1050,7 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
     if (!context)
         return (FT_FAILURE);
     entries = transpiler_standard_library_get_entries(&entry_count);
-    manifest = "{\n  \"schema_version\": 1,\n  \"mode\": \"standard-library\",\n  \"template_contract\": \"CBLC-TEMPLATE-TYPE-SUBSTITUTION@1\",\n  \"artifacts\": [\n";
+    manifest = "{\n  \"schema_version\": 1,\n  \"mode\": \"standard-library\",\n  \"template_contract\": \"CBLC-TEMPLATE-TYPE-SUBSTITUTION@6\",\n  \"artifacts\": [\n";
     manifest_has_artifact = 0;
     index = 0;
     while (index < entry_count)
@@ -1004,14 +1097,28 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
             cma_free(program_text);
             return (FT_FAILURE);
         }
-        if (pipeline_write_file(resolved_path, program_text) != FT_SUCCESS)
         {
-            if (std::snprintf(message, sizeof(message),
-                    "Unable to write standard library program '%s' to '%s'",
-                    entries[index].program_name, resolved_path) >= 0)
-                (void)pipeline_emit_error(context, message);
-            cma_free(program_text);
-            return (FT_FAILURE);
+            char *selected_text;
+
+            selected_text = NULL;
+            if (pipeline_write_standard_library_artifact(context, &entries[index],
+                    resolved_path, program_text, &selected_text) != FT_SUCCESS)
+            {
+                if (std::snprintf(message, sizeof(message),
+                        "Unable to write standard library program '%s' to '%s'",
+                        entries[index].program_name, resolved_path) >= 0)
+                    (void)pipeline_emit_error(context, message);
+                if (selected_text && selected_text != program_text)
+                    cma_free(selected_text);
+                if (program_text)
+                    cma_free(program_text);
+                return (FT_FAILURE);
+            }
+            if (selected_text != program_text)
+            {
+                cma_free(program_text);
+                program_text = selected_text;
+            }
         }
         if (manifest_has_artifact)
             manifest += ",\n";
@@ -1033,7 +1140,19 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
             }
             manifest += hash_text;
         }
-        manifest += "\",\n      \"dependencies\": ";
+        {
+            char width_text[32];
+
+            if (std::snprintf(width_text, sizeof(width_text), "%zu",
+                    pipeline_standard_library_max_char_width(program_text)) < 0)
+            {
+                cma_free(program_text);
+                return (FT_FAILURE);
+            }
+            manifest += "\",\n      \"char_width\": ";
+            manifest += width_text;
+            manifest += ",\n      \"dependencies\": ";
+        }
         manifest += pipeline_manifest_dependencies(program_text, entries[index].program_name);
         manifest += "\n    }";
         manifest_has_artifact = 1;
@@ -1241,7 +1360,7 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
     file_count = context->source_count;
     if (file_count == 0)
         return (FT_SUCCESS);
-    manifest = "{\n  \"schema_version\": 1,\n  \"mode\": \"cblc-to-cobol\",\n  \"runtime\": \"external-standard-library\",\n  \"template_contract\": \"CBLC-TEMPLATE-TYPE-SUBSTITUTION@1\",\n  \"artifacts\": [\n";
+    manifest = "{\n  \"schema_version\": 1,\n  \"mode\": \"cblc-to-cobol\",\n  \"runtime\": \"external-standard-library\",\n  \"template_contract\": \"CBLC-TEMPLATE-TYPE-SUBSTITUTION@6\",\n  \"artifacts\": [\n";
     manifest_has_artifact = 0;
     transpiler_context_reset_module_registry(context);
     transpiler_context_reset_unit_state(context);

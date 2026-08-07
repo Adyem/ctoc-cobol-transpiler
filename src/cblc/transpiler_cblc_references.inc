@@ -189,6 +189,9 @@ static int cblc_type_requires_default_construct(const t_cblc_translation_unit *u
     index = 0;
     while (index < type->field_count)
     {
+        if (type->fields[index].kind == CBLC_DATA_KIND_STRING
+            && !type->fields[index].is_const)
+            return (1);
         if (type->fields[index].kind == CBLC_DATA_KIND_STRUCT)
         {
             const t_cblc_struct_type *field_type;
@@ -214,6 +217,9 @@ static int cblc_type_requires_destruct(const t_cblc_translation_unit *unit,
     index = 0;
     while (index < type->field_count)
     {
+        if (type->fields[index].kind == CBLC_DATA_KIND_STRING
+            && !type->fields[index].is_const)
+            return (1);
         if (type->fields[index].kind == CBLC_DATA_KIND_STRUCT)
         {
             const t_cblc_struct_type *field_type;

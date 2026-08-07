@@ -215,6 +215,16 @@ int test_cblc_inline_int_pointer_to_pointer_read_translates_to_cobol_and_execute
 int test_cblc_inline_int_pointer_to_pointer_retargets_pointer_translates_to_cobol_and_executes(void);
 int test_cblc_inline_class_methods_translates_to_cobol_and_executes(void);
 int test_cblc_inline_array_access_translates_to_cobol_and_executes(void);
+int test_cblc_inline_trivial_struct_array_template_translates_to_cobol_and_executes(void);
+int test_cblc_inline_char_struct_array_template_translates_to_cobol_and_executes(void);
+int test_cblc_inline_const_string_struct_array_template_translates_to_cobol_and_executes(void);
+int test_cblc_inline_mutable_string_struct_array_template_translates_to_cobol_and_executes(void);
+int test_cblc_imported_mutable_string_struct_array_template_translates_to_cobol_and_executes(void);
+int test_cblc_inline_struct_array_constructor_arguments_translate_to_cobol_and_execute(void);
+int test_cblc_imported_struct_array_constructor_arguments_translate_to_cobol_and_execute(void);
+int test_cblc_inline_borrowed_pointer_struct_array_translates_to_cobol_and_executes(void);
+int test_cblc_imported_borrowed_pointer_struct_array_translates_to_cobol_and_executes(void);
+int test_cblc_imported_trivial_struct_array_template_translates_to_cobol_and_executes(void);
 int test_cblc_inline_functions_without_keyword_translates_to_cobol_and_executes(void);
 int test_cblc_inline_const_values_translates_to_cobol_and_executes(void);
 int test_cblc_inline_struct_field_access_translates_to_cobol_and_executes(void);
@@ -706,6 +716,26 @@ const t_test_case *get_compiler_cobol_round_trip_pipeline_tests(size_t *count)
             test_cblc_inline_class_methods_translates_to_cobol_and_executes},
         {"cblc_inline_array_access_translates_to_cobol_and_executes",
             test_cblc_inline_array_access_translates_to_cobol_and_executes},
+        {"cblc_inline_trivial_struct_array_template_translates_to_cobol_and_executes",
+            test_cblc_inline_trivial_struct_array_template_translates_to_cobol_and_executes},
+        {"cblc_inline_char_struct_array_template_translates_to_cobol_and_executes",
+            test_cblc_inline_char_struct_array_template_translates_to_cobol_and_executes},
+        {"cblc_inline_const_string_struct_array_template_translates_to_cobol_and_executes",
+            test_cblc_inline_const_string_struct_array_template_translates_to_cobol_and_executes},
+        {"cblc_inline_mutable_string_struct_array_template_translates_to_cobol_and_executes",
+            test_cblc_inline_mutable_string_struct_array_template_translates_to_cobol_and_executes},
+        {"cblc_imported_mutable_string_struct_array_template_translates_to_cobol_and_executes",
+            test_cblc_imported_mutable_string_struct_array_template_translates_to_cobol_and_executes},
+        {"cblc_inline_struct_array_constructor_arguments_translate_to_cobol_and_execute",
+            test_cblc_inline_struct_array_constructor_arguments_translate_to_cobol_and_execute},
+        {"cblc_imported_struct_array_constructor_arguments_translate_to_cobol_and_execute",
+            test_cblc_imported_struct_array_constructor_arguments_translate_to_cobol_and_execute},
+        {"cblc_inline_borrowed_pointer_struct_array_translates_to_cobol_and_executes",
+            test_cblc_inline_borrowed_pointer_struct_array_translates_to_cobol_and_executes},
+        {"cblc_imported_borrowed_pointer_struct_array_translates_to_cobol_and_executes",
+            test_cblc_imported_borrowed_pointer_struct_array_translates_to_cobol_and_executes},
+        {"cblc_imported_trivial_struct_array_template_translates_to_cobol_and_executes",
+            test_cblc_imported_trivial_struct_array_template_translates_to_cobol_and_executes},
         {"cblc_inline_functions_without_keyword_translates_to_cobol_and_executes",
             test_cblc_inline_functions_without_keyword_translates_to_cobol_and_executes},
         {"cblc_inline_const_values_translates_to_cobol_and_executes",

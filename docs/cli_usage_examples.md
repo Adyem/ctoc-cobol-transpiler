@@ -28,6 +28,20 @@ CBL-C→COBOL translation emits `cblc.manifest.json` beside the requested
 outputs. It records generated target paths, stable content hashes, and only
 the standard-library programs referenced by the generated targets.
 
+Pass `--emit-all-standard-library` when a build should deploy the complete
+standard-library catalog beside the translated output:
+
+```
+ctoc_cobol_transpiler --direction cblc-to-cobol \
+  --input src/main.cblc --output main.cob --output-dir build \
+  --emit-all-standard-library
+```
+
+This keeps every generated program in the same directory and records all of
+them in the manifest. It is useful for packaging a self-contained COBOL
+runtime; without the switch, only the transitive closure of programs used by
+the translated targets is emitted.
+
 ## Building the standard library
 
 Use the `standard-library` direction to emit every cataloged helper as an individual COBOL program. The generator writes each routine to the current directory unless `--output-dir` redirects the artifacts:
@@ -46,6 +60,7 @@ ctoc_cobol_transpiler --direction cobol-to-cblc --input samples/cobol/copy_file.
 
 * `--output-dir` overrides the directory that hosts generated files. When omitted, the tool writes next to the provided `--output` path.
 * `standard-library` mode also emits `cblc.manifest.json`, containing the catalog entries, artifact paths, and content hashes for the generated COBOL programs.
+* Standard-library artifacts are collision-safe. If a matching generated program already exists, it is retained when its `PIC X(...)` buffer width is at least as large as the new variant; a narrower variant is upgraded. An unrelated file at the same path is never silently overwritten.
 * `--format` accepts `default`, `minimal`, or `pretty` to toggle whitespace and alignment policies for COBOL emission. `pretty` feeds generated COBOL through the canonical formatter so braces, indentation, and operator spacing remain consistent across runs.
 * `--layout` accepts `normalize` or `preserve` to control the regenerated CBL-C layout when translating from COBOL. `normalize` routes output through the formatter, while `preserve` copies the recovered structure verbatim so existing spacing can be reviewed without modification.
 

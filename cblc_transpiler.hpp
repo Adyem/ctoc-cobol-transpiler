@@ -312,6 +312,8 @@ typedef struct s_transpiler_function_signature
     t_transpiler_function_return_mode return_mode;
     t_transpiler_symbol_visibility visibility;
     t_transpiler_function_parameter_kind parameter_kinds[TRANSPILE_FUNCTION_PARAMETER_MAX];
+    size_t parameter_array_counts[TRANSPILE_FUNCTION_PARAMETER_MAX];
+    size_t parameter_lengths[TRANSPILE_FUNCTION_PARAMETER_MAX];
     char parameter_source_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
     char parameter_actual_source_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
     char parameter_cobol_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
@@ -345,6 +347,7 @@ typedef struct s_transpiler_type_field_signature
     size_t array_count;
     int kind;
     int is_const;
+    int is_borrowed;
     int is_template_parameter;
     char template_parameter_name[TRANSPILE_IDENTIFIER_MAX];
     t_transpiler_symbol_visibility visibility;
@@ -354,6 +357,8 @@ typedef struct s_transpiler_type_method_signature
 {
     char name[TRANSPILE_IDENTIFIER_MAX];
     t_transpiler_function_parameter_kind parameter_kinds[TRANSPILE_FUNCTION_PARAMETER_MAX];
+    size_t parameter_array_counts[TRANSPILE_FUNCTION_PARAMETER_MAX];
+    size_t parameter_lengths[TRANSPILE_FUNCTION_PARAMETER_MAX];
     char parameter_source_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
     char parameter_actual_source_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
     char parameter_cobol_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
@@ -370,6 +375,8 @@ typedef struct s_transpiler_type_method_signature
 typedef struct s_transpiler_type_constructor_signature
 {
     t_transpiler_function_parameter_kind parameter_kinds[TRANSPILE_FUNCTION_PARAMETER_MAX];
+    size_t parameter_array_counts[TRANSPILE_FUNCTION_PARAMETER_MAX];
+    size_t parameter_lengths[TRANSPILE_FUNCTION_PARAMETER_MAX];
     char parameter_source_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
     char parameter_actual_source_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
     char parameter_cobol_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
@@ -401,6 +408,7 @@ typedef struct s_transpiler_type_signature
     size_t template_parameter_count;
     char template_parameter_names[CBLC_TEMPLATE_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
     char template_parameter_name[TRANSPILE_IDENTIFIER_MAX];
+    unsigned long long layout_fingerprint;
 }   t_transpiler_type_signature;
 
 #define TRANSPILE_DATA_SIGNATURE_TEXT_MAX 256
@@ -643,6 +651,7 @@ typedef struct s_transpiler_context
     const char *copybook_graph_directory;
     const char *semantic_diff_directory;
     int emit_standard_library;
+    int emit_all_standard_library;
     t_transpiler_format_mode format_mode;
     t_transpiler_layout_mode layout_mode;
     t_transpiler_diagnostic_level diagnostic_level;
@@ -700,6 +709,7 @@ int transpiler_context_set_io_paths(t_transpiler_context *context, const char **
     const char **target_paths, size_t target_count);
 void transpiler_context_set_output_directory(t_transpiler_context *context, const char *output_directory);
 void transpiler_context_set_emit_standard_library(t_transpiler_context *context, int emit);
+void transpiler_context_set_emit_all_standard_library(t_transpiler_context *context, int emit);
 void transpiler_context_set_ast_dump_directory(t_transpiler_context *context, const char *directory);
 void transpiler_context_set_ast_dump_enabled(t_transpiler_context *context, int enabled);
 void transpiler_context_set_copybook_graph_directory(t_transpiler_context *context, const char *directory);
@@ -1251,7 +1261,9 @@ typedef struct s_cblc_type_ref
     char name[TRANSPILE_IDENTIFIER_MAX];
     size_t parameter_index;
     size_t pointer_depth;
+    size_t length;
     size_t array_count;
+    unsigned long long layout_fingerprint;
     size_t argument_count;
     size_t argument_ids[CBLC_TYPE_REF_ARGUMENT_MAX];
 }   t_cblc_type_ref;
@@ -1325,6 +1337,7 @@ typedef struct s_cblc_struct_field
     size_t array_count;
     t_cblc_data_kind kind;
     int is_const;
+    int is_borrowed;
     int is_template_parameter;
     char template_parameter_name[TRANSPILE_IDENTIFIER_MAX];
     t_cblc_member_visibility visibility;
@@ -1337,6 +1350,8 @@ typedef struct s_cblc_parameter
     char cobol_name[TRANSPILE_IDENTIFIER_MAX];
     char type_name[TRANSPILE_IDENTIFIER_MAX];
     t_transpiler_function_parameter_kind kind;
+    size_t length;
+    size_t array_count;
 }   t_cblc_parameter;
 
 typedef struct s_cblc_method
@@ -1384,6 +1399,7 @@ typedef struct s_cblc_struct_type
     char template_parameter_name[TRANSPILE_IDENTIFIER_MAX];
     char template_source_name[TRANSPILE_IDENTIFIER_MAX];
     char template_argument_name[TRANSPILE_IDENTIFIER_MAX];
+    unsigned long long layout_fingerprint;
     int has_default_constructor;
     t_cblc_constructor *constructors;
     size_t constructor_count;
@@ -1540,6 +1556,10 @@ struct s_cblc_translation_unit
     size_t function_instantiation_capacity;
     int parse_error_code;
     char parse_error_message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    char template_error_name[TRANSPILE_IDENTIFIER_MAX];
+    char template_error_arguments[TRANSPILE_IDENTIFIER_MAX];
+    size_t template_error_definition_offset;
+    size_t template_error_use_offset;
     size_t template_max_instantiations;
     size_t template_max_instantiation_depth;
     size_t template_instantiation_depth;
@@ -1923,6 +1943,7 @@ typedef struct s_transpiler_cli_options
     t_transpiler_warning_settings warning_settings;
     int show_help;
     int emit_standard_library;
+    int emit_all_standard_library;
     int dump_ast;
     const char *dump_ast_directory;
     int dump_copybook_graph;

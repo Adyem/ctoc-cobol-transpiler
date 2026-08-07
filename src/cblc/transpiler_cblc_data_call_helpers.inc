@@ -195,10 +195,37 @@ static int cblc_parse_call_argument_list(const char **cursor,
             }
             else
             {
+                const char *array_argument_start;
+                char array_identifier[TRANSPILE_IDENTIFIER_MAX];
+                t_cblc_data_item *array_item;
+
                 *cursor = argument_start;
-                if (cblc_parse_numeric_expression_until_paren(cursor, unit, expression,
-                        sizeof(expression)) != FT_SUCCESS)
-                    return (FT_FAILURE);
+                array_argument_start = *cursor;
+                if (cblc_parse_identifier(cursor, array_identifier,
+                        sizeof(array_identifier)) == FT_SUCCESS)
+                {
+                    array_item = cblc_find_data_item(unit, array_identifier);
+                    cblc_skip_whitespace(cursor);
+                    if (array_item && array_item->array_count > 0
+                        && (**cursor == ')' || **cursor == ','))
+                    {
+                        ft_strlcpy(expression, array_identifier, sizeof(expression));
+                    }
+                    else
+                    {
+                        *cursor = array_argument_start;
+                        if (cblc_parse_numeric_expression_until_paren(cursor, unit, expression,
+                                sizeof(expression)) != FT_SUCCESS)
+                            return (FT_FAILURE);
+                    }
+                }
+                else
+                {
+                    *cursor = array_argument_start;
+                    if (cblc_parse_numeric_expression_until_paren(cursor, unit, expression,
+                            sizeof(expression)) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                }
             }
         }
         if (count > 0)

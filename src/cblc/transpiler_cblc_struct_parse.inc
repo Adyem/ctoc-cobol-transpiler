@@ -2,6 +2,13 @@ static int cblc_parse_template_header(const char **cursor,
     char parameter_names[][TRANSPILE_IDENTIFIER_MAX], size_t *out_count);
 static int cblc_template_argument_mangle_key(const char *argument,
     char *key, size_t key_size);
+static int cblc_template_arguments_to_key(
+    const char arguments[][TRANSPILE_IDENTIFIER_MAX], size_t argument_count,
+    char *key, size_t key_size);
+static void cblc_record_template_instantiation_error(
+    t_cblc_translation_unit *unit, int code, const char *message,
+    const char *template_name, const char *argument_key,
+    size_t definition_offset, size_t use_offset);
 static int cblc_function_return_kind_from_data_kind(t_cblc_data_kind kind,
     t_cblc_function_return_kind *out_kind);
 
@@ -30,6 +37,77 @@ static int cblc_active_template_parameter_index(const char *name, size_t *out_in
     return (FT_FAILURE);
 }
 
+static int cblc_parse_borrowed_struct_pointer_field(const char **cursor,
+    t_cblc_translation_unit *unit, t_cblc_struct_type *type,
+    t_cblc_member_visibility visibility, int is_const)
+{
+    const char *start;
+    char base_name[TRANSPILE_IDENTIFIER_MAX];
+    char identifier[TRANSPILE_IDENTIFIER_MAX];
+    t_cblc_data_kind kind;
+    size_t pointer_depth;
+
+    if (!cursor || !*cursor || !unit || !type)
+        return (FT_FAILURE);
+    start = *cursor;
+    if (!cblc_match_keyword(cursor, "borrowed"))
+        return (FT_FAILURE);
+    cblc_skip_whitespace(cursor);
+    if (cblc_match_keyword(cursor, "int"))
+    {
+        kind = CBLC_DATA_KIND_INT_POINTER;
+        ft_strlcpy(base_name, "int", sizeof(base_name));
+    }
+    else if (cblc_match_keyword(cursor, "char"))
+    {
+        kind = CBLC_DATA_KIND_CHAR_POINTER;
+        ft_strlcpy(base_name, "char", sizeof(base_name));
+    }
+    else if (cblc_match_keyword(cursor, "void"))
+    {
+        kind = CBLC_DATA_KIND_VOID_POINTER;
+        ft_strlcpy(base_name, "void", sizeof(base_name));
+    }
+    else if (cblc_parse_identifier(cursor, base_name, sizeof(base_name)) == FT_SUCCESS
+        && cblc_find_struct_type(unit, base_name))
+        kind = CBLC_DATA_KIND_STRUCT_POINTER;
+    else
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    cblc_skip_whitespace(cursor);
+    pointer_depth = 0;
+    while (**cursor == '*')
+    {
+        *cursor += 1;
+        pointer_depth += 1;
+        cblc_skip_whitespace(cursor);
+    }
+    if (pointer_depth != 1
+        || cblc_parse_identifier(cursor, identifier, sizeof(identifier)) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    cblc_skip_whitespace(cursor);
+    if (**cursor != ';')
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    *cursor += 1;
+    if (cblc_struct_type_append_field(type, identifier, 0, 0, kind,
+            kind == CBLC_DATA_KIND_STRUCT_POINTER ? base_name : NULL,
+            is_const, visibility) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    type->fields[type->field_count - 1].is_borrowed = 1;
+    return (FT_SUCCESS);
+}
+
 static int cblc_parse_struct_field_declaration(const char **cursor, t_cblc_translation_unit *unit,
     t_cblc_struct_type *type, t_cblc_member_visibility visibility)
 {
@@ -46,7 +124,15 @@ static int cblc_parse_struct_field_declaration(const char **cursor, t_cblc_trans
     if (cblc_match_keyword(cursor, "const"))
     {
         is_const = 1;
-        cblc_skip_whitespace(cursor);
+            cblc_skip_whitespace(cursor);
+    }
+    {
+        const char *pointer_start = *cursor;
+
+        if (cblc_parse_borrowed_struct_pointer_field(cursor, unit, type, visibility,
+                is_const) == FT_SUCCESS)
+            return (FT_SUCCESS);
+        *cursor = pointer_start;
     }
     if (cblc_match_keyword(cursor, "int"))
     {
@@ -449,6 +535,9 @@ static int cblc_method_parameters_match(const t_cblc_method *method,
     while (index < parameter_count)
     {
         if (method->parameters[index].kind != parameters[index].kind)
+            return (0);
+        if (method->parameters[index].length != parameters[index].length
+            || method->parameters[index].array_count != parameters[index].array_count)
             return (0);
         if (std::strncmp(method->parameters[index].type_name, parameters[index].type_name,
                 sizeof(method->parameters[index].type_name)) != 0)
@@ -1240,6 +1329,29 @@ static int cblc_template_argument_shape(const t_cblc_translation_unit *unit,
     }
     if (*pointer_depth > 2)
         return (FT_FAILURE);
+    *length = 1;
+    if (std::strncmp(base, "string(", 7) == 0)
+    {
+        size_t capacity;
+        size_t capacity_index;
+
+        if (base_length < 9 || base[base_length - 1] != ')')
+            return (FT_FAILURE);
+        capacity = 0;
+        capacity_index = 7;
+        while (capacity_index + 1 < base_length)
+        {
+            if (!std::isdigit(static_cast<unsigned char>(base[capacity_index])))
+                return (FT_FAILURE);
+            capacity = capacity * 10
+                + static_cast<size_t>(base[capacity_index] - '0');
+            capacity_index += 1;
+        }
+        if (capacity == 0)
+            return (FT_FAILURE);
+        *length = capacity;
+        base[6] = '\0';
+    }
     if (std::strcmp(base, "int") == 0)
         *kind = *pointer_depth == 0 ? CBLC_DATA_KIND_INT
             : (*pointer_depth == 1 ? CBLC_DATA_KIND_INT_POINTER
@@ -1270,9 +1382,39 @@ static int cblc_template_argument_shape(const t_cblc_translation_unit *unit,
     }
     else
         return (FT_FAILURE);
-    *length = *kind == CBLC_DATA_KIND_CHAR ? 1 : 1;
     ft_strlcpy(base_name, base, base_name_size);
     return (FT_SUCCESS);
+}
+
+static int cblc_struct_fixed_array_abi_is_trivial(
+    const t_cblc_translation_unit *unit, const t_cblc_struct_type *type,
+    size_t depth)
+{
+    size_t index;
+
+    if (!unit || !type || depth > CBLC_TEMPLATE_PARAMETER_MAX)
+        return (0);
+    index = 0;
+    while (index < type->field_count)
+    {
+        const t_cblc_struct_field *field;
+
+        field = &type->fields[index];
+        if (field->array_count > 0
+            || (cblc_data_kind_is_pointer(field->kind) && !field->is_borrowed))
+            return (0);
+        if (field->kind == CBLC_DATA_KIND_STRUCT)
+        {
+            const t_cblc_struct_type *nested_type;
+
+            nested_type = cblc_find_struct_type(unit, field->struct_type_name);
+            if (!nested_type
+                || !cblc_struct_fixed_array_abi_is_trivial(unit, nested_type, depth + 1))
+                return (0);
+        }
+        index += 1;
+    }
+    return (1);
 }
 
 static int cblc_template_argument_kind(const t_cblc_translation_unit *unit,
@@ -1315,6 +1457,7 @@ static int cblc_template_argument_ref(t_cblc_translation_unit *unit,
         {
             reference = unit->type_refs[
                 unit->template_instantiations[instantiation_index].applied_ref_id];
+            reference.length = length;
             reference.pointer_depth = pointer_depth;
             reference.array_count = array_count;
             return (cblc_type_ref_append(unit, &reference, out_ref_id));
@@ -1326,6 +1469,8 @@ static int cblc_template_argument_ref(t_cblc_translation_unit *unit,
     {
         reference.kind = CBLC_TYPE_REF_NAMED;
         ft_strlcpy(reference.name, base_name, sizeof(reference.name));
+        reference.layout_fingerprint = cblc_struct_layout_fingerprint(unit,
+            cblc_find_struct_type(unit, base_name), 0);
     }
     else
     {
@@ -1333,6 +1478,7 @@ static int cblc_template_argument_ref(t_cblc_translation_unit *unit,
         reference.builtin_kind = kind;
     }
     reference.pointer_depth = pointer_depth;
+    reference.length = length;
     reference.array_count = array_count;
     return (cblc_type_ref_append(unit, &reference, out_ref_id));
 }
@@ -1443,6 +1589,21 @@ static int cblc_substitute_template_parameter_in_parameter_map(
                     &parameter->kind) != FT_SUCCESS)
                 return (FT_FAILURE);
             ft_strlcpy(parameter->type_name, arguments[index], sizeof(parameter->type_name));
+            {
+                t_cblc_data_kind argument_shape_kind;
+                size_t argument_length;
+                size_t argument_pointer_depth;
+                size_t argument_array_count;
+                char argument_base_name[TRANSPILE_IDENTIFIER_MAX];
+
+                if (cblc_template_argument_shape(unit, arguments[index],
+                        &argument_shape_kind, &argument_length,
+                        &argument_pointer_depth, &argument_array_count,
+                        argument_base_name, sizeof(argument_base_name)) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                parameter->length = argument_length;
+                parameter->array_count = argument_array_count;
+            }
             break ;
         }
         index += 1;
@@ -1580,7 +1741,8 @@ static int cblc_materialize_template_method_storage(t_cblc_translation_unit *uni
         if (cblc_data_kind_from_parameter_kind(method->parameters[index].kind,
                 &parameter_kind) != FT_SUCCESS
             || cblc_add_named_data_item(unit, actual_source, actual_cobol,
-                parameter_kind, 0, 0,
+                parameter_kind, method->parameters[index].length,
+                method->parameters[index].array_count,
                 parameter_kind == CBLC_DATA_KIND_STRUCT
                     ? method->parameters[index].type_name : NULL,
                 method->source_name, 0, 0, 0) != FT_SUCCESS)
@@ -1657,7 +1819,8 @@ static int cblc_materialize_template_constructor_storage(
         if (cblc_data_kind_from_parameter_kind(constructor->parameters[index].kind,
                 &parameter_kind) != FT_SUCCESS
             || cblc_add_named_data_item(unit, actual_source, actual_cobol,
-                parameter_kind, 0, 0,
+                parameter_kind, constructor->parameters[index].length,
+                constructor->parameters[index].array_count,
                 parameter_kind == CBLC_DATA_KIND_STRUCT
                     ? constructor->parameters[index].type_name : NULL,
                 concrete_type->source_name, 0, 0, 0) != FT_SUCCESS)
@@ -1753,7 +1916,6 @@ static const t_cblc_struct_type *cblc_instantiate_template_struct_arguments(
     char concrete_source_name[TRANSPILE_IDENTIFIER_MAX];
     char concrete_cobol_name[TRANSPILE_IDENTIFIER_MAX];
     char argument_key[TRANSPILE_IDENTIFIER_MAX];
-    char argument_component[TRANSPILE_IDENTIFIER_MAX];
 
     template_type = cblc_find_template_struct(unit, template_name);
     expected_parameter_count = template_type ? template_type->template_parameter_count : 0;
@@ -1779,18 +1941,9 @@ static const t_cblc_struct_type *cblc_instantiate_template_struct_arguments(
             return (NULL);
         parameter_index += 1;
     }
-    argument_key[0] = '\0';
-    parameter_index = 0;
-    while (parameter_index < argument_count)
-    {
-        if (parameter_index > 0)
-            ft_strlcat(argument_key, "__", sizeof(argument_key));
-        if (cblc_template_argument_mangle_key(arguments[parameter_index],
-                argument_component, sizeof(argument_component)) != FT_SUCCESS)
-            return (NULL);
-        ft_strlcat(argument_key, argument_component, sizeof(argument_key));
-        parameter_index += 1;
-    }
+    if (cblc_template_arguments_to_key(arguments, argument_count,
+            argument_key, sizeof(argument_key)) != FT_SUCCESS)
+        return (NULL);
     index = 0;
     while (index < unit->template_instantiation_count)
     {
@@ -1812,9 +1965,11 @@ static const t_cblc_struct_type *cblc_instantiate_template_struct_arguments(
         && unit->template_instantiation_count + unit->function_instantiation_count
             >= unit->template_max_instantiations)
     {
-        cblc_record_template_parse_error(unit,
+        cblc_record_template_instantiation_error(unit,
             TRANSPILE_ERROR_TEMPLATE_INSTANTIATION_FAILED,
-            "template instantiation limit exceeded");
+            "template instantiation limit exceeded", template_name,
+            argument_key, cblc_template_definition_offset(unit, template_name, 1),
+            static_cast<size_t>(-1));
         return (NULL);
     }
     if (cblc_build_template_instance_names(template_name, argument_key,
@@ -1867,6 +2022,7 @@ static const t_cblc_struct_type *cblc_instantiate_template_struct_arguments(
                 field_kind, field_struct_name, field->is_const,
                 field->visibility) != FT_SUCCESS)
             return (NULL);
+        type->fields[type->field_count - 1].is_borrowed = field->is_borrowed;
         index += 1;
     }
     index = 0;
@@ -1932,12 +2088,14 @@ static const t_cblc_struct_type *cblc_instantiate_template_struct_arguments(
         type->destructor_statement_count = template_type->destructor_statement_count;
         type->destructor_statement_capacity = template_type->destructor_statement_count;
     }
+    type->layout_fingerprint = cblc_struct_layout_fingerprint(unit, type, 0);
     unit->struct_type_count += 1;
     {
         t_cblc_type_ref applied_reference;
 
         std::memset(&applied_reference, 0, sizeof(applied_reference));
         applied_reference.kind = CBLC_TYPE_REF_APPLIED;
+        applied_reference.length = 1;
         ft_strlcpy(applied_reference.name, template_name,
             sizeof(applied_reference.name));
         applied_reference.argument_count = argument_count;
@@ -2014,7 +2172,21 @@ static int cblc_parse_template_argument_type(const char **cursor,
         return (FT_FAILURE);
     cblc_skip_whitespace(cursor);
     if (**cursor != '<')
+    {
         ft_strlcpy(argument, template_name, argument_size);
+        if (**cursor == '(')
+        {
+            size_t capacity;
+            char capacity_text[64];
+
+            if (cblc_parse_string_capacity_clause(cursor, &capacity) != FT_SUCCESS
+                || std::snprintf(capacity_text, sizeof(capacity_text), "(%zu)", capacity) < 0
+                || std::strlen(argument) + std::strlen(capacity_text) >= argument_size)
+                return (FT_FAILURE);
+            ft_strlcat(argument, capacity_text, argument_size);
+            cblc_skip_whitespace(cursor);
+        }
+    }
     else
     {
         *cursor += 1;
@@ -2064,6 +2236,13 @@ static int cblc_template_argument_mangle_key(const char *argument,
             ft_strlcat(key, "_PTR", key_size);
         else if (*cursor == '[')
             ft_strlcat(key, "_ARR", key_size);
+        else if (*cursor == '(')
+            ft_strlcat(key, "_CAP", key_size);
+        else if (*cursor == ')' || *cursor == ']')
+        {
+            cursor += 1;
+            continue ;
+        }
         else if (*cursor != ']')
         {
             char character[2];
@@ -2075,6 +2254,32 @@ static int cblc_template_argument_mangle_key(const char *argument,
         if (std::strlen(key) >= key_size - 1)
             return (FT_FAILURE);
         cursor += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+static int cblc_template_arguments_to_key(
+    const char arguments[][TRANSPILE_IDENTIFIER_MAX], size_t argument_count,
+    char *key, size_t key_size)
+{
+    size_t index;
+    char component[TRANSPILE_IDENTIFIER_MAX];
+
+    if (!arguments || argument_count == 0 || !key || key_size == 0)
+        return (FT_FAILURE);
+    key[0] = '\0';
+    index = 0;
+    while (index < argument_count)
+    {
+        if (index > 0)
+            ft_strlcat(key, "__", key_size);
+        if (cblc_template_argument_mangle_key(arguments[index], component,
+                sizeof(component)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        ft_strlcat(key, component, key_size);
+        if (std::strlen(key) >= key_size - 1)
+            return (FT_FAILURE);
+        index += 1;
     }
     return (FT_SUCCESS);
 }
@@ -2189,12 +2394,14 @@ static int cblc_parse_struct_instance_declaration(const char **cursor,
     char type_identifier[TRANSPILE_IDENTIFIER_MAX];
     char instance_identifier[TRANSPILE_IDENTIFIER_MAX];
     t_cblc_data_item *item;
+    size_t array_count;
 
     if (!cursor || !*cursor || !unit)
         return (FT_FAILURE);
     start = *cursor;
     constructor_arguments[0] = '\0';
     constructor_argument_count = 0;
+    array_count = 0;
     if (cblc_parse_identifier(cursor, type_identifier, sizeof(type_identifier)) != FT_SUCCESS)
         return (FT_FAILURE);
     type = cblc_find_struct_type(unit, type_identifier);
@@ -2250,6 +2457,15 @@ static int cblc_parse_struct_instance_declaration(const char **cursor,
         return (FT_FAILURE);
     }
     cblc_skip_whitespace(cursor);
+    if (**cursor == '[')
+    {
+        if (cblc_parse_array_count_clause(cursor, &array_count) != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        cblc_skip_whitespace(cursor);
+    }
     if (**cursor == '(')
     {
         *cursor += 1;
@@ -2304,6 +2520,7 @@ static int cblc_parse_struct_instance_declaration(const char **cursor,
     ft_strlcpy(item->constructor_arguments, constructor_arguments, sizeof(item->constructor_arguments));
     item->constructor_argument_count = constructor_argument_count;
     item->kind = CBLC_DATA_KIND_STRUCT;
+    item->array_count = array_count;
     item->is_active = 1;
     unit->data_count += 1;
     if (cblc_add_struct_instance_field_items(unit, type, item->source_name, item->cobol_name,
@@ -2835,6 +3052,7 @@ static int cblc_add_parameter_binding(t_cblc_translation_unit *unit,
         ft_strlcpy(parameters[*parameter_count].type_name, type_name,
             sizeof(parameters[*parameter_count].type_name));
     parameters[*parameter_count].kind = parameter_kind;
+    parameters[*parameter_count].array_count = 0;
     *parameter_count += 1;
     return (FT_SUCCESS);
 }
@@ -3019,6 +3237,24 @@ static void cblc_record_template_parse_error(t_cblc_translation_unit *unit,
     if (message)
         ft_strlcpy(unit->parse_error_message, message,
             sizeof(unit->parse_error_message));
+}
+
+static void cblc_record_template_instantiation_error(
+    t_cblc_translation_unit *unit, int code, const char *message,
+    const char *template_name, const char *argument_key,
+    size_t definition_offset, size_t use_offset)
+{
+    if (!unit || unit->parse_error_code != 0)
+        return ;
+    cblc_record_template_parse_error(unit, code, message);
+    if (template_name)
+        ft_strlcpy(unit->template_error_name, template_name,
+            sizeof(unit->template_error_name));
+    if (argument_key)
+        ft_strlcpy(unit->template_error_arguments, argument_key,
+            sizeof(unit->template_error_arguments));
+    unit->template_error_definition_offset = definition_offset;
+    unit->template_error_use_offset = use_offset;
 }
 
 static size_t cblc_source_offset(const t_cblc_translation_unit *unit,
@@ -3232,7 +3468,10 @@ static int cblc_build_template_instance_names(const char *template_name,
         template_name, argument);
     if (source_length >= 0 && static_cast<size_t>(source_length) < source_size
         && cobol_length >= 0 && static_cast<size_t>(cobol_length) < cobol_size)
+    {
+        cblc_identifier_to_cobol(cobol_name, cobol_name, cobol_size);
         return (FT_SUCCESS);
+    }
     hash = cblc_template_name_hash(template_name, argument);
     if (std::snprintf(source_name, source_size, "TPL-%.*s-H%016llX", 40,
             template_name, hash) < 0
@@ -3241,6 +3480,7 @@ static int cblc_build_template_instance_names(const char *template_name,
         return (FT_FAILURE);
     if (std::strlen(source_name) >= source_size || std::strlen(cobol_name) >= cobol_size)
         return (FT_FAILURE);
+    cblc_identifier_to_cobol(cobol_name, cobol_name, cobol_size);
     return (FT_SUCCESS);
 }
 
@@ -3254,6 +3494,8 @@ static const t_cblc_function *cblc_instantiate_template_function_arguments(
     t_cblc_function *function;
     t_cblc_data_kind argument_kinds[CBLC_TEMPLATE_PARAMETER_MAX];
     t_cblc_function_return_kind argument_return_kinds[CBLC_TEMPLATE_PARAMETER_MAX];
+    size_t argument_lengths[CBLC_TEMPLATE_PARAMETER_MAX];
+    size_t argument_array_counts[CBLC_TEMPLATE_PARAMETER_MAX];
     char argument_type_names[CBLC_TEMPLATE_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
     size_t expected_parameter_count;
     char concrete_source_name[TRANSPILE_IDENTIFIER_MAX];
@@ -3263,7 +3505,6 @@ static const t_cblc_function *cblc_instantiate_template_function_arguments(
     size_t index;
     size_t parameter_index;
     char argument_key[TRANSPILE_IDENTIFIER_MAX];
-    char argument_component[TRANSPILE_IDENTIFIER_MAX];
 
     template_function = cblc_find_template_function(unit, template_name);
     expected_parameter_count = template_function ? template_function->template_parameter_count : 0;
@@ -3287,7 +3528,6 @@ static const t_cblc_function *cblc_instantiate_template_function_arguments(
                 &argument_shape_kind, &argument_shape_length,
                 &argument_pointer_depth, &argument_array_count,
                 argument_base_name, sizeof(argument_base_name)) != FT_SUCCESS
-            || argument_array_count != 0
             || cblc_template_argument_ref(unit, arguments[parameter_index],
                 &argument_ref_ids[parameter_index]) != FT_SUCCESS
             || cblc_template_concrete_signature(unit, arguments[parameter_index],
@@ -3295,20 +3535,33 @@ static const t_cblc_function *cblc_instantiate_template_function_arguments(
                 argument_type_names[parameter_index],
                 sizeof(argument_type_names[parameter_index])) != FT_SUCCESS)
             return (NULL);
+        argument_array_counts[parameter_index] = argument_array_count;
+        argument_lengths[parameter_index] = argument_shape_length;
+        if (argument_array_count > 0)
+        {
+            int array_abi_supported;
+
+            array_abi_supported = argument_shape_kind == CBLC_DATA_KIND_INT
+                || argument_shape_kind == CBLC_DATA_KIND_STRUCT
+                || (argument_shape_kind == CBLC_DATA_KIND_STRING
+                    && std::strncmp(arguments[parameter_index], "string(", 7) == 0);
+            if (!array_abi_supported)
+                return (NULL);
+        }
+        if (argument_array_count > 0 && argument_shape_kind == CBLC_DATA_KIND_STRUCT)
+        {
+            const t_cblc_struct_type *argument_type;
+
+            argument_type = cblc_find_struct_type(unit, argument_base_name);
+            if (!argument_type
+                || !cblc_struct_fixed_array_abi_is_trivial(unit, argument_type, 0))
+                return (NULL);
+        }
         parameter_index += 1;
     }
-    argument_key[0] = '\0';
-    parameter_index = 0;
-    while (parameter_index < argument_count)
-    {
-        if (parameter_index > 0)
-            ft_strlcat(argument_key, "__", sizeof(argument_key));
-        if (cblc_template_argument_mangle_key(arguments[parameter_index],
-                argument_component, sizeof(argument_component)) != FT_SUCCESS)
-            return (NULL);
-        ft_strlcat(argument_key, argument_component, sizeof(argument_key));
-        parameter_index += 1;
-    }
+    if (cblc_template_arguments_to_key(arguments, argument_count,
+            argument_key, sizeof(argument_key)) != FT_SUCCESS)
+        return (NULL);
     index = 0;
     while (index < unit->function_instantiation_count)
     {
@@ -3330,9 +3583,11 @@ static const t_cblc_function *cblc_instantiate_template_function_arguments(
         && unit->template_instantiation_count + unit->function_instantiation_count
             >= unit->template_max_instantiations)
     {
-        cblc_record_template_parse_error(unit,
+        cblc_record_template_instantiation_error(unit,
             TRANSPILE_ERROR_TEMPLATE_INSTANTIATION_FAILED,
-            "template instantiation limit exceeded");
+            "template instantiation limit exceeded", template_name,
+            argument_key, cblc_template_definition_offset(unit, template_name, 2),
+            static_cast<size_t>(-1));
         return (NULL);
     }
     parameter_index = 0;
@@ -3421,15 +3676,29 @@ static const t_cblc_function *cblc_instantiate_template_function_arguments(
         if (parameter_index < argument_count)
         {
             parameter_kind = argument_kinds[parameter_index];
-            ft_strlcpy(function->parameters[index].type_name, arguments[parameter_index],
-                sizeof(function->parameters[index].type_name));
+            if (parameter_kind == CBLC_DATA_KIND_STRUCT
+                || parameter_kind == CBLC_DATA_KIND_STRUCT_POINTER)
+                ft_strlcpy(function->parameters[index].type_name,
+                    argument_type_names[parameter_index],
+                    sizeof(function->parameters[index].type_name));
+            else
+                ft_strlcpy(function->parameters[index].type_name, arguments[parameter_index],
+                    sizeof(function->parameters[index].type_name));
             if (cblc_parameter_kind_from_data_kind(parameter_kind,
                     &function->parameters[index].kind) != FT_SUCCESS)
                 return (NULL);
+            function->parameters[index].array_count =
+                argument_array_counts[parameter_index];
+            function->parameters[index].length = argument_lengths[parameter_index];
         }
         else if (cblc_data_kind_from_parameter_kind(function->parameters[index].kind,
                 &parameter_kind) != FT_SUCCESS)
             return (NULL);
+        if (parameter_index >= argument_count)
+        {
+            function->parameters[index].length = 0;
+            function->parameters[index].array_count = 0;
+        }
         if (std::snprintf(new_actual, sizeof(new_actual), "%s__%s",
                 function->source_name, function->parameters[index].source_name) < 0
             || std::snprintf(actual_cobol, sizeof(actual_cobol), "%s-%s",
@@ -3447,7 +3716,9 @@ static const t_cblc_function *cblc_instantiate_template_function_arguments(
                     || parameter_kind == CBLC_DATA_KIND_STRUCT_POINTER))
                 parameter_struct_name = argument_type_names[parameter_index];
             if (cblc_add_named_data_item(unit, new_actual,
-                    function->parameters[index].cobol_name, parameter_kind, 0, 0,
+                    function->parameters[index].cobol_name, parameter_kind,
+                    function->parameters[index].length,
+                    function->parameters[index].array_count,
                     parameter_struct_name, function->source_name, 0, 0, 0) != FT_SUCCESS)
                 return (NULL);
         }
@@ -3604,9 +3875,16 @@ static int cblc_parse_explicit_function_application(const char **cursor,
         arguments, argument_count);
     if (!function)
     {
-        cblc_record_template_parse_error(unit,
+        char argument_key[TRANSPILE_IDENTIFIER_MAX];
+
+        if (cblc_template_arguments_to_key(arguments, argument_count,
+                argument_key, sizeof(argument_key)) != FT_SUCCESS)
+            argument_key[0] = '\0';
+        cblc_record_template_instantiation_error(unit,
             TRANSPILE_ERROR_TEMPLATE_INSTANTIATION_FAILED,
-            "template function instantiation failed");
+            "template function instantiation failed", identifier,
+            argument_key, cblc_template_definition_offset(unit, identifier, 2),
+            cblc_source_offset(unit, application_start));
         return (FT_FAILURE);
     }
     {

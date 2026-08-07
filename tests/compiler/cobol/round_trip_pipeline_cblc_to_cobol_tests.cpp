@@ -140,9 +140,6 @@ static int run_two_module_cblc_to_cobol_execution_test(const char *main_source,
         goto cleanup;
     if (std::snprintf(output_file_name, sizeof(output_file_name), "%s.txt", base_name) < 0)
         goto cleanup;
-    if (test_expect_success(cblc_parse_translation_unit(main_source, &main_unit),
-            "two-module main source should parse") != FT_SUCCESS)
-        goto cleanup;
     if (test_expect_success(cblc_parse_translation_unit(worker_source, &worker_unit),
             "two-module worker source should parse") != FT_SUCCESS)
         goto cleanup;
@@ -156,6 +153,14 @@ static int run_two_module_cblc_to_cobol_execution_test(const char *main_source,
     if (transpiler_context_register_module_import(&context, "main_mod", "worker_mod") != FT_SUCCESS)
         goto cleanup;
     if (cblc_register_translation_unit_exports(&context, "worker_mod", &worker_unit) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_import_translation_unit_type_stubs(&context, "main_mod", &main_unit)
+            != FT_SUCCESS
+        || cblc_import_translation_unit_function_stubs(&context, "main_mod", &main_unit)
+            != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_parse_translation_unit(main_source, &main_unit),
+            "two-module main source should parse") != FT_SUCCESS)
         goto cleanup;
     if (cblc_register_translation_unit_exports(&context, "main_mod", &main_unit) != FT_SUCCESS)
         goto cleanup;
@@ -391,6 +396,239 @@ FT_TEST(test_cblc_inline_array_access_translates_to_cobol_and_executes)
         "}\n";
     return (run_inline_cblc_to_cobol_execution_test(source,
             "inline_array_access_generated", "ARRAY OK\n"));
+}
+
+FT_TEST(test_cblc_inline_trivial_struct_array_template_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "struct Point { int value; };\n"
+        "template <typename T>\n"
+        "void consume(T values) {\n"
+        "    display(\"STRUCT ARRAY OK\");\n"
+        "    return;\n"
+        "}\n"
+        "Point points[2];\n"
+        "void main() {\n"
+        "    consume<Point[2]>(points);\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+        "trivial_struct_array_template", "STRUCT ARRAY OK\n"));
+}
+
+FT_TEST(test_cblc_inline_char_struct_array_template_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "struct Point { char name[8]; };\n"
+        "template <typename T>\n"
+        "void consume(T values) {\n"
+        "    display(\"CHAR STRUCT ARRAY OK\");\n"
+        "    return;\n"
+        "}\n"
+        "Point points[2];\n"
+        "void main() {\n"
+        "    consume<Point[2]>(points);\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+        "char_struct_array_template", "CHAR STRUCT ARRAY OK\n"));
+}
+
+FT_TEST(test_cblc_inline_const_string_struct_array_template_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "struct Point { const string name(8); };\n"
+        "template <typename T>\n"
+        "void consume(T values) {\n"
+        "    display(\"CONST STRING STRUCT ARRAY OK\");\n"
+        "    return;\n"
+        "}\n"
+        "Point points[2];\n"
+        "void main() {\n"
+        "    consume<Point[2]>(points);\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+        "const_string_struct_array_template", "CONST STRING STRUCT ARRAY OK\n"));
+}
+
+FT_TEST(test_cblc_inline_mutable_string_struct_array_template_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "struct Point { string name(8); };\n"
+        "template <typename T>\n"
+        "void consume(T values) {\n"
+        "    display(\"MUTABLE STRING STRUCT ARRAY OK\");\n"
+        "    return;\n"
+        "}\n"
+        "Point points[2];\n"
+        "void main() {\n"
+        "    consume<Point[2]>(points);\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+        "mutable_string_struct_array_template", "MUTABLE STRING STRUCT ARRAY OK\n"));
+}
+
+FT_TEST(test_cblc_imported_mutable_string_struct_array_template_translates_to_cobol_and_executes)
+{
+    const char *main_source;
+    const char *worker_source;
+
+    main_source = "import \"worker_mod\";\n"
+        "Point points[2];\n"
+        "void main() {\n"
+        "    consume<Point[2]>(points);\n"
+        "    return;\n"
+        "}\n";
+    worker_source = "struct Point { string name(8); };\n"
+        "template <typename T>\n"
+        "void consume(T values) {\n"
+        "    display(\"IMPORTED MUTABLE STRING ARRAY OK\");\n"
+        "    return;\n"
+        "}\n"
+        "void worker() { return; }\n";
+    return (run_two_module_cblc_to_cobol_execution_test(main_source, worker_source,
+        "imported_mutable_string_struct_array_template",
+        "IMPORTED MUTABLE STRING ARRAY OK\n"));
+}
+
+FT_TEST(test_cblc_inline_struct_array_constructor_arguments_translate_to_cobol_and_execute)
+{
+    const char *source;
+
+    source = "class Point {\n"
+        "    public:\n"
+        "    int value;\n"
+        "    Point(int initial) {\n"
+        "        value = initial;\n"
+        "    }\n"
+        "};\n"
+        "template <typename T>\n"
+        "void consume(T values) {\n"
+        "    if (values[1].value == 7) {\n"
+        "        display(\"STRUCT ARRAY CTOR OK\");\n"
+        "    } else {\n"
+        "        display(\"STRUCT ARRAY CTOR BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n"
+        "Point points[2](7);\n"
+        "void main() {\n"
+        "    consume<Point[2]>(points);\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+        "struct_array_constructor_arguments", "STRUCT ARRAY CTOR OK\n"));
+}
+
+FT_TEST(test_cblc_imported_struct_array_constructor_arguments_translate_to_cobol_and_execute)
+{
+    const char *main_source;
+    const char *worker_source;
+
+    main_source = "import \"worker_mod\";\n"
+        "Point points[2](7);\n"
+        "void main() {\n"
+        "    consume<Point[2]>(points);\n"
+        "    return;\n"
+        "}\n";
+    worker_source = "class Point {\n"
+        "    public:\n"
+        "    int value;\n"
+        "    Point(int initial) {\n"
+        "        value = initial;\n"
+        "    }\n"
+        "};\n"
+        "template <typename T>\n"
+        "void consume(T values) {\n"
+        "    if (values[1].value == 7) {\n"
+        "        display(\"IMPORTED STRUCT ARRAY CTOR OK\");\n"
+        "    } else {\n"
+        "        display(\"IMPORTED STRUCT ARRAY CTOR BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n"
+        "void worker() { return; }\n";
+    return (run_two_module_cblc_to_cobol_execution_test(main_source, worker_source,
+        "imported_struct_array_constructor_arguments",
+        "IMPORTED STRUCT ARRAY CTOR OK\n"));
+}
+
+FT_TEST(test_cblc_inline_borrowed_pointer_struct_array_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "struct Holder { borrowed int *ptr; };\n"
+        "template <typename T>\n"
+        "void consume(T values) {\n"
+        "    if (values[1].ptr == NULL) {\n"
+        "        display(\"BORROWED POINTER ARRAY OK\");\n"
+        "    } else {\n"
+        "        display(\"BORROWED POINTER ARRAY BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n"
+        "Holder holders[2];\n"
+        "void main() {\n"
+        "    consume<Holder[2]>(holders);\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+        "borrowed_pointer_struct_array", "BORROWED POINTER ARRAY OK\n"));
+}
+
+FT_TEST(test_cblc_imported_borrowed_pointer_struct_array_translates_to_cobol_and_executes)
+{
+    const char *main_source;
+    const char *worker_source;
+
+    main_source = "import \"worker_mod\";\n"
+        "Holder holders[2];\n"
+        "void main() {\n"
+        "    consume<Holder[2]>(holders);\n"
+        "    return;\n"
+        "}\n";
+    worker_source = "struct Holder { borrowed int *ptr; };\n"
+        "template <typename T>\n"
+        "void consume(T values) {\n"
+        "    if (values[1].ptr == NULL) {\n"
+        "        display(\"IMPORTED BORROWED POINTER ARRAY OK\");\n"
+        "    } else {\n"
+        "        display(\"IMPORTED BORROWED POINTER ARRAY BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n"
+        "void worker() { return; }\n";
+    return (run_two_module_cblc_to_cobol_execution_test(main_source, worker_source,
+        "imported_borrowed_pointer_struct_array",
+        "IMPORTED BORROWED POINTER ARRAY OK\n"));
+}
+
+FT_TEST(test_cblc_imported_trivial_struct_array_template_translates_to_cobol_and_executes)
+{
+    const char *main_source;
+    const char *worker_source;
+
+    main_source = "import \"worker_mod\";\n"
+        "Point points[2];\n"
+        "void main() {\n"
+        "    consume<Point[2]>(points);\n"
+        "    return;\n"
+        "}\n";
+    worker_source = "struct Point { int value; };\n"
+        "template <typename T>\n"
+        "void consume(T values) {\n"
+        "    display(\"IMPORTED STRUCT ARRAY OK\");\n"
+        "    return;\n"
+        "}\n"
+        "void worker() { return; }\n";
+    return (run_two_module_cblc_to_cobol_execution_test(main_source, worker_source,
+        "imported_trivial_struct_array_template", "IMPORTED STRUCT ARRAY OK\n"));
 }
 
 FT_TEST(test_cblc_inline_functions_without_keyword_translates_to_cobol_and_executes)

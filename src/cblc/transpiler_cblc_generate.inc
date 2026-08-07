@@ -1,3 +1,25 @@
+static int cblc_string_item_is_array_member(const t_cblc_translation_unit *unit,
+    const t_cblc_data_item *item)
+{
+    const char *separator;
+    char owner_name[TRANSPILE_IDENTIFIER_MAX];
+    size_t owner_length;
+    const t_cblc_data_item *owner;
+
+    if (!unit || !item || item->kind != CBLC_DATA_KIND_STRING)
+        return (0);
+    separator = std::strchr(item->source_name, '.');
+    if (!separator)
+        return (0);
+    owner_length = static_cast<size_t>(separator - item->source_name);
+    if (owner_length == 0 || owner_length >= sizeof(owner_name))
+        return (0);
+    std::memcpy(owner_name, item->source_name, owner_length);
+    owner_name[owner_length] = '\0';
+    owner = cblc_find_data_item_const(unit, owner_name);
+    return (owner && owner->array_count > 0);
+}
+
 static int cblc_emit_reusable_method_paragraphs(const t_cblc_translation_unit *unit,
     t_cobol_text_builder *builder)
 {
@@ -13,7 +35,8 @@ static int cblc_emit_reusable_method_paragraphs(const t_cblc_translation_unit *u
         size_t method_index;
 
         receiver = &unit->data_items[data_index];
-        if (receiver->is_alias || receiver->kind != CBLC_DATA_KIND_STRUCT)
+        if (receiver->is_alias || receiver->kind != CBLC_DATA_KIND_STRUCT
+            || receiver->array_count > 0)
         {
             data_index += 1;
             continue ;
@@ -246,7 +269,7 @@ static int cblc_emit_reusable_string_intrinsic_results(
 
         item = &unit->data_items[data_index];
         if (item->is_alias || item->kind != CBLC_DATA_KIND_STRING
-            || item->array_count > 0)
+            || item->array_count > 0 || cblc_string_item_is_array_member(unit, item))
         {
             data_index += 1;
             continue ;
@@ -309,7 +332,7 @@ static int cblc_emit_reusable_string_intrinsic_arguments(
 
         item = &unit->data_items[data_index];
         if (item->is_alias || item->kind != CBLC_DATA_KIND_STRING
-            || item->array_count > 0)
+            || item->array_count > 0 || cblc_string_item_is_array_member(unit, item))
         {
             data_index += 1;
             continue ;
@@ -377,7 +400,7 @@ static int cblc_emit_reusable_string_intrinsic_paragraphs(
 
         item = &unit->data_items[data_index];
         if (item->is_alias || item->kind != CBLC_DATA_KIND_STRING
-            || item->array_count > 0)
+            || item->array_count > 0 || cblc_string_item_is_array_member(unit, item))
         {
             data_index += 1;
             continue ;
@@ -472,7 +495,7 @@ static int cblc_emit_reusable_parameterized_string_intrinsic_paragraphs(
 
         receiver = &unit->data_items[data_index];
         if (receiver->is_alias || receiver->kind != CBLC_DATA_KIND_STRING
-            || receiver->array_count > 0)
+            || receiver->array_count > 0 || cblc_string_item_is_array_member(unit, receiver))
         {
             data_index += 1;
             continue ;
@@ -1196,7 +1219,9 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
         goto cleanup;
     if (cblc_emit_reusable_parameterized_string_intrinsic_paragraphs(unit, &builder)
         != FT_SUCCESS)
+    {
         goto cleanup;
+    }
     if (cblc_emit_reusable_lifecycle_paragraphs(unit, &builder) != FT_SUCCESS)
         goto cleanup;
     if (std::snprintf(line, sizeof(line), "       END PROGRAM %s.",

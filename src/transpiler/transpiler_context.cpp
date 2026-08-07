@@ -1104,6 +1104,8 @@ static int transpiler_context_type_method_signatures_compatible(
     while (index < left->parameter_count)
     {
         if (left->parameter_kinds[index] != right->parameter_kinds[index]
+            || left->parameter_array_counts[index] != right->parameter_array_counts[index]
+            || left->parameter_lengths[index] != right->parameter_lengths[index]
             || std::strncmp(left->parameter_type_names[index],
                 right->parameter_type_names[index],
                 sizeof(left->parameter_type_names[index])) != 0)
@@ -1127,6 +1129,8 @@ static int transpiler_context_type_constructor_signatures_compatible(
     while (index < left->parameter_count)
     {
         if (left->parameter_kinds[index] != right->parameter_kinds[index]
+            || left->parameter_array_counts[index] != right->parameter_array_counts[index]
+            || left->parameter_lengths[index] != right->parameter_lengths[index]
             || std::strncmp(left->parameter_type_names[index],
                 right->parameter_type_names[index],
                 sizeof(left->parameter_type_names[index])) != 0)
@@ -1630,6 +1634,7 @@ int transpiler_context_init(t_transpiler_context *context)
     context->copybook_graph_directory = NULL;
     context->semantic_diff_directory = NULL;
     context->emit_standard_library = 0;
+    context->emit_all_standard_library = 0;
     context->format_mode = TRANSPILE_FORMAT_DEFAULT;
     context->layout_mode = TRANSPILE_LAYOUT_NORMALIZE;
     context->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
@@ -2003,6 +2008,13 @@ void transpiler_context_set_emit_standard_library(t_transpiler_context *context,
         context->emit_standard_library = 1;
     else
         context->emit_standard_library = 0;
+}
+
+void transpiler_context_set_emit_all_standard_library(t_transpiler_context *context, int emit)
+{
+    if (!context)
+        return ;
+    context->emit_all_standard_library = emit ? 1 : 0;
 }
 
 void transpiler_context_set_ast_dump_directory(t_transpiler_context *context, const char *directory)
@@ -2994,6 +3006,8 @@ int transpiler_context_register_function_signature_record(t_transpiler_context *
         ft_strlcpy(registered->parameter_type_names[index],
             record->parameter_type_names[index],
             sizeof(registered->parameter_type_names[index]));
+            registered->parameter_array_counts[index] = record->parameter_array_counts[index];
+            registered->parameter_lengths[index] = record->parameter_lengths[index];
         index += 1;
     }
     if (record->statement_count > 0 && record->statements)

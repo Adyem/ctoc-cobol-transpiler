@@ -186,6 +186,9 @@ static int cblc_constructor_signatures_match(const t_cblc_constructor *construct
     {
         if (constructor->parameters[index].kind != parameters[index].kind)
             return (0);
+        if (constructor->parameters[index].length != parameters[index].length
+            || constructor->parameters[index].array_count != parameters[index].array_count)
+            return (0);
         if (constructor->parameters[index].kind == TRANSPILE_FUNCTION_PARAMETER_STRUCT
             && std::strncmp(constructor->parameters[index].type_name,
                 parameters[index].type_name,
@@ -269,6 +272,89 @@ static int cblc_translation_unit_ensure_type_ref_capacity(t_cblc_translation_uni
     return (FT_SUCCESS);
 }
 
+static unsigned long long cblc_layout_hash_bytes(unsigned long long hash,
+    const void *data, size_t length)
+{
+    const unsigned char *bytes;
+    size_t index;
+
+    bytes = static_cast<const unsigned char *>(data);
+    index = 0;
+    while (index < length)
+    {
+        hash ^= bytes[index];
+        hash *= 1099511628211ULL;
+        index += 1;
+    }
+    return (hash);
+}
+
+static unsigned long long cblc_layout_hash_u64(unsigned long long hash,
+    unsigned long long value)
+{
+    unsigned char bytes[8];
+    size_t index;
+
+    index = 0;
+    while (index < sizeof(bytes))
+    {
+        bytes[index] = static_cast<unsigned char>((value >> (index * 8)) & 0xffU);
+        index += 1;
+    }
+    return (cblc_layout_hash_bytes(hash, bytes, sizeof(bytes)));
+}
+
+static unsigned long long cblc_layout_hash_text(unsigned long long hash,
+    const char *text)
+{
+    size_t length;
+
+    length = text ? std::strlen(text) : 0;
+    hash = cblc_layout_hash_u64(hash, static_cast<unsigned long long>(length));
+    if (length > 0)
+        hash = cblc_layout_hash_bytes(hash, text, length);
+    return (hash);
+}
+
+static unsigned long long cblc_struct_layout_fingerprint(
+    const t_cblc_translation_unit *unit, const t_cblc_struct_type *type, size_t depth)
+{
+    unsigned long long hash;
+    size_t index;
+
+    if (!unit || !type || depth > CBLC_TEMPLATE_PARAMETER_MAX)
+        return (0);
+    hash = 1469598103934665603ULL;
+    hash = cblc_layout_hash_text(hash, "CBLC-LAYOUT@1");
+    hash = cblc_layout_hash_u64(hash, static_cast<unsigned long long>(type->is_class));
+    hash = cblc_layout_hash_u64(hash, static_cast<unsigned long long>(type->field_count));
+    index = 0;
+    while (index < type->field_count)
+    {
+        const t_cblc_struct_field *field;
+        const t_cblc_struct_type *nested_type;
+        unsigned long long nested_fingerprint;
+
+        field = &type->fields[index];
+        hash = cblc_layout_hash_text(hash, field->source_name);
+        hash = cblc_layout_hash_u64(hash, static_cast<unsigned long long>(field->kind));
+        hash = cblc_layout_hash_u64(hash, static_cast<unsigned long long>(field->length));
+        hash = cblc_layout_hash_u64(hash, static_cast<unsigned long long>(field->array_count));
+        hash = cblc_layout_hash_u64(hash, static_cast<unsigned long long>(field->is_const));
+        hash = cblc_layout_hash_u64(hash, static_cast<unsigned long long>(field->is_borrowed));
+        hash = cblc_layout_hash_text(hash, field->declared_type_name);
+        hash = cblc_layout_hash_text(hash, field->struct_type_name);
+        nested_type = NULL;
+        if (field->kind == CBLC_DATA_KIND_STRUCT)
+            nested_type = cblc_find_struct_type(unit, field->struct_type_name);
+        nested_fingerprint = nested_type
+            ? cblc_struct_layout_fingerprint(unit, nested_type, depth + 1) : 0;
+        hash = cblc_layout_hash_u64(hash, nested_fingerprint);
+        index += 1;
+    }
+    return (hash);
+}
+
 static int cblc_type_ref_equal(const t_cblc_type_ref *left,
     const t_cblc_type_ref *right)
 {
@@ -279,7 +365,9 @@ static int cblc_type_ref_equal(const t_cblc_type_ref *left,
         || std::strcmp(left->name, right->name) != 0
         || left->parameter_index != right->parameter_index
         || left->pointer_depth != right->pointer_depth
+        || left->length != right->length
         || left->array_count != right->array_count
+        || left->layout_fingerprint != right->layout_fingerprint
         || left->argument_count != right->argument_count
         || left->argument_count > CBLC_TYPE_REF_ARGUMENT_MAX)
         return (0);
@@ -577,11 +665,21 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
     }
     else
     {
+        unsigned long long existing_layout_fingerprint;
+
+        existing_layout_fingerprint = cblc_struct_layout_fingerprint(unit, type, 0);
+        if (signature->layout_fingerprint != 0
+            && existing_layout_fingerprint != 0
+            && signature->layout_fingerprint != existing_layout_fingerprint)
+            return (FT_FAILURE);
+        if (!type->is_imported)
+            return (FT_SUCCESS);
         type->is_class = signature->kind == TRANSPILE_TYPE_CLASS;
         type->is_imported = 1;
     }
     type->has_default_constructor = signature->has_default_constructor;
     type->has_destructor = signature->has_destructor;
+    type->layout_fingerprint = signature->layout_fingerprint;
     type->is_template = signature->is_template;
     type->template_parameter_count = signature->template_parameter_count;
     size_t template_parameter_index = 0;
@@ -616,6 +714,7 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
             type->fields[index].array_count = signature->fields[index].array_count;
             type->fields[index].kind = static_cast<t_cblc_data_kind>(signature->fields[index].kind);
             type->fields[index].is_const = signature->fields[index].is_const;
+            type->fields[index].is_borrowed = signature->fields[index].is_borrowed;
             type->fields[index].is_template_parameter =
                 signature->fields[index].is_template_parameter;
             ft_strlcpy(type->fields[index].template_parameter_name,
@@ -629,6 +728,8 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
         }
         type->field_count = signature->field_count;
     }
+    if (type->layout_fingerprint == 0)
+        type->layout_fingerprint = cblc_struct_layout_fingerprint(unit, type, 0);
     if (signature->method_count > 0 && signature->methods)
     {
         if (cblc_struct_type_ensure_method_capacity(type, signature->method_count) != FT_SUCCESS)
@@ -655,6 +756,10 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
             {
                 type->methods[index].parameters[parameter_index].kind =
                     signature->methods[index].parameter_kinds[parameter_index];
+                    type->methods[index].parameters[parameter_index].array_count =
+                    signature->methods[index].parameter_array_counts[parameter_index];
+                type->methods[index].parameters[parameter_index].length =
+                    signature->methods[index].parameter_lengths[parameter_index];
                 ft_strlcpy(type->methods[index].parameters[parameter_index].source_name,
                     signature->methods[index].parameter_source_names[parameter_index],
                     sizeof(type->methods[index].parameters[parameter_index].source_name));
@@ -713,6 +818,10 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
             {
                 type->constructors[index].parameters[parameter_index].kind =
                     signature->constructors[index].parameter_kinds[parameter_index];
+                    type->constructors[index].parameters[parameter_index].array_count =
+                    signature->constructors[index].parameter_array_counts[parameter_index];
+                type->constructors[index].parameters[parameter_index].length =
+                    signature->constructors[index].parameter_lengths[parameter_index];
                 ft_strlcpy(type->constructors[index].parameters[parameter_index].source_name,
                     signature->constructors[index].parameter_source_names[parameter_index],
                     sizeof(type->constructors[index].parameters[parameter_index].source_name));
@@ -814,7 +923,9 @@ static int cblc_register_imported_parameter_storage(t_cblc_translation_unit *uni
             if (!type)
                 return (FT_FAILURE);
             if (cblc_add_named_data_item(unit, parameters[index].actual_source_name,
-                    parameters[index].cobol_name, kind, 0, 0, parameters[index].type_name,
+                    parameters[index].cobol_name, kind, parameters[index].length,
+                    parameters[index].array_count,
+                    parameters[index].type_name,
                     NULL, 0, 0, 0) != FT_SUCCESS)
                 return (FT_FAILURE);
             unit->data_items[unit->data_count - 1].is_imported = is_imported;
@@ -826,7 +937,9 @@ static int cblc_register_imported_parameter_storage(t_cblc_translation_unit *uni
         else
         {
             if (cblc_add_named_data_item(unit, parameters[index].actual_source_name,
-                    parameters[index].cobol_name, kind, 0, 0, parameters[index].type_name,
+                    parameters[index].cobol_name, kind, parameters[index].length,
+                    parameters[index].array_count,
+                    parameters[index].type_name,
                     NULL, 0, 0, 0) != FT_SUCCESS)
                 return (FT_FAILURE);
             unit->data_items[unit->data_count - 1].is_imported = is_imported;

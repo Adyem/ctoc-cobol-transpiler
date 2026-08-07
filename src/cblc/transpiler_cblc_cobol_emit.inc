@@ -926,14 +926,52 @@ static int cblc_destructor_paragraph_name(const t_cblc_data_item *receiver,
     return (FT_SUCCESS);
 }
 
+static unsigned long long cblc_intrinsic_name_hash(const char *name)
+{
+    unsigned long long hash;
+
+    hash = 1469598103934665603ULL;
+    while (name && *name != '\0')
+    {
+        hash ^= static_cast<unsigned char>(*name);
+        hash *= 1099511628211ULL;
+        name += 1;
+    }
+    return (hash);
+}
+
+static int cblc_intrinsic_receiver_name(const t_cblc_data_item *receiver,
+    char *buffer, size_t buffer_size)
+{
+    size_t name_length;
+    int written;
+
+    if (!receiver || !buffer || buffer_size == 0)
+        return (FT_FAILURE);
+    name_length = std::strlen(receiver->cobol_name);
+    if (name_length <= 27)
+    {
+        ft_strlcpy(buffer, receiver->cobol_name, buffer_size);
+        return (std::strlen(buffer) == name_length ? FT_SUCCESS : FT_FAILURE);
+    }
+    written = std::snprintf(buffer, buffer_size, "CBLC-R-%016llX",
+        cblc_intrinsic_name_hash(receiver->cobol_name));
+    if (written < 0 || static_cast<size_t>(written) >= buffer_size)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
 static int cblc_intrinsic_paragraph_name(const t_cblc_data_item *receiver,
     const char *intrinsic_name, char *buffer, size_t buffer_size)
 {
+    char receiver_name[TRANSPILE_IDENTIFIER_MAX];
     char normalized_name[TRANSPILE_IDENTIFIER_MAX];
     size_t index;
     int written;
 
-    if (!receiver || !intrinsic_name || !buffer || buffer_size == 0)
+    if (!receiver || !intrinsic_name || !buffer || buffer_size == 0
+        || cblc_intrinsic_receiver_name(receiver, receiver_name,
+            sizeof(receiver_name)) != FT_SUCCESS)
         return (FT_FAILURE);
     ft_strlcpy(normalized_name, intrinsic_name, sizeof(normalized_name));
     index = 0;
@@ -946,7 +984,7 @@ static int cblc_intrinsic_paragraph_name(const t_cblc_data_item *receiver,
         index += 1;
     }
     written = std::snprintf(buffer, buffer_size, "CBLC-INTRINSIC-%s-%s",
-        receiver->cobol_name, normalized_name);
+        receiver_name, normalized_name);
     if (written < 0 || static_cast<size_t>(written) >= buffer_size)
         return (FT_FAILURE);
     return (FT_SUCCESS);
@@ -955,11 +993,14 @@ static int cblc_intrinsic_paragraph_name(const t_cblc_data_item *receiver,
 static int cblc_intrinsic_result_name(const t_cblc_data_item *receiver,
     const char *intrinsic_name, char *buffer, size_t buffer_size)
 {
+    char receiver_name[TRANSPILE_IDENTIFIER_MAX];
     char normalized_name[TRANSPILE_IDENTIFIER_MAX];
     size_t index;
     int written;
 
-    if (!receiver || !intrinsic_name || !buffer || buffer_size == 0)
+    if (!receiver || !intrinsic_name || !buffer || buffer_size == 0
+        || cblc_intrinsic_receiver_name(receiver, receiver_name,
+            sizeof(receiver_name)) != FT_SUCCESS)
         return (FT_FAILURE);
     ft_strlcpy(normalized_name, intrinsic_name, sizeof(normalized_name));
     index = 0;
@@ -970,7 +1011,7 @@ static int cblc_intrinsic_result_name(const t_cblc_data_item *receiver,
         index += 1;
     }
     written = std::snprintf(buffer, buffer_size, "CBLC-INTRINSIC-%s-%s-RESULT",
-        receiver->cobol_name, normalized_name);
+        receiver_name, normalized_name);
     if (written < 0 || static_cast<size_t>(written) >= buffer_size)
         return (FT_FAILURE);
     return (FT_SUCCESS);
@@ -979,12 +1020,15 @@ static int cblc_intrinsic_result_name(const t_cblc_data_item *receiver,
 static int cblc_intrinsic_argument_name(const t_cblc_data_item *receiver,
     size_t argument_index, const char *component, char *buffer, size_t buffer_size)
 {
+    char receiver_name[TRANSPILE_IDENTIFIER_MAX];
     int written;
 
-    if (!receiver || !component || !buffer || buffer_size == 0)
+    if (!receiver || !component || !buffer || buffer_size == 0
+        || cblc_intrinsic_receiver_name(receiver, receiver_name,
+            sizeof(receiver_name)) != FT_SUCCESS)
         return (FT_FAILURE);
     written = std::snprintf(buffer, buffer_size, "CBLC-INTRINSIC-%s-ARG%zu-%s",
-        receiver->cobol_name, argument_index, component);
+        receiver_name, argument_index, component);
     if (written < 0 || static_cast<size_t>(written) >= buffer_size)
         return (FT_FAILURE);
     return (FT_SUCCESS);
@@ -1884,6 +1928,50 @@ static int cblc_emit_lifecycle_statement(const t_cblc_translation_unit *unit,
     type = cblc_find_struct_type(unit, item->struct_type_name);
     if (!type)
         return (FT_FAILURE);
+    if (item->array_count > 0)
+    {
+        if (statement->type != CBLC_STATEMENT_DEFAULT_CONSTRUCT
+            && statement->type != CBLC_STATEMENT_DESTRUCT)
+            return (FT_FAILURE);
+        if (statement->type == CBLC_STATEMENT_DEFAULT_CONSTRUCT
+            && statement->call_argument_count > 0)
+        {
+            const t_cblc_constructor *array_constructor;
+            size_t element_index;
+
+            array_constructor = cblc_find_constructor_for_arguments(unit, type,
+                statement->call_arguments, statement->call_argument_count);
+            if (!array_constructor
+                || cblc_emit_struct_array_lifecycle(unit, type, item->cobol_name,
+                    item->array_count, 0, builder, 0) != FT_SUCCESS)
+                return (FT_FAILURE);
+            element_index = 1;
+            while (element_index <= item->array_count)
+            {
+                size_t statement_index;
+
+                if (array_constructor->parameter_count > 0
+                    && cblc_emit_parameter_argument_moves(unit, statement->call_arguments,
+                        statement->call_argument_count, array_constructor->parameters,
+                        array_constructor->parameter_count, builder) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                statement_index = 0;
+                while (statement_index < array_constructor->statement_count)
+                {
+                    if (cblc_emit_array_element_constructor_statement(unit,
+                            &array_constructor->statements[statement_index],
+                            item->cobol_name, element_index, builder) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    statement_index += 1;
+                }
+                element_index += 1;
+            }
+            return (FT_SUCCESS);
+        }
+        return (cblc_emit_struct_array_lifecycle(unit, type, item->cobol_name,
+            item->array_count, 0, builder,
+            statement->type == CBLC_STATEMENT_DESTRUCT));
+    }
     if (statement->type == CBLC_STATEMENT_DEFAULT_CONSTRUCT
         && ((statement->call_argument_count == 0 && type->has_default_constructor)
             || statement->call_argument_count > 0))
@@ -2307,6 +2395,7 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
                 if (cblc_emit_local_call_argument_moves(unit, target_function,
                         statement, builder) != FT_SUCCESS)
                     return (FT_FAILURE);
+                ft_strlcpy(cobol_name, target_function->cobol_name, sizeof(cobol_name));
                 if (std::snprintf(line, sizeof(line), "           PERFORM %s",
                         cobol_name) < 0)
                     return (FT_FAILURE);
@@ -2376,6 +2465,7 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
                 if (cblc_emit_local_call_argument_moves(unit, target_function,
                         statement, builder) != FT_SUCCESS)
                     return (FT_FAILURE);
+                ft_strlcpy(cobol_name, target_function->cobol_name, sizeof(cobol_name));
                 if (std::snprintf(line, sizeof(line), "           PERFORM %s",
                         cobol_name) < 0)
                     return (FT_FAILURE);
@@ -2618,7 +2708,13 @@ static int cblc_emit_struct_instance(const t_cblc_translation_unit *unit,
     type = cblc_find_struct_type(unit, item->struct_type_name);
     if (!type)
         return (FT_FAILURE);
-    if (std::snprintf(line, sizeof(line), "       01 %s.", item->cobol_name) < 0)
+    if (item->array_count > 0)
+    {
+        if (std::snprintf(line, sizeof(line), "       01 %s OCCURS %zu TIMES.",
+                item->cobol_name, item->array_count) < 0)
+            return (FT_FAILURE);
+    }
+    else if (std::snprintf(line, sizeof(line), "       01 %s.", item->cobol_name) < 0)
         return (FT_FAILURE);
     if (cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
         return (FT_FAILURE);

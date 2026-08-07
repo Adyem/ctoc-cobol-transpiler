@@ -1251,6 +1251,15 @@ static int cblc_parse_call(const char **cursor, t_cblc_translation_unit *unit,
                         || !cblc_argument_matches_parameter(unit, argument,
                             &local_target->parameters[argument_index]))
                     {
+                        if (local_target->is_template_instantiation)
+                            cblc_record_template_instantiation_error(unit,
+                                TRANSPILE_ERROR_TEMPLATE_INSTANTIATION_FAILED,
+                                "template function instantiation failed",
+                                local_target->template_source_name,
+                                local_target->template_argument_name,
+                                cblc_template_definition_offset(unit,
+                                    local_target->template_source_name, 2),
+                                cblc_source_offset(unit, start));
                         *cursor = start;
                         return (FT_FAILURE);
                     }

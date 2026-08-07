@@ -353,6 +353,7 @@ int transpiler_cli_options_init(t_transpiler_cli_options *options)
     transpiler_cli_warning_settings_enable_all(&options->warning_settings);
     options->show_help = 0;
     options->emit_standard_library = 0;
+    options->emit_all_standard_library = 0;
     options->dump_ast = 0;
     options->dump_ast_directory = NULL;
     options->dump_copybook_graph = 0;
@@ -386,6 +387,7 @@ void transpiler_cli_options_dispose(t_transpiler_cli_options *options)
     transpiler_cli_warning_settings_enable_all(&options->warning_settings);
     options->show_help = 0;
     options->emit_standard_library = 0;
+    options->emit_all_standard_library = 0;
     options->dump_ast = 0;
     options->dump_ast_directory = NULL;
     options->dump_copybook_graph = 0;
@@ -455,6 +457,12 @@ static int transpiler_cli_parse_long_option(t_transpiler_cli_options *options, c
             return (FT_FAILURE);
         }
         options->output_directory = argv[*index];
+        return (FT_SUCCESS);
+    }
+    if (std::strncmp(argument, "--emit-all-standard-library", 28) == 0
+        && std::strlen(argument) == 27)
+    {
+        options->emit_all_standard_library = 1;
         return (FT_SUCCESS);
     }
     if (std::strncmp(argument, "--format", 9) == 0 && std::strlen(argument) == 8)
@@ -606,6 +614,7 @@ int transpiler_cli_apply(const t_transpiler_cli_options *options, t_transpiler_c
         return (FT_FAILURE);
     transpiler_context_set_output_directory(context, options->output_directory);
     transpiler_context_set_emit_standard_library(context, options->emit_standard_library);
+    transpiler_context_set_emit_all_standard_library(context, options->emit_all_standard_library);
     transpiler_context_set_ast_dump_enabled(context, options->dump_ast);
     transpiler_context_set_ast_dump_directory(context, options->dump_ast_directory);
     transpiler_context_set_copybook_graph_enabled(context, options->dump_copybook_graph);
@@ -627,6 +636,7 @@ void transpiler_cli_print_usage(void)
     std::printf("       Direction: cblc-to-cobol | cobol-to-cblc | standard-library\n");
     std::printf("       Environment: CTOC_DEFAULT_DIRECTION can supply the direction.\n");
     std::printf("       Standard-library builds emit all cataloged programs to the selected directory.\n");
+    std::printf("       --emit-all-standard-library also deploys the complete catalog during CBL-C compilation.\n");
     std::printf("       Optional: --output-dir <directory> to override emission path base.\n");
     std::printf("                 --format <default|minimal|pretty> to control COBOL layout.\n");
     std::printf("                 --layout <normalize|preserve> to control regenerated CBL-C layout.\n");

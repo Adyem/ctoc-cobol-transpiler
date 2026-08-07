@@ -769,29 +769,338 @@ FT_TEST(test_cblc_templates_reject_unsupported_parameter_forms)
     return (FT_SUCCESS);
 }
 
-FT_TEST(test_cblc_template_function_rejects_array_abi_gap)
+FT_TEST(test_cblc_template_function_rejects_scalar_for_array_abi)
 {
     const char *source;
     t_cblc_translation_unit unit;
     int status;
 
     source = "template <typename T>\n"
-        "int consume(T value) { return 1; }\n"
-        "int result;\n"
+        "void consume(T value) { return; }\n"
         "void main() {\n"
-        "    result = consume<int[3]>(0);\n"
+        "    consume<int[3]>(0);\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&unit);
     status = FT_FAILURE;
     if (cblc_parse_translation_unit(source, &unit) == FT_SUCCESS
-        || unit.parse_error_code != TRANSPILE_ERROR_TEMPLATE_INSTANTIATION_FAILED)
+        || unit.parse_error_code != TRANSPILE_ERROR_TEMPLATE_INSTANTIATION_FAILED
+        || std::strcmp(unit.parse_error_message,
+            "template function instantiation failed") != 0
+        || std::strcmp(unit.template_error_name, "consume") != 0
+        || std::strcmp(unit.template_error_arguments, "int_ARR3") != 0
+        || unit.template_error_definition_offset == static_cast<size_t>(-1)
+        || unit.template_error_use_offset == static_cast<size_t>(-1))
     {
-        std::printf("Assertion failed: array template function ABI gap should be rejected\n");
+        std::printf("Assertion failed: array template function ABI gap should be rejected (error=%d, message=%s, name=%s, args=%s)\n",
+            unit.parse_error_code, unit.parse_error_message, unit.template_error_name,
+            unit.template_error_arguments);
         goto cleanup;
     }
     status = FT_SUCCESS;
 cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_function_rejects_nontrivial_struct_array_abi)
+{
+    const char *sources[2];
+    size_t index;
+
+    sources[0] = "template <typename T>\n"
+        "void consume(T value) { return; }\n"
+        "string names[3](8);\n"
+        "void main() {\n"
+        "    consume<string[3]>(names);\n"
+        "    return;\n"
+        "}\n";
+    sources[1] = "struct Point { string names[2](8); };\n"
+        "template <typename T>\n"
+        "void consume(T value) { return; }\n"
+        "void main() {\n"
+        "    consume<Point[2]>(0);\n"
+        "    return;\n"
+        "}\n";
+    index = 0;
+    while (index < 2)
+    {
+        t_cblc_translation_unit unit;
+
+        cblc_translation_unit_init(&unit);
+        if (cblc_parse_translation_unit(sources[index], &unit) == FT_SUCCESS
+            || unit.parse_error_code != TRANSPILE_ERROR_TEMPLATE_INSTANTIATION_FAILED
+            || std::strcmp(unit.parse_error_message,
+                "template function instantiation failed") != 0
+            || std::strcmp(unit.template_error_name, "consume") != 0
+            || unit.template_error_arguments[0] == '\0'
+            || unit.template_error_definition_offset == static_cast<size_t>(-1)
+            || unit.template_error_use_offset == static_cast<size_t>(-1))
+        {
+            std::printf("Assertion failed: non-trivial struct array ABI should be rejected (index=%zu, error=%d, message=%s, args=%s)\n",
+                index, unit.parse_error_code, unit.parse_error_message,
+                unit.template_error_arguments);
+            cblc_translation_unit_dispose(&unit);
+            return (FT_FAILURE);
+        }
+        cblc_translation_unit_dispose(&unit);
+        index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cblc_template_function_int_array_abi)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "template <typename T>\n"
+        "void consume(T values) { display(\"CONSUMED\"); return; }\n"
+        "int numbers[3];\n"
+        "void main() {\n"
+        "    consume<int[3]>(numbers);\n"
+        "    return;\n"
+        "}\n";
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS
+        || unit.function_instantiation_count != 1
+        || unit.functions[unit.function_instantiations[0].function_index].parameter_count != 1
+        || unit.functions[unit.function_instantiations[0].function_index].parameters[0].array_count != 3)
+    {
+        std::printf("Assertion failed: int array template function should preserve parameter shape\n");
+        goto cleanup;
+    }
+    if (cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
+        || !generated_cobol
+        || !ft_strnstr(generated_cobol, "OCCURS 3 TIMES.", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "MOVE NUMBERS(1) TO", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "MOVE NUMBERS(3) TO", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "DISPLAY \"CONSUMED\"", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: int array template function should emit OCCURS storage (generated=%s)\n",
+            generated_cobol ? generated_cobol : "<null>");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_function_string_array_abi)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "template <typename T>\n"
+        "void consume(T values) { display(\"CONSUMED\"); return; }\n"
+        "string names[3](8);\n"
+        "void main() {\n"
+        "    names[1] = \"one\";\n"
+        "    consume<string(8)[3]>(names);\n"
+        "    return;\n"
+        "}\n";
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS
+        || unit.function_instantiation_count != 1
+        || unit.functions[unit.function_instantiations[0].function_index].parameter_count != 1
+        || unit.functions[unit.function_instantiations[0].function_index].parameters[0].kind
+            != TRANSPILE_FUNCTION_PARAMETER_STRING
+        || unit.functions[unit.function_instantiations[0].function_index].parameters[0].length != 8
+        || unit.functions[unit.function_instantiations[0].function_index].parameters[0].array_count != 3)
+    {
+        std::printf("Assertion failed: string array template function should preserve capacity and shape\n");
+        goto cleanup;
+    }
+    if (cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
+        || !generated_cobol
+        || !ft_strnstr(generated_cobol, "OCCURS 3 TIMES.", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol,
+            "COMPUTE CBLC-TPL-CONSUME-STRING-CAP8-ARR3-VALUES-LEN",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "MOVE NAMES-BUF TO", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "DISPLAY \"CONSUMED\"", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: string array template function should emit per-element copy ABI (generated=%s)\n",
+            generated_cobol ? generated_cobol : "<null>");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_function_struct_array_abi)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "struct Point { int value; };\n"
+        "template <typename T>\n"
+        "void consume(T values) { display(\"CONSUMED\"); return; }\n"
+        "Point points[2];\n"
+        "void main() {\n"
+        "    consume<Point[2]>(points);\n"
+        "    return;\n"
+        "}\n";
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS
+        || unit.function_instantiation_count != 1
+        || unit.functions[unit.function_instantiations[0].function_index].parameters[0].kind
+            != TRANSPILE_FUNCTION_PARAMETER_STRUCT
+        || unit.functions[unit.function_instantiations[0].function_index].parameters[0].array_count != 2
+        || std::strcmp(unit.functions[unit.function_instantiations[0].function_index].parameters[0].type_name,
+            "Point") != 0)
+    {
+        std::printf("Assertion failed: struct array template function should preserve layout identity and shape\n");
+        goto cleanup;
+    }
+    if (cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
+        || !generated_cobol
+        || !ft_strnstr(generated_cobol, "POINTS OCCURS 2 TIMES.", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "MOVE POINTS-VALUE(1) TO", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "DISPLAY \"CONSUMED\"", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: struct array template function should emit group-copy ABI (generated=%s)\n",
+            generated_cobol ? generated_cobol : "<null>");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_function_char_struct_array_abi)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "struct Point { char name[8]; };\n"
+        "template <typename T>\n"
+        "void consume(T values) { display(\"CHAR STRUCT ARRAY\"); return; }\n"
+        "Point points[2];\n"
+        "void main() {\n"
+        "    consume<Point[2]>(points);\n"
+        "    return;\n"
+        "}\n";
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS
+        || unit.function_instantiation_count != 1
+        || cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
+        || !generated_cobol
+        || !std::strstr(generated_cobol, "POINTS-NAME PIC X(8)")
+        || !std::strstr(generated_cobol, "MOVE POINTS-NAME(1) TO")
+        || !std::strstr(generated_cobol, "DISPLAY \"CHAR STRUCT ARRAY\""))
+    {
+        std::printf("Assertion failed: character-buffer struct array should emit value copies (generated=%s)\n",
+            generated_cobol ? generated_cobol : "<null>");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_function_const_string_struct_array_abi)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "struct Point { const string name(8); };\n"
+        "template <typename T>\n"
+        "void consume(T values) { display(\"CONST STRING ARRAY\"); return; }\n"
+        "Point points[2];\n"
+        "void main() {\n"
+        "    consume<Point[2]>(points);\n"
+        "    return;\n"
+        "}\n";
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS
+        || unit.function_instantiation_count != 1
+        || cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
+        || !generated_cobol
+        || !std::strstr(generated_cobol, "POINTS-NAME-BUF PIC X(8)")
+        || !std::strstr(generated_cobol, "MOVE POINTS-NAME-BUF(1) TO")
+        || !std::strstr(generated_cobol, "DISPLAY \"CONST STRING ARRAY\""))
+    {
+        std::printf("Assertion failed: const fixed string struct array should emit value copies (generated=%s)\n",
+            generated_cobol ? generated_cobol : "<null>");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_function_mutable_string_struct_array_abi)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "struct Point { string name(8); };\n"
+        "template <typename T>\n"
+        "void consume(T values) { display(\"MUTABLE STRING ARRAY\"); return; }\n"
+        "Point points[2];\n"
+        "void main() {\n"
+        "    consume<Point[2]>(points);\n"
+        "    return;\n"
+        "}\n";
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS
+        || unit.function_instantiation_count != 1
+        || cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
+        || !generated_cobol
+        || !std::strstr(generated_cobol, "POINTS-NAME-PTR USAGE POINTER")
+        || !std::strstr(generated_cobol, "ALLOCATE 8 CHARACTERS RETURNING POINTS-NAME-PTR(1)")
+        || !std::strstr(generated_cobol, "FREE CBLC-TPL-CONSUME-POINT-ARR2-VALUES-NAME-PTR(1)")
+        || !std::strstr(generated_cobol, "DISPLAY \"MUTABLE STRING ARRAY\""))
+    {
+        std::printf("Assertion failed: mutable string struct array should emit owned copies and cleanup (generated=%s)\n",
+            generated_cobol ? generated_cobol : "<null>");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
     cblc_translation_unit_dispose(&unit);
     return (status);
 }
@@ -1026,7 +1335,10 @@ FT_TEST(test_cblc_template_instantiation_limit_is_deterministic)
     status = FT_FAILURE;
     if (cblc_parse_translation_unit(source, &unit) == FT_SUCCESS
         || unit.parse_error_code != TRANSPILE_ERROR_TEMPLATE_INSTANTIATION_FAILED
-        || std::strcmp(unit.parse_error_message, "template instantiation limit exceeded") != 0)
+        || std::strcmp(unit.parse_error_message, "template instantiation limit exceeded") != 0
+        || std::strcmp(unit.template_error_name, "box") != 0
+        || std::strcmp(unit.template_error_arguments, "char") != 0
+        || unit.template_error_definition_offset == static_cast<size_t>(-1))
     {
         std::printf("Assertion failed: template instance limits should fail deterministically\n");
         goto cleanup;
@@ -1321,6 +1633,72 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_import_rejects_conflicting_same_named_type_layout)
+{
+    const char *worker_source;
+    const char *main_source;
+    t_cblc_translation_unit worker_unit;
+    t_cblc_translation_unit main_unit;
+    t_transpiler_context context;
+    int context_initialized;
+    int status;
+
+    worker_source = "struct Point { int value; };\n"
+        "void worker() { return; }\n";
+    main_source = "import \"worker_mod\";\n"
+        "struct Point { char name[8]; };\n"
+        "void main() { return; }\n";
+    cblc_translation_unit_init(&worker_unit);
+    cblc_translation_unit_init(&main_unit);
+    context_initialized = 0;
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(worker_source, &worker_unit) != FT_SUCCESS
+        || cblc_parse_translation_unit(main_source, &main_unit) != FT_SUCCESS
+        || transpiler_context_init(&context) != FT_SUCCESS)
+        goto cleanup;
+    context_initialized = 1;
+    if (transpiler_context_register_module(&context, "worker_mod", "worker_mod")
+            != FT_SUCCESS
+        || transpiler_context_register_module(&context, "main_mod", "main_mod")
+            != FT_SUCCESS
+        || transpiler_context_register_module_import(&context, "main_mod", "worker_mod")
+            != FT_SUCCESS
+        || cblc_register_translation_unit_exports(&context, "worker_mod", &worker_unit)
+            != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_import_translation_unit_type_stubs(&context, "main_mod", &main_unit)
+        == FT_SUCCESS)
+    {
+        std::printf("Assertion failed: same-named conflicting layouts should be rejected\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (context_initialized)
+        transpiler_context_dispose(&context);
+    cblc_translation_unit_dispose(&worker_unit);
+    cblc_translation_unit_dispose(&main_unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_struct_pointer_fields_require_borrowed_annotation)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+
+    source = "struct Holder { int *ptr; };\n"
+        "void main() { return; }\n";
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) == FT_SUCCESS)
+    {
+        cblc_translation_unit_dispose(&unit);
+        std::printf("Assertion failed: unannotated pointer fields should be rejected\n");
+        return (FT_FAILURE);
+    }
+    cblc_translation_unit_dispose(&unit);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_cblc_imported_template_function_instantiates_from_exported_body)
 {
     const char *worker_source;
@@ -1337,11 +1715,18 @@ FT_TEST(test_cblc_imported_template_function_instantiates_from_exported_body)
         "T identity(T value) {\n"
         "    return value;\n"
         "}\n"
+        "template <typename T>\n"
+        "void consume(T values) {\n"
+        "    display(\"CONSUMED\");\n"
+        "    return;\n"
+        "}\n"
         "void worker() { return; }\n";
     main_source = "import \"worker_mod\";\n"
         "int result;\n"
+        "int numbers[3];\n"
         "void main() {\n"
         "    result = identity<int>(7);\n"
+        "    consume<int[3]>(numbers);\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&worker_unit);
@@ -1379,13 +1764,121 @@ FT_TEST(test_cblc_imported_template_function_instantiates_from_exported_body)
         std::printf("Assertion failed: imported function template should instantiate from its body\n");
         goto cleanup;
     }
+    {
+        const t_cblc_function *array_function;
+
+        array_function = NULL;
+        for (size_t function_index = 0; function_index < main_unit.function_count;
+            ++function_index)
+        {
+            if (std::strcmp(main_unit.functions[function_index].source_name,
+                    "consume__int_ARR3") == 0)
+            {
+                array_function = &main_unit.functions[function_index];
+                break;
+            }
+        }
+        if (!array_function || array_function->parameter_count != 1
+            || array_function->parameters[0].array_count != 3)
+        {
+            std::printf("Assertion failed: imported array template should preserve ABI shape\n");
+            goto cleanup;
+        }
+    }
     if (test_expect_success(cblc_generate_cobol(&main_unit, &generated_cobol),
             "consumer should emit imported function template instance") != FT_SUCCESS)
         goto cleanup;
     if (!generated_cobol || !std::strstr(generated_cobol, "CBLC-TPL-IDENTITY-INT")
+        || !std::strstr(generated_cobol, "MOVE NUMBERS(1) TO")
+        || !std::strstr(generated_cobol, "DISPLAY \"CONSUMED\"")
         || std::strstr(generated_cobol, "typename"))
     {
-        std::printf("Assertion failed: imported function output should be concrete\n");
+        std::printf("Assertion failed: imported function output should be concrete (generated=%s)\n",
+            generated_cobol ? generated_cobol : "<null>");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&worker_unit);
+    cblc_translation_unit_dispose(&main_unit);
+    if (context_initialized)
+        transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_cblc_imported_trivial_struct_array_template_executes)
+{
+    const char *worker_source;
+    const char *main_source;
+    t_cblc_translation_unit worker_unit;
+    t_cblc_translation_unit main_unit;
+    t_transpiler_context context;
+    char *generated_cobol;
+    int context_initialized;
+    int status;
+
+    worker_source = "struct Point { int value; };\n"
+        "template <typename T>\n"
+        "void consume(T values) {\n"
+        "    display(\"IMPORTED\");\n"
+        "    return;\n"
+        "}\n"
+        "void worker() { return; }\n";
+    main_source = "import \"worker_mod\";\n"
+        "Point points[2];\n"
+        "void main() {\n"
+        "    consume<Point[2]>(points);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&worker_unit);
+    cblc_translation_unit_init(&main_unit);
+    generated_cobol = NULL;
+    context_initialized = 0;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(worker_source, &worker_unit),
+            "struct-array template provider should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        goto cleanup;
+    context_initialized = 1;
+    if (transpiler_context_register_module(&context, "worker_mod", "worker_mod") != FT_SUCCESS
+        || transpiler_context_register_module(&context, "main_mod", "main_mod") != FT_SUCCESS
+        || transpiler_context_register_module_import(&context, "main_mod", "worker_mod")
+            != FT_SUCCESS
+        || cblc_register_translation_unit_exports(&context, "worker_mod", &worker_unit)
+            != FT_SUCCESS
+        || cblc_import_translation_unit_type_stubs(&context, "main_mod", &main_unit)
+            != FT_SUCCESS
+        || cblc_import_translation_unit_function_stubs(&context, "main_mod", &main_unit)
+            != FT_SUCCESS
+        || cblc_parse_translation_unit(main_source, &main_unit) != FT_SUCCESS)
+        goto cleanup;
+    if (main_unit.function_instantiation_count != 1
+        || main_unit.functions[main_unit.function_instantiations[0].function_index].parameter_count
+            != 1
+        || main_unit.functions[main_unit.function_instantiations[0].function_index]
+            .parameters[0].kind != TRANSPILE_FUNCTION_PARAMETER_STRUCT
+        || main_unit.functions[main_unit.function_instantiations[0].function_index]
+            .parameters[0].array_count != 2
+        || std::strcmp(main_unit.functions[main_unit.function_instantiations[0].function_index]
+                .parameters[0].type_name, "Point") != 0)
+    {
+        std::printf("Assertion failed: imported struct-array template should preserve ABI shape\n");
+        goto cleanup;
+    }
+    if (test_expect_success(cblc_generate_cobol(&main_unit, &generated_cobol),
+            "imported struct-array template should generate COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol
+        || !std::strstr(generated_cobol, "POINTS OCCURS 2 TIMES.")
+        || !std::strstr(generated_cobol, "MOVE POINTS-VALUE(1) TO")
+        || !std::strstr(generated_cobol, "PERFORM CBLC-TPL-CONSUME-POINT-ARR2")
+        || !std::strstr(generated_cobol, "DISPLAY \"IMPORTED\""))
+    {
+        std::printf("Assertion failed: imported struct-array template should emit concrete ABI (generated=%s)\n",
+            generated_cobol ? generated_cobol : "<null>");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -4757,8 +5250,22 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_templates_instantiate_multi_parameter_function},
         {"cblc_templates_reject_unsupported_parameter_forms",
             test_cblc_templates_reject_unsupported_parameter_forms},
-        {"cblc_template_function_rejects_array_abi_gap",
-            test_cblc_template_function_rejects_array_abi_gap},
+        {"cblc_template_function_rejects_scalar_for_array_abi",
+            test_cblc_template_function_rejects_scalar_for_array_abi},
+        {"cblc_template_function_rejects_nontrivial_struct_array_abi",
+            test_cblc_template_function_rejects_nontrivial_struct_array_abi},
+        {"cblc_template_function_int_array_abi",
+            test_cblc_template_function_int_array_abi},
+        {"cblc_template_function_string_array_abi",
+            test_cblc_template_function_string_array_abi},
+        {"cblc_template_function_struct_array_abi",
+            test_cblc_template_function_struct_array_abi},
+        {"cblc_template_function_char_struct_array_abi",
+            test_cblc_template_function_char_struct_array_abi},
+        {"cblc_template_function_const_string_struct_array_abi",
+            test_cblc_template_function_const_string_struct_array_abi},
+        {"cblc_template_function_mutable_string_struct_array_abi",
+            test_cblc_template_function_mutable_string_struct_array_abi},
         {"cblc_template_parse_reports_stable_diagnostic",
             test_cblc_template_parse_reports_stable_diagnostic},
         {"cblc_template_function_rejects_mismatched_argument",
@@ -4781,8 +5288,14 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_template_class_constructor_is_concrete},
         {"cblc_imported_template_type_instantiates_from_exported_metadata",
             test_cblc_imported_template_type_instantiates_from_exported_metadata},
+        {"cblc_import_rejects_conflicting_same_named_type_layout",
+            test_cblc_import_rejects_conflicting_same_named_type_layout},
+        {"cblc_struct_pointer_fields_require_borrowed_annotation",
+            test_cblc_struct_pointer_fields_require_borrowed_annotation},
         {"cblc_imported_template_function_instantiates_from_exported_body",
             test_cblc_imported_template_function_instantiates_from_exported_body},
+        {"cblc_imported_trivial_struct_array_template_executes",
+            test_cblc_imported_trivial_struct_array_template_executes},
         {"cblc_parse_translation_unit_tracks_multiple_functions",
             test_cblc_parse_translation_unit_tracks_multiple_functions},
         {"cblc_parse_translation_unit_accepts_functions_without_keyword",

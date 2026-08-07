@@ -58,6 +58,14 @@ FT_TEST(test_cli_standard_library_emits_all_programs)
     }
     validation_env_set = 1;
     status = FT_FAILURE;
+    if (std::snprintf(program_path, sizeof(program_path), "%s/CBLC-STRCMP.cob",
+            directory_template) < 0
+        || test_write_text_file(program_path,
+            "       IDENTIFICATION DIVISION.\n"
+            "       PROGRAM-ID. CBLC-STRCMP.\n"
+            "       LINKAGE SECTION.\n"
+            "       01 LNK-FIRST PIC X(512).\n") != FT_SUCCESS)
+        goto cleanup;
     command_length = std::snprintf(command, sizeof(command),
         "./ctoc_cobol_transpiler --direction standard-library --output-dir %s",
         directory_template);
@@ -89,6 +97,12 @@ FT_TEST(test_cli_standard_library_emits_all_programs)
                 entries[index].program_name);
             goto cleanup;
         }
+        if (std::strncmp(entries[index].program_name, "CBLC-STRCMP", 12) == 0
+            && !ft_strnstr(file_buffer, "PIC X(512)", std::strlen(file_buffer)))
+        {
+            std::printf("Assertion failed: wider existing standard-library buffer should be retained\n");
+            goto cleanup;
+        }
         test_remove_file(program_path);
         index += 1;
     }
@@ -102,7 +116,7 @@ FT_TEST(test_cli_standard_library_emits_all_programs)
     }
     if (!ft_strnstr(file_buffer, "\"schema_version\": 1", std::strlen(file_buffer))
         || !ft_strnstr(file_buffer,
-            "\"template_contract\": \"CBLC-TEMPLATE-TYPE-SUBSTITUTION@1\"",
+            "\"template_contract\": \"CBLC-TEMPLATE-TYPE-SUBSTITUTION@6\"",
             std::strlen(file_buffer))
         || !ft_strnstr(file_buffer, "CBLC-STRLEN", std::strlen(file_buffer)))
     {
@@ -183,7 +197,7 @@ FT_TEST(test_cli_cobol_translation_emits_required_standard_library_programs)
         goto cleanup;
     if (test_read_text_file(manifest_path, file_buffer, sizeof(file_buffer)) != FT_SUCCESS
         || !ft_strnstr(file_buffer,
-            "\"template_contract\": \"CBLC-TEMPLATE-TYPE-SUBSTITUTION@1\"",
+            "\"template_contract\": \"CBLC-TEMPLATE-TYPE-SUBSTITUTION@6\"",
             std::strlen(file_buffer))
         || !ft_strnstr(file_buffer, "CBLC-STRLEN", std::strlen(file_buffer))
         || !ft_strnstr(file_buffer, "\"source_hash\": \"fnv1a64:",
@@ -208,10 +222,60 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cli_cobol_translation_can_deploy_complete_standard_library)
+{
+    char directory_template[64];
+    char source_path[TRANSPILE_FILE_PATH_MAX];
+    char target_path[TRANSPILE_FILE_PATH_MAX];
+    char all_path[TRANSPILE_FILE_PATH_MAX];
+    char manifest_path[TRANSPILE_FILE_PATH_MAX];
+    char command[1024];
+    char file_buffer[131072];
+    int status;
+
+    status = FT_FAILURE;
+    ft_strlcpy(directory_template, "/tmp/ctoc_all_libraryXXXXXX",
+        sizeof(directory_template));
+    if (!mkdtemp(directory_template))
+        return (FT_FAILURE);
+    if (std::snprintf(source_path, sizeof(source_path), "%s/main.cblc", directory_template) < 0
+        || std::snprintf(target_path, sizeof(target_path), "%s/main.cob", directory_template) < 0
+        || std::snprintf(all_path, sizeof(all_path), "%s/CBLC-ABS.cob", directory_template) < 0
+        || std::snprintf(manifest_path, sizeof(manifest_path), "%s/cblc.manifest.json",
+            directory_template) < 0)
+        goto cleanup;
+    if (test_write_text_file(source_path,
+            "void main() { return; }\n") != FT_SUCCESS)
+        goto cleanup;
+    if (std::snprintf(command, sizeof(command),
+            "CTOC_SKIP_STANDARD_LIBRARY_VALIDATION=1 ./ctoc_cobol_transpiler "
+            "--direction cblc-to-cobol --input %s --output %s "
+            "--output-dir %s --emit-all-standard-library", source_path, "main.cob",
+            directory_template) < 0 || test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(all_path, file_buffer, sizeof(file_buffer)) != FT_SUCCESS
+        || !ft_strnstr(file_buffer, "PROGRAM-ID. CBLC-ABS.", std::strlen(file_buffer)))
+        goto cleanup;
+    if (test_read_text_file(manifest_path, file_buffer, sizeof(file_buffer)) != FT_SUCCESS
+        || !ft_strnstr(file_buffer, "CBLC-ABS", std::strlen(file_buffer))
+        || !ft_strnstr(file_buffer, "CBLC-STRCMP", std::strlen(file_buffer)))
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    test_remove_file(source_path);
+    test_remove_file(target_path);
+    test_remove_file(all_path);
+    test_remove_file(manifest_path);
+    rmdir(directory_template);
+    return (status);
+}
+
 static const t_test_case g_cli_standard_library_tests[] = {
     {"cli_standard_library_emits_all_programs", test_cli_standard_library_emits_all_programs},
     {"cli_cobol_translation_emits_required_standard_library_programs",
-        test_cli_cobol_translation_emits_required_standard_library_programs}
+        test_cli_cobol_translation_emits_required_standard_library_programs},
+    {"cli_cobol_translation_can_deploy_complete_standard_library",
+        test_cli_cobol_translation_can_deploy_complete_standard_library}
 };
 
 const t_test_case *get_cli_standard_library_tests(size_t *count)
