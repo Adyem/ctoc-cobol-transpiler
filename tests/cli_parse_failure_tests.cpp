@@ -71,8 +71,27 @@ FT_TEST(test_cli_rejects_unknown_direction)
 
     argc = sizeof(argv) / sizeof(argv[0]);
     return (expect_cli_parse_failure(argv, argc,
-        "Unknown direction 'invalid-direction'. Expected 'cblc-to-cobol', 'cblc-to-c', 'cobol-to-cblc', or 'standard-library'.\n",
+        "Unknown direction 'invalid-direction'. Expected 'cblc-to-cobol', 'cobol-to-cblc', or 'standard-library'.\n",
         "CLI should reject unknown direction"));
+}
+
+FT_TEST(test_cli_rejects_removed_c_translation_direction)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cblc-to-c",
+        "--input",
+        "first.cblc",
+        "--output",
+        "first.c"
+    };
+    size_t argc;
+
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Unknown direction 'cblc-to-c'. Expected 'cblc-to-cobol', 'cobol-to-cblc', or 'standard-library'.\n",
+        "CLI should reject the removed C translation direction"));
 }
 
 FT_TEST(test_cli_rejects_missing_direction_value)
@@ -89,7 +108,7 @@ FT_TEST(test_cli_rejects_missing_direction_value)
 
     argc = sizeof(argv) / sizeof(argv[0]);
     return (expect_cli_parse_failure(argv, argc,
-        "Unknown direction '--input'. Expected 'cblc-to-cobol', 'cblc-to-c', 'cobol-to-cblc', or 'standard-library'.\n",
+        "Unknown direction '--input'. Expected 'cblc-to-cobol', 'cobol-to-cblc', or 'standard-library'.\n",
         "CLI should reject missing direction value"));
 }
 
@@ -347,6 +366,7 @@ const t_test_case *get_cli_parse_failure_tests(size_t *count)
     static const t_test_case tests[] = {
         {"cli_rejects_mismatched_path_counts", test_cli_rejects_mismatched_path_counts},
         {"cli_rejects_unknown_direction", test_cli_rejects_unknown_direction},
+        {"cli_rejects_removed_c_translation_direction", test_cli_rejects_removed_c_translation_direction},
         {"cli_rejects_missing_direction_value", test_cli_rejects_missing_direction_value},
         {"cli_requires_direction_without_environment", test_cli_requires_direction_without_environment},
         {"cli_requires_input_path", test_cli_requires_input_path},

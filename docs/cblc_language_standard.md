@@ -2,12 +2,13 @@
 
 **Status:** authoritative repository specification
 **Version:** 0.2 (implementation baseline)
-**Last reviewed:** 2026-08-05
+**Last reviewed:** 2026-08-07
 
 This document is the normative reference for CBL-C as implemented by this
 repository. It specifies source syntax, static semantics, runtime behavior,
-diagnostics, module behavior, and the behavior of the CBL-C-to-COBOL and
-CBL-C-to-C compiler pipelines.
+diagnostics, module behavior, and the behavior of the CBL-C-to-COBOL compiler
+pipeline. CBL-C-to-C translation is intentionally removed from the supported
+product surface.
 
 The word **must** describes a required rule. **May** describes an allowed
 implementation choice that does not change observable CBL-C behavior. A
@@ -81,7 +82,7 @@ subsections rather than rewriting the meaning of unrelated features.
 ## 1. Scope and conformance
 
 CBL-C is a small, statically checked, C-like source language designed to lower
-deterministically to COBOL and portable C. It is not general-purpose C++ and
+deterministically to COBOL. It is not general-purpose C++ or portable C and
 does not promise source compatibility with C, C++, or any COBOL edition.
 
 A conforming implementation of this repository's language must:
@@ -89,9 +90,8 @@ A conforming implementation of this repository's language must:
 1. reject source that violates the lexical, syntactic, or semantic rules here;
 2. report source locations for diagnostics where a location is available;
 3. preserve the specified evaluation and lowering behavior;
-4. produce equivalent observable behavior in the supported CBL-C-to-COBOL and
-   CBL-C-to-C paths, apart from target-runtime differences explicitly listed
-   in this document; and
+4. produce the specified observable behavior in the supported CBL-C-to-COBOL
+   path; and
 5. keep the parser, semantic pass, generators, formatter, samples, and tests
    synchronized when adding a language feature.
 
@@ -342,9 +342,8 @@ emitter resolves those references once while emitting the method block. A
 method block must contain its own parameter/local storage contract, receiver
 contract, return contract, and lifecycle/error behavior.
 
-For the C backend, the block is a generated function with a stable mangled name
-and an explicit receiver parameter. For the COBOL backend, the block is a
-generated callable paragraph/subprogram according to the target ABI, with the
+For the COBOL backend, the block is a generated callable paragraph/subprogram
+according to the target ABI, with the
 receiver passed by reference and value results/status passed through explicit
 slots. A call site may contain argument preparation and result movement, but it
 must not contain the method's implementation statements.
@@ -388,14 +387,13 @@ string.length       → CBLC string-length helper
 string.starts_with  → CBLC string-prefix helper
 ```
 
-The mapping is resolved once during semantic analysis. The CBL-C-to-C backend
-emits a call to the shared C runtime helper; the CBL-C-to-COBOL backend emits a
-call to the generated standard-library subprogram or one shared generated
-paragraph. Neither backend may reproduce the complete append/length/prefix
-algorithm separately at every source call site.
+The mapping is resolved once during semantic analysis. The CBL-C-to-COBOL
+backend emits a call to the generated standard-library subprogram or one shared
+generated paragraph. The COBOL backend must not reproduce the complete
+append/length/prefix algorithm separately at every source call site.
 
 The source of truth for the currently registered string intrinsic names,
-argument counts, mutability, and C helper associations is
+argument counts, mutability, and COBOL target associations is
 `src/transpiler/transpiler_cblc_intrinsics.cpp`. A registry entry is not a
 claim that a COBOL program exists: the COBOL target association remains unset
 until its calling convention and generated artifact are implemented and tested.
@@ -611,25 +609,7 @@ slots, and one paragraph per registered operation. This rule is especially
 important for string capacity checks, allocation, copying, comparison, and
 lifecycle cleanup.
 
-### 14.2 CBL-C to C
-
-The C backend is a portable behavioral baseline used for execution and
-differential testing. It must preserve supported source semantics for scalar,
-string, record, class, pointer, call, control-flow, lifecycle, and registered
-runtime operations. It may use helper functions and generated backing storage;
-those implementation details are not part of CBL-C source compatibility.
-
-Each user-defined method and compiler-known intrinsic must have one generated C
-function or one shared runtime function per compilation unit/linkage contract.
-The current C backend satisfies this for user-defined methods whose parameters
-use the supported scalar, record, pointer, and string-buffer ABI. Constructor
-bodies with supported scalar/record/string parameters, including receiver-side
-string member initialization, are emitted as reusable C functions. Call sites
-may not inline a second copy of an implementation once its callable ABI is
-available. Parameterized destructors and unsupported result/receiver kinds
-remain explicit conformance gaps.
-
-### 14.3 Generated artifacts and dependencies
+### 14.2 Generated artifacts and dependencies
 
 Generated files are build artifacts, not accidental side effects of individual
 source functions. The compiler must distinguish these artifact classes:
@@ -637,16 +617,15 @@ source functions. The compiler must distinguish these artifact classes:
 | Artifact | Purpose | Current repository behavior |
 | --- | --- | --- |
 | translated module | User program/module output | Written to the matching `--output` path. |
-| target runtime helper | Shared C/COBOL implementation support | CBL-C C output extracts the referenced helper closure in deterministic registry order; `standard-library` mode emits the complete `cblc_runtime_helpers.c` package and COBOL standard-library programs separately. |
+| target runtime helper | Shared COBOL implementation support | COBOL standard-library programs and shared generated paragraphs provide the target support; no C runtime artifact is emitted. |
 | standard-library subprogram | External callable helper with a stable ABI | `standard-library` mode currently emits every registered helper as its own `.cob`. |
-| metadata/manifest | Dependency and build description | Both standard-library and normal translation modes emit `cblc.manifest.json`; C output records embedded runtime support, while COBOL output emits and records the transitive standard-library closure referenced by generated targets. |
+| metadata/manifest | Dependency and build description | Both standard-library and normal translation modes emit `cblc.manifest.json`; COBOL output records the transitive standard-library closure referenced by generated targets. |
 
 The current `standard-library` command is therefore a packaging operation:
 
 ```text
 standard-library
-    ├── CBLC-*.cob
-    └── cblc_runtime_helpers.c
+    └── CBLC-*.cob
 ```
 
 It intentionally validates and writes each catalog entry independently. Normal
@@ -656,26 +635,19 @@ the targets, and records them in the manifest. The manifests use stable FNV-1a c
 standard-library manifest describes the complete catalog package, while normal
 translation describes the generated target plus its required helper closure.
 
-The scalable model for future work is dependency-closed packaging. The C
-runtime helper registry now assigns each helper a stable identifier and
-declares helper-to-helper dependencies. C output scans the generated program
-body, computes the transitive closure, and emits only that closure in registry
-order. During semantic analysis, every intrinsic, standard-library call, runtime helper, and
+The scalable model for future work is dependency-closed packaging. During
+semantic analysis, every intrinsic, standard-library call, runtime helper, and
 generated method records a stable artifact identifier. The build then computes
 the transitive dependency closure and emits:
 
 ```text
 build/<target>/<module>.cob
 build/<target>/runtime/<required-helper>.cob
-build/<target>/runtime/cblc_runtime_helpers.c
 build/<target>/cblc.manifest.json
 ```
 
 Each generated artifact includes a `dependencies` array of stable artifact IDs.
-Embedded C targets additionally include `runtime_helpers`, an ordered array of
-helper IDs and their declared helper dependencies. This makes the exact
-embedded closure inspectable without treating the helper definitions as a
-separate file. The manifest should list source modules, generated artifacts, dependencies,
+The manifest should list source modules, generated artifacts, dependencies,
 target language, ABI version, compiler version, and hashes. It allows a build
 system to compile only required files, prevents duplicate helper definitions,
 and makes incremental builds reproducible. A `--runtime` or equivalent policy
@@ -689,7 +661,7 @@ embed a small runtime into each output file; that is simpler for distribution
 but is unsuitable here once multiple COBOL modules share helpers because it can
 create duplicate program names and duplicated state.
 
-### 14.4 Reverse COBOL to CBL-C
+### 14.3 Reverse COBOL to CBL-C
 
 The reverse pipeline reconstructs only the documented recoverable subset. It may
 normalize names, comments, declarations, values, groups, copy directives,
@@ -745,7 +717,7 @@ The initial feature registry is:
 | `CBLC-MEM-POINTER` | Supported pointer kinds and allocator calls | current/partial | 6.6, 12 |
 | `CBLC-IO-FILE` | File declarations and sequential I/O | partial | 11, 14 |
 | `CBLC-ABI-COBOL` | COBOL linkage/result/status conventions | current | 8, 12, 14.1 |
-| `CBLC-ARTIFACT-RUNTIME` | Runtime helper packaging and dependency manifests | current/partial | 14.3 |
+| `CBLC-ARTIFACT-RUNTIME` | COBOL standard-library packaging and dependency manifests | current/partial | 14.3 |
 
 `current/partial` means the named capability exists, but one or more
 interactions, target paths, or artifact contracts remain incomplete. A registry
@@ -866,20 +838,13 @@ remaining intrinsic and runtime artifact contracts:
   calls, truncation/status behavior, and future multi-argument signatures.
   Update the intrinsic registry and this ABI section together whenever an
   operation is added.
-- [ ] **Selective C runtime extraction (`CBLC-TODO-C-RUNTIME`).** The C
-  backend now performs dependency-closed extraction: every helper has a stable
-  ID and declared edges, generated C receives only the referenced transitive
-  closure in deterministic order, and the C manifest records the selected IDs
-  and edges. Complete the release gate with an explicit shared-runtime mode,
-  public missing/cyclic-contract diagnostics, duplicate/unsupported requests,
-  and generated C compile/link coverage.
 
 | Area | Current status | Required hardening |
 | --- | --- | --- |
 | exact grammar | **partial** | Keep accepted syntax examples and parser tests synchronized with this document. |
-| method reuse | **partial** | C supports callable blocks for supported scalar/record/pointer/string parameters and scalar/record/string constructor/lifecycle bodies, including string members; COBOL supports receiver-specialized paragraphs for supported methods and custom constructors/destructors. Extend parameterized destructor ABI and other result kinds. |
-| built-in string intrinsics | **partial** | The operation registry, canonical parser operands, C helper routing, registry-driven arity validation, and reusable COBOL paragraphs for zero- and one-argument string operations are centralized; executable COBOL validation and broader ABI coverage remain release gates. |
-| runtime dependency closure | **partial** | C output now emits and manifests the selected transitive C-helper closure; COBOL output emits the transitive standard-library closure. A shared-runtime policy and broader artifact-level dependency validation remain. |
+| method reuse | **partial** | COBOL supports receiver-specialized paragraphs for supported methods and custom constructors/destructors. Extend parameterized destructor ABI and other result kinds. |
+| built-in string intrinsics | **partial** | The operation registry, canonical parser operands, registry-driven arity validation, and reusable COBOL paragraphs for zero- and one-argument string operations are centralized; executable COBOL validation and broader ABI coverage remain release gates. |
+| runtime dependency closure | **partial** | COBOL output emits the transitive standard-library closure; broader artifact-level dependency validation remains. |
 | forward file-control generation | **partial** | Define file declaration semantics, status/EOF behavior, and supported target clauses individually. |
 | reverse translation | **partial** | Keep reverse-recoverable syntax separate from forward language conformance. |
 | feature registry | **current framework** | Assign stable `CBLC-*` IDs and status records to every new capability. |

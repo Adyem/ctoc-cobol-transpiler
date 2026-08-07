@@ -32,13 +32,7 @@ Refer to `docs/onboarding_checklist.md` for a full environment audit before comm
    cat build/minimal_program.cblc
    ```
 
-4. When you need a native baseline for debugging, emit the same CBL-C inputs as portable C:
-   ```
-   ./ctoc_cobol_transpiler --direction cblc-to-c \
-       --input samples/cblc/minimal_program.cblc \
-       --output build/minimal_program.c
-   ```
-   The generated C pulls in lightweight helper routines (`cblc_string_assign_literal`, `cblc_display_*`, etc.) so you can build and execute the translation with any C toolchain while preserving the runtime semantics exercised by the COBOL backend.
+4. Compile the generated COBOL with GnuCOBOL when it is available, then run the resulting executable to validate the end-to-end behavior.
 
 The `docs/cli_usage_examples.md` file contains additional flag combinations. Forward CBL-C→COBOL coverage now runs automatically when the `cobc` binary is available on your PATH or under `/goinfre/$USER/local/bin`. Export `CTOC_ENABLE_FORWARD_TRANSLATION=0` (or pass `FORWARD_TRANSLATION=0` to `make test`) if you need to skip the COBOL-backed cases temporarily, or set the variable to `1` to force-enable them in environments without automatic detection.
 
@@ -81,11 +75,11 @@ The transpiler context tracks caller-observed buffer widths and rejects subprogr
 
 ### Bidirectional Source Maps
 
-Source maps now capture the relationship between generated CBL-C output and the originating COBOL statements so tooling can surface diagnostics against either language. The transpiler context exposes helpers to register spans for each translation unit, enumerate the table, and query in both directions when you need to locate the corresponding code snippet.【F:transpiler_context.cpp†L1198-L1313】 Regression tests cover successful registration, reverse lookups, and invalid span rejection so the context stays reliable as new stages adopt the mapping APIs.【F:tests/transpiler_context_tests.cpp†L1432-L1572】
+Source maps now capture the relationship between generated COBOL output and the originating CBL-C or COBOL statements so tooling can surface diagnostics against either language. The transpiler context exposes helpers to register spans for each translation unit, enumerate the table, and query in both directions when you need to locate the corresponding code snippet.【F:transpiler_context.cpp†L1198-L1313】 Regression tests cover successful registration, reverse lookups, and invalid span rejection so the context stays reliable as new stages adopt the mapping APIs.【F:tests/transpiler_context_tests.cpp†L1432-L1572】
 
 ## Where to Learn More
 
-* `docs/runtime_api_reference.md` documents the libft-backed runtime helpers that generated programs link against.
+* `docs/runtime_api_reference.md` documents the libft-backed runtime services used by the compiler and generated COBOL support programs.
 * `docs/cobol_dialect_requirements.md` captures the supported COBOL subset.
 * [`cblc_language_standard.md`](cblc_language_standard.md) is the authoritative language standard, compiler-behavior contract, and extension framework.
 * `docs/ide_integration.md` explains how to wire editor support (VS Code, Vim, Emacs) into daily workflows using the bundled grammar and automation tips.

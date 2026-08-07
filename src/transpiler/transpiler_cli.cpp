@@ -115,14 +115,6 @@ static int transpiler_cli_parse_direction_value(const char *value, t_transpiler_
         options->emit_standard_library = 0;
         return (FT_SUCCESS);
     }
-    length = std::strlen("cblc-to-c");
-    if (std::strncmp(value, "cblc-to-c", length + 1) == 0)
-    {
-        options->source_language = TRANSPILE_LANGUAGE_CBL_C;
-        options->target_language = TRANSPILE_LANGUAGE_C;
-        options->emit_standard_library = 0;
-        return (FT_SUCCESS);
-    }
     length = std::strlen("cobol-to-cblc");
     if (std::strncmp(value, "cobol-to-cblc", length + 1) == 0)
     {
@@ -139,7 +131,7 @@ static int transpiler_cli_parse_direction_value(const char *value, t_transpiler_
         options->target_language = TRANSPILE_LANGUAGE_NONE;
         return (FT_SUCCESS);
     }
-    std::printf("Unknown direction '%s'. Expected 'cblc-to-cobol', 'cblc-to-c', 'cobol-to-cblc', or 'standard-library'.\n", value);
+    std::printf("Unknown direction '%s'. Expected 'cblc-to-cobol', 'cobol-to-cblc', or 'standard-library'.\n", value);
     return (FT_FAILURE);
 }
 
@@ -632,7 +624,7 @@ void transpiler_cli_print_usage(void)
 {
     std::printf("Usage: ctoc_cobol_transpiler --direction <dir> --input <path> [--input <path> ...]\n");
     std::printf("       --output <path> [--output <path> ...]\n");
-    std::printf("       Direction: cblc-to-cobol | cblc-to-c | cobol-to-cblc | standard-library\n");
+    std::printf("       Direction: cblc-to-cobol | cobol-to-cblc | standard-library\n");
     std::printf("       Environment: CTOC_DEFAULT_DIRECTION can supply the direction.\n");
     std::printf("       Standard-library builds emit all cataloged programs to the selected directory.\n");
     std::printf("       Optional: --output-dir <directory> to override emission path base.\n");

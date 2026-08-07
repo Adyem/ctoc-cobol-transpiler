@@ -1,11 +1,10 @@
 # CBL-C ↔ COBOL Transpiler
 
-`ctoc_cobol_transpiler` is a source-to-source compiler for moving between a small C-style language, **CBL-C**, and COBOL. The project is aimed at COBOL modernization, regression testing, and experiments where business logic should be easier to author while still producing COBOL that can be compiled with GnuCOBOL.
+`ctoc_cobol_transpiler` is a source-to-source compiler for moving from a small C-style language, **CBL-C**, to COBOL. The project is aimed at COBOL modernization, regression testing, and experiments where business logic should be easier to author while still producing COBOL that can be compiled with GnuCOBOL.
 
 The tool currently supports four CLI directions:
 
 - `cblc-to-cobol`: generate COBOL from CBL-C.
-- `cblc-to-c`: generate portable C from CBL-C for native comparison and debugging.
 - `cobol-to-cblc`: recover CBL-C from the supported COBOL dialect.
 - `standard-library`: emit the bundled COBOL helper programs.
 
@@ -34,14 +33,6 @@ Translate CBL-C into COBOL:
 ./ctoc_cobol_transpiler --direction cblc-to-cobol \
     --input samples/cblc/return_numeric.cblc \
     --output build/return_numeric.cob
-```
-
-Generate C instead of COBOL:
-
-```sh
-./ctoc_cobol_transpiler --direction cblc-to-c \
-    --input samples/cblc/return_numeric.cblc \
-    --output build/return_numeric.c
 ```
 
 The CLI creates missing output directories automatically. See [`docs/getting_started.md`](docs/getting_started.md) and [`docs/cli_usage_examples.md`](docs/cli_usage_examples.md) for more command examples.
@@ -77,10 +68,6 @@ The forward backend can emit COBOL for the supported CBL-C subset. Implemented g
 
 Forward file-control generation for arbitrary CBL-C `file` declarations is still a known gap. The reverse pipeline can recover supported file I/O syntax from COBOL, but not every recovered construct has full forward COBOL emission yet.
 
-### C Generation
-
-The `cblc-to-c` backend emits portable C for much of the same CBL-C surface. It is useful for differential tests, quick debugging, and environments where a COBOL compiler is not available. Generated C includes helper routines for strings, display behavior, pointer storage, function calls, class/struct lifecycles, and standard-library-equivalent operations.
-
 ### COBOL → CBL-C Reverse Pipeline
 
 The reverse translator supports a practical ANSI-85-oriented subset:
@@ -98,7 +85,7 @@ Unsupported or partial reverse features include `ALTER`, `ENTRY`, `RENAMES`, som
 
 ### Standard Library And Runtime
 
-The repository includes a generated COBOL standard-library catalog and C/C++ runtime helpers. Implemented helper areas include:
+The repository includes a generated COBOL standard-library catalog and compiler runtime services. Implemented helper areas include:
 
 - String and memory helpers: strlen, strnlen, strcmp, strcpy, strncpy, strcat, memcmp, checked memory movement, case conversion, and string-to-number conversion.
 - Math helpers: abs, fabs, floor, ceil, rounded, banker rounding, sqrt, min, max, power, exp, log, sin, cos, and tan.
@@ -169,7 +156,7 @@ This exercises class signatures, out-of-class method bodies, constructor initial
 
 ## Repository Layout
 
-- [`src`](src): lexer, parser, CBL-C parser/generator pieces, COBOL/C emitters, semantics, runtime helpers, standard-library generators, formatter, and LSP code.
+- [`src`](src): lexer, parser, CBL-C parser/generator pieces, COBOL emitter, semantics, runtime services, standard-library generators, formatter, and LSP code.
 - [`tests`](tests): unit, integration, round-trip, standard-library, runtime, compiler, stress, fuzz-adjacent, and validation tests.
 - [`samples`](samples): COBOL, CBL-C, multi-module, and feature-showcase programs.
 - [`docs`](docs): language, CLI, ABI, runtime, dialect, CI, onboarding, and editor documentation.

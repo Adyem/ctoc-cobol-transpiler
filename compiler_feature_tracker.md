@@ -6,6 +6,7 @@ are completed; keep completed items grouped separately from the remaining work t
 ## Completed Features
 
 - [x] Establish core pipeline/context/diagnostics infrastructure to host future compiler stages.
+- [x] Remove the unsupported CBL-C→C product direction and keep CBL-C→COBOL as the primary forward compiler path.
 - [x] Provide runtime string helpers for trimming, comparison, and numeric conversion consumed by code generation.
 - [x] Finalize libft-backed scalar, string, and record runtime helpers for generated programs.
 - [x] Document runtime APIs consumed by generated code for future maintenance.
@@ -21,7 +22,6 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Build a command-line driver that accepts source paths and target direction (CBL-C→COBOL or COBOL→CBL-C).
 - [x] Add configuration handling for output directories, formatting options, and diagnostics levels.
 - [x] Accept multiple translation units per invocation, mapping each input CBL-C/Cobol file to a corresponding output while enforcing a single `main` entrypoint.
-- [x] Emit portable C from the shared IR so teams can diff native builds against helper-backed C output without relying on a COBOL toolchain.
 - [x] Integrate logging and error reporting consistent with libft capabilities.
 - [x] Inventory the existing CBL-C language samples and document required tokens and constructs.
 - [x] Define the authoritative CBL-C grammar (expressions, statements, declarations, file directives).
@@ -44,7 +44,6 @@ are completed; keep completed items grouped separately from the remaining work t
 - [ ] Forward CBL-C samples translate successfully when the COBOL toolchain is available; parser and generator coverage keeps
       the round-trip suites under `tests/compiler/cobol/` passing by default.
 - [x] Parse the ANSI-85 subset of COBOL targeted by the forward compiler.
-- [x] Audit existing runtime helpers for compatibility with libft memory allocation patterns.
 - [x] Recover higher-level constructs (loops, conditionals, file I/O) from procedural COBOL into CBL-C syntax.
 - [x] Validate round-trip fidelity with golden input/output fixtures.
 - [x] Normalize identifiers, literal formats, and layout during re-emission to produce idiomatic CBL-C.
@@ -173,7 +172,6 @@ are completed; keep completed items grouped separately from the remaining work t
 
 - [x] Deterministic builds: scrub timestamps and paths to guarantee reproducible output.
 - [x] Parallel compilation: build a translation-unit DAG, cache per-file outputs, and support incremental rebuilds.
-- [x] Factor shared helper emission so the COBOL and C backends reuse a single registry before introducing runtime library packaging.
 
 ### Runtime / Stdlib
 
@@ -208,8 +206,6 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Fuzzing: add grammar-based and mutation fuzzers for the lexer and parser to guard against crashes (`make fuzz` invokes
       `scripts/fuzz_transpiler.py`).
 - [x] Property tests: introduce round-trip and normalization idempotence suites.
-- [x] Differential tests: compare runtime results between COBOL outputs and the alternative C backend.
-- [x] Multi-module C backend integration suite: emit several translation units via `--direction cblc-to-c`, compile them together, and confirm helper registration and call graphs remain deterministic.
 - [x] Stress suites: cover huge records, deep nesting, long lines, and wide numerics.
 - [x] Coverage in CI: enforce line and branch coverage thresholds as part of the release gates (`make coverage` guards 60% line / 65% branch coverage).
 - [x] Add integration tests verifying subprogram calls respect original string lengths across translations.
@@ -221,7 +217,6 @@ are completed; keep completed items grouped separately from the remaining work t
 - [ ] Model `COPY ... REPLACING` expansions inside the semantic pipeline to unblock copybook customization without pre-processing.
 - [ ] Introduce incremental recompilation for changed paragraphs by persisting AST fragments in the incremental cache and reusing unaffected sections.
 - [x] Add a differential IR inspection mode that dumps the semantic tree before and after normalization to help debug aggressive rewrites.
-- [x] Offer alternate backends (e.g., direct C output) sharing the same AST and semantic pipeline.
 - [x] Explore performance optimizations (incremental recompilation, caching intermediate representations).
 - [x] Investigate IDE integration hooks (language server, syntax highlighting, code completion).
     - [x] Publish an initial VS Code TextMate grammar and cross-editor setup guide so contributors can enable highlighting quickly.
@@ -235,13 +230,6 @@ are completed; keep completed items grouped separately from the remaining work t
     - [x] Route call sites through `PERFORM` plus argument/result plumbing without duplicating intrinsic bodies.
     - [ ] Add arity/type, aliasing, capacity/truncation, multi-call, and executable COBOL regression tests.
     - [x] Update the intrinsic registry, ABI documentation, and conformance matrix for the current operation set.
-- [ ] **Selective C runtime extraction (`CBLC-TODO-C-RUNTIME`)**
-    - [x] Assign stable artifact IDs to runtime helpers and declare helper-to-helper dependencies.
-    - [x] Collect helper references from generated C call sites and compute a deterministic transitive closure.
-    - [x] Emit only required helper definitions in C output; retain the complete bundle for standard-library packaging.
-    - [x] Record selected helper IDs and dependency edges in C translation manifests.
-    - [ ] Add explicit shared-runtime mode and public missing/cyclic-contract diagnostics.
-    - [x] Add empty, single-helper, transitive registry-rendering, manifest, and generated C extraction coverage; duplicate, unsupported-helper, and generated C compile/link coverage remain.
 
 ### Known Bugs / Diagnostics
 These issues track regressions uncovered in recent round-trip suites.

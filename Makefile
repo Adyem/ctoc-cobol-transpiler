@@ -262,7 +262,6 @@ TEST_SRC    = imported/libft_test_runner.cpp \
              tests/runtime_sort_tests.cpp \
              tests/standard_library_tests.cpp \
              tests/standard_library/standard_library_registry_tests.cpp \
-             tests/standard_library/runtime_helper_registry_tests.cpp \
              tests/standard_library/standard_library_abs_tests.cpp \
              tests/standard_library/standard_library_atoi_tests.cpp \
              tests/standard_library/standard_library_atol_tests.cpp \
@@ -335,11 +334,6 @@ TEST_SRC    = imported/libft_test_runner.cpp \
               tests/property_tests.cpp \
               tests/cobol_type_tests.cpp \
               tests/compiler/compiler_test_support.cpp \
-              tests/compiler/c/build_tests.cpp \
-              tests/compiler/c/exit_tests.cpp \
-              tests/compiler/c/multi_module_tests.cpp \
-              tests/compiler/c/tests.cpp \
-              tests/compiler/differential_tests.cpp \
               tests/compiler/incremental_cache_tests.cpp \
               tests/compiler/cobol/copy_file_tests.cpp \
               tests/compiler/cobol/filter_prefix_tests.cpp \
