@@ -243,6 +243,161 @@ static int cblc_translation_unit_ensure_struct_capacity(t_cblc_translation_unit 
     return (FT_SUCCESS);
 }
 
+static int cblc_translation_unit_ensure_type_ref_capacity(t_cblc_translation_unit *unit,
+    size_t desired_capacity)
+{
+    t_cblc_type_ref *new_refs;
+
+    if (!unit)
+        return (FT_FAILURE);
+    if (unit->type_ref_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 4)
+        desired_capacity = 4;
+    new_refs = static_cast<t_cblc_type_ref *>(cma_calloc(desired_capacity,
+        sizeof(*new_refs)));
+    if (!new_refs)
+        return (FT_FAILURE);
+    if (unit->type_refs)
+    {
+        std::memcpy(new_refs, unit->type_refs,
+            unit->type_ref_count * sizeof(*new_refs));
+        cma_free(unit->type_refs);
+    }
+    unit->type_refs = new_refs;
+    unit->type_ref_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
+static int cblc_type_ref_equal(const t_cblc_type_ref *left,
+    const t_cblc_type_ref *right)
+{
+    size_t index;
+
+    if (!left || !right || left->kind != right->kind
+        || left->builtin_kind != right->builtin_kind
+        || std::strcmp(left->name, right->name) != 0
+        || left->parameter_index != right->parameter_index
+        || left->pointer_depth != right->pointer_depth
+        || left->array_count != right->array_count
+        || left->argument_count != right->argument_count
+        || left->argument_count > CBLC_TYPE_REF_ARGUMENT_MAX)
+        return (0);
+    index = 0;
+    while (index < left->argument_count)
+    {
+        if (left->argument_ids[index] != right->argument_ids[index])
+            return (0);
+        index += 1;
+    }
+    return (1);
+}
+
+static int cblc_type_ref_append(t_cblc_translation_unit *unit,
+    const t_cblc_type_ref *reference, size_t *out_id)
+{
+    size_t index;
+
+    if (!unit || !reference || !out_id)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < unit->type_ref_count)
+    {
+        if (cblc_type_ref_equal(&unit->type_refs[index], reference))
+        {
+            *out_id = index;
+            return (FT_SUCCESS);
+        }
+        index += 1;
+    }
+    if (unit->type_ref_count >= unit->type_ref_capacity
+        && cblc_translation_unit_ensure_type_ref_capacity(unit,
+            unit->type_ref_capacity == 0 ? 4 : unit->type_ref_capacity * 2) != FT_SUCCESS)
+        return (FT_FAILURE);
+    unit->type_refs[unit->type_ref_count] = *reference;
+    *out_id = unit->type_ref_count;
+    unit->type_ref_count += 1;
+    return (FT_SUCCESS);
+}
+
+static int cblc_translation_unit_ensure_template_definition_capacity(
+    t_cblc_translation_unit *unit, size_t desired_capacity)
+{
+    t_cblc_template_definition *definitions;
+
+    if (!unit)
+        return (FT_FAILURE);
+    if (unit->template_definition_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 2)
+        desired_capacity = 2;
+    definitions = static_cast<t_cblc_template_definition *>(cma_calloc(
+        desired_capacity, sizeof(*definitions)));
+    if (!definitions)
+        return (FT_FAILURE);
+    if (unit->template_definitions)
+    {
+        std::memcpy(definitions, unit->template_definitions,
+            unit->template_definition_count * sizeof(*definitions));
+        cma_free(unit->template_definitions);
+    }
+    unit->template_definitions = definitions;
+    unit->template_definition_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
+static int cblc_translation_unit_ensure_template_instantiation_capacity(
+    t_cblc_translation_unit *unit, size_t desired_capacity)
+{
+    t_cblc_template_instantiation *instantiations;
+
+    if (!unit)
+        return (FT_FAILURE);
+    if (unit->template_instantiation_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 2)
+        desired_capacity = 2;
+    instantiations = static_cast<t_cblc_template_instantiation *>(cma_calloc(
+        desired_capacity, sizeof(*instantiations)));
+    if (!instantiations)
+        return (FT_FAILURE);
+    if (unit->template_instantiations)
+    {
+        std::memcpy(instantiations, unit->template_instantiations,
+            unit->template_instantiation_count * sizeof(*instantiations));
+        cma_free(unit->template_instantiations);
+    }
+    unit->template_instantiations = instantiations;
+    unit->template_instantiation_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
+static int cblc_translation_unit_ensure_function_instantiation_capacity(
+    t_cblc_translation_unit *unit, size_t desired_capacity)
+{
+    t_cblc_function_instantiation *instantiations;
+
+    if (!unit)
+        return (FT_FAILURE);
+    if (unit->function_instantiation_capacity >= desired_capacity)
+        return (FT_SUCCESS);
+    if (desired_capacity < 2)
+        desired_capacity = 2;
+    instantiations = static_cast<t_cblc_function_instantiation *>(cma_calloc(
+        desired_capacity, sizeof(*instantiations)));
+    if (!instantiations)
+        return (FT_FAILURE);
+    if (unit->function_instantiations)
+    {
+        std::memcpy(instantiations, unit->function_instantiations,
+            unit->function_instantiation_count * sizeof(*instantiations));
+        cma_free(unit->function_instantiations);
+    }
+    unit->function_instantiations = instantiations;
+    unit->function_instantiation_capacity = desired_capacity;
+    return (FT_SUCCESS);
+}
+
 static int cblc_register_builtin_string_type(t_cblc_translation_unit *unit)
 {
     t_cblc_struct_type *type;
@@ -427,6 +582,19 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
     }
     type->has_default_constructor = signature->has_default_constructor;
     type->has_destructor = signature->has_destructor;
+    type->is_template = signature->is_template;
+    type->template_parameter_count = signature->template_parameter_count;
+    size_t template_parameter_index = 0;
+    while (template_parameter_index < type->template_parameter_count
+        && template_parameter_index < CBLC_TEMPLATE_PARAMETER_MAX)
+    {
+        ft_strlcpy(type->template_parameter_names[template_parameter_index],
+            signature->template_parameter_names[template_parameter_index],
+            sizeof(type->template_parameter_names[template_parameter_index]));
+        template_parameter_index += 1;
+    }
+    ft_strlcpy(type->template_parameter_name, signature->template_parameter_name,
+        sizeof(type->template_parameter_name));
     if (signature->field_count > 0 && signature->fields)
     {
         if (cblc_struct_type_ensure_field_capacity(type, signature->field_count) != FT_SUCCESS)
@@ -448,6 +616,11 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
             type->fields[index].array_count = signature->fields[index].array_count;
             type->fields[index].kind = static_cast<t_cblc_data_kind>(signature->fields[index].kind);
             type->fields[index].is_const = signature->fields[index].is_const;
+            type->fields[index].is_template_parameter =
+                signature->fields[index].is_template_parameter;
+            ft_strlcpy(type->fields[index].template_parameter_name,
+                signature->fields[index].template_parameter_name,
+                sizeof(type->fields[index].template_parameter_name));
             if (signature->fields[index].visibility == TRANSPILE_SYMBOL_PUBLIC)
                 type->fields[index].visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
             else

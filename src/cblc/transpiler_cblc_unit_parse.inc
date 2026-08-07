@@ -34,6 +34,11 @@ static int cblc_parse_function(const char **cursor, t_cblc_translation_unit *uni
     function->return_item_index = -1;
     function->return_cobol_name[0] = '\0';
     function->return_source_name[0] = '\0';
+    function->is_template = 0;
+    function->is_template_instantiation = 0;
+    function->template_parameter_name[0] = '\0';
+    function->template_source_name[0] = '\0';
+    function->template_argument_name[0] = '\0';
     function->local_destructor_targets = NULL;
     function->local_destructor_count = 0;
     function->local_destructor_capacity = 0;
@@ -60,11 +65,13 @@ static int cblc_parse_function(const char **cursor, t_cblc_translation_unit *uni
     }
     index = unit->function_count;
     unit->function_count += 1;
-    if (unit->entry_function_index == static_cast<size_t>(-1))
+    if (!g_cblc_active_template_parameter
+        && unit->entry_function_index == static_cast<size_t>(-1))
         unit->entry_function_index = index;
-    if (std::strncmp(identifier, "main", sizeof(identifier)) == 0)
+    if (!g_cblc_active_template_parameter
+        && std::strncmp(identifier, "main", sizeof(identifier)) == 0)
         unit->entry_function_index = index;
-    if (unit->entry_function_index == index)
+    if (!g_cblc_active_template_parameter && unit->entry_function_index == index)
         ft_strlcpy(unit->program_name, function->cobol_name, sizeof(unit->program_name));
     cblc_skip_whitespace(cursor);
     if (**cursor != '(')
@@ -81,6 +88,10 @@ static int cblc_parse_function(const char **cursor, t_cblc_translation_unit *uni
         return (FT_FAILURE);
     *cursor += 1;
     *cursor -= 1;
+    if (cblc_translation_unit_ensure_function_capacity(unit, unit->function_count + 2)
+        != FT_SUCCESS)
+        return (FT_FAILURE);
+    function = &unit->functions[index];
     if (cblc_parse_statement_block(cursor, unit, function, 1) != FT_SUCCESS)
         return (FT_FAILURE);
     while (parameter_scope_base < unit->data_count)
@@ -233,12 +244,30 @@ void cblc_translation_unit_init(t_cblc_translation_unit *unit)
 {
     if (!unit)
         return ;
+    unit->source_text = NULL;
     unit->data_items = NULL;
     unit->data_count = 0;
     unit->data_capacity = 0;
     unit->struct_types = NULL;
     unit->struct_type_count = 0;
     unit->struct_type_capacity = 0;
+    unit->type_refs = NULL;
+    unit->type_ref_count = 0;
+    unit->type_ref_capacity = 0;
+    unit->template_definitions = NULL;
+    unit->template_definition_count = 0;
+    unit->template_definition_capacity = 0;
+    unit->template_instantiations = NULL;
+    unit->template_instantiation_count = 0;
+    unit->template_instantiation_capacity = 0;
+    unit->function_instantiations = NULL;
+    unit->function_instantiation_count = 0;
+    unit->function_instantiation_capacity = 0;
+    unit->parse_error_code = 0;
+    unit->parse_error_message[0] = '\0';
+    unit->template_max_instantiations = 1024;
+    unit->template_max_instantiation_depth = 32;
+    unit->template_instantiation_depth = 0;
     unit->imports = NULL;
     unit->import_count = 0;
     unit->import_capacity = 0;
@@ -317,6 +346,14 @@ void cblc_translation_unit_dispose(t_cblc_translation_unit *unit)
         }
         cma_free(unit->struct_types);
     }
+    if (unit->type_refs)
+        cma_free(unit->type_refs);
+    if (unit->template_definitions)
+        cma_free(unit->template_definitions);
+    if (unit->template_instantiations)
+        cma_free(unit->template_instantiations);
+    if (unit->function_instantiations)
+        cma_free(unit->function_instantiations);
     if (unit->imports)
         cma_free(unit->imports);
     if (unit->copy_includes)
@@ -345,11 +382,29 @@ void cblc_translation_unit_dispose(t_cblc_translation_unit *unit)
         cma_free(unit->functions);
     }
     unit->data_items = NULL;
+    unit->source_text = NULL;
     unit->data_count = 0;
     unit->data_capacity = 0;
     unit->struct_types = NULL;
     unit->struct_type_count = 0;
     unit->struct_type_capacity = 0;
+    unit->type_refs = NULL;
+    unit->type_ref_count = 0;
+    unit->type_ref_capacity = 0;
+    unit->template_definitions = NULL;
+    unit->template_definition_count = 0;
+    unit->template_definition_capacity = 0;
+    unit->template_instantiations = NULL;
+    unit->template_instantiation_count = 0;
+    unit->template_instantiation_capacity = 0;
+    unit->function_instantiations = NULL;
+    unit->function_instantiation_count = 0;
+    unit->function_instantiation_capacity = 0;
+    unit->parse_error_code = 0;
+    unit->parse_error_message[0] = '\0';
+    unit->template_max_instantiations = 1024;
+    unit->template_max_instantiation_depth = 32;
+    unit->template_instantiation_depth = 0;
     unit->imports = NULL;
     unit->import_count = 0;
     unit->import_capacity = 0;
@@ -374,6 +429,7 @@ int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit)
 
     if (!text || !unit)
         return (FT_FAILURE);
+    unit->source_text = text;
     g_cblc_constructor_parse_state.type = NULL;
     g_cblc_constructor_parse_state.initialized_fields = NULL;
     g_cblc_constructor_parse_state.active = 0;
@@ -403,6 +459,19 @@ int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit)
             cursor -= std::strlen("file");
             if (cblc_parse_file_declaration(&cursor, unit) != FT_SUCCESS)
                 return (FT_FAILURE);
+            continue ;
+        }
+        if (cblc_match_keyword(&cursor, "template"))
+        {
+            cursor -= std::strlen("template");
+            if (cblc_parse_template_struct_definition(&cursor, unit) != FT_SUCCESS
+                && cblc_parse_template_function_definition(&cursor, unit) != FT_SUCCESS)
+            {
+                cblc_record_template_parse_error(unit,
+                    TRANSPILE_ERROR_TEMPLATE_INVALID_DECLARATION,
+                    "invalid template declaration");
+                return (FT_FAILURE);
+            }
             continue ;
         }
         if (cblc_parse_qualified_lifecycle_definition(&cursor, unit) == FT_SUCCESS)

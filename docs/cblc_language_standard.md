@@ -1,7 +1,7 @@
 # CBL-C Language Standard and Compiler Behavior
 
 **Status:** authoritative repository specification
-**Version:** 0.2 (implementation baseline)
+**Version:** 0.3 (bounded template subset)
 **Last reviewed:** 2026-08-07
 
 This document is the normative reference for CBL-C as implemented by this
@@ -313,7 +313,7 @@ semantic model and generated group/storage representation.
 A class combines member storage with named constructors and methods. It is not
 a virtual object system. The following are unsupported unless explicitly added
 by a future standard revision: inheritance, virtual dispatch, vtables,
-templates, operator overloading, lambdas, exceptions, and arbitrary namespaces.
+operator overloading, lambdas, exceptions, and arbitrary namespaces.
 
 Classes support public and private members, in-class method bodies, qualified
 out-of-class method definitions, constructors, methods, const enforcement, and
@@ -352,6 +352,69 @@ The implementation may specialize a method for a concrete receiver type, but
 that specialization must still be emitted once and referenced by name. Stable
 names must include enough module/type/method/signature information to avoid
 collisions without depending on source call-site order.
+
+### 6.5.2 Bounded type templates
+
+CBL-C supports a bounded compile-time type-substitution facility. A template is
+monomorphized into an ordinary concrete type or function before COBOL emission;
+it does not introduce runtime polymorphism, inheritance, virtual dispatch, or
+dynamic type information.
+
+The supported declaration forms are:
+
+```cblc
+template <typename T>
+struct box { T value; };
+
+template <typename T, typename U>
+struct pair_value { T first; U second; };
+
+template <typename T>
+T identity(T value) { return value; }
+```
+
+The parameter list must contain one to four distinct `typename` parameters.
+Non-type parameters, parameter packs, defaults, constraints, specialization,
+and template-template parameters are unsupported and must be rejected.
+
+An explicit type application uses an ordered, comma-separated argument list:
+
+```cblc
+box<int> scalar;
+box<int*> pointer_value;
+box<int[3]> fixed_values;
+pair_value<int, char> pair;
+```
+
+Nested applications are permitted when each inner application resolves to a
+concrete type. The supported argument shapes are the existing CBL-C scalar,
+string, struct/class, pointer, and fixed-array shapes. Pointer depth and the
+fixed array count are part of type identity; `int*`, `int**`, and `int[3]` are
+not interchangeable with `int`.
+
+Template fields, function parameters, method parameters, and dependent returns
+are substituted structurally. A dependent field retains the argument's kind,
+struct identity, pointer shape, and fixed-array count. A template definition is
+immutable, and repeated requests for the same ordered canonical argument list
+must reuse one concrete instantiation.
+
+Free-function applications may be explicit, for example
+`identity<int>(value)`. The current deduction subset also permits exact
+one-parameter deduction for supported concrete arguments. Deduction must not
+infer through conversions, overload sets, pointer covariance, or runtime values.
+
+Concrete names are compiler-generated from the template name and canonical
+argument key. Names must be deterministic, bounded, and collision-safe; source
+punctuation used for pointer and array shape must not be copied directly into a
+COBOL identifier. The generated COBOL program must contain only concrete
+paragraphs, groups, and calls, with no unresolved `T` or `typename`.
+
+The current template feature is partial. Array arguments in function parameter
+positions have no independent array ABI yet and are rejected until the calling
+convention is specified. The same applies to unsupported return/storage shapes.
+Adding any new template form requires updating this section, the feature
+registry, diagnostics, formatter/tooling behavior, and both direct and
+GnuCOBOL-backed tests.
 
 ### 6.6 Pointers
 
@@ -628,7 +691,7 @@ source functions. The compiler must distinguish these artifact classes:
 | translated module | User program/module output | Written to the matching `--output` path. |
 | target runtime helper | Shared COBOL implementation support | COBOL standard-library programs and shared generated paragraphs provide the target support; no C runtime artifact is emitted. |
 | standard-library subprogram | External callable helper with a stable ABI | `standard-library` mode currently emits every registered helper as its own `.cob`. |
-| metadata/manifest | Dependency and build description | Both standard-library and normal translation modes emit `cblc.manifest.json`; COBOL output records the transitive standard-library closure referenced by generated targets. |
+| metadata/manifest | Dependency and build description | Both standard-library and normal translation modes emit `cblc.manifest.json`; COBOL output records the transitive standard-library closure referenced by generated targets. Target entries record direct source hashes and imported module source hashes in `module_dependencies`. The manifest also records `template_contract: CBLC-TEMPLATE-TYPE-SUBSTITUTION@1`; consumers must reject or invalidate artifacts from an unknown template contract. |
 
 The current `standard-library` command is therefore a packaging operation:
 
@@ -686,7 +749,8 @@ other items listed in the COBOL dialect requirements.
 The following are not part of this version's CBL-C standard:
 
 - general C/C++ compatibility;
-- templates, macros as a language mechanism, namespaces, lambdas, exceptions;
+- non-type template parameters, parameter packs, defaults, constraints,
+  specialization, and template-template parameters;
 - inheritance and virtual dispatch;
 - operator overloading;
 - arbitrary pointer casts and unchecked memory reinterpretation;
@@ -723,6 +787,7 @@ The initial feature registry is:
 | `CBLC-MOD-IMPORT` | Multi-file imports and public signatures | current/partial | 4, 14.3 |
 | `CBLC-TYPE-STRING` | Fixed-capacity built-in string values | current/partial | 6.3, 6.8, 12 |
 | `CBLC-TYPE-CLASS` | Classes, methods, constructors, and lifecycle | current/partial | 6.5, 8, 14 |
+| `CBLC-TEMPLATE-TYPE-SUBSTITUTION` | Bounded type templates and monomorphization | partial | 6.5.2, 8, 14 |
 | `CBLC-MEM-POINTER` | Supported pointer kinds and allocator calls | current/partial | 6.6, 12 |
 | `CBLC-IO-FILE` | File declarations and sequential I/O | partial | 11, 14 |
 | `CBLC-ABI-COBOL` | COBOL linkage/result/status conventions | current | 8, 12, 14.1 |

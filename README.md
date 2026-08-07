@@ -56,6 +56,8 @@ CBL-C is intentionally C-like, but its data model maps onto COBOL storage and ca
 
 The authoritative language and compiler-behavior standard is [`docs/cblc_language_standard.md`](docs/cblc_language_standard.md). The samples in [`samples/cblc`](samples/cblc) and [`samples/feature_showcase`](samples/feature_showcase) show larger examples.
 
+The planned basic template design is documented in [`docs/template_implementation_plan.md`](docs/template_implementation_plan.md); it is not part of the language standard until implemented and verified.
+
 ### COBOL Generation
 
 The forward backend can emit COBOL for the supported CBL-C subset. Implemented generation includes:

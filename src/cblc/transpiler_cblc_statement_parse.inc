@@ -1179,6 +1179,12 @@ static int cblc_parse_call(const char **cursor, t_cblc_translation_unit *unit,
         *cursor = start;
         return (FT_FAILURE);
     }
+    if (cblc_parse_explicit_function_application(cursor, unit, identifier,
+            sizeof(identifier)) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
     cblc_skip_whitespace(cursor);
     if (**cursor != '(')
     {
@@ -1196,6 +1202,34 @@ static int cblc_parse_call(const char **cursor, t_cblc_translation_unit *unit,
         const t_cblc_function *local_target;
 
         local_target = cblc_find_function_in_unit(unit, identifier);
+        if (!local_target)
+        {
+            const t_cblc_function *template_function;
+            char inferred_argument[TRANSPILE_IDENTIFIER_MAX];
+
+            template_function = cblc_find_template_function(unit, identifier);
+            if (template_function
+                && cblc_infer_template_function_argument(unit, template_function,
+                    call_arguments, argument_count, inferred_argument,
+                    sizeof(inferred_argument)) == FT_SUCCESS)
+            {
+                size_t argument_ref_id;
+
+                local_target = cblc_instantiate_template_function(unit, identifier,
+                    inferred_argument);
+                if (!local_target)
+                {
+                    *cursor = start;
+                    return (FT_FAILURE);
+                }
+                if (cblc_template_argument_ref(unit, inferred_argument,
+                        &argument_ref_id) == FT_SUCCESS)
+                    cblc_record_function_template_use(unit, identifier,
+                        argument_ref_id, cblc_source_offset(unit, start));
+                ft_strlcpy(identifier, local_target->source_name,
+                    sizeof(identifier));
+            }
+        }
         if (local_target)
         {
             size_t argument_index;

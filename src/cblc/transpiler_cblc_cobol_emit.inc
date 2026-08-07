@@ -2564,6 +2564,23 @@ static int cblc_emit_struct_fields(const t_cblc_translation_unit *unit, const t_
             if (cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
                 return (FT_FAILURE);
         }
+        else if (cblc_data_kind_is_pointer(type->fields[index].kind))
+        {
+            if (type->fields[index].array_count > 0)
+            {
+                if (std::snprintf(line, sizeof(line),
+                        "       %02zu %s-%s USAGE POINTER OCCURS %zu TIMES.",
+                        level, prefix, type->fields[index].cobol_name,
+                        type->fields[index].array_count) < 0)
+                    return (FT_FAILURE);
+            }
+            else if (std::snprintf(line, sizeof(line),
+                    "       %02zu %s-%s USAGE POINTER VALUE NULL.",
+                    level, prefix, type->fields[index].cobol_name) < 0)
+                return (FT_FAILURE);
+            if (cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
         else if (type->fields[index].kind == CBLC_DATA_KIND_STRUCT)
         {
             const t_cblc_struct_type *field_type;

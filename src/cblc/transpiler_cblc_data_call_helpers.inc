@@ -264,6 +264,26 @@ static const t_cblc_function *cblc_find_function_in_unit(const t_cblc_translatio
     while (index < unit->function_count)
     {
         if (std::strncmp(unit->functions[index].source_name, identifier,
+                sizeof(unit->functions[index].source_name)) == 0
+            && !unit->functions[index].is_template)
+            return (&unit->functions[index]);
+        index += 1;
+    }
+    return (NULL);
+}
+
+static const t_cblc_function *cblc_find_template_function(
+    const t_cblc_translation_unit *unit, const char *identifier)
+{
+    size_t index;
+
+    if (!unit || !identifier)
+        return (NULL);
+    index = 0;
+    while (index < unit->function_count)
+    {
+        if (unit->functions[index].is_template
+            && std::strncmp(unit->functions[index].source_name, identifier,
                 sizeof(unit->functions[index].source_name)) == 0)
             return (&unit->functions[index]);
         index += 1;

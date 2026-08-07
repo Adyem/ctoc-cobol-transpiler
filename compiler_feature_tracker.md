@@ -109,6 +109,7 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] Forward file I/O foundation: parse CBL-C file declarations and basic `open`/`read`/`write`/`close` statements, and emit COBOL FILE-CONTROL, FILE SECTION, fixed records, and AT END EOF handling.
 - [x] Forward file I/O completion for the supported sequential subset: lower `while (read(file, record))` to COBOL `PERFORM UNTIL` plus `AT END`, allowing `copy_file.cblc` to generate a complete copy loop.
 - [ ] Forward file I/O expansion: extend the model for general boolean loop conditions, indexed/relative organizations, and advanced COBOL clauses.
+- [ ] Basic templates: implement one-parameter compile-time type substitution for structs/classes and functions, with explicit applications, deterministic monomorphization, and no polymorphism or inheritance; follow [`docs/template_implementation_plan.md`](docs/template_implementation_plan.md).
 
 ### Core Language Frontend
 - [ ] Parse COBOL `ALTER` and `ENTRY` statements and lower them into structured equivalents in the shared IR so legacy flow control can round-trip.

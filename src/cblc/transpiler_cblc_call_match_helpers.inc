@@ -219,6 +219,32 @@ static const t_cblc_constructor *cblc_find_constructor_for_arguments(
     return (NULL);
 }
 
+static int cblc_call_arguments_match_parameters(const t_cblc_translation_unit *unit,
+    const char *call_arguments, size_t call_argument_count,
+    const t_cblc_parameter *parameters, size_t parameter_count)
+{
+    t_cblc_statement statement;
+    size_t index;
+
+    if (!unit || !call_arguments || !parameters
+        || call_argument_count != parameter_count)
+        return (0);
+    std::memset(&statement, 0, sizeof(statement));
+    ft_strlcpy(statement.call_arguments, call_arguments, sizeof(statement.call_arguments));
+    statement.call_argument_count = call_argument_count;
+    index = 0;
+    while (index < parameter_count)
+    {
+        char argument[TRANSPILE_STATEMENT_TEXT_MAX];
+
+        if (cblc_extract_call_argument(&statement, index, argument, sizeof(argument)) != FT_SUCCESS
+            || !cblc_argument_matches_parameter(unit, argument, &parameters[index]))
+            return (0);
+        index += 1;
+    }
+    return (1);
+}
+
 static int cblc_emit_parameter_argument_moves(const t_cblc_translation_unit *unit,
     const char *call_arguments,
     size_t call_argument_count, const t_cblc_parameter *parameters,

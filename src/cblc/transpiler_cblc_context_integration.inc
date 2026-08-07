@@ -84,6 +84,105 @@ int cblc_import_translation_unit_type_stubs(t_transpiler_context *context, const
     return (FT_SUCCESS);
 }
 
+int cblc_import_translation_unit_function_stubs(t_transpiler_context *context,
+    const char *module_name, t_cblc_translation_unit *unit)
+{
+    const t_transpiler_function_signature *functions;
+    size_t function_count;
+    size_t index;
+
+    if (!context || !module_name || !unit)
+        return (FT_FAILURE);
+    functions = transpiler_context_get_functions(context, &function_count);
+    index = 0;
+    while (index < function_count)
+    {
+        const t_transpiler_function_signature *signature;
+        const t_cblc_function *existing;
+        t_cblc_function *function;
+        size_t parameter_index;
+
+        signature = &functions[index];
+        if (!signature->is_template
+            || std::strncmp(signature->module, module_name, TRANSPILE_MODULE_NAME_MAX) == 0
+            || !cblc_context_module_imports_module(context, module_name, signature->module))
+        {
+            index += 1;
+            continue ;
+        }
+        existing = cblc_find_function_in_unit(unit, signature->name);
+        if (existing)
+        {
+            index += 1;
+            continue ;
+        }
+        if (unit->function_count >= unit->function_capacity
+            && cblc_translation_unit_ensure_function_capacity(unit,
+                unit->function_capacity == 0 ? 2 : unit->function_capacity * 2) != FT_SUCCESS)
+            return (FT_FAILURE);
+        function = &unit->functions[unit->function_count];
+        std::memset(function, 0, sizeof(*function));
+        ft_strlcpy(function->source_name, signature->name, sizeof(function->source_name));
+        cblc_identifier_to_cobol(function->source_name, function->cobol_name,
+            sizeof(function->cobol_name));
+        function->return_kind = static_cast<t_cblc_function_return_kind>(signature->return_kind);
+        ft_strlcpy(function->return_type_name, signature->return_type_name,
+            sizeof(function->return_type_name));
+        ft_strlcpy(function->return_cobol_name, signature->return_cobol_name,
+            sizeof(function->return_cobol_name));
+        ft_strlcpy(function->return_source_name, signature->return_source_name,
+            sizeof(function->return_source_name));
+        function->saw_return = signature->saw_return;
+        function->parameter_count = signature->parameter_count;
+        function->is_template = 1;
+        function->template_parameter_count = signature->template_parameter_count;
+        size_t template_parameter_index = 0;
+        while (template_parameter_index < function->template_parameter_count
+            && template_parameter_index < CBLC_TEMPLATE_PARAMETER_MAX)
+        {
+            ft_strlcpy(function->template_parameter_names[template_parameter_index],
+                signature->template_parameter_names[template_parameter_index],
+                sizeof(function->template_parameter_names[template_parameter_index]));
+            template_parameter_index += 1;
+        }
+        ft_strlcpy(function->template_parameter_name, signature->template_parameter_name,
+            sizeof(function->template_parameter_name));
+        parameter_index = 0;
+        while (parameter_index < signature->parameter_count
+            && parameter_index < TRANSPILE_FUNCTION_PARAMETER_MAX)
+        {
+            function->parameters[parameter_index].kind = signature->parameter_kinds[parameter_index];
+            ft_strlcpy(function->parameters[parameter_index].source_name,
+                signature->parameter_source_names[parameter_index],
+                sizeof(function->parameters[parameter_index].source_name));
+            ft_strlcpy(function->parameters[parameter_index].actual_source_name,
+                signature->parameter_actual_source_names[parameter_index],
+                sizeof(function->parameters[parameter_index].actual_source_name));
+            ft_strlcpy(function->parameters[parameter_index].cobol_name,
+                signature->parameter_cobol_names[parameter_index],
+                sizeof(function->parameters[parameter_index].cobol_name));
+            ft_strlcpy(function->parameters[parameter_index].type_name,
+                signature->parameter_type_names[parameter_index],
+                sizeof(function->parameters[parameter_index].type_name));
+            parameter_index += 1;
+        }
+        if (signature->statement_count > 0 && signature->statements)
+        {
+            function->statements = static_cast<t_cblc_statement *>(cma_calloc(
+                signature->statement_count, sizeof(*function->statements)));
+            if (!function->statements)
+                return (FT_FAILURE);
+            std::memcpy(function->statements, signature->statements,
+                signature->statement_count * sizeof(*function->statements));
+            function->statement_count = signature->statement_count;
+            function->statement_capacity = signature->statement_count;
+        }
+        unit->function_count += 1;
+        index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
 int cblc_resolve_translation_unit_calls(t_transpiler_context *context, const char *module_name,
     t_cblc_translation_unit *unit)
 {
@@ -331,6 +430,11 @@ static int cblc_export_type_fields(t_transpiler_type_signature *signature,
         signature->fields[index].array_count = type->fields[index].array_count;
         signature->fields[index].kind = static_cast<int>(type->fields[index].kind);
         signature->fields[index].is_const = type->fields[index].is_const;
+        signature->fields[index].is_template_parameter =
+            type->fields[index].is_template_parameter;
+        ft_strlcpy(signature->fields[index].template_parameter_name,
+            type->fields[index].template_parameter_name,
+            sizeof(signature->fields[index].template_parameter_name));
         signature->fields[index].visibility =
             cblc_export_member_visibility(type->fields[index].visibility);
         index += 1;
@@ -559,6 +663,21 @@ int cblc_register_translation_unit_exports(t_transpiler_context *context, const 
             signature.visibility = TRANSPILE_SYMBOL_PUBLIC;
             signature.has_default_constructor = unit->struct_types[index].has_default_constructor;
             signature.has_destructor = unit->struct_types[index].has_destructor;
+            signature.is_template = unit->struct_types[index].is_template;
+            signature.template_parameter_count =
+                unit->struct_types[index].template_parameter_count;
+            size_t template_parameter_index = 0;
+            while (template_parameter_index < signature.template_parameter_count
+                && template_parameter_index < CBLC_TEMPLATE_PARAMETER_MAX)
+            {
+                ft_strlcpy(signature.template_parameter_names[template_parameter_index],
+                    unit->struct_types[index].template_parameter_names[template_parameter_index],
+                    sizeof(signature.template_parameter_names[template_parameter_index]));
+                template_parameter_index += 1;
+            }
+            ft_strlcpy(signature.template_parameter_name,
+                unit->struct_types[index].template_parameter_name,
+                sizeof(signature.template_parameter_name));
             if (cblc_export_type_signature_fill(&signature, &unit->struct_types[index])
                 != FT_SUCCESS)
                 return (FT_FAILURE);
@@ -614,7 +733,8 @@ int cblc_register_translation_unit_exports(t_transpiler_context *context, const 
     index = 0;
     while (index < unit->function_count)
     {
-        if (std::strncmp(unit->functions[index].source_name, "main", TRANSPILE_IDENTIFIER_MAX) == 0)
+        if (!unit->functions[index].is_template
+            && std::strncmp(unit->functions[index].source_name, "main", TRANSPILE_IDENTIFIER_MAX) == 0)
         {
             entry_index = index;
             break ;
@@ -638,23 +758,63 @@ int cblc_register_translation_unit_exports(t_transpiler_context *context, const 
     {
         if (index != entry_index)
         {
-            t_transpiler_function_return_mode return_mode;
-            t_transpiler_function_parameter_kind parameter_kinds[TRANSPILE_FUNCTION_PARAMETER_MAX];
+            t_transpiler_function_signature signature;
             size_t parameter_index;
 
-            return_mode = TRANSPILE_FUNCTION_RETURN_VOID;
+            std::memset(&signature, 0, sizeof(signature));
+            ft_strlcpy(signature.name, unit->functions[index].source_name,
+                sizeof(signature.name));
+            signature.return_mode = TRANSPILE_FUNCTION_RETURN_VOID;
             if (unit->functions[index].return_kind != CBLC_FUNCTION_RETURN_VOID)
-                return_mode = TRANSPILE_FUNCTION_RETURN_VALUE;
+                signature.return_mode = TRANSPILE_FUNCTION_RETURN_VALUE;
+            signature.return_kind = unit->functions[index].return_kind;
+            ft_strlcpy(signature.return_type_name, unit->functions[index].return_type_name,
+                sizeof(signature.return_type_name));
+            ft_strlcpy(signature.return_cobol_name, unit->functions[index].return_cobol_name,
+                sizeof(signature.return_cobol_name));
+            ft_strlcpy(signature.return_source_name, unit->functions[index].return_source_name,
+                sizeof(signature.return_source_name));
+            signature.saw_return = unit->functions[index].saw_return;
+            signature.visibility = TRANSPILE_SYMBOL_PUBLIC;
+            signature.is_template = unit->functions[index].is_template;
+            signature.template_parameter_count =
+                unit->functions[index].template_parameter_count;
+            size_t template_parameter_index = 0;
+            while (template_parameter_index < signature.template_parameter_count
+                && template_parameter_index < CBLC_TEMPLATE_PARAMETER_MAX)
+            {
+                ft_strlcpy(signature.template_parameter_names[template_parameter_index],
+                    unit->functions[index].template_parameter_names[template_parameter_index],
+                    sizeof(signature.template_parameter_names[template_parameter_index]));
+                template_parameter_index += 1;
+            }
+            ft_strlcpy(signature.template_parameter_name,
+                unit->functions[index].template_parameter_name,
+                sizeof(signature.template_parameter_name));
+            signature.statements = unit->functions[index].statements;
+            signature.statement_count = unit->functions[index].statement_count;
+            signature.parameter_count = unit->functions[index].parameter_count;
             parameter_index = 0;
             while (parameter_index < unit->functions[index].parameter_count)
             {
-                parameter_kinds[parameter_index] = unit->functions[index].parameters[parameter_index].kind;
+                signature.parameter_kinds[parameter_index] =
+                    unit->functions[index].parameters[parameter_index].kind;
+                ft_strlcpy(signature.parameter_source_names[parameter_index],
+                    unit->functions[index].parameters[parameter_index].source_name,
+                    sizeof(signature.parameter_source_names[parameter_index]));
+                ft_strlcpy(signature.parameter_actual_source_names[parameter_index],
+                    unit->functions[index].parameters[parameter_index].actual_source_name,
+                    sizeof(signature.parameter_actual_source_names[parameter_index]));
+                ft_strlcpy(signature.parameter_cobol_names[parameter_index],
+                    unit->functions[index].parameters[parameter_index].cobol_name,
+                    sizeof(signature.parameter_cobol_names[parameter_index]));
+                ft_strlcpy(signature.parameter_type_names[parameter_index],
+                    unit->functions[index].parameters[parameter_index].type_name,
+                    sizeof(signature.parameter_type_names[parameter_index]));
                 parameter_index += 1;
             }
-            if (transpiler_context_register_function_signature(context, module_name,
-                    unit->functions[index].source_name, return_mode,
-                    TRANSPILE_SYMBOL_PUBLIC, parameter_kinds,
-                    unit->functions[index].parameter_count) != FT_SUCCESS)
+            if (transpiler_context_register_function_signature_record(context, module_name,
+                    &signature) != FT_SUCCESS)
                 return (FT_FAILURE);
         }
         index += 1;

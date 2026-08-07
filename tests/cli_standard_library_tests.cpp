@@ -101,6 +101,9 @@ FT_TEST(test_cli_standard_library_emits_all_programs)
         goto cleanup;
     }
     if (!ft_strnstr(file_buffer, "\"schema_version\": 1", std::strlen(file_buffer))
+        || !ft_strnstr(file_buffer,
+            "\"template_contract\": \"CBLC-TEMPLATE-TYPE-SUBSTITUTION@1\"",
+            std::strlen(file_buffer))
         || !ft_strnstr(file_buffer, "CBLC-STRLEN", std::strlen(file_buffer)))
     {
         std::printf("Assertion failed: standard library manifest should describe generated artifacts\n");
@@ -179,7 +182,14 @@ FT_TEST(test_cli_cobol_translation_emits_required_standard_library_programs)
             std::strlen(file_buffer)))
         goto cleanup;
     if (test_read_text_file(manifest_path, file_buffer, sizeof(file_buffer)) != FT_SUCCESS
+        || !ft_strnstr(file_buffer,
+            "\"template_contract\": \"CBLC-TEMPLATE-TYPE-SUBSTITUTION@1\"",
+            std::strlen(file_buffer))
         || !ft_strnstr(file_buffer, "CBLC-STRLEN", std::strlen(file_buffer))
+        || !ft_strnstr(file_buffer, "\"source_hash\": \"fnv1a64:",
+            std::strlen(file_buffer))
+        || !ft_strnstr(file_buffer, "\"module_dependencies\": []",
+            std::strlen(file_buffer))
         || !ft_strnstr(file_buffer, "\"dependencies\": [\"CBLC-STRLEN\"]",
             std::strlen(file_buffer))
         || ft_strnstr(file_buffer, "CBLC-ABS", std::strlen(file_buffer)))

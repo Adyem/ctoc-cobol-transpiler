@@ -525,11 +525,25 @@ static int cblc_parse_function_call_assignment(const char **cursor,
     const t_cblc_function *called_function;
     t_cblc_statement *statement;
     size_t argument_count;
+    char target_source_name[TRANSPILE_IDENTIFIER_MAX];
 
     if (!cursor || !*cursor || !unit || !function || !target_item)
         return (FT_FAILURE);
     start = *cursor;
+    ft_strlcpy(target_source_name, target_item->source_name, sizeof(target_source_name));
     if (cblc_parse_identifier(cursor, identifier, sizeof(identifier)) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    if (cblc_parse_explicit_function_application(cursor, unit, identifier,
+            sizeof(identifier)) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    target_item = cblc_find_data_item(unit, target_source_name);
+    if (!target_item)
     {
         *cursor = start;
         return (FT_FAILURE);
@@ -555,7 +569,47 @@ static int cblc_parse_function_call_assignment(const char **cursor,
         return (FT_FAILURE);
     }
     called_function = cblc_find_function_in_unit(unit, identifier);
+    if (!called_function)
+    {
+        const t_cblc_function *template_function;
+        char inferred_argument[TRANSPILE_IDENTIFIER_MAX];
+
+        template_function = cblc_find_template_function(unit, identifier);
+        if (template_function
+            && cblc_infer_template_function_argument(unit, template_function,
+                call_arguments, argument_count, inferred_argument,
+                sizeof(inferred_argument)) == FT_SUCCESS)
+        {
+            size_t argument_ref_id;
+
+            called_function = cblc_instantiate_template_function(unit, identifier,
+                inferred_argument);
+            if (!called_function)
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+            if (cblc_template_argument_ref(unit, inferred_argument, &argument_ref_id)
+                == FT_SUCCESS)
+                cblc_record_function_template_use(unit, identifier, argument_ref_id,
+                    cblc_source_offset(unit, start));
+            ft_strlcpy(identifier, called_function->source_name, sizeof(identifier));
+            target_item = cblc_find_data_item(unit, target_source_name);
+            if (!target_item)
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+        }
+    }
     if (called_function && !cblc_function_return_matches_target(called_function, target_item))
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    if (called_function
+        && !cblc_call_arguments_match_parameters(unit, call_arguments, argument_count,
+            called_function->parameters, called_function->parameter_count))
     {
         *cursor = start;
         return (FT_FAILURE);

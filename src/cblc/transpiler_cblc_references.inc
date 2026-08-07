@@ -63,6 +63,26 @@ static const t_cblc_struct_type *cblc_find_struct_type(const t_cblc_translation_
     while (index < unit->struct_type_count)
     {
         if (std::strncmp(unit->struct_types[index].source_name, identifier,
+                sizeof(unit->struct_types[index].source_name)) == 0
+            && !unit->struct_types[index].is_template)
+            return (&unit->struct_types[index]);
+        index += 1;
+    }
+    return (NULL);
+}
+
+static const t_cblc_struct_type *cblc_find_template_struct(
+    const t_cblc_translation_unit *unit, const char *identifier)
+{
+    size_t index;
+
+    if (!unit || !identifier)
+        return (NULL);
+    index = 0;
+    while (index < unit->struct_type_count)
+    {
+        if (unit->struct_types[index].is_template
+            && std::strncmp(unit->struct_types[index].source_name, identifier,
                 sizeof(unit->struct_types[index].source_name)) == 0)
             return (&unit->struct_types[index]);
         index += 1;

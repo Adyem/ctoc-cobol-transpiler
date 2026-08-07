@@ -20,6 +20,10 @@ typedef struct s_cblc_constructor_parse_state
 
 static t_cblc_constructor_parse_state g_cblc_constructor_parse_state = {NULL, NULL, 0};
 static const t_cblc_struct_type *g_cblc_member_access_type = NULL;
+static const char *g_cblc_active_template_parameter = NULL;
+static char g_cblc_active_template_parameters[CBLC_TEMPLATE_PARAMETER_MAX]
+    [TRANSPILE_IDENTIFIER_MAX];
+static size_t g_cblc_active_template_parameter_count = 0;
 
 static int cblc_parse_std_strcpy(const char **cursor, t_cblc_translation_unit *unit,
     t_cblc_function *function);
@@ -69,6 +73,16 @@ static int cblc_extract_call_argument(const t_cblc_statement *statement,
     size_t argument_index, char *buffer, size_t buffer_size);
 static int cblc_argument_matches_parameter(const t_cblc_translation_unit *unit,
     const char *argument, const t_cblc_parameter *parameter);
+static int cblc_call_arguments_match_parameters(const t_cblc_translation_unit *unit,
+    const char *call_arguments, size_t call_argument_count,
+    const t_cblc_parameter *parameters, size_t parameter_count);
+static int cblc_parameter_kind_from_data_kind(t_cblc_data_kind kind,
+    t_transpiler_function_parameter_kind *out_kind);
+static void cblc_replace_template_text(char *text, size_t text_size,
+    const char *from, const char *to);
+static int cblc_build_template_instance_names(const char *template_name,
+    const char *argument, char *source_name, size_t source_size,
+    char *cobol_name, size_t cobol_size);
 static int cblc_normalize_call_arguments(const t_cblc_translation_unit *unit,
     const char *call_arguments, size_t call_argument_count, char *buffer,
     size_t buffer_size);
@@ -96,6 +110,13 @@ static int cblc_parse_function_return_type(const char **cursor,
     char *type_name, size_t type_name_size);
 static const t_cblc_struct_type *cblc_find_struct_type(const t_cblc_translation_unit *unit,
     const char *identifier);
+static const t_cblc_function *cblc_find_template_function(
+    const t_cblc_translation_unit *unit, const char *identifier);
+static int cblc_parse_function(const char **cursor, t_cblc_translation_unit *unit);
+static void cblc_record_template_parse_error(t_cblc_translation_unit *unit,
+    int code, const char *message);
+static size_t cblc_source_offset(const t_cblc_translation_unit *unit,
+    const char *position);
 static const t_cblc_struct_type *cblc_find_receiver_type(const t_cblc_translation_unit *unit,
     const t_cblc_data_item *item);
 static t_cblc_data_item *cblc_find_data_item(t_cblc_translation_unit *unit,

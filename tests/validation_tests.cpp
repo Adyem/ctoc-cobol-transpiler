@@ -419,6 +419,986 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_templates_instantiate_struct_fields)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "template <typename T>\n"
+        "struct box { T value; };\n"
+        "box<int> item;\n"
+        "void main() {\n"
+        "    box<int> local;\n"
+        "    local.value = 8;\n"
+        "    display(local.value);\n"
+        "    item.value = 7;\n"
+        "    display(item.value);\n"
+        "    return;\n"
+        "}\n";
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "one-parameter template should parse and instantiate") != FT_SUCCESS)
+        goto cleanup;
+    if (unit.template_definition_count != 1 || unit.template_instantiation_count != 1
+        || unit.struct_type_count < 3 || unit.type_ref_count < 2
+        || unit.template_instantiations[0].argument_ref_id >= unit.type_ref_count
+        || unit.template_instantiations[0].applied_ref_id >= unit.type_ref_count
+        || unit.type_refs[unit.template_instantiations[0].applied_ref_id].kind
+            != CBLC_TYPE_REF_APPLIED
+        || unit.template_definitions[0].definition_offset != 0
+        || unit.template_instantiations[0].definition_offset != 0
+        || unit.template_instantiations[0].first_use_offset == static_cast<size_t>(-1)
+        || unit.template_instantiations[0].first_use_offset <=
+            unit.template_instantiations[0].definition_offset)
+    {
+        std::printf("Assertion failed: template metadata should record one definition and instantiation\n");
+        goto cleanup;
+    }
+    if (unit.template_instantiations[0].struct_type_index >= unit.struct_type_count
+        || unit.struct_types[unit.template_instantiations[0].struct_type_index].field_count != 1
+        || unit.struct_types[unit.template_instantiations[0].struct_type_index].fields[0].kind
+            != CBLC_DATA_KIND_INT)
+    {
+        std::printf("Assertion failed: template field should be substituted with int\n");
+        goto cleanup;
+    }
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "instantiated template should generate COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol || !ft_strnstr(generated_cobol, "ITEM-VALUE",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should contain the substituted field\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_templates_instantiate_multi_parameter_struct_fields)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "template <typename T, typename U>\n"
+        "struct pair_value { T first; U second; };\n"
+        "pair_value<int, char> item;\n"
+        "void main() {\n"
+        "    item.first = 4;\n"
+        "    display(item.first);\n"
+        "    return;\n"
+        "}\n";
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "multi-parameter template struct should parse and instantiate") != FT_SUCCESS)
+        goto cleanup;
+    if (unit.template_definition_count != 1 || unit.template_instantiation_count != 1
+        || unit.template_definitions[0].parameter_count != 2
+        || unit.struct_types[unit.template_definitions[0].struct_type_index].template_parameter_count != 2
+        || unit.template_instantiations[0].argument_count != 2
+        || unit.template_instantiations[0].argument_ref_ids[0]
+            == unit.template_instantiations[0].argument_ref_ids[1]
+        || unit.template_instantiations[0].applied_ref_id >= unit.type_ref_count
+        || unit.type_refs[unit.template_instantiations[0].applied_ref_id].kind
+            != CBLC_TYPE_REF_APPLIED
+        || unit.type_refs[unit.template_instantiations[0].applied_ref_id].argument_count != 2)
+    {
+        std::printf("Assertion failed: multi-parameter template metadata should preserve ordered arguments (defs=%zu inst=%zu params=%zu typeparams=%zu args=%zu refs=%zu/%zu applied=%zu types=%zu appliedargs=%zu)\n",
+            unit.template_definition_count, unit.template_instantiation_count,
+            unit.template_definitions[0].parameter_count,
+            unit.struct_types[unit.template_definitions[0].struct_type_index].template_parameter_count,
+            unit.template_instantiations[0].argument_count,
+            unit.template_instantiations[0].argument_ref_ids[0],
+            unit.template_instantiations[0].argument_ref_ids[1],
+            unit.template_instantiations[0].applied_ref_id, unit.type_ref_count,
+            unit.type_refs[unit.template_instantiations[0].applied_ref_id < unit.type_ref_count
+                ? unit.template_instantiations[0].applied_ref_id : 0].argument_count);
+        goto cleanup;
+    }
+    {
+        const t_cblc_struct_type *type;
+
+        type = &unit.struct_types[unit.template_instantiations[0].struct_type_index];
+        if (type->field_count != 2 || type->fields[0].kind != CBLC_DATA_KIND_INT
+            || type->fields[1].kind != CBLC_DATA_KIND_CHAR)
+        {
+            std::printf("Assertion failed: multi-parameter fields should be substituted independently\n");
+            goto cleanup;
+        }
+    }
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "multi-parameter template struct should generate COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol || !std::strstr(generated_cobol, "ITEM-FIRST")
+        || !std::strstr(generated_cobol, "ITEM-SECOND"))
+    {
+        std::printf("Assertion failed: multi-parameter fields should emit concrete COBOL storage\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_pointer_argument_preserves_shape)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "template <typename T>\n"
+        "struct holder { T value; };\n"
+        "holder<int*> item;\n";
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "pointer template argument should parse and instantiate") != FT_SUCCESS)
+        goto cleanup;
+    if (unit.template_instantiation_count != 1
+        || unit.template_instantiations[0].argument_ref_id >= unit.type_ref_count
+        || unit.type_refs[unit.template_instantiations[0].argument_ref_id].kind
+            != CBLC_TYPE_REF_BUILTIN
+        || unit.type_refs[unit.template_instantiations[0].argument_ref_id].builtin_kind
+            != CBLC_DATA_KIND_INT_POINTER
+        || unit.type_refs[unit.template_instantiations[0].argument_ref_id].pointer_depth != 1)
+    {
+        std::printf("Assertion failed: pointer template argument should retain canonical shape\n");
+        goto cleanup;
+    }
+    {
+        const t_cblc_struct_type *type =
+            &unit.struct_types[unit.template_instantiations[0].struct_type_index];
+
+        if (type->field_count != 1 || type->fields[0].kind != CBLC_DATA_KIND_INT_POINTER)
+        {
+            std::printf("Assertion failed: pointer template field should retain pointer kind\n");
+            goto cleanup;
+        }
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_array_argument_preserves_shape)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "template <typename T>\n"
+        "struct holder { T value; };\n"
+        "holder<int[3]> item;\n";
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "array template argument should parse and instantiate") != FT_SUCCESS)
+        goto cleanup;
+    if (unit.template_instantiation_count != 1
+        || unit.template_instantiations[0].argument_ref_id >= unit.type_ref_count
+        || unit.type_refs[unit.template_instantiations[0].argument_ref_id].kind
+            != CBLC_TYPE_REF_BUILTIN
+        || unit.type_refs[unit.template_instantiations[0].argument_ref_id].builtin_kind
+            != CBLC_DATA_KIND_INT
+        || unit.type_refs[unit.template_instantiations[0].argument_ref_id].array_count != 3)
+    {
+        std::printf("Assertion failed: array template argument should retain canonical shape\n");
+        goto cleanup;
+    }
+    {
+        const t_cblc_struct_type *type =
+            &unit.struct_types[unit.template_instantiations[0].struct_type_index];
+
+        if (type->field_count != 1 || type->fields[0].kind != CBLC_DATA_KIND_INT
+            || type->fields[0].array_count != 3)
+        {
+            std::printf("Assertion failed: array template field should retain array shape\n");
+            goto cleanup;
+        }
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_templates_instantiate_function)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "template <typename T>\n"
+        "T identity(T value) { return value; }\n"
+        "int result;\n"
+        "void main() {\n"
+        "    result = identity<int>(7);\n"
+        "    result = identity(8);\n"
+        "    display(result);\n"
+        "    return;\n"
+        "}\n";
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "one-parameter function template should parse and instantiate") != FT_SUCCESS)
+        goto cleanup;
+
+    if (unit.function_instantiation_count != 1 || unit.type_ref_count < 2
+        || unit.function_instantiations[0].argument_ref_id >= unit.type_ref_count
+        || unit.function_instantiations[0].applied_ref_id >= unit.type_ref_count
+        || unit.type_refs[unit.function_instantiations[0].applied_ref_id].kind
+            != CBLC_TYPE_REF_APPLIED
+        || unit.function_instantiations[0].definition_offset != 0
+        || unit.function_instantiations[0].first_use_offset == static_cast<size_t>(-1)
+        || unit.function_instantiations[0].first_use_offset <=
+            unit.function_instantiations[0].definition_offset)
+    {
+        std::printf("Assertion failed: function template should record one instantiation\n");
+        goto cleanup;
+    }
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "instantiated function template should generate COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol || !ft_strnstr(generated_cobol, "CBLC-TPL-IDENTITY-INT",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should contain the concrete function paragraph\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_templates_instantiate_multi_parameter_function)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "template <typename T, typename U>\n"
+        "T first_value(T first, U second) { return first; }\n"
+        "struct marker_type { int value; };\n"
+        "int result;\n"
+        "marker_type marker;\n"
+        "void main() {\n"
+        "    result = first_value<int, marker_type>(7, marker);\n"
+        "    display(result);\n"
+        "    return;\n"
+        "}\n";
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "multi-parameter function template should parse and instantiate") != FT_SUCCESS)
+        goto cleanup;
+    if (unit.function_instantiation_count != 1
+        || unit.function_instantiations[0].argument_count != 2
+        || unit.functions[unit.function_instantiations[0].function_index].parameter_count != 2
+        || unit.functions[unit.function_instantiations[0].function_index].parameters[0].kind
+            != TRANSPILE_FUNCTION_PARAMETER_INT
+        || unit.functions[unit.function_instantiations[0].function_index].parameters[1].kind
+            != TRANSPILE_FUNCTION_PARAMETER_STRUCT)
+    {
+        std::printf("Assertion failed: multi-parameter function arguments should substitute independently\n");
+        goto cleanup;
+    }
+    if (cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: multi-parameter function template should generate COBOL\n");
+        goto cleanup;
+    }
+    if (!generated_cobol || !std::strstr(generated_cobol, "FIRST-VALUE")
+        || !std::strstr(generated_cobol, "MARKER-TYPE"))
+    {
+        std::printf("Assertion failed: multi-parameter function should emit a concrete paragraph\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_templates_reject_unsupported_parameter_forms)
+{
+    const char *sources[1];
+    size_t index;
+
+    sources[0] = "template <int N>\n"
+        "struct fixed { int value; };\n";
+    index = 0;
+    while (index < 1)
+    {
+        t_cblc_translation_unit unit;
+
+        cblc_translation_unit_init(&unit);
+        if (cblc_parse_translation_unit(sources[index], &unit) == FT_SUCCESS)
+        {
+            std::printf("Assertion failed: unsupported template parameter form should be rejected\n");
+            cblc_translation_unit_dispose(&unit);
+            return (FT_FAILURE);
+        }
+        cblc_translation_unit_dispose(&unit);
+        index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cblc_template_function_rejects_array_abi_gap)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "template <typename T>\n"
+        "int consume(T value) { return 1; }\n"
+        "int result;\n"
+        "void main() {\n"
+        "    result = consume<int[3]>(0);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_SUCCESS
+        || unit.parse_error_code != TRANSPILE_ERROR_TEMPLATE_INSTANTIATION_FAILED)
+    {
+        std::printf("Assertion failed: array template function ABI gap should be rejected\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_parse_reports_stable_diagnostic)
+{
+    t_cblc_frontend_analysis analysis;
+    const char *source;
+    int status;
+
+    source = "template <int N>\n"
+        "struct fixed { int value; };\n";
+    status = FT_FAILURE;
+    if (cblc_frontend_analysis_init(&analysis) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (cblc_frontend_analyze_document(&analysis, "template.cblc", source) == FT_SUCCESS)
+        goto cleanup;
+    if (analysis.diagnostics.count != 1
+        || analysis.diagnostics.items[0].code != TRANSPILE_ERROR_TEMPLATE_INVALID_DECLARATION
+        || std::strncmp(analysis.diagnostics.items[0].message,
+            "invalid template declaration", TRANSPILE_DIAGNOSTIC_MESSAGE_MAX) != 0
+        || analysis.diagnostics.items[0].span.start_line != 1
+        || analysis.diagnostics.items[0].span.start_column != 1)
+    {
+        std::printf("Assertion failed: invalid templates should produce a stable diagnostic\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_frontend_analysis_dispose(&analysis);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_function_rejects_mismatched_argument)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "struct Box { int value; };\n"
+        "template <typename T>\n"
+        "T identity(T value) { return value; }\n"
+        "Box box;\n"
+        "int result;\n"
+        "void main() {\n"
+        "    result = identity<int>(box);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_SUCCESS)
+    {
+        std::printf("Assertion failed: instantiated function should reject a mismatched argument type\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_function_deduces_exact_string_argument)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "template <typename T>\n"
+        "void sink(T value) {\n"
+        "    display(value);\n"
+        "    return;\n"
+        "}\n"
+        "string message;\n"
+        "void main() {\n"
+        "    message = \"hello\";\n"
+        "    sink(message);\n"
+        "    sink<string>(message);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "template function should deduce an exact string argument") != FT_SUCCESS)
+        goto cleanup;
+    if (unit.function_instantiation_count != 1)
+    {
+        std::printf("Assertion failed: explicit and deduced string calls should share one instance\n");
+        goto cleanup;
+    }
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "string template function should emit COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol || !std::strstr(generated_cobol, "CBLC-TPL-SINK-STRING"))
+    {
+        std::printf("Assertion failed: string template function should have a concrete paragraph\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_class_instantiates_members)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    const t_cblc_struct_type *type;
+    size_t type_index;
+    int status;
+
+    source = "template <typename T>\n"
+        "class box {\n"
+        "    public:\n"
+        "    T value;\n"
+        "    void set(T next) {\n"
+        "        value = next;\n"
+        "        return;\n"
+        "    }\n"
+        "};\n"
+        "box<int> item;\n"
+        "void main() {\n"
+        "    item.set(7);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "class template with a dependent member should parse") != FT_SUCCESS)
+        goto cleanup;
+    type = NULL;
+    type_index = 0;
+    while (type_index < unit.struct_type_count)
+    {
+        if (std::strcmp(unit.struct_types[type_index].source_name, "box__int") == 0)
+        {
+            type = &unit.struct_types[type_index];
+            break;
+        }
+        type_index += 1;
+    }
+    if (!type || type->method_count != 1
+        || type->methods[0].parameters[0].kind != TRANSPILE_FUNCTION_PARAMETER_INT
+        || std::strcmp(type->methods[0].parameters[0].type_name, "int") != 0)
+    {
+        std::printf("Assertion failed: class template member should be concretely substituted\n");
+        goto cleanup;
+    }
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "class template member should emit concrete COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol
+        || std::strstr(generated_cobol, "T VALUE")
+        || !std::strstr(generated_cobol,
+            "CBLC-METHOD-ITEM-CBLC-TPL-BOX-INT-SET"))
+    {
+        std::printf("Assertion failed: class template member output should be concrete\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_method_pointer_return_is_concrete)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    const t_cblc_struct_type *type;
+    size_t type_index;
+    int status;
+
+    source = "template <typename T>\n"
+        "class pointer_box {\n"
+        "    public:\n"
+        "    T value;\n"
+        "    T get() { return value; }\n"
+        "};\n"
+        "pointer_box<int*> item;\n"
+        "void main() { return; }\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "pointer-returning template method should parse") != FT_SUCCESS)
+        goto cleanup;
+    type = NULL;
+    type_index = 0;
+    while (type_index < unit.struct_type_count)
+    {
+        if (std::strcmp(unit.struct_types[type_index].source_name,
+                "pointer_box__int_PTR") == 0)
+        {
+            type = &unit.struct_types[type_index];
+            break;
+        }
+        type_index += 1;
+    }
+    if (!type || type->method_count != 1
+        || type->methods[0].return_kind != CBLC_FUNCTION_RETURN_INT_POINTER
+        || type->fields[0].kind != CBLC_DATA_KIND_INT_POINTER)
+    {
+        std::printf("Assertion failed: template method pointer return should be concrete\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_instantiation_limit_is_deterministic)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "template <typename T>\n"
+        "struct box { T value; };\n"
+        "box<int> first;\n"
+        "box<char> second;\n";
+    cblc_translation_unit_init(&unit);
+    unit.template_max_instantiations = 1;
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_SUCCESS
+        || unit.parse_error_code != TRANSPILE_ERROR_TEMPLATE_INSTANTIATION_FAILED
+        || std::strcmp(unit.parse_error_message, "template instantiation limit exceeded") != 0)
+    {
+        std::printf("Assertion failed: template instance limits should fail deterministically\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_names_are_bounded_and_deterministic)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    const t_cblc_struct_type *type;
+    int status;
+
+    source = "template <typename T>\n"
+        "struct extremely_long_template_name_that_needs_bounding_12345 { T value; };\n"
+        "extremely_long_template_name_that_needs_bounding_12345<int> item;\n"
+        "void main() { return; }\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "long template name should parse and instantiate") != FT_SUCCESS)
+        goto cleanup;
+    type = NULL;
+    for (size_t type_index = 0; type_index < unit.struct_type_count; ++type_index)
+    {
+        if (unit.struct_types[type_index].is_template_instantiation)
+        {
+            type = &unit.struct_types[type_index];
+            break;
+        }
+    }
+    if (!type || std::strlen(type->source_name) >= TRANSPILE_IDENTIFIER_MAX
+        || std::strlen(type->cobol_name) >= TRANSPILE_IDENTIFIER_MAX
+        || std::strncmp(type->source_name, "TPL-", 4) != 0)
+    {
+        std::printf("Assertion failed: template instance names should be bounded and hashed\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_nested_template_type_application)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "template <typename T>\n"
+        "struct box { T value; };\n"
+        "box<box<int>> nested;\n"
+        "void main() {\n"
+        "    nested.value.value = 9;\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "nested template type application should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (unit.template_instantiation_count != 2)
+    {
+        std::printf("Assertion failed: nested template application should instantiate each layer\n");
+        goto cleanup;
+    }
+    if (unit.template_instantiations[0].applied_ref_id >= unit.type_ref_count
+        || unit.template_instantiations[1].applied_ref_id >= unit.type_ref_count
+        || unit.type_refs[unit.template_instantiations[0].applied_ref_id].kind
+            != CBLC_TYPE_REF_APPLIED
+        || unit.type_refs[unit.template_instantiations[1].applied_ref_id].kind
+            != CBLC_TYPE_REF_APPLIED
+        || unit.template_instantiations[1].argument_ref_id
+            != unit.template_instantiations[0].applied_ref_id)
+    {
+        std::printf("Assertion failed: nested template references should retain structural applied IDs\n");
+        goto cleanup;
+    }
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "nested template type should emit COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol || !std::strstr(generated_cobol, "NESTED-VALUE-VALUE"))
+    {
+        std::printf("Assertion failed: nested template fields should be concrete\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_instantiation_depth_is_deterministic)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "template <typename T>\n"
+        "struct box { T value; };\n"
+        "box<int> item;\n"
+        "void main() { return; }\n";
+    cblc_translation_unit_init(&unit);
+    unit.template_max_instantiation_depth = 1;
+    unit.template_instantiation_depth = 1;
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_SUCCESS
+        || std::strcmp(unit.parse_error_message,
+            "template instantiation depth exceeded") != 0)
+    {
+        std::printf("Assertion failed: template depth limit should fail deterministically\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_class_constructor_is_concrete)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    const t_cblc_struct_type *type;
+    size_t type_index;
+    int status;
+
+    source = "template <typename T>\n"
+        "class box {\n"
+        "    public:\n"
+        "    T value;\n"
+        "    box(T initial) {\n"
+        "        value = initial;\n"
+        "    }\n"
+        "};\n"
+        "box<int> item(7);\n"
+        "void main() {\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "class template constructor should parse") != FT_SUCCESS)
+        goto cleanup;
+    type = NULL;
+    type_index = 0;
+    while (type_index < unit.struct_type_count)
+    {
+        if (std::strcmp(unit.struct_types[type_index].source_name, "box__int") == 0)
+        {
+            type = &unit.struct_types[type_index];
+            break;
+        }
+        type_index += 1;
+    }
+    if (!type || type->constructor_count != 1
+        || type->constructors[0].parameters[0].kind
+            != TRANSPILE_FUNCTION_PARAMETER_INT
+        || std::strcmp(type->constructors[0].parameters[0].type_name, "int") != 0)
+    {
+        std::printf("Assertion failed: template constructor should be concretely substituted\n");
+        goto cleanup;
+    }
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "class template constructor should emit COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol
+        || !std::strstr(generated_cobol, "CBLC-TPL-BOX-INT-CTOR-INITIAL")
+        || !std::strstr(generated_cobol, "CBLC-CONSTRUCTOR-ITEM-0")
+        || std::strstr(generated_cobol, "T VALUE"))
+    {
+        std::printf("Assertion failed: template constructor output should be concrete\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_imported_template_type_instantiates_from_exported_metadata)
+{
+    const char *worker_source;
+    const char *main_source;
+    t_cblc_translation_unit worker_unit;
+    t_cblc_translation_unit main_unit;
+    t_transpiler_context context;
+    const t_cblc_struct_type *type;
+    const t_cblc_struct_type *pointer_type;
+    const t_cblc_struct_type *array_type;
+    char *generated_cobol;
+    int context_initialized;
+    int status;
+
+    worker_source = "template <typename T>\n"
+        "struct box {\n"
+        "    T value;\n"
+        "};\n"
+        "void worker() { return; }\n";
+    main_source = "import \"worker_mod\";\n"
+        "box<int> item;\n"
+        "box<int*> pointer_item;\n"
+        "box<int[3]> array_item;\n"
+        "void main() { return; }\n";
+    cblc_translation_unit_init(&worker_unit);
+    cblc_translation_unit_init(&main_unit);
+    generated_cobol = NULL;
+    context_initialized = 0;
+    status = FT_FAILURE;
+    pointer_type = NULL;
+    array_type = NULL;
+    if (test_expect_success(cblc_parse_translation_unit(worker_source, &worker_unit),
+            "template provider should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_parse_translation_unit(main_source, &main_unit) == FT_SUCCESS)
+    {
+        /* The consumer must resolve the provider template through the context,
+         * so a parse without imported metadata is expected to fail. */
+        std::printf("Assertion failed: consumer should require imported template metadata\n");
+        goto cleanup;
+    }
+    cblc_translation_unit_dispose(&main_unit);
+    cblc_translation_unit_init(&main_unit);
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        goto cleanup;
+    context_initialized = 1;
+    if (transpiler_context_register_module(&context, "worker_mod", "worker_mod") != FT_SUCCESS
+        || transpiler_context_register_module(&context, "main_mod", "main_mod") != FT_SUCCESS
+        || transpiler_context_register_module_import(&context, "main_mod", "worker_mod") != FT_SUCCESS
+        || cblc_register_translation_unit_exports(&context, "worker_mod", &worker_unit) != FT_SUCCESS
+        || cblc_import_translation_unit_type_stubs(&context, "main_mod", &main_unit) != FT_SUCCESS
+        || cblc_parse_translation_unit(main_source, &main_unit) != FT_SUCCESS)
+        goto cleanup;
+    type = NULL;
+    for (size_t type_index = 0; type_index < main_unit.struct_type_count; ++type_index)
+    {
+        if (std::strcmp(main_unit.struct_types[type_index].source_name, "box__int") == 0)
+        {
+            type = &main_unit.struct_types[type_index];
+            break;
+        }
+    }
+    for (size_t imported_type_index = 0;
+        imported_type_index < main_unit.struct_type_count; ++imported_type_index)
+    {
+        const t_cblc_struct_type *candidate = &main_unit.struct_types[imported_type_index];
+
+        if (std::strcmp(candidate->source_name, "box__int_PTR") == 0)
+            pointer_type = candidate;
+        if (std::strcmp(candidate->source_name, "box__int_ARR3") == 0)
+            array_type = candidate;
+    }
+    if (!type || type->field_count != 1 || type->fields[0].kind != CBLC_DATA_KIND_INT
+        || type->fields[0].is_template_parameter || !pointer_type || !array_type
+        || pointer_type->fields[0].kind != CBLC_DATA_KIND_INT_POINTER
+        || array_type->fields[0].kind != CBLC_DATA_KIND_INT
+        || array_type->fields[0].array_count != 3)
+    {
+        std::printf("Assertion failed: imported template metadata should instantiate concretely\n");
+        goto cleanup;
+    }
+    if (test_expect_success(cblc_generate_cobol(&main_unit, &generated_cobol),
+            "consumer should emit imported template instance") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol || !std::strstr(generated_cobol, "ITEM-VALUE")
+        || std::strstr(generated_cobol, "T VALUE"))
+    {
+        std::printf("Assertion failed: imported template output should contain concrete fields\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&worker_unit);
+    cblc_translation_unit_dispose(&main_unit);
+    if (context_initialized)
+        transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_cblc_imported_template_function_instantiates_from_exported_body)
+{
+    const char *worker_source;
+    const char *main_source;
+    t_cblc_translation_unit worker_unit;
+    t_cblc_translation_unit main_unit;
+    t_transpiler_context context;
+    const t_cblc_function *function;
+    char *generated_cobol;
+    int context_initialized;
+    int status;
+
+    worker_source = "template <typename T>\n"
+        "T identity(T value) {\n"
+        "    return value;\n"
+        "}\n"
+        "void worker() { return; }\n";
+    main_source = "import \"worker_mod\";\n"
+        "int result;\n"
+        "void main() {\n"
+        "    result = identity<int>(7);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&worker_unit);
+    cblc_translation_unit_init(&main_unit);
+    generated_cobol = NULL;
+    context_initialized = 0;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(worker_source, &worker_unit),
+            "function template provider should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+        goto cleanup;
+    context_initialized = 1;
+    if (transpiler_context_register_module(&context, "worker_mod", "worker_mod") != FT_SUCCESS
+        || transpiler_context_register_module(&context, "main_mod", "main_mod") != FT_SUCCESS
+        || transpiler_context_register_module_import(&context, "main_mod", "worker_mod") != FT_SUCCESS
+        || cblc_register_translation_unit_exports(&context, "worker_mod", &worker_unit) != FT_SUCCESS
+        || cblc_import_translation_unit_function_stubs(&context, "main_mod", &main_unit) != FT_SUCCESS
+        || cblc_parse_translation_unit(main_source, &main_unit) != FT_SUCCESS)
+        goto cleanup;
+    function = NULL;
+    for (size_t function_index = 0; function_index < main_unit.function_count; ++function_index)
+    {
+        if (std::strcmp(main_unit.functions[function_index].source_name,
+                "identity__int") == 0)
+        {
+            function = &main_unit.functions[function_index];
+            break;
+        }
+    }
+    if (!function || !function->is_template_instantiation
+        || function->return_kind != CBLC_FUNCTION_RETURN_INT
+        || function->statement_count == 0)
+    {
+        std::printf("Assertion failed: imported function template should instantiate from its body\n");
+        goto cleanup;
+    }
+    if (test_expect_success(cblc_generate_cobol(&main_unit, &generated_cobol),
+            "consumer should emit imported function template instance") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol || !std::strstr(generated_cobol, "CBLC-TPL-IDENTITY-INT")
+        || std::strstr(generated_cobol, "typename"))
+    {
+        std::printf("Assertion failed: imported function output should be concrete\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&worker_unit);
+    cblc_translation_unit_dispose(&main_unit);
+    if (context_initialized)
+        transpiler_context_dispose(&context);
+    return (status);
+}
+
 FT_TEST(test_cblc_parse_translation_unit_tracks_multiple_functions)
 {
     const char *source;
@@ -3765,6 +4745,44 @@ const t_test_case *get_validation_tests(size_t *count)
             test_transpiler_validation_accepts_indexed_array_usage},
         {"cblc_parse_translation_unit_records_imports", test_cblc_parse_translation_unit_records_imports},
         {"cblc_parse_translation_unit_records_copy_includes", test_cblc_parse_translation_unit_records_copy_includes},
+        {"cblc_templates_instantiate_struct_fields", test_cblc_templates_instantiate_struct_fields},
+        {"cblc_templates_instantiate_multi_parameter_struct_fields",
+            test_cblc_templates_instantiate_multi_parameter_struct_fields},
+        {"cblc_template_pointer_argument_preserves_shape",
+            test_cblc_template_pointer_argument_preserves_shape},
+        {"cblc_template_array_argument_preserves_shape",
+            test_cblc_template_array_argument_preserves_shape},
+        {"cblc_templates_instantiate_function", test_cblc_templates_instantiate_function},
+        {"cblc_templates_instantiate_multi_parameter_function",
+            test_cblc_templates_instantiate_multi_parameter_function},
+        {"cblc_templates_reject_unsupported_parameter_forms",
+            test_cblc_templates_reject_unsupported_parameter_forms},
+        {"cblc_template_function_rejects_array_abi_gap",
+            test_cblc_template_function_rejects_array_abi_gap},
+        {"cblc_template_parse_reports_stable_diagnostic",
+            test_cblc_template_parse_reports_stable_diagnostic},
+        {"cblc_template_function_rejects_mismatched_argument",
+            test_cblc_template_function_rejects_mismatched_argument},
+        {"cblc_template_function_deduces_exact_string_argument",
+            test_cblc_template_function_deduces_exact_string_argument},
+        {"cblc_template_class_instantiates_members",
+            test_cblc_template_class_instantiates_members},
+        {"cblc_template_method_pointer_return_is_concrete",
+            test_cblc_template_method_pointer_return_is_concrete},
+        {"cblc_template_instantiation_limit_is_deterministic",
+            test_cblc_template_instantiation_limit_is_deterministic},
+        {"cblc_template_names_are_bounded_and_deterministic",
+            test_cblc_template_names_are_bounded_and_deterministic},
+        {"cblc_nested_template_type_application",
+            test_cblc_nested_template_type_application},
+        {"cblc_template_instantiation_depth_is_deterministic",
+            test_cblc_template_instantiation_depth_is_deterministic},
+        {"cblc_template_class_constructor_is_concrete",
+            test_cblc_template_class_constructor_is_concrete},
+        {"cblc_imported_template_type_instantiates_from_exported_metadata",
+            test_cblc_imported_template_type_instantiates_from_exported_metadata},
+        {"cblc_imported_template_function_instantiates_from_exported_body",
+            test_cblc_imported_template_function_instantiates_from_exported_body},
         {"cblc_parse_translation_unit_tracks_multiple_functions",
             test_cblc_parse_translation_unit_tracks_multiple_functions},
         {"cblc_parse_translation_unit_accepts_functions_without_keyword",

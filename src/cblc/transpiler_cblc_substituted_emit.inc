@@ -56,6 +56,13 @@ static int cblc_emit_substituted_statement(const t_cblc_translation_unit *unit,
 
     if (!unit || !statement || !replacement || !builder)
         return (FT_FAILURE);
+    /* A constructor body carries an implicit lifecycle record for its receiver.
+     * The receiver is already materialized before this paragraph runs, so
+     * replaying that record would try to construct the concrete receiver as a
+     * field. Explicit member lifecycle records still flow through normally. */
+    if (statement->type == CBLC_STATEMENT_DEFAULT_CONSTRUCT
+        && std::strcmp(statement->target, "CBLC-THIS-VALUE") == 0)
+        return (FT_SUCCESS);
     substituted = *statement;
     if (cblc_replace_this_prefix(statement->target, replacement, substituted.target,
             sizeof(substituted.target)) != FT_SUCCESS)

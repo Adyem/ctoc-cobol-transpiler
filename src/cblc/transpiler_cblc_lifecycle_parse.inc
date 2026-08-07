@@ -628,7 +628,8 @@ static int cblc_inject_entry_lifecycle(t_cblc_translation_unit *unit)
         const t_cblc_struct_type *type;
 
         item = &unit->data_items[index];
-        if (item->is_alias || item->is_function_local || std::strchr(item->source_name, '.'))
+        if (item->is_template_item || item->is_alias || item->is_function_local
+            || std::strchr(item->source_name, '.'))
         {
             index += 1;
             continue ;
@@ -1240,6 +1241,36 @@ static int cblc_parse_local_struct_instance_declaration(const char **cursor,
     if (cblc_parse_identifier(cursor, type_identifier, sizeof(type_identifier)) != FT_SUCCESS)
         return (FT_FAILURE);
     type = cblc_find_struct_type(unit, type_identifier);
+    cblc_skip_whitespace(cursor);
+    if (**cursor == '<')
+    {
+        char argument_identifier[TRANSPILE_IDENTIFIER_MAX];
+
+        *cursor += 1;
+        cblc_skip_whitespace(cursor);
+        if (cblc_parse_identifier(cursor, argument_identifier, sizeof(argument_identifier)) != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        cblc_skip_whitespace(cursor);
+        if (**cursor != '>')
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        *cursor += 1;
+        type = cblc_instantiate_template_struct(unit, type_identifier, argument_identifier);
+        if (type)
+        {
+            size_t argument_ref_id;
+
+            if (cblc_template_argument_ref(unit, argument_identifier, &argument_ref_id)
+                == FT_SUCCESS)
+                cblc_record_struct_template_use(unit, type_identifier, argument_ref_id,
+                    cblc_source_offset(unit, start));
+        }
+    }
     if (!type)
     {
         *cursor = start;

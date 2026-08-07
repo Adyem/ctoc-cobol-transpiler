@@ -853,6 +853,23 @@ static int transpiler_context_functions_reserve(t_transpiler_context *context, s
     return (FT_SUCCESS);
 }
 
+static void transpiler_context_clear_function_signatures(t_transpiler_context *context)
+{
+    size_t index;
+
+    if (!context || !context->functions)
+        return ;
+    index = 0;
+    while (index < context->function_count)
+    {
+        if (context->functions[index].statements)
+            cma_free(context->functions[index].statements);
+        context->functions[index].statements = NULL;
+        index += 1;
+    }
+    context->function_count = 0;
+}
+
 static int transpiler_context_types_reserve(t_transpiler_context *context, size_t desired_capacity)
 {
     t_transpiler_type_signature *new_types;
@@ -1832,6 +1849,7 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->semantic_diff_enabled = 0;
     context->last_error_code = FT_SUCCESS;
     transpiler_context_clear_semantic_snapshots(context);
+    transpiler_context_clear_function_signatures(context);
     if (context->functions)
         cma_free(context->functions);
     context->functions = NULL;
@@ -2127,7 +2145,7 @@ void transpiler_context_reset_unit_state(t_transpiler_context *context)
     transpiler_context_clear_semantic_snapshots(context);
     context->active_source_text = NULL;
     context->active_source_length = 0;
-    context->function_count = 0;
+    transpiler_context_clear_function_signatures(context);
     transpiler_context_clear_type_signatures(context);
     context->file_count = 0;
     context->module_order_count = 0;
@@ -2926,6 +2944,69 @@ int transpiler_context_register_function(t_transpiler_context *context, const ch
 {
     return (transpiler_context_register_function_signature(context, module_name, name,
             return_mode, visibility, NULL, 0));
+}
+
+int transpiler_context_register_function_signature_record(t_transpiler_context *context,
+    const char *module_name, const t_transpiler_function_signature *record)
+{
+    const t_transpiler_function_signature *registered_const;
+    t_transpiler_function_signature *registered;
+    size_t index;
+
+    if (!context || !module_name || !record)
+        return (FT_FAILURE);
+    if (transpiler_context_register_function_signature(context, module_name,
+            record->name, record->return_mode, record->visibility,
+            record->parameter_kinds, record->parameter_count) != FT_SUCCESS)
+        return (FT_FAILURE);
+    registered_const = transpiler_context_find_function(context, module_name, record->name);
+    if (!registered_const)
+        return (FT_FAILURE);
+    registered = const_cast<t_transpiler_function_signature *>(registered_const);
+    registered->return_kind = record->return_kind;
+    ft_strlcpy(registered->return_type_name, record->return_type_name,
+        sizeof(registered->return_type_name));
+    registered->is_template = record->is_template;
+    registered->template_parameter_count = record->template_parameter_count;
+    index = 0;
+    while (index < registered->template_parameter_count
+        && index < CBLC_TEMPLATE_PARAMETER_MAX)
+    {
+        ft_strlcpy(registered->template_parameter_names[index],
+            record->template_parameter_names[index],
+            sizeof(registered->template_parameter_names[index]));
+        index += 1;
+    }
+    ft_strlcpy(registered->template_parameter_name, record->template_parameter_name,
+        sizeof(registered->template_parameter_name));
+    index = 0;
+    while (index < record->parameter_count && index < TRANSPILE_FUNCTION_PARAMETER_MAX)
+    {
+        ft_strlcpy(registered->parameter_source_names[index],
+            record->parameter_source_names[index],
+            sizeof(registered->parameter_source_names[index]));
+        ft_strlcpy(registered->parameter_actual_source_names[index],
+            record->parameter_actual_source_names[index],
+            sizeof(registered->parameter_actual_source_names[index]));
+        ft_strlcpy(registered->parameter_cobol_names[index],
+            record->parameter_cobol_names[index],
+            sizeof(registered->parameter_cobol_names[index]));
+        ft_strlcpy(registered->parameter_type_names[index],
+            record->parameter_type_names[index],
+            sizeof(registered->parameter_type_names[index]));
+        index += 1;
+    }
+    if (record->statement_count > 0 && record->statements)
+    {
+        registered->statements = static_cast<t_cblc_statement *>(cma_calloc(
+            record->statement_count, sizeof(*registered->statements)));
+        if (!registered->statements)
+            return (FT_FAILURE);
+        std::memcpy(registered->statements, record->statements,
+            record->statement_count * sizeof(*registered->statements));
+        registered->statement_count = record->statement_count;
+    }
+    return (FT_SUCCESS);
 }
 
 const t_transpiler_function_signature *transpiler_context_find_function(const t_transpiler_context *context,

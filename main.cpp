@@ -339,12 +339,55 @@ static int pipeline_write_translation_manifest(const t_transpiler_context *conte
     const char *mode, const std::string &manifest)
 {
     char manifest_path[TRANSPILE_FILE_PATH_MAX];
+    const char *first_target;
+    const char *separator;
+    size_t directory_length;
 
     if (!context || !mode)
         return (FT_FAILURE);
-    if (pipeline_resolve_output_path(context, "cblc.manifest.json", manifest_path,
-            sizeof(manifest_path)) != FT_SUCCESS)
-        return (FT_FAILURE);
+    if (context->output_directory && context->output_directory[0] != '\0')
+    {
+        if (pipeline_resolve_output_path(context, "cblc.manifest.json", manifest_path,
+                sizeof(manifest_path)) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    else
+    {
+        /* With explicit output paths, keep the manifest beside the outputs.
+         * Falling back to the process working directory made test and build
+         * invocations leave an unrelated root-level artifact behind. */
+        if (!context->target_paths || context->target_count == 0
+            || !context->target_paths[0])
+            return (FT_FAILURE);
+        first_target = context->target_paths[0];
+        separator = std::strrchr(first_target, '/');
+        {
+            const char *backslash;
+
+            backslash = std::strrchr(first_target, '\\');
+            if (!separator || (backslash && backslash > separator))
+                separator = backslash;
+        }
+        if (!separator)
+            ft_strlcpy(manifest_path, "cblc.manifest.json", sizeof(manifest_path));
+        else
+        {
+            directory_length = static_cast<size_t>(separator - first_target);
+            if (directory_length == 0)
+                directory_length = 1;
+            if (directory_length + std::strlen("/cblc.manifest.json") + 1
+                > sizeof(manifest_path))
+                return (FT_FAILURE);
+            std::memcpy(manifest_path, first_target, directory_length);
+            manifest_path[directory_length] = '\0';
+            if (directory_length == 1 && (manifest_path[0] == '/' || manifest_path[0] == '\\'))
+                ft_strlcpy(manifest_path + directory_length, "cblc.manifest.json",
+                    sizeof(manifest_path) - directory_length);
+            else
+                std::strncat(manifest_path, "/cblc.manifest.json",
+                    sizeof(manifest_path) - std::strlen(manifest_path) - 1);
+        }
+    }
     return (pipeline_write_file(manifest_path, manifest.c_str()));
 }
 
@@ -731,7 +774,8 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
 
         should_skip = 0;
         if (transpiler_incremental_cache_should_skip(&g_incremental_cache, input_path, resolved_path,
-                copybook_signature, &should_skip)
+                copybook_signature,
+                pipeline_hash_text("CBLC-TEMPLATE-TYPE-SUBSTITUTION@1"), &should_skip)
             != FT_SUCCESS)
         {
             if (std::snprintf(message, sizeof(message), "Unable to query incremental cache for '%s'", input_path) >= 0)
@@ -875,7 +919,8 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
             record_ast_path = ast_path;
         copybook_signature = transpiler_context_compute_copybook_signature(context);
         if (transpiler_incremental_cache_record(&g_incremental_cache, input_path, resolved_path, record_ast_path,
-                copybook_signature)
+                copybook_signature,
+                pipeline_hash_text("CBLC-TEMPLATE-TYPE-SUBSTITUTION@1"))
             != FT_SUCCESS)
         {
             if (std::snprintf(message, sizeof(message), "Failed to update incremental cache for '%s'", input_path) >= 0)
@@ -912,7 +957,7 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
     if (!context)
         return (FT_FAILURE);
     entries = transpiler_standard_library_get_entries(&entry_count);
-    manifest = "{\n  \"schema_version\": 1,\n  \"mode\": \"standard-library\",\n  \"artifacts\": [\n";
+    manifest = "{\n  \"schema_version\": 1,\n  \"mode\": \"standard-library\",\n  \"template_contract\": \"CBLC-TEMPLATE-TYPE-SUBSTITUTION@1\",\n  \"artifacts\": [\n";
     manifest_has_artifact = 0;
     index = 0;
     while (index < entry_count)
@@ -1120,6 +1165,56 @@ static void pipeline_assign_unit_program_name(t_cblc_translation_unit *unit, con
     }
 }
 
+static std::string pipeline_module_dependencies_json(const t_transpiler_context *context,
+    const t_cblc_translation_unit *unit, char **sources,
+    char (*module_names)[TRANSPILE_MODULE_NAME_MAX])
+{
+    std::string dependencies;
+    size_t import_index;
+
+    dependencies = "[";
+    if (!context || !unit || !sources || !module_names)
+        return (dependencies + "]");
+    import_index = 0;
+    while (import_index < unit->import_count)
+    {
+        size_t source_index;
+        const char *dependency_name;
+        const char *dependency_source;
+        char hash_text[32];
+
+        source_index = 0;
+        while (source_index < context->source_count)
+        {
+            if (pipeline_paths_equal(unit->imports[import_index].path,
+                    context->source_paths[source_index])
+                || std::strncmp(unit->imports[import_index].path,
+                    module_names[source_index], TRANSPILE_MODULE_NAME_MAX) == 0)
+                break;
+            source_index += 1;
+        }
+        dependency_name = unit->imports[import_index].path;
+        dependency_source = NULL;
+        if (source_index < context->source_count)
+        {
+            dependency_name = module_names[source_index];
+            dependency_source = sources[source_index];
+        }
+        if (import_index > 0)
+            dependencies += ",";
+        dependencies += "{\"module\":\"";
+        dependencies += pipeline_json_escape(dependency_name);
+        dependencies += "\",\"source_hash\":\"fnv1a64:";
+        if (std::snprintf(hash_text, sizeof(hash_text), "%016llx",
+                pipeline_hash_text(dependency_source)) >= 0)
+            dependencies += hash_text;
+        dependencies += "\"}";
+        import_index += 1;
+    }
+    dependencies += "]";
+    return (dependencies);
+}
+
 static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *user_data)
 {
     t_cblc_translation_unit *units;
@@ -1146,7 +1241,7 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
     file_count = context->source_count;
     if (file_count == 0)
         return (FT_SUCCESS);
-    manifest = "{\n  \"schema_version\": 1,\n  \"mode\": \"cblc-to-cobol\",\n  \"runtime\": \"external-standard-library\",\n  \"artifacts\": [\n";
+    manifest = "{\n  \"schema_version\": 1,\n  \"mode\": \"cblc-to-cobol\",\n  \"runtime\": \"external-standard-library\",\n  \"template_contract\": \"CBLC-TEMPLATE-TYPE-SUBSTITUTION@1\",\n  \"artifacts\": [\n";
     manifest_has_artifact = 0;
     transpiler_context_reset_module_registry(context);
     transpiler_context_reset_unit_state(context);
@@ -1253,6 +1348,16 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
         {
             if (std::snprintf(message, sizeof(message),
                     "Failed to import type stubs for module '%s'", module_names[source_index]) >= 0)
+                (void)pipeline_emit_error(context, message);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        if (cblc_import_translation_unit_function_stubs(context,
+                module_names[source_index], unit) != FT_SUCCESS)
+        {
+            if (std::snprintf(message, sizeof(message),
+                    "Failed to import function template stubs for module '%s'",
+                    module_names[source_index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;
             goto cleanup;
@@ -1437,7 +1542,22 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
         manifest += pipeline_json_escape(ordered_units[index]->program_name);
         manifest += "\",\n      \"path\": \"";
         manifest += pipeline_json_escape(context->target_paths[source_index]);
-        manifest += "\",\n      \"hash\": \"fnv1a64:";
+        manifest += "\",\n      \"source_hash\": \"fnv1a64:";
+        {
+            char hash_text[32];
+
+            if (std::snprintf(hash_text, sizeof(hash_text), "%016llx",
+                    pipeline_hash_text(sources[source_index])) < 0)
+            {
+                status = FT_FAILURE;
+                goto cleanup;
+            }
+            manifest += hash_text;
+        }
+        manifest += "\",\n      \"module_dependencies\": ";
+        manifest += pipeline_module_dependencies_json(context, ordered_units[index],
+            sources, module_names);
+        manifest += ",\n      \"hash\": \"fnv1a64:";
         {
             char hash_text[32];
 

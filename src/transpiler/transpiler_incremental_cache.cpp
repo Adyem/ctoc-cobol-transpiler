@@ -22,6 +22,7 @@ static void incremental_cache_entry_reset(t_transpiler_incremental_cache_entry *
     entry->ast_timestamp = 0;
     entry->ast_size = 0;
     entry->copybook_signature = 0;
+    entry->compiler_contract_signature = 0;
 }
 
 static int incremental_cache_reserve_entries(t_transpiler_incremental_cache *cache, size_t desired_capacity)
@@ -116,7 +117,7 @@ static t_transpiler_incremental_cache_entry *incremental_cache_find_entry(t_tran
 
 static int incremental_cache_parse_line(const std::string &line, t_transpiler_incremental_cache_entry *entry)
 {
-    std::string fields[10];
+    std::string fields[11];
     size_t field_index;
     size_t cursor;
     size_t separator;
@@ -130,7 +131,7 @@ static int incremental_cache_parse_line(const std::string &line, t_transpiler_in
     incremental_cache_entry_reset(entry);
     field_index = 0;
     cursor = 0;
-    while (cursor <= line.size() && field_index < 10)
+    while (cursor <= line.size() && field_index < 11)
     {
         separator = line.find('|', cursor);
         if (separator == std::string::npos)
@@ -143,7 +144,7 @@ static int incremental_cache_parse_line(const std::string &line, t_transpiler_in
         field_index += 1;
         cursor = separator + 1;
     }
-    if (field_index != 10)
+    if (field_index != 10 && field_index != 11)
         return (FT_FAILURE);
     ft_strlcpy(entry->input_path, fields[0].c_str(), TRANSPILE_FILE_PATH_MAX);
     ft_strlcpy(entry->output_path, fields[1].c_str(), TRANSPILE_FILE_PATH_MAX);
@@ -155,6 +156,8 @@ static int incremental_cache_parse_line(const std::string &line, t_transpiler_in
     entry->ast_timestamp = std::strtoll(fields[7].c_str(), NULL, 10);
     entry->ast_size = std::strtoull(fields[8].c_str(), NULL, 10);
     entry->copybook_signature = std::strtoull(fields[9].c_str(), NULL, 10);
+    if (field_index == 11)
+        entry->compiler_contract_signature = std::strtoull(fields[10].c_str(), NULL, 10);
     return (FT_SUCCESS);
 }
 
@@ -280,7 +283,7 @@ int transpiler_incremental_cache_save(t_transpiler_incremental_cache *cache)
         stream << entry->input_path << '|' << entry->output_path << '|' << entry->ast_path << '|'
             << entry->input_timestamp << '|' << entry->input_size << '|' << entry->output_timestamp << '|'
             << entry->output_size << '|' << entry->ast_timestamp << '|' << entry->ast_size << '|'
-            << entry->copybook_signature << '\n';
+            << entry->copybook_signature << '|' << entry->compiler_contract_signature << '\n';
         index += 1;
     }
     stream.close();
@@ -289,7 +292,8 @@ int transpiler_incremental_cache_save(t_transpiler_incremental_cache *cache)
 }
 
 int transpiler_incremental_cache_should_skip(t_transpiler_incremental_cache *cache, const char *input_path,
-    const char *output_path, unsigned long long copybook_signature, int *should_skip)
+    const char *output_path, unsigned long long copybook_signature,
+    unsigned long long compiler_contract_signature, int *should_skip)
 {
     t_transpiler_incremental_cache_entry *entry;
     long long timestamp;
@@ -321,6 +325,8 @@ int transpiler_incremental_cache_should_skip(t_transpiler_incremental_cache *cac
     }
     if (entry->copybook_signature != copybook_signature)
         return (FT_SUCCESS);
+    if (entry->compiler_contract_signature != compiler_contract_signature)
+        return (FT_SUCCESS);
     if (should_skip)
         *should_skip = 1;
     return (FT_SUCCESS);
@@ -338,7 +344,8 @@ static void incremental_cache_update_entry(t_transpiler_incremental_cache_entry 
 }
 
 int transpiler_incremental_cache_record(t_transpiler_incremental_cache *cache, const char *input_path,
-    const char *output_path, const char *ast_path, unsigned long long copybook_signature)
+    const char *output_path, const char *ast_path, unsigned long long copybook_signature,
+    unsigned long long compiler_contract_signature)
 {
     t_transpiler_incremental_cache_entry *entry;
     long long input_timestamp;
@@ -380,6 +387,7 @@ int transpiler_incremental_cache_record(t_transpiler_incremental_cache *cache, c
     entry->ast_timestamp = ast_timestamp;
     entry->ast_size = ast_size;
     entry->copybook_signature = copybook_signature;
+    entry->compiler_contract_signature = compiler_contract_signature;
     cache->dirty = 1;
     return (FT_SUCCESS);
 }

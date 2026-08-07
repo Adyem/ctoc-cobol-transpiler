@@ -38,7 +38,7 @@ FT_TEST(test_compiler_incremental_cache_records_and_skips)
         goto cleanup;
     if (transpiler_incremental_cache_load(&cache) != FT_SUCCESS)
         goto cleanup;
-    if (transpiler_incremental_cache_record(&cache, input_path, output_path, NULL, 0) != FT_SUCCESS)
+    if (transpiler_incremental_cache_record(&cache, input_path, output_path, NULL, 0, 0) != FT_SUCCESS)
         goto cleanup;
     if (transpiler_incremental_cache_save(&cache) != FT_SUCCESS)
         goto cleanup;
@@ -50,14 +50,14 @@ FT_TEST(test_compiler_incremental_cache_records_and_skips)
     if (transpiler_incremental_cache_load(&cache) != FT_SUCCESS)
         goto cleanup;
     should_skip = 0;
-    if (transpiler_incremental_cache_should_skip(&cache, input_path, output_path, 0, &should_skip) != FT_SUCCESS)
+    if (transpiler_incremental_cache_should_skip(&cache, input_path, output_path, 0, 0, &should_skip) != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(should_skip, 1, "cache should skip unchanged inputs") != FT_SUCCESS)
         goto cleanup;
     if (test_write_text_file(input_path, "IDENTIFICATION DIVISION.\nCHANGED.\n") != FT_SUCCESS)
         goto cleanup;
     should_skip = 1;
-    if (transpiler_incremental_cache_should_skip(&cache, input_path, output_path, 0, &should_skip) != FT_SUCCESS)
+    if (transpiler_incremental_cache_should_skip(&cache, input_path, output_path, 0, 0, &should_skip) != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(should_skip, 0, "cache should rebuild when inputs change") != FT_SUCCESS)
         goto cleanup;
@@ -101,7 +101,7 @@ FT_TEST(test_compiler_incremental_cache_detects_copybook_changes)
         goto cleanup;
     if (transpiler_incremental_cache_load(&cache) != FT_SUCCESS)
         goto cleanup;
-    if (transpiler_incremental_cache_record(&cache, input_path, output_path, NULL, 123ULL) != FT_SUCCESS)
+    if (transpiler_incremental_cache_record(&cache, input_path, output_path, NULL, 123ULL, 77ULL) != FT_SUCCESS)
         goto cleanup;
     if (transpiler_incremental_cache_save(&cache) != FT_SUCCESS)
         goto cleanup;
@@ -113,14 +113,21 @@ FT_TEST(test_compiler_incremental_cache_detects_copybook_changes)
     if (transpiler_incremental_cache_load(&cache) != FT_SUCCESS)
         goto cleanup;
     should_skip = 0;
-    if (transpiler_incremental_cache_should_skip(&cache, input_path, output_path, 123ULL, &should_skip) != FT_SUCCESS)
+    if (transpiler_incremental_cache_should_skip(&cache, input_path, output_path, 123ULL, 77ULL, &should_skip) != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(should_skip, 1, "cache should skip when copybook signature matches") != FT_SUCCESS)
         goto cleanup;
     should_skip = 1;
-    if (transpiler_incremental_cache_should_skip(&cache, input_path, output_path, 456ULL, &should_skip) != FT_SUCCESS)
+    if (transpiler_incremental_cache_should_skip(&cache, input_path, output_path, 456ULL, 77ULL, &should_skip) != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(should_skip, 0, "cache should rebuild when copybook signature differs") != FT_SUCCESS)
+        goto cleanup;
+    should_skip = 1;
+    if (transpiler_incremental_cache_should_skip(&cache, input_path, output_path,
+            123ULL, 78ULL, &should_skip) != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(should_skip, 0,
+            "cache should rebuild when compiler contract changes") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:

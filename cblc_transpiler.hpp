@@ -5,6 +5,8 @@
 
 #include "compatibility/libft_compat.hpp"
 
+#define CBLC_TEMPLATE_PARAMETER_MAX 4
+
 // ===============================
 // Core runtime support utilities
 // ===============================
@@ -301,6 +303,8 @@ typedef enum e_transpiler_function_parameter_kind
     TRANSPILE_FUNCTION_PARAMETER_STRUCT_POINTER
 }   t_transpiler_function_parameter_kind;
 
+typedef struct s_cblc_statement t_cblc_statement;
+
 typedef struct s_transpiler_function_signature
 {
     char name[TRANSPILE_FUNCTION_NAME_MAX];
@@ -308,7 +312,22 @@ typedef struct s_transpiler_function_signature
     t_transpiler_function_return_mode return_mode;
     t_transpiler_symbol_visibility visibility;
     t_transpiler_function_parameter_kind parameter_kinds[TRANSPILE_FUNCTION_PARAMETER_MAX];
+    char parameter_source_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    char parameter_actual_source_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    char parameter_cobol_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    char parameter_type_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
     size_t parameter_count;
+    int return_kind;
+    char return_type_name[TRANSPILE_IDENTIFIER_MAX];
+    char return_cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    char return_source_name[TRANSPILE_IDENTIFIER_MAX];
+    int saw_return;
+    t_cblc_statement *statements;
+    size_t statement_count;
+    int is_template;
+    size_t template_parameter_count;
+    char template_parameter_names[CBLC_TEMPLATE_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    char template_parameter_name[TRANSPILE_IDENTIFIER_MAX];
 }   t_transpiler_function_signature;
 
 typedef enum e_transpiler_type_kind
@@ -316,8 +335,6 @@ typedef enum e_transpiler_type_kind
     TRANSPILE_TYPE_STRUCT = 0,
     TRANSPILE_TYPE_CLASS
 }   t_transpiler_type_kind;
-
-typedef struct s_cblc_statement t_cblc_statement;
 
 typedef struct s_transpiler_type_field_signature
 {
@@ -328,6 +345,8 @@ typedef struct s_transpiler_type_field_signature
     size_t array_count;
     int kind;
     int is_const;
+    int is_template_parameter;
+    char template_parameter_name[TRANSPILE_IDENTIFIER_MAX];
     t_transpiler_symbol_visibility visibility;
 }   t_transpiler_type_field_signature;
 
@@ -378,6 +397,10 @@ typedef struct s_transpiler_type_signature
     t_cblc_statement *destructor_statements;
     size_t destructor_statement_count;
     int has_destructor_definition;
+    int is_template;
+    size_t template_parameter_count;
+    char template_parameter_names[CBLC_TEMPLATE_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    char template_parameter_name[TRANSPILE_IDENTIFIER_MAX];
 }   t_transpiler_type_signature;
 
 #define TRANSPILE_DATA_SIGNATURE_TEXT_MAX 256
@@ -424,6 +447,10 @@ typedef struct s_transpiler_data_signature
 #define TRANSPILE_ERROR_TYPE_EXPORT_CONFLICT 1022
 #define TRANSPILE_ERROR_TYPE_PRIVATE_ACCESS 1023
 #define TRANSPILE_ERROR_FILE_CONFIGURATION 1024
+#define TRANSPILE_ERROR_TEMPLATE_INVALID_DECLARATION 1025
+#define TRANSPILE_ERROR_TEMPLATE_UNSUPPORTED_PARAMETER 1026
+#define TRANSPILE_ERROR_TEMPLATE_UNKNOWN_ARGUMENT 1027
+#define TRANSPILE_ERROR_TEMPLATE_INSTANTIATION_FAILED 1028
 
 typedef enum e_transpiler_file_role
 {
@@ -576,6 +603,7 @@ typedef struct s_transpiler_incremental_cache_entry
     long long ast_timestamp;
     unsigned long long ast_size;
     unsigned long long copybook_signature;
+    unsigned long long compiler_contract_signature;
 }   t_transpiler_incremental_cache_entry;
 
 typedef struct s_transpiler_incremental_cache
@@ -710,6 +738,8 @@ int transpiler_context_register_function_signature(t_transpiler_context *context
     const char *name, t_transpiler_function_return_mode return_mode,
     t_transpiler_symbol_visibility visibility,
     const t_transpiler_function_parameter_kind *parameter_kinds, size_t parameter_count);
+int transpiler_context_register_function_signature_record(t_transpiler_context *context,
+    const char *module_name, const t_transpiler_function_signature *record);
 const t_transpiler_function_signature *transpiler_context_find_function(const t_transpiler_context *context,
     const char *module_name, const char *name);
 const t_transpiler_function_signature *transpiler_context_resolve_function_access(t_transpiler_context *context,
@@ -782,9 +812,11 @@ int transpiler_incremental_cache_set_manifest(t_transpiler_incremental_cache *ca
 int transpiler_incremental_cache_load(t_transpiler_incremental_cache *cache);
 int transpiler_incremental_cache_save(t_transpiler_incremental_cache *cache);
 int transpiler_incremental_cache_should_skip(t_transpiler_incremental_cache *cache, const char *input_path,
-    const char *output_path, unsigned long long copybook_signature, int *should_skip);
+    const char *output_path, unsigned long long copybook_signature,
+    unsigned long long compiler_contract_signature, int *should_skip);
 int transpiler_incremental_cache_record(t_transpiler_incremental_cache *cache, const char *input_path,
-    const char *output_path, const char *ast_path, unsigned long long copybook_signature);
+    const char *output_path, const char *ast_path, unsigned long long copybook_signature,
+    unsigned long long compiler_contract_signature);
 
 // ===============================
 // Lexing, parsing, and AST nodes
@@ -1202,6 +1234,28 @@ typedef enum e_cblc_data_kind
     CBLC_DATA_KIND_INT_POINTER_POINTER
 }   t_cblc_data_kind;
 
+typedef enum e_cblc_type_ref_kind
+{
+    CBLC_TYPE_REF_BUILTIN = 0,
+    CBLC_TYPE_REF_NAMED,
+    CBLC_TYPE_REF_TEMPLATE_PARAMETER,
+    CBLC_TYPE_REF_APPLIED
+}   t_cblc_type_ref_kind;
+
+#define CBLC_TYPE_REF_ARGUMENT_MAX 4
+
+typedef struct s_cblc_type_ref
+{
+    t_cblc_type_ref_kind kind;
+    t_cblc_data_kind builtin_kind;
+    char name[TRANSPILE_IDENTIFIER_MAX];
+    size_t parameter_index;
+    size_t pointer_depth;
+    size_t array_count;
+    size_t argument_count;
+    size_t argument_ids[CBLC_TYPE_REF_ARGUMENT_MAX];
+}   t_cblc_type_ref;
+
 typedef struct s_cblc_intrinsic_entry
 {
     const char *name;
@@ -1253,6 +1307,7 @@ typedef struct s_cblc_data_item
     int is_alias;
     int is_active;
     int is_imported;
+    int is_template_item;
     int has_initializer;
     size_t initializer_length;
     char initializer_text[TRANSPILE_STATEMENT_TEXT_MAX];
@@ -1270,6 +1325,8 @@ typedef struct s_cblc_struct_field
     size_t array_count;
     t_cblc_data_kind kind;
     int is_const;
+    int is_template_parameter;
+    char template_parameter_name[TRANSPILE_IDENTIFIER_MAX];
     t_cblc_member_visibility visibility;
 }   t_cblc_struct_field;
 
@@ -1320,6 +1377,13 @@ typedef struct s_cblc_struct_type
     int is_class;
     int is_builtin;
     int is_imported;
+    int is_template;
+    int is_template_instantiation;
+    size_t template_parameter_count;
+    char template_parameter_names[CBLC_TEMPLATE_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    char template_parameter_name[TRANSPILE_IDENTIFIER_MAX];
+    char template_source_name[TRANSPILE_IDENTIFIER_MAX];
+    char template_argument_name[TRANSPILE_IDENTIFIER_MAX];
     int has_default_constructor;
     t_cblc_constructor *constructors;
     size_t constructor_count;
@@ -1330,6 +1394,49 @@ typedef struct s_cblc_struct_type
     size_t destructor_statement_count;
     size_t destructor_statement_capacity;
 }   t_cblc_struct_type;
+
+typedef struct s_cblc_template_definition
+{
+    char source_name[TRANSPILE_IDENTIFIER_MAX];
+    char parameter_name[TRANSPILE_IDENTIFIER_MAX];
+    size_t parameter_count;
+    char parameter_names[CBLC_TEMPLATE_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    size_t struct_type_index;
+    size_t function_index;
+    size_t definition_offset;
+    int declaration_kind;
+    int is_class;
+}   t_cblc_template_definition;
+
+typedef struct s_cblc_template_instantiation
+{
+    char template_source_name[TRANSPILE_IDENTIFIER_MAX];
+    char argument_name[TRANSPILE_IDENTIFIER_MAX];
+    char concrete_source_name[TRANSPILE_IDENTIFIER_MAX];
+    size_t argument_ref_id;
+    size_t definition_offset;
+    size_t first_use_offset;
+    size_t struct_type_index;
+    size_t applied_ref_id;
+    size_t argument_count;
+    char argument_names[CBLC_TEMPLATE_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    size_t argument_ref_ids[CBLC_TEMPLATE_PARAMETER_MAX];
+}   t_cblc_template_instantiation;
+
+typedef struct s_cblc_function_instantiation
+{
+    char template_source_name[TRANSPILE_IDENTIFIER_MAX];
+    char argument_name[TRANSPILE_IDENTIFIER_MAX];
+    char concrete_source_name[TRANSPILE_IDENTIFIER_MAX];
+    size_t argument_ref_id;
+    size_t definition_offset;
+    size_t first_use_offset;
+    size_t function_index;
+    size_t argument_count;
+    char argument_names[CBLC_TEMPLATE_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    size_t argument_ref_ids[CBLC_TEMPLATE_PARAMETER_MAX];
+    size_t applied_ref_id;
+}   t_cblc_function_instantiation;
 
 typedef struct s_cblc_import
 {
@@ -1398,6 +1505,13 @@ typedef struct s_cblc_function
     int return_item_index;
     char return_cobol_name[TRANSPILE_IDENTIFIER_MAX];
     char return_source_name[TRANSPILE_IDENTIFIER_MAX];
+    int is_template;
+    size_t template_parameter_count;
+    char template_parameter_names[CBLC_TEMPLATE_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    int is_template_instantiation;
+    char template_parameter_name[TRANSPILE_IDENTIFIER_MAX];
+    char template_source_name[TRANSPILE_IDENTIFIER_MAX];
+    char template_argument_name[TRANSPILE_IDENTIFIER_MAX];
     char (*local_destructor_targets)[TRANSPILE_IDENTIFIER_MAX];
     size_t local_destructor_count;
     size_t local_destructor_capacity;
@@ -1405,12 +1519,30 @@ typedef struct s_cblc_function
 
 struct s_cblc_translation_unit
 {
+    const char *source_text;
     t_cblc_data_item *data_items;
     size_t data_count;
     size_t data_capacity;
     t_cblc_struct_type *struct_types;
     size_t struct_type_count;
     size_t struct_type_capacity;
+    t_cblc_type_ref *type_refs;
+    size_t type_ref_count;
+    size_t type_ref_capacity;
+    t_cblc_template_definition *template_definitions;
+    size_t template_definition_count;
+    size_t template_definition_capacity;
+    t_cblc_template_instantiation *template_instantiations;
+    size_t template_instantiation_count;
+    size_t template_instantiation_capacity;
+    t_cblc_function_instantiation *function_instantiations;
+    size_t function_instantiation_count;
+    size_t function_instantiation_capacity;
+    int parse_error_code;
+    char parse_error_message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    size_t template_max_instantiations;
+    size_t template_max_instantiation_depth;
+    size_t template_instantiation_depth;
     t_cblc_import *imports;
     size_t import_count;
     size_t import_capacity;
@@ -1438,6 +1570,8 @@ int cblc_register_translation_unit_exports(t_transpiler_context *context, const 
     const t_cblc_translation_unit *unit);
 int cblc_import_translation_unit_type_stubs(t_transpiler_context *context, const char *module_name,
     t_cblc_translation_unit *unit);
+int cblc_import_translation_unit_function_stubs(t_transpiler_context *context,
+    const char *module_name, t_cblc_translation_unit *unit);
 int cblc_resolve_translation_unit_calls(t_transpiler_context *context, const char *module_name,
     t_cblc_translation_unit *unit);
 

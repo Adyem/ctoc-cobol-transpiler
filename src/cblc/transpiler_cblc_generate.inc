@@ -840,6 +840,11 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
     index = 0;
     while (index < unit->data_count)
     {
+        if (unit->data_items[index].is_template_item)
+        {
+            index += 1;
+            continue ;
+        }
         if (unit->data_items[index].is_alias || std::strchr(unit->data_items[index].source_name, '.')
             || std::strstr(unit->data_items[index].source_name, "->")
             || cblc_is_entry_parameter_item(unit, &unit->data_items[index])
@@ -1168,7 +1173,7 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
         index = 0;
         while (index < unit->function_count)
         {
-            if (index != entry_index)
+            if (index != entry_index && !unit->functions[index].is_template)
             {
                 if (cblc_emit_function(unit, &unit->functions[index], &builder, 0) != FT_SUCCESS)
                     goto cleanup;

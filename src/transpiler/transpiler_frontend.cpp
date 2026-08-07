@@ -763,8 +763,25 @@ int cblc_frontend_analyze_document(t_cblc_frontend_analysis *analysis, const cha
         span.start_column = 1;
         span.end_line = 1;
         span.end_column = 1;
+        if (analysis->unit->parse_error_code >= TRANSPILE_ERROR_TEMPLATE_INVALID_DECLARATION
+            && analysis->unit->parse_error_code <= TRANSPILE_ERROR_TEMPLATE_INSTANTIATION_FAILED)
+        {
+            size_t template_offset;
+
+            if (transpiler_source_find_identifier(analysis->source_text, "template", 0,
+                    &template_offset) == FT_SUCCESS)
+                transpiler_source_make_span(analysis->path, analysis->source_text,
+                    template_offset, template_offset + std::strlen("template"), &span);
+        }
+        int diagnostic_code;
+        const char *diagnostic_message;
+
+        diagnostic_code = analysis->unit->parse_error_code != 0
+            ? analysis->unit->parse_error_code : FT_FAILURE;
+        diagnostic_message = analysis->unit->parse_error_message[0] != '\0'
+            ? analysis->unit->parse_error_message : "Parse error";
         if (transpiler_diagnostics_push_with_details(&analysis->diagnostics,
-                TRANSPILE_SEVERITY_ERROR, FT_FAILURE, "Parse error", &span, NULL, NULL)
+                TRANSPILE_SEVERITY_ERROR, diagnostic_code, diagnostic_message, &span, NULL, NULL)
             != FT_SUCCESS)
             return (FT_FAILURE);
         return (FT_FAILURE);
