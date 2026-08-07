@@ -45,3 +45,7 @@ void analyze_precision() {
         display("DAY TARGET");
     }
 }
+
+void main() {
+    analyze_precision();
+}

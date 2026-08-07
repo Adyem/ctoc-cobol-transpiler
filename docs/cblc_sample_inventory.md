@@ -2,14 +2,21 @@
 
 This document captures the reference CBL-C snippets that exercise the currently defined surface area of the language. Each
 sample lives in `samples/cblc` and is registered in `samples/cblc/manifest.txt` so automated checks can ensure the examples stay
-in sync with the documentation. Executable statements appear inside named function blocks so the transpiler can emit matching
-COBOL paragraphs, and every sample includes a `void main()` entrypoint that invokes the showcased routine.
+in sync with the documentation.
+
+The forward-conforming samples contain executable statements inside named
+function blocks and provide a lowercase `void main()` entrypoint. Files whose
+name begins with `reverse_` are different: they are golden outputs of the
+COBOL-to-CBL-C reverse pipeline. Reverse output is intentionally allowed to
+contain recoverable-but-not-forward-conforming constructs and must not be used
+as a forward-compilation example. This distinction follows section 14.3 of
+the authoritative language standard.
 
 ## Sample Coverage
 
 ### `samples/cblc/minimal_program.cblc`
 - **Purpose:** Mirrors the COBOL minimal program so the reverse pipeline has a trivially round-trippable example.
-- **Constructs:** A single global buffer, `void MAIN()` entrypoint, literal assignment, and explicit `return;` statement.
+- **Constructs:** A single global buffer, lowercase `void main()` entrypoint, literal assignment, and explicit `return;` statement.
 
 ### `samples/cblc/copy_file.cblc`
 - **Purpose:** Demonstrates the baseline file copy loop used throughout the CBL-C language standard and ensures the runtime string buffer path
@@ -531,6 +538,7 @@ void main() {
 ### `samples/cblc/numeric_precision.cblc`
 - **Purpose:** Locks down widened arithmetic and comparison behavior across long, long long, float, and double operands so numeric helper coverage stays in sync with the golden fixtures.
 - **Constructs:** Global accumulators, block-scoped temporaries, mixed-width arithmetic (`+`, `-`, `*`), relational comparisons (`>`, `>=`, `==`, `!=`), and console output that highlights each decision point.
+- **Conformance:** Includes an explicit `void main()` entrypoint that invokes `analyze_precision()`.
 
 ```cblc
 long day_total;

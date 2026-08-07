@@ -252,6 +252,9 @@ FT_TEST(test_cblc_numeric_precision_matches_golden)
         "    if (day_total == 75000) {\n"
         "        display(\"DAY TARGET\");\n"
         "    }\n"
+        "}\n\n"
+        "void main() {\n"
+        "    analyze_precision();\n"
         "}\n";
 
     if (golden_expect_file_matches("samples/cblc/numeric_precision.cblc", expected,

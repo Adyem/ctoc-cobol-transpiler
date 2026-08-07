@@ -813,6 +813,14 @@ Unsupported or partial reverse areas include `ALTER`, `ENTRY`, `RENAMES`, broad
 `INSPECT` forms, advanced packed decimal cases, complex table features, and
 other items listed in the COBOL dialect requirements.
 
+The `samples/cblc/reverse_*.cblc` files are golden reverse-translation
+fixtures. They document the recoverable output of that pipeline and are not
+forward-conformance inputs; consumers must not assume that every recovered
+paragraph, enum-like declaration, or unresolved external file reference can
+be sent back through the forward compiler unchanged. Forward examples use a
+lowercase `void main()` entrypoint and must satisfy the source rules in this
+document.
+
 ## 15. Unsupported language surface
 
 The following are not part of this version's CBL-C standard:
