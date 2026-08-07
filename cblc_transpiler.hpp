@@ -1740,10 +1740,14 @@ typedef struct s_transpiler_runtime_helper_entry
 {
     const char *identifier;
     const char *source;
+    const char *const *dependencies;
+    size_t dependency_count;
 }   t_transpiler_runtime_helper_entry;
 
 const t_transpiler_runtime_helper_entry *transpiler_runtime_helpers_get_entries(size_t *count);
 int transpiler_runtime_helpers_render_c_source(char **out_text);
+int transpiler_runtime_helpers_render_c_source_for_references(const char *references,
+    char **out_text);
 
 // ============================
 // Command line and diagnostics

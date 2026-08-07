@@ -637,7 +637,7 @@ source functions. The compiler must distinguish these artifact classes:
 | Artifact | Purpose | Current repository behavior |
 | --- | --- | --- |
 | translated module | User program/module output | Written to the matching `--output` path. |
-| target runtime helper | Shared C/COBOL implementation support | C runtime helpers are assembled into `cblc_runtime_helpers.c`; COBOL standard-library programs are emitted separately. |
+| target runtime helper | Shared C/COBOL implementation support | CBL-C C output extracts the referenced helper closure in deterministic registry order; `standard-library` mode emits the complete `cblc_runtime_helpers.c` package and COBOL standard-library programs separately. |
 | standard-library subprogram | External callable helper with a stable ABI | `standard-library` mode currently emits every registered helper as its own `.cob`. |
 | metadata/manifest | Dependency and build description | Both standard-library and normal translation modes emit `cblc.manifest.json`; C output records embedded runtime support, while COBOL output emits and records the transitive standard-library closure referenced by generated targets. |
 
@@ -656,8 +656,11 @@ the targets, and records them in the manifest. The manifests use stable FNV-1a c
 standard-library manifest describes the complete catalog package, while normal
 translation describes the generated target plus its required helper closure.
 
-The scalable model for future work is dependency-closed packaging. During
-semantic analysis, every intrinsic, standard-library call, runtime helper, and
+The scalable model for future work is dependency-closed packaging. The C
+runtime helper registry now assigns each helper a stable identifier and
+declares helper-to-helper dependencies. C output scans the generated program
+body, computes the transitive closure, and emits only that closure in registry
+order. During semantic analysis, every intrinsic, standard-library call, runtime helper, and
 generated method records a stable artifact identifier. The build then computes
 the transitive dependency closure and emits:
 

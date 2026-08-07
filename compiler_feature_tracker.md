@@ -236,11 +236,11 @@ are completed; keep completed items grouped separately from the remaining work t
     - [ ] Add arity/type, aliasing, capacity/truncation, multi-call, and executable COBOL regression tests.
     - [x] Update the intrinsic registry, ABI documentation, and conformance matrix for the current operation set.
 - [ ] **Selective C runtime extraction (`CBLC-TODO-C-RUNTIME`)**
-    - [ ] Assign stable artifact IDs to runtime helpers and declare helper-to-helper dependencies.
-    - [ ] Collect helper references from semantic lowering and generated call sites, then compute a deterministic transitive closure.
-    - [ ] Emit only required helper definitions while retaining an explicit preinstalled/shared-runtime mode.
+    - [x] Assign stable artifact IDs to runtime helpers and declare helper-to-helper dependencies.
+    - [x] Collect helper references from generated C call sites and compute a deterministic transitive closure.
+    - [x] Emit only required helper definitions in C output; retain the complete bundle for standard-library packaging.
     - [ ] Record helper IDs and dependency edges in manifests and reject missing or cyclic contracts deterministically.
-    - [ ] Add empty, single-helper, transitive, duplicate, unsupported-helper, and generated C compile/link tests.
+    - [x] Add empty, single-helper, and transitive registry-rendering tests; duplicate, unsupported-helper, manifest, and generated C compile/link coverage remain.
 
 ### Known Bugs / Diagnostics
 These issues track regressions uncovered in recent round-trip suites.

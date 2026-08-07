@@ -3789,6 +3789,48 @@ static int c_backend_emit_helper_functions(t_c_backend_buffer *buffer)
     return (FT_SUCCESS);
 }
 
+static int c_backend_filter_runtime_helpers(t_c_backend_buffer *buffer,
+    size_t helper_start, size_t helper_end)
+{
+    t_c_backend_buffer filtered;
+    char *selected_source;
+    size_t suffix_length;
+
+    if (!buffer || helper_start > helper_end || helper_end > buffer->length)
+        return (FT_FAILURE);
+    selected_source = NULL;
+    if (transpiler_runtime_helpers_render_c_source_for_references(
+            buffer->data + helper_end, &selected_source) != FT_SUCCESS
+        || !selected_source)
+    {
+        if (selected_source)
+            cma_free(selected_source);
+        return (FT_FAILURE);
+    }
+    c_backend_buffer_init(&filtered);
+    if (c_backend_buffer_append_span(&filtered, buffer->data, helper_start) != FT_SUCCESS
+        || c_backend_buffer_append_string(&filtered, selected_source) != FT_SUCCESS
+        || (selected_source[0] != '\0'
+            && c_backend_buffer_append_string(&filtered, "\n") != FT_SUCCESS))
+    {
+        cma_free(selected_source);
+        c_backend_buffer_dispose(&filtered);
+        return (FT_FAILURE);
+    }
+    suffix_length = buffer->length - helper_end;
+    if (c_backend_buffer_append_span(&filtered, buffer->data + helper_end, suffix_length)
+        != FT_SUCCESS)
+    {
+        cma_free(selected_source);
+        c_backend_buffer_dispose(&filtered);
+        return (FT_FAILURE);
+    }
+    cma_free(selected_source);
+    c_backend_buffer_dispose(buffer);
+    *buffer = filtered;
+    return (FT_SUCCESS);
+}
+
 static int c_backend_function_return_type(const t_cblc_function *function, char *buffer,
     size_t buffer_size)
 {
@@ -3948,6 +3990,8 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
     size_t index;
     size_t statement_index;
     size_t entry_index;
+    size_t helper_start;
+    size_t helper_end;
     const t_cblc_function *entry_function;
     int generate_main;
     int status;
@@ -3992,8 +4036,10 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
         goto cleanup;
     if (c_backend_buffer_append_line(&buffer, "") != FT_SUCCESS)
         goto cleanup;
+    helper_start = buffer.length;
     if (c_backend_emit_helper_functions(&buffer) != FT_SUCCESS)
         goto cleanup;
+    helper_end = buffer.length;
     if (c_backend_buffer_append_line(&buffer, "") != FT_SUCCESS)
         goto cleanup;
     index = 0;
@@ -4542,6 +4588,8 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
             goto cleanup;
         index += 1;
     }
+    if (c_backend_filter_runtime_helpers(&buffer, helper_start, helper_end) != FT_SUCCESS)
+        goto cleanup;
     status = FT_SUCCESS;
     *out_text = buffer.data;
     buffer.data = NULL;

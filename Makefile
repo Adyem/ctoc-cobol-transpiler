@@ -262,6 +262,7 @@ TEST_SRC    = imported/libft_test_runner.cpp \
              tests/runtime_sort_tests.cpp \
              tests/standard_library_tests.cpp \
              tests/standard_library/standard_library_registry_tests.cpp \
+             tests/standard_library/runtime_helper_registry_tests.cpp \
              tests/standard_library/standard_library_abs_tests.cpp \
              tests/standard_library/standard_library_atoi_tests.cpp \
              tests/standard_library/standard_library_atol_tests.cpp \

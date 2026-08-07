@@ -325,25 +325,36 @@ static const char g_runtime_helper_display_literal[] =
     "    printf(\"%s\\n\", literal);\n"
     "}\n";
 
+static const char *g_runtime_dependency_string_length[] = {
+    "cblc_string_length"
+};
+
+static const char *g_runtime_dependency_min_size[] = {
+    "cblc_min_size"
+};
+
 static const t_transpiler_runtime_helper_entry g_runtime_helper_entries[] = {
-    {"cblc_min_size", g_runtime_helper_min_size},
-    {"cblc_string_length", g_runtime_helper_string_length},
-    {"cblc_string_assign_literal", g_runtime_helper_string_assign_literal},
-    {"cblc_string_copy", g_runtime_helper_string_copy},
-    {"cblc_string_append_literal", g_runtime_helper_string_append_literal},
-    {"cblc_string_append", g_runtime_helper_string_append},
-    {"cblc_string_equals", g_runtime_helper_string_equals},
-    {"cblc_string_starts_with", g_runtime_helper_string_starts_with},
-    {"cblc_string_ends_with", g_runtime_helper_string_ends_with},
-    {"cblc_string_compare", g_runtime_helper_string_compare},
-    {"cblc_string_contains", g_runtime_helper_string_contains},
-    {"cblc_char_assign_literal", g_runtime_helper_char_assign_literal},
-    {"cblc_char_copy", g_runtime_helper_char_copy},
-    {"cblc_display_string", g_runtime_helper_display_string},
-    {"cblc_display_char_buffer", g_runtime_helper_display_char_buffer},
-    {"cblc_display_int", g_runtime_helper_display_int},
-    {"cblc_display_size", g_runtime_helper_display_size},
-    {"cblc_display_literal", g_runtime_helper_display_literal}
+    {"cblc_min_size", g_runtime_helper_min_size, NULL, 0},
+    {"cblc_string_length", g_runtime_helper_string_length, NULL, 0},
+    {"cblc_string_assign_literal", g_runtime_helper_string_assign_literal,
+        g_runtime_dependency_string_length, 1},
+    {"cblc_string_copy", g_runtime_helper_string_copy, NULL, 0},
+    {"cblc_string_append_literal", g_runtime_helper_string_append_literal,
+        g_runtime_dependency_string_length, 1},
+    {"cblc_string_append", g_runtime_helper_string_append, NULL, 0},
+    {"cblc_string_equals", g_runtime_helper_string_equals, NULL, 0},
+    {"cblc_string_starts_with", g_runtime_helper_string_starts_with, NULL, 0},
+    {"cblc_string_ends_with", g_runtime_helper_string_ends_with, NULL, 0},
+    {"cblc_string_compare", g_runtime_helper_string_compare, g_runtime_dependency_min_size, 1},
+    {"cblc_string_contains", g_runtime_helper_string_contains, NULL, 0},
+    {"cblc_char_assign_literal", g_runtime_helper_char_assign_literal,
+        g_runtime_dependency_string_length, 1},
+    {"cblc_char_copy", g_runtime_helper_char_copy, g_runtime_dependency_min_size, 1},
+    {"cblc_display_string", g_runtime_helper_display_string, NULL, 0},
+    {"cblc_display_char_buffer", g_runtime_helper_display_char_buffer, NULL, 0},
+    {"cblc_display_int", g_runtime_helper_display_int, NULL, 0},
+    {"cblc_display_size", g_runtime_helper_display_size, NULL, 0},
+    {"cblc_display_literal", g_runtime_helper_display_literal, NULL, 0}
 };
 
 const t_transpiler_runtime_helper_entry *transpiler_runtime_helpers_get_entries(size_t *count)
@@ -398,6 +409,143 @@ int transpiler_runtime_helpers_render_c_source(char **out_text)
         index += 1;
     }
     buffer[offset] = '\0';
+    *out_text = buffer;
+    return (FT_SUCCESS);
+}
+
+static int transpiler_runtime_helpers_find_index(const char *identifier, size_t *out_index)
+{
+    size_t count;
+    size_t index;
+
+    if (!identifier || !out_index)
+        return (FT_FAILURE);
+    count = sizeof(g_runtime_helper_entries) / sizeof(g_runtime_helper_entries[0]);
+    index = 0;
+    while (index < count)
+    {
+        if (std::strcmp(g_runtime_helper_entries[index].identifier, identifier) == 0)
+        {
+            *out_index = index;
+            return (FT_SUCCESS);
+        }
+        index += 1;
+    }
+    return (FT_FAILURE);
+}
+
+static int transpiler_runtime_helpers_select(size_t index, unsigned char *selected,
+    unsigned char *visiting, size_t count)
+{
+    const t_transpiler_runtime_helper_entry *entry;
+    size_t dependency_index;
+    size_t dependency_entry_index;
+
+    if (!selected || !visiting || index >= count)
+        return (FT_FAILURE);
+    if (selected[index])
+        return (FT_SUCCESS);
+    if (visiting[index])
+        return (FT_FAILURE);
+    visiting[index] = 1;
+    entry = &g_runtime_helper_entries[index];
+    dependency_index = 0;
+    while (dependency_index < entry->dependency_count)
+    {
+        if (transpiler_runtime_helpers_find_index(entry->dependencies[dependency_index],
+                &dependency_entry_index) != FT_SUCCESS
+            || transpiler_runtime_helpers_select(dependency_entry_index, selected,
+                visiting, count) != FT_SUCCESS)
+            return (FT_FAILURE);
+        dependency_index += 1;
+    }
+    visiting[index] = 0;
+    selected[index] = 1;
+    return (FT_SUCCESS);
+}
+
+int transpiler_runtime_helpers_render_c_source_for_references(const char *references,
+    char **out_text)
+{
+    size_t count;
+    unsigned char *selected;
+    unsigned char *visiting;
+    size_t total_length;
+    size_t index;
+    size_t offset;
+    char *buffer;
+
+    if (!references || !out_text)
+        return (FT_FAILURE);
+    *out_text = NULL;
+    count = sizeof(g_runtime_helper_entries) / sizeof(g_runtime_helper_entries[0]);
+    selected = static_cast<unsigned char *>(cma_calloc(count, sizeof(unsigned char)));
+    visiting = static_cast<unsigned char *>(cma_calloc(count, sizeof(unsigned char)));
+    if (!selected || !visiting)
+    {
+        if (selected)
+            cma_free(selected);
+        if (visiting)
+            cma_free(visiting);
+        return (FT_FAILURE);
+    }
+    index = 0;
+    while (index < count)
+    {
+        char needle[TRANSPILE_IDENTIFIER_MAX];
+
+        if (std::snprintf(needle, sizeof(needle), "%s(",
+                g_runtime_helper_entries[index].identifier) < 0)
+        {
+            cma_free(selected);
+            cma_free(visiting);
+            return (FT_FAILURE);
+        }
+        if (std::strstr(references, needle)
+            && transpiler_runtime_helpers_select(index, selected, visiting, count)
+                != FT_SUCCESS)
+        {
+            cma_free(selected);
+            cma_free(visiting);
+            return (FT_FAILURE);
+        }
+        index += 1;
+    }
+    total_length = 0;
+    index = 0;
+    while (index < count)
+    {
+        if (selected[index])
+            total_length += std::strlen(g_runtime_helper_entries[index].source) + 1;
+        index += 1;
+    }
+    buffer = static_cast<char *>(cma_calloc(total_length + 1, sizeof(char)));
+    if (!buffer)
+    {
+        cma_free(selected);
+        cma_free(visiting);
+        return (FT_FAILURE);
+    }
+    offset = 0;
+    index = 0;
+    while (index < count)
+    {
+        size_t source_length;
+
+        if (!selected[index])
+        {
+            index += 1;
+            continue ;
+        }
+        source_length = std::strlen(g_runtime_helper_entries[index].source);
+        std::memcpy(buffer + offset, g_runtime_helper_entries[index].source, source_length);
+        offset += source_length;
+        buffer[offset++] = '\n';
+        index += 1;
+    }
+    buffer[offset] = '\0';
+    cma_free(selected);
+    cma_free(visiting);
     *out_text = buffer;
     return (FT_SUCCESS);
 }

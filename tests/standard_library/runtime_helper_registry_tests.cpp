@@ -40,3 +40,57 @@ FT_TEST(test_runtime_helper_registry_renders_source)
     cma_free(source);
     return (FT_SUCCESS);
 }
+
+FT_TEST(test_runtime_helper_registry_renders_transitive_dependencies)
+{
+    char *source;
+
+    source = NULL;
+    if (transpiler_runtime_helpers_render_c_source_for_references(
+            "cblc_string_assign_literal(buffer, capacity, &length, literal);",
+            &source) != FT_SUCCESS || !source)
+    {
+        std::printf("Assertion failed: selective runtime helper rendering should succeed\n");
+        if (source)
+            cma_free(source);
+        return (FT_FAILURE);
+    }
+    if (!ft_strnstr(source, "cblc_string_assign_literal", std::strlen(source))
+        || !ft_strnstr(source, "cblc_string_length", std::strlen(source)))
+    {
+        std::printf("Assertion failed: selective rendering should include transitive dependencies\n");
+        cma_free(source);
+        return (FT_FAILURE);
+    }
+    if (ft_strnstr(source, "cblc_display_literal", std::strlen(source)))
+    {
+        std::printf("Assertion failed: selective rendering should omit unrelated helpers\n");
+        cma_free(source);
+        return (FT_FAILURE);
+    }
+    cma_free(source);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_runtime_helper_registry_renders_empty_for_no_references)
+{
+    char *source;
+
+    source = NULL;
+    if (transpiler_runtime_helpers_render_c_source_for_references(
+            "void generated_function(void) {}", &source) != FT_SUCCESS || !source)
+    {
+        std::printf("Assertion failed: empty selective runtime rendering should succeed\n");
+        if (source)
+            cma_free(source);
+        return (FT_FAILURE);
+    }
+    if (source[0] != '\0')
+    {
+        std::printf("Assertion failed: no helper references should produce empty source\n");
+        cma_free(source);
+        return (FT_FAILURE);
+    }
+    cma_free(source);
+    return (FT_SUCCESS);
+}
