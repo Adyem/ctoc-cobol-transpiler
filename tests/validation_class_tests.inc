@@ -969,10 +969,23 @@ FT_TEST(test_cblc_generate_cobol_emits_builtin_string_methods)
     if (!generated_cobol)
         goto cleanup;
     if (!ft_strnstr(generated_cobol,
+            "01 CBLC-INTRINSIC-MAIN-GREETING-ARG1-GROUP.",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol,
+            "PERFORM CBLC-INTRINSIC-MAIN-GREETING-APPEND.",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol,
+            "IF MAIN-GREETING-CAP < MAIN-GREETING-LEN + CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should route append through its reusable intrinsic ABI\n");
+        goto cleanup;
+    }
+    if (ft_strnstr(generated_cobol,
             "MOVE MAIN-SUFFIX-BUF(1:MAIN-SUFFIX-LEN) TO MAIN-GREETING-BUF(MAIN-GREETING-LEN + 1:MAIN-SUFFIX-LEN).",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: generated COBOL should emit builtin dynamic string append move\n");
+        std::printf("Assertion failed: generated COBOL should not inline the append implementation\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_cobol,
@@ -1018,42 +1031,42 @@ FT_TEST(test_cblc_generate_cobol_emits_builtin_string_methods)
         goto cleanup;
     }
     if (!ft_strnstr(generated_cobol,
-            "IF MAIN-GREETING-LEN = MAIN-SUFFIX-LEN",
+            "IF MAIN-GREETING-LEN = CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should emit builtin string equals length comparison\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_cobol,
-            "IF MAIN-GREETING-BUF(1:MAIN-GREETING-LEN) = MAIN-SUFFIX-BUF(1:MAIN-SUFFIX-LEN)",
+            "IF MAIN-GREETING-BUF(1:MAIN-GREETING-LEN) = CBLC-INTRINSIC-MAIN-GREETING-ARG1-BUF(1:CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN)",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should emit builtin string equals comparison\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_cobol,
-            "IF MAIN-GREETING-LEN >= MAIN-SUFFIX-LEN AND MAIN-GREETING-BUF(1:MAIN-SUFFIX-LEN) = MAIN-SUFFIX-BUF(1:MAIN-SUFFIX-LEN)",
+            "PERFORM CBLC-INTRINSIC-MAIN-GREETING-STARTS-WITH.",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should emit builtin string starts_with comparison\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_cobol,
-            "IF MAIN-GREETING-LEN >= MAIN-SUFFIX-LEN AND MAIN-GREETING-BUF(MAIN-GREETING-LEN - MAIN-SUFFIX-LEN + 1:MAIN-SUFFIX-LEN) = MAIN-SUFFIX-BUF(1:MAIN-SUFFIX-LEN)",
+            "IF MAIN-GREETING-BUF(MAIN-GREETING-LEN - CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN + 1:CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN) = CBLC-INTRINSIC-MAIN-GREETING-ARG1-BUF(1:CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN)",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should emit builtin string ends_with comparison\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_cobol,
-            "CALL 'CBLC-STRCMP-STRING' USING BY REFERENCE MAIN-GREETING BY REFERENCE MAIN-SUFFIX BY REFERENCE TOTAL.",
+            "CALL 'CBLC-STRCMP-STRING' USING BY REFERENCE MAIN-GREETING BY REFERENCE CBLC-INTRINSIC-MAIN-GREETING-ARG1-GROUP BY REFERENCE CBLC-INTRINSIC-MAIN-GREETING-PARAMETERIZED-RESULT.",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should emit builtin string compare helper call\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_cobol,
-            "INSPECT MAIN-GREETING-BUF(1:MAIN-GREETING-LEN) TALLYING TOTAL FOR ALL MAIN-SUFFIX-BUF(1:MAIN-SUFFIX-LEN)",
+            "INSPECT MAIN-GREETING-BUF(1:MAIN-GREETING-LEN) TALLYING CBLC-INTRINSIC-MAIN-GREETING-PARAMETERIZED-RESULT FOR ALL CBLC-INTRINSIC-MAIN-GREETING-ARG1-BUF(1:CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN)",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should emit builtin string contains tallying logic\n");

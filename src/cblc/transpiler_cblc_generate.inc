@@ -270,6 +270,97 @@ static int cblc_emit_reusable_string_intrinsic_results(
     return (FT_SUCCESS);
 }
 
+static size_t cblc_reusable_string_intrinsic_buffer_length(
+    const t_cblc_translation_unit *unit)
+{
+    size_t data_index;
+    size_t maximum_length;
+
+    maximum_length = 256;
+    if (!unit)
+        return (maximum_length);
+    data_index = 0;
+    while (data_index < unit->data_count)
+    {
+        if (!unit->data_items[data_index].is_alias
+            && unit->data_items[data_index].kind == CBLC_DATA_KIND_STRING
+            && unit->data_items[data_index].array_count == 0
+            && unit->data_items[data_index].length > maximum_length)
+            maximum_length = unit->data_items[data_index].length;
+        data_index += 1;
+    }
+    return (maximum_length);
+}
+
+static int cblc_emit_reusable_string_intrinsic_arguments(
+    const t_cblc_translation_unit *unit, t_cobol_text_builder *builder)
+{
+    size_t data_index;
+    size_t buffer_length;
+
+    if (!unit || !builder)
+        return (FT_FAILURE);
+    buffer_length = cblc_reusable_string_intrinsic_buffer_length(unit);
+    data_index = 0;
+    while (data_index < unit->data_count)
+    {
+        const t_cblc_data_item *item;
+        size_t argument_index;
+
+        item = &unit->data_items[data_index];
+        if (item->is_alias || item->kind != CBLC_DATA_KIND_STRING
+            || item->array_count > 0)
+        {
+            data_index += 1;
+            continue ;
+        }
+        argument_index = 0;
+        while (argument_index < 2)
+        {
+            char group_name[TRANSPILE_IDENTIFIER_MAX];
+            char length_name[TRANSPILE_IDENTIFIER_MAX];
+            char buffer_name[TRANSPILE_IDENTIFIER_MAX];
+            char line[256];
+
+            if (cblc_intrinsic_argument_name(item, argument_index, "GROUP",
+                    group_name, sizeof(group_name)) != FT_SUCCESS
+                || cblc_intrinsic_argument_name(item, argument_index, "LEN",
+                    length_name, sizeof(length_name)) != FT_SUCCESS
+                || cblc_intrinsic_argument_name(item, argument_index, "BUF",
+                    buffer_name, sizeof(buffer_name)) != FT_SUCCESS
+                || std::snprintf(line, sizeof(line), "       01 %s.", group_name) < 0
+                || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                || std::snprintf(line, sizeof(line), "          05 %s PIC S9(9) COMP VALUE 0.",
+                    length_name) < 0
+                || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                || std::snprintf(line, sizeof(line), "          05 %s PIC X(%zu).",
+                    buffer_name, buffer_length) < 0
+                || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                return (FT_FAILURE);
+            argument_index += 1;
+        }
+        {
+            char result_name[TRANSPILE_IDENTIFIER_MAX];
+            char status_name[TRANSPILE_IDENTIFIER_MAX];
+            char line[256];
+
+            if (cblc_intrinsic_result_name(item, "parameterized", result_name,
+                    sizeof(result_name)) != FT_SUCCESS
+                || cblc_intrinsic_argument_name(item, 2, "STATUS", status_name,
+                    sizeof(status_name)) != FT_SUCCESS
+                || std::snprintf(line, sizeof(line), "       01 %s PIC S9(9) VALUE 0.",
+                    result_name) < 0
+                || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                || std::snprintf(line, sizeof(line), "       01 %s PIC S9(9) VALUE 0.",
+                    status_name) < 0
+                || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        data_index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
 static int cblc_emit_reusable_string_intrinsic_paragraphs(
     const t_cblc_translation_unit *unit, t_cobol_text_builder *builder)
 {
@@ -355,6 +446,298 @@ static int cblc_emit_reusable_string_intrinsic_paragraphs(
                 || cobol_text_builder_append_line(builder, "") != FT_SUCCESS)
                 return (FT_FAILURE);
             name_index += 1;
+        }
+        data_index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+static int cblc_emit_reusable_parameterized_string_intrinsic_paragraphs(
+    const t_cblc_translation_unit *unit, t_cobol_text_builder *builder)
+{
+    const t_cblc_intrinsic_entry *intrinsic_entries;
+    size_t intrinsic_count;
+    size_t data_index;
+
+    if (!unit || !builder)
+        return (FT_FAILURE);
+    intrinsic_entries = cblc_intrinsic_get_entries(&intrinsic_count);
+    if (!intrinsic_entries)
+        return (FT_FAILURE);
+    data_index = 0;
+    while (data_index < unit->data_count)
+    {
+        const t_cblc_data_item *receiver;
+        size_t intrinsic_index;
+
+        receiver = &unit->data_items[data_index];
+        if (receiver->is_alias || receiver->kind != CBLC_DATA_KIND_STRING
+            || receiver->array_count > 0)
+        {
+            data_index += 1;
+            continue ;
+        }
+        intrinsic_index = 0;
+        while (intrinsic_index < intrinsic_count)
+        {
+            const t_cblc_intrinsic_entry *intrinsic_entry;
+            const char *intrinsic_name;
+            char paragraph_name[TRANSPILE_IDENTIFIER_MAX];
+            char argument_zero_length[TRANSPILE_IDENTIFIER_MAX];
+            char argument_zero_buffer[TRANSPILE_IDENTIFIER_MAX];
+            char argument_one_group[TRANSPILE_IDENTIFIER_MAX];
+            char argument_one_length[TRANSPILE_IDENTIFIER_MAX];
+            char argument_one_buffer[TRANSPILE_IDENTIFIER_MAX];
+            char result_name[TRANSPILE_IDENTIFIER_MAX];
+            char status_name[TRANSPILE_IDENTIFIER_MAX];
+            char line[512];
+
+            intrinsic_entry = &intrinsic_entries[intrinsic_index];
+            if (intrinsic_entry->minimum_arguments != 1
+                || intrinsic_entry->maximum_arguments != 1)
+            {
+                intrinsic_index += 1;
+                continue ;
+            }
+            intrinsic_name = intrinsic_entry->name;
+            if (cblc_intrinsic_paragraph_name(receiver, intrinsic_name, paragraph_name,
+                    sizeof(paragraph_name)) != FT_SUCCESS
+                || cblc_intrinsic_argument_name(receiver, 0, "LEN", argument_zero_length,
+                    sizeof(argument_zero_length)) != FT_SUCCESS
+                || cblc_intrinsic_argument_name(receiver, 0, "BUF", argument_zero_buffer,
+                    sizeof(argument_zero_buffer)) != FT_SUCCESS
+                || cblc_intrinsic_argument_name(receiver, 1, "GROUP", argument_one_group,
+                    sizeof(argument_one_group)) != FT_SUCCESS
+                || cblc_intrinsic_argument_name(receiver, 1, "LEN", argument_one_length,
+                    sizeof(argument_one_length)) != FT_SUCCESS
+                || cblc_intrinsic_argument_name(receiver, 1, "BUF", argument_one_buffer,
+                    sizeof(argument_one_buffer)) != FT_SUCCESS
+                || cblc_intrinsic_result_name(receiver, "parameterized", result_name,
+                    sizeof(result_name)) != FT_SUCCESS
+                || cblc_intrinsic_argument_name(receiver, 2, "STATUS", status_name,
+                    sizeof(status_name)) != FT_SUCCESS
+                || std::snprintf(line, sizeof(line), "       %s.", paragraph_name) < 0
+                || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (std::strcmp(intrinsic_name, "append") == 0)
+            {
+                if (std::snprintf(line, sizeof(line), "           MOVE 0 TO %s.", status_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                if (cblc_string_item_uses_dynamic_storage(receiver))
+                {
+                    if (std::snprintf(line, sizeof(line),
+                            "           IF %s-CAP < %s-LEN + %s",
+                            receiver->cobol_name, receiver->cobol_name, argument_one_length) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    if (std::snprintf(line, sizeof(line), "               MOVE SPACES TO %s",
+                            argument_zero_buffer) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line), "               IF %s-LEN > 0",
+                            receiver->cobol_name) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line),
+                            "                   MOVE %s-BUF(1:%s-LEN) TO %s(1:%s-LEN)",
+                            receiver->cobol_name, receiver->cobol_name, argument_zero_buffer,
+                            receiver->cobol_name) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line), "               END-IF") < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line), "               MOVE %s-LEN TO %s",
+                            receiver->cobol_name, argument_zero_length) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line), "               IF %s-PTR NOT = NULL",
+                            receiver->cobol_name) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line), "                   FREE %s-PTR",
+                            receiver->cobol_name) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || cobol_text_builder_append_line(builder, "               END-IF") != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line),
+                            "               IF %s-LEN + %s > %zu",
+                            receiver->cobol_name, argument_one_length, receiver->length) < 0)
+                        return (FT_FAILURE);
+                    if (std::snprintf(line, sizeof(line),
+                            "                   ALLOCATE %s-LEN + %s CHARACTERS RETURNING %s-PTR",
+                            receiver->cobol_name, argument_one_length, receiver->cobol_name) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line), "                   COMPUTE %s-CAP = %s-LEN + %s",
+                            receiver->cobol_name, receiver->cobol_name, argument_one_length) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || cobol_text_builder_append_line(builder, "               ELSE") != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line),
+                            "                   ALLOCATE %zu CHARACTERS RETURNING %s-PTR",
+                            receiver->length, receiver->cobol_name) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line), "                   MOVE %zu TO %s-CAP",
+                            receiver->length, receiver->cobol_name) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || cobol_text_builder_append_line(builder, "               END-IF") != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line), "               SET ADDRESS OF %s-BUF TO %s-PTR",
+                            receiver->cobol_name, receiver->cobol_name) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line), "               IF %s > 0",
+                            argument_zero_length) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line),
+                            "                   MOVE %s(1:%s) TO %s-BUF(1:%s)",
+                            argument_zero_buffer, argument_zero_length, receiver->cobol_name,
+                            argument_zero_length) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || cobol_text_builder_append_line(builder, "               END-IF") != FT_SUCCESS
+                        || cobol_text_builder_append_line(builder, "           END-IF") != FT_SUCCESS)
+                        return (FT_FAILURE);
+                }
+                if (!cblc_string_item_uses_dynamic_storage(receiver))
+                {
+                    if (std::snprintf(line, sizeof(line),
+                            "           IF %s-LEN + %s > %zu",
+                            receiver->cobol_name, argument_one_length, receiver->length) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line), "               MOVE 1 TO %s",
+                            status_name) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || cobol_text_builder_append_line(builder, "           ELSE") != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line), "               IF %s > 0",
+                            argument_one_length) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line),
+                            "                   MOVE %s(1:%s) TO %s-BUF(%s-LEN + 1:%s)",
+                            argument_one_buffer, argument_one_length, receiver->cobol_name,
+                            receiver->cobol_name, argument_one_length) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || cobol_text_builder_append_line(builder, "               END-IF") != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line), "               COMPUTE %s-LEN = %s-LEN + %s",
+                            receiver->cobol_name, receiver->cobol_name, argument_one_length) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || cobol_text_builder_append_line(builder, "           END-IF.") != FT_SUCCESS)
+                        return (FT_FAILURE);
+                }
+                else if (std::snprintf(line, sizeof(line), "           IF %s > 0",
+                        argument_one_length) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line),
+                        "               MOVE %s(1:%s) TO %s-BUF(%s-LEN + 1:%s)",
+                        argument_one_buffer, argument_one_length, receiver->cobol_name,
+                        receiver->cobol_name, argument_one_length) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || cobol_text_builder_append_line(builder, "           END-IF") != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "           COMPUTE %s-LEN = %s-LEN + %s.",
+                        receiver->cobol_name, receiver->cobol_name, argument_one_length) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            else if (std::strcmp(intrinsic_name, "compare") == 0)
+            {
+                if (std::snprintf(line, sizeof(line),
+                        "           CALL 'CBLC-STRCMP-STRING' USING BY REFERENCE %s BY REFERENCE %s BY REFERENCE %s.",
+                        receiver->cobol_name, argument_one_group, result_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            else if (std::strcmp(intrinsic_name, "equals") == 0)
+            {
+                if (std::snprintf(line, sizeof(line), "           MOVE 0 TO %s.", result_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "           IF %s-LEN = %s",
+                        receiver->cobol_name, argument_one_length) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "               IF %s-LEN = 0",
+                        receiver->cobol_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                if (std::snprintf(line, sizeof(line), "                   MOVE 1 TO %s",
+                        result_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || cobol_text_builder_append_line(builder, "               ELSE") != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line),
+                        "                   IF %s-BUF(1:%s-LEN) = %s(1:%s)",
+                        receiver->cobol_name, receiver->cobol_name, argument_one_buffer,
+                        argument_one_length) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "                       MOVE 1 TO %s",
+                        result_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || cobol_text_builder_append_line(builder, "                   END-IF") != FT_SUCCESS
+                    || cobol_text_builder_append_line(builder, "               END-IF") != FT_SUCCESS
+                    || cobol_text_builder_append_line(builder, "           END-IF.") != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            else if (std::strcmp(intrinsic_name, "starts_with") == 0
+                || std::strcmp(intrinsic_name, "ends_with") == 0)
+            {
+                int is_prefix;
+
+                is_prefix = std::strcmp(intrinsic_name, "starts_with") == 0;
+                if (std::snprintf(line, sizeof(line), "           MOVE 0 TO %s.", result_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "           IF %s = 0",
+                        argument_one_length) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "               MOVE 1 TO %s",
+                        result_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || cobol_text_builder_append_line(builder, "           ELSE") != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "               IF %s-LEN >= %s",
+                        receiver->cobol_name, argument_one_length) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                if (is_prefix)
+                {
+                    if (std::snprintf(line, sizeof(line),
+                            "                   IF %s-BUF(1:%s) = %s(1:%s)",
+                            receiver->cobol_name, argument_one_length, argument_one_buffer,
+                            argument_one_length) < 0)
+                        return (FT_FAILURE);
+                }
+                else
+                {
+                    if (std::snprintf(line, sizeof(line),
+                            "                   IF %s-BUF(%s-LEN - %s + 1:%s) = %s(1:%s)",
+                            receiver->cobol_name, receiver->cobol_name, argument_one_length,
+                            argument_one_length, argument_one_buffer, argument_one_length) < 0)
+                        return (FT_FAILURE);
+                }
+                if (cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "                       MOVE 1 TO %s",
+                        result_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || cobol_text_builder_append_line(builder, "                   END-IF") != FT_SUCCESS
+                    || cobol_text_builder_append_line(builder, "               END-IF") != FT_SUCCESS
+                    || cobol_text_builder_append_line(builder, "           END-IF.") != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            else
+            {
+                if (std::snprintf(line, sizeof(line), "           MOVE 0 TO %s.", result_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "           IF %s = 0",
+                        argument_one_length) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "               MOVE 1 TO %s",
+                        result_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || cobol_text_builder_append_line(builder, "           ELSE") != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line),
+                        "               INSPECT %s-BUF(1:%s-LEN) TALLYING %s FOR ALL %s(1:%s)",
+                        receiver->cobol_name, receiver->cobol_name, result_name,
+                        argument_one_buffer, argument_one_length) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "               IF %s > 0",
+                        result_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "                   MOVE 1 TO %s",
+                        result_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                    || cobol_text_builder_append_line(builder, "               END-IF") != FT_SUCCESS
+                    || cobol_text_builder_append_line(builder, "           END-IF.") != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            if (cobol_text_builder_append_line(builder, "           EXIT.") != FT_SUCCESS
+                || cobol_text_builder_append_line(builder, "") != FT_SUCCESS)
+                return (FT_FAILURE);
+            intrinsic_index += 1;
         }
         data_index += 1;
     }
@@ -594,6 +977,8 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
     }
     if (cblc_emit_reusable_method_results(unit, &builder) != FT_SUCCESS)
         goto cleanup;
+    if (cblc_emit_reusable_string_intrinsic_arguments(unit, &builder) != FT_SUCCESS)
+        goto cleanup;
     if (cblc_emit_reusable_string_intrinsic_results(unit, &builder) != FT_SUCCESS)
         goto cleanup;
     if (cblc_unit_has_pointer_data(unit))
@@ -762,6 +1147,9 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
     if (cblc_emit_reusable_method_paragraphs(unit, &builder) != FT_SUCCESS)
         goto cleanup;
     if (cblc_emit_reusable_string_intrinsic_paragraphs(unit, &builder) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_emit_reusable_parameterized_string_intrinsic_paragraphs(unit, &builder)
+        != FT_SUCCESS)
         goto cleanup;
     if (cblc_emit_reusable_lifecycle_paragraphs(unit, &builder) != FT_SUCCESS)
         goto cleanup;

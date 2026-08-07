@@ -4059,7 +4059,16 @@ FT_TEST(test_cblc_generate_cobol_emits_builtin_string_equals_literal)
     if (!generated_cobol)
         goto cleanup;
     if (!ft_strnstr(generated_cobol,
-            "IF MAIN-GREETING-LEN = 2 AND MAIN-GREETING-BUF(1:MAIN-GREETING-LEN) = \"HI\"",
+            "MOVE \"HI\" TO CBLC-INTRINSIC-MAIN-GREETING-ARG1-BUF.",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol,
+            "COMPUTE CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN = 2.",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol,
+            "PERFORM CBLC-INTRINSIC-MAIN-GREETING-EQUALS.",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol,
+            "IF MAIN-GREETING-LEN = CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should emit builtin string literal equals comparison\n");

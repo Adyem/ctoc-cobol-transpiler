@@ -230,11 +230,11 @@ are completed; keep completed items grouped separately from the remaining work t
 ## Remaining Implementation TODOs
 
 - [ ] **Parameterized COBOL intrinsic ABI (`CBLC-TODO-INTRINSIC-ABI`)**
-    - [ ] Define stable paragraph names, argument storage, copy/move rules, result slots, and collision handling for parameterized intrinsics.
-    - [ ] Implement reusable COBOL paragraphs for `append`, `equals`, `starts_with`, `ends_with`, `compare`, and `contains`.
-    - [ ] Route call sites through `PERFORM` plus argument/result plumbing without duplicating intrinsic bodies.
+    - [x] Define stable paragraph names, argument storage, copy/move rules, result slots, and collision handling for parameterized intrinsics.
+    - [x] Implement reusable COBOL paragraphs for `append`, `equals`, `starts_with`, `ends_with`, `compare`, and `contains`.
+    - [x] Route call sites through `PERFORM` plus argument/result plumbing without duplicating intrinsic bodies.
     - [ ] Add arity/type, aliasing, capacity/truncation, multi-call, and executable COBOL regression tests.
-    - [ ] Update the intrinsic registry, ABI documentation, and conformance matrix when complete.
+    - [x] Update the intrinsic registry, ABI documentation, and conformance matrix for the current operation set.
 - [ ] **Selective C runtime extraction (`CBLC-TODO-C-RUNTIME`)**
     - [ ] Assign stable artifact IDs to runtime helpers and declare helper-to-helper dependencies.
     - [ ] Collect helper references from semantic lowering and generated call sites, then compute a deterministic transitive closure.

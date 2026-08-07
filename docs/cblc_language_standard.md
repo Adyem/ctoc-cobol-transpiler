@@ -605,8 +605,11 @@ with parameters. Parameter storage and non-void result slots are explicit
 working-storage ABI elements. Constructors/destructors, pointer receivers, and
 other return kinds still require shared lifecycle/receiver ABI work in the
 remaining gaps; supported constructor and destructor bodies are already emitted
-as receiver-specialized paragraphs. This rule is especially important for string capacity
-checks, allocation, copying, comparison, and lifecycle cleanup.
+as receiver-specialized paragraphs. Built-in string operations with parameters
+use the same model: each receiver has reusable argument groups, result/status
+slots, and one paragraph per registered operation. This rule is especially
+important for string capacity checks, allocation, copying, comparison, and
+lifecycle cleanup.
 
 ### 14.2 CBL-C to C
 
@@ -847,17 +850,16 @@ are met.
 The following work items are the next release-gated tasks for completing the
 remaining intrinsic and runtime artifact contracts:
 
-- [ ] **Parameterized COBOL intrinsic ABI (`CBLC-TODO-INTRINSIC-ABI`).**
-  Define one stable ABI for every registered intrinsic with arguments:
-  receiver-specific paragraph naming, explicit `USING`/linkage or equivalent
-  parameter storage, argument copy/move rules, result slots, arity and type
-  validation, and collision-safe names. Implement reusable COBOL paragraphs
-  for `append`, `equals`, `starts_with`, `ends_with`, `compare`, and
-  `contains` (and any newly registered parameterized operation) so call sites
-  emit only `PERFORM`/argument/result plumbing. Add generated-source,
-  multi-call, aliasing, capacity/truncation, and executable COBOL tests for
-  each operation. Update the intrinsic registry and this ABI section together
-  whenever an operation is added.
+- [ ] **Parameterized COBOL intrinsic ABI (`CBLC-TODO-INTRINSIC-ABI`).** The
+  reusable receiver-specialized ABI is implemented for the current one-argument
+  string registry (`append`, `equals`, `starts_with`, `ends_with`, `compare`,
+  and `contains`): argument groups, result/status slots, literal/variable
+  argument moves, collision-safe paragraph names, dynamic growth, and fixed
+  capacity handling are emitted once per operation. Complete the release gate
+  by adding executable COBOL coverage for every operation, aliasing and repeated
+  calls, truncation/status behavior, and future multi-argument signatures.
+  Update the intrinsic registry and this ABI section together whenever an
+  operation is added.
 - [ ] **Selective C runtime extraction (`CBLC-TODO-C-RUNTIME`).** Replace the
   current whole-runtime C helper bundle with dependency-closed extraction.
   Give every runtime helper a stable artifact ID, declare helper-to-helper
@@ -873,7 +875,7 @@ remaining intrinsic and runtime artifact contracts:
 | --- | --- | --- |
 | exact grammar | **partial** | Keep accepted syntax examples and parser tests synchronized with this document. |
 | method reuse | **partial** | C supports callable blocks for supported scalar/record/pointer/string parameters and scalar/record/string constructor/lifecycle bodies, including string members; COBOL supports receiver-specialized paragraphs for supported methods and custom constructors/destructors. Extend parameterized destructor ABI and other result kinds. |
-| built-in string intrinsics | **partial** | The operation registry, canonical parser operands, C helper routing, registry-driven arity validation, and reusable COBOL paragraphs for zero-argument string operations are centralized; parameterized intrinsic paragraphs remain. |
+| built-in string intrinsics | **partial** | The operation registry, canonical parser operands, C helper routing, registry-driven arity validation, and reusable COBOL paragraphs for zero- and one-argument string operations are centralized; executable COBOL validation and broader ABI coverage remain release gates. |
 | runtime dependency closure | **partial** | Normal COBOL translation now emits and manifests the transitive standard-library closure with per-artifact dependency edges; semantic dependency IDs and selective C runtime extraction remain to be formalized. |
 | forward file-control generation | **partial** | Define file declaration semantics, status/EOF behavior, and supported target clauses individually. |
 | reverse translation | **partial** | Keep reverse-recoverable syntax separate from forward language conformance. |
