@@ -1,3 +1,77 @@
+static int cblc_parse_file_read_while(const char **cursor, t_cblc_translation_unit *unit,
+    t_cblc_function *function)
+{
+    const char *start;
+    char keyword[TRANSPILE_IDENTIFIER_MAX];
+    char file_name[TRANSPILE_IDENTIFIER_MAX];
+    char record_name[TRANSPILE_IDENTIFIER_MAX];
+    t_cblc_file_declaration *file;
+    t_cblc_data_item *record;
+
+    if (!cursor || !*cursor || !unit || !function)
+        return (FT_FAILURE);
+    start = *cursor;
+    if (cblc_parse_identifier(cursor, keyword, sizeof(keyword)) != FT_SUCCESS
+        || std::strncmp(keyword, "while", sizeof(keyword)) != 0)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    cblc_skip_whitespace(cursor);
+    if (**cursor != '(')
+        goto fail;
+    *cursor += 1;
+    cblc_skip_whitespace(cursor);
+    if (cblc_parse_identifier(cursor, keyword, sizeof(keyword)) != FT_SUCCESS
+        || std::strncmp(keyword, "read", sizeof(keyword)) != 0)
+        goto fail;
+    cblc_skip_whitespace(cursor);
+    if (**cursor != '(')
+        goto fail;
+    *cursor += 1;
+    cblc_skip_whitespace(cursor);
+    if (cblc_parse_identifier(cursor, file_name, sizeof(file_name)) != FT_SUCCESS)
+        goto fail;
+    file = cblc_find_file(unit, file_name);
+    if (!file)
+        goto fail;
+    cblc_skip_whitespace(cursor);
+    if (**cursor != ',')
+        goto fail;
+    *cursor += 1;
+    cblc_skip_whitespace(cursor);
+    if (cblc_parse_identifier(cursor, record_name, sizeof(record_name)) != FT_SUCCESS)
+        goto fail;
+    record = cblc_find_data_item(unit, record_name);
+    if (!record || record->kind != CBLC_DATA_KIND_CHAR || record->array_count != 0)
+        goto fail;
+    cblc_skip_whitespace(cursor);
+    if (**cursor != ')')
+        goto fail;
+    *cursor += 1;
+    cblc_skip_whitespace(cursor);
+    if (**cursor != ')')
+        goto fail;
+    *cursor += 1;
+    cblc_skip_whitespace(cursor);
+    if (**cursor != '{')
+        goto fail;
+    file->record_length = record->length;
+    ft_strlcpy(file->record_source_name, record_name, sizeof(file->record_source_name));
+    if (cblc_append_statement(function, CBLC_STATEMENT_WHILE_BEGIN,
+            file_name, NULL, 0) != FT_SUCCESS
+        || cblc_append_statement(function, CBLC_STATEMENT_FILE_READ,
+            file_name, record_name, 0) != FT_SUCCESS
+        || cblc_parse_statement_block(cursor, unit, function, 1) != FT_SUCCESS
+        || cblc_append_statement(function, CBLC_STATEMENT_WHILE_END,
+            file_name, NULL, 0) != FT_SUCCESS)
+        goto fail;
+    return (FT_SUCCESS);
+fail:
+    *cursor = start;
+    return (FT_FAILURE);
+}
+
 static int cblc_parse_file_statement(const char **cursor, t_cblc_translation_unit *unit,
     t_cblc_function *function)
 {

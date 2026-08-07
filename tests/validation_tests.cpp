@@ -4090,11 +4090,16 @@ FT_TEST(test_cblc_generate_cobol_emits_sequential_file_io)
     int status;
 
     source = "file input input \"input.txt\";\n"
+        "file output output \"output.txt\";\n"
         "char record[16];\n"
         "void main() {\n"
         "    open(input, \"r\");\n"
-        "    read(input, record);\n"
+        "    open(output, \"w\");\n"
+        "    while (read(input, record)) {\n"
+        "        write(output, record);\n"
+        "    }\n"
         "    close(input);\n"
+        "    close(output);\n"
         "}\n";
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
@@ -4110,8 +4115,13 @@ FT_TEST(test_cblc_generate_cobol_emits_sequential_file_io)
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "FD INPUT.", std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "OPEN INPUT INPUT.", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "PERFORM UNTIL CBLC-EOF-FLAG = 'Y'",
+            std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "READ INPUT INTO RECORD", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "CLOSE INPUT.", std::strlen(generated_cobol)))
+        || !ft_strnstr(generated_cobol, "WRITE OUTPUT-RECORD.", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "END-PERFORM.", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "CLOSE INPUT.", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "CLOSE OUTPUT.", std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should contain sequential file I/O\n");
         goto cleanup;

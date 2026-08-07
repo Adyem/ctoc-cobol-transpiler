@@ -107,7 +107,8 @@ are completed; keep completed items grouped separately from the remaining work t
 - [x] OCCURS DEPENDING ON: thread runtime upper bounds through layout analysis so both emitters size tables correctly and flag missing controlling values.
 - [ ] RENAMES groups: retain alias relationships during semantic lowering so reverse translation can recover original DATA DIVISION overlays.
 - [x] Forward file I/O foundation: parse CBL-C file declarations and basic `open`/`read`/`write`/`close` statements, and emit COBOL FILE-CONTROL, FILE SECTION, fixed records, and AT END EOF handling.
-- [ ] Forward file I/O completion: add loop/read-expression lowering so samples like `copy_file.cblc` execute, then extend the model for indexed/relative organizations and advanced COBOL clauses.
+- [x] Forward file I/O completion for the supported sequential subset: lower `while (read(file, record))` to COBOL `PERFORM UNTIL` plus `AT END`, allowing `copy_file.cblc` to generate a complete copy loop.
+- [ ] Forward file I/O expansion: extend the model for general boolean loop conditions, indexed/relative organizations, and advanced COBOL clauses.
 
 ### Core Language Frontend
 - [ ] Parse COBOL `ALTER` and `ENTRY` statements and lower them into structured equivalents in the shared IR so legacy flow control can round-trip.

@@ -498,7 +498,7 @@ boolean condition model; arbitrary target-language truthiness is not a promise.
 `if` selects exactly one branch. `while` reevaluates its condition before each
 iteration. `perform` is a resolved named operation, not an escape hatch for
 arbitrary COBOL paragraph ranges. The compiler preserves structured branch and
-loop behavior in both supported forward backends.
+loop behavior in the supported CBL-C-to-COBOL backend.
 
 The language does not currently include general `for`, `switch`, `goto`,
 exceptions, or user-defined control-flow operators.
@@ -524,9 +524,11 @@ are currently fixed-length `char` arrays; the first read/write establishes the
 COBOL FD record length. A generated read includes an `AT END` action that sets
 the shared EOF flag.
 
-Loop syntax and boolean read expressions are not yet part of this forward
-statement subset, so a complete copy loop such as `while (read(...))` remains
-pending even though the individual file operations now have a defined lowering.
+The forward compiler supports the restricted file-copy loop form
+`while (read(file, record))`. It lowers to a COBOL `PERFORM UNTIL` loop whose
+read operation sets the shared EOF flag at `AT END`. General boolean loop
+conditions and other loop forms remain governed by the broader control-flow
+rules in this standard.
 
 Indexed/relative organization, report-writer features, advanced COBOL file
 clauses, and arbitrary file-control layouts are outside this version. The
@@ -852,7 +854,7 @@ remaining intrinsic and runtime artifact contracts:
 | method reuse | **partial** | COBOL supports receiver-specialized paragraphs for supported methods and custom constructors/destructors. Extend parameterized destructor ABI and other result kinds. |
 | built-in string intrinsics | **partial** | The operation registry, canonical parser operands, registry-driven arity validation, and reusable COBOL paragraphs for zero- and one-argument string operations are centralized; executable COBOL validation and broader ABI coverage remain release gates. |
 | runtime dependency closure | **partial** | COBOL output emits the transitive standard-library closure; broader artifact-level dependency validation remains. |
-| forward file-control generation | **partial** | Define file declaration semantics, status/EOF behavior, and supported target clauses individually. |
+| forward file-control generation | **partial** | The sequential declaration/open/read/write/close subset and restricted read loop are defined; add indexed/relative organizations, report-writer clauses, and broader file-control validation incrementally. |
 | reverse translation | **partial** | Keep reverse-recoverable syntax separate from forward language conformance. |
 | feature registry | **current framework** | Assign stable `CBLC-*` IDs and status records to every new capability. |
 

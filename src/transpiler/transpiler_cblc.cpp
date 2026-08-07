@@ -29,6 +29,8 @@ static int cblc_parse_display(const char **cursor, t_cblc_translation_unit *unit
     t_cblc_function *function);
 static int cblc_parse_file_statement(const char **cursor, t_cblc_translation_unit *unit,
     t_cblc_function *function);
+static int cblc_parse_file_read_while(const char **cursor, t_cblc_translation_unit *unit,
+    t_cblc_function *function);
 static int cblc_parse_call(const char **cursor, t_cblc_translation_unit *unit,
     t_cblc_function *function);
 static int cblc_parse_method_call(const char **cursor, t_cblc_translation_unit *unit,

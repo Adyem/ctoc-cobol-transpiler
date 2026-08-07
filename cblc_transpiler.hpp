@@ -1366,7 +1366,9 @@ typedef enum e_cblc_statement_type
     CBLC_STATEMENT_FILE_OPEN,
     CBLC_STATEMENT_FILE_READ,
     CBLC_STATEMENT_FILE_WRITE,
-    CBLC_STATEMENT_FILE_CLOSE
+    CBLC_STATEMENT_FILE_CLOSE,
+    CBLC_STATEMENT_WHILE_BEGIN,
+    CBLC_STATEMENT_WHILE_END
 }   t_cblc_statement_type;
 
 struct s_cblc_statement

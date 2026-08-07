@@ -44,12 +44,12 @@ The CLI creates missing output directories automatically. See [`docs/getting_sta
 CBL-C is intentionally C-like, but its data model maps onto COBOL storage and calling conventions. Implemented language features include:
 
 - Global scalar declarations for `int`, `long`, `long long`, `float`, `double`, `bool`, `char`, fixed-size `char[]`, and `string`.
-- Local block storage for scalars, arrays, strings, pointers, and struct/class instances. Block-local aliases stop being visible after the closing brace, while generated backing storage remains unique for COBOL and C emission.
+- Local block storage for scalars, arrays, strings, pointers, and struct/class instances. Block-local aliases stop being visible after the closing brace, while generated backing storage remains unique for COBOL.
 - Arithmetic, comparison, boolean, assignment, unary, and `ABS` expressions over integral and floating types, with widening and diagnostics for unsafe conversions.
 - `void` and value-returning functions, including parameter passing and generated return slots for COBOL.
 - Multi-file CBL-C builds with repeated `--input` / `--output` pairs and `import "file.cblc"` support.
 - `struct` and `record`-style storage, nested fields, arrays, and generated COBOL group items.
-- `class` declarations with public/private members, constructors, methods, copy-constructor style flows, `const` member enforcement, reusable C method lowering, receiver-specialized COBOL void-method paragraphs, and C++-style out-of-class method definitions.
+- `class` declarations with public/private members, constructors, methods, copy-constructor style flows, `const` member enforcement, receiver-specialized COBOL method paragraphs, and C++-style out-of-class method definitions.
 - Pointer support for `void *`, `char *`, `int *`, struct pointers, pointer indexing, pointer arithmetic, address-of, dereference, casts, `std::malloc`, `std::realloc`, and `std::free`.
 - Built-in `string` behavior including constructor-style initialization, assignment, append, clear, length, capacity, empty, equality, compare, contains, starts-with, and ends-with operations.
 - `display`, `return`, `if` / `else`, `while`, function calls, method calls, and selected file-style syntax used by the reverse pipeline.
@@ -66,7 +66,7 @@ The forward backend can emit COBOL for the supported CBL-C subset. Implemented g
 - Standard-library calls through generated COBOL subprograms and trailing status / return slots.
 - Source maps and semantic IR dumps for diagnostics and debugging.
 
-Forward file-control generation for arbitrary CBL-C `file` declarations is still a known gap. The reverse pipeline can recover supported file I/O syntax from COBOL, but not every recovered construct has full forward COBOL emission yet.
+Forward file-control generation supports line-sequential files, fixed-length records, basic open/read/write/close operations, and the restricted `while (read(file, record))` copy loop. Indexed/relative organizations, report-writer clauses, and arbitrary recovered file-control layouts remain outside the current forward subset.
 
 ### COBOL → CBL-C Reverse Pipeline
 
@@ -190,7 +190,7 @@ Some COBOL execution tests require `cobc` from GnuCOBOL. The test harness auto-d
 
 The project is active and does not yet cover all COBOL or all C/C++ syntax. Notable gaps include:
 
-- Full forward file-control emission for arbitrary CBL-C file declarations.
+- Full forward file-control emission for indexed/relative organizations, report-writer clauses, and arbitrary CBL-C file declarations.
 - Legacy COBOL constructs such as `ALTER`, `ENTRY`, broad `INSPECT` support, and `RENAMES`.
 - Full packed-decimal and advanced numeric picture coverage beyond the implemented heuristics.
 - All possible COBOL table, report-writer, screen-section, and environment-division variants.

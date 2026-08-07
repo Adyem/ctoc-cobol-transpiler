@@ -2137,6 +2137,21 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
             }
             }
         }
+        else if (statement->type == CBLC_STATEMENT_WHILE_BEGIN
+            || statement->type == CBLC_STATEMENT_WHILE_END)
+        {
+            if (statement->type == CBLC_STATEMENT_WHILE_BEGIN)
+            {
+                if (std::snprintf(line, sizeof(line),
+                        "           PERFORM UNTIL CBLC-EOF-FLAG = 'Y'") < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            else if (cobol_text_builder_append_line(builder, "           END-PERFORM.")
+                != FT_SUCCESS)
+                return (FT_FAILURE);
+            skip_append = 1;
+        }
         else if (statement->type == CBLC_STATEMENT_FILE_OPEN
             || statement->type == CBLC_STATEMENT_FILE_CLOSE
             || statement->type == CBLC_STATEMENT_FILE_READ
@@ -2176,7 +2191,8 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
                             record->cobol_name, file->cobol_name) < 0
                         || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
                         || std::snprintf(line, sizeof(line), "           WRITE %s-RECORD.",
-                            file->cobol_name) < 0)
+                            file->cobol_name) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
                         return (FT_FAILURE);
                 }
                 else
@@ -2186,7 +2202,7 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
                         || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
                         || cobol_text_builder_append_line(builder,
                             "               AT END MOVE 'Y' TO CBLC-EOF-FLAG") != FT_SUCCESS
-                        || cobol_text_builder_append_line(builder, "           END-READ.") != FT_SUCCESS)
+                        || cobol_text_builder_append_line(builder, "           END-READ") != FT_SUCCESS)
                         return (FT_FAILURE);
                 }
             }
