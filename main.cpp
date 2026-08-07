@@ -393,6 +393,54 @@ static std::string pipeline_manifest_dependencies(const char *generated_text,
     return (dependencies);
 }
 
+static std::string pipeline_manifest_runtime_helpers(const char *generated_text)
+{
+    const t_transpiler_runtime_helper_entry *entries;
+    size_t entry_count;
+    size_t index;
+    int has_helper;
+    std::string helpers;
+
+    helpers = "[";
+    has_helper = 0;
+    if (!generated_text)
+        return (helpers + "]");
+    entries = transpiler_runtime_helpers_get_entries(&entry_count);
+    index = 0;
+    while (index < entry_count)
+    {
+        char needle[TRANSPILE_IDENTIFIER_MAX];
+
+        if (std::snprintf(needle, sizeof(needle), "%s(", entries[index].identifier) < 0)
+            return ("[]");
+        if (std::strstr(generated_text, needle))
+        {
+            size_t dependency_index;
+
+            if (has_helper)
+                helpers += ", ";
+            helpers += "{\"id\": \"";
+            helpers += pipeline_json_escape(entries[index].identifier);
+            helpers += "\", \"dependencies\": [";
+            dependency_index = 0;
+            while (dependency_index < entries[index].dependency_count)
+            {
+                if (dependency_index > 0)
+                    helpers += ", ";
+                helpers += "\"";
+                helpers += pipeline_json_escape(entries[index].dependencies[dependency_index]);
+                helpers += "\"";
+                dependency_index += 1;
+            }
+            helpers += "]}";
+            has_helper = 1;
+        }
+        index += 1;
+    }
+    helpers += "]";
+    return (helpers);
+}
+
 static int pipeline_emit_required_standard_library(t_transpiler_context *context,
     const char *generated_text, std::string &manifest, int *manifest_has_artifact)
 {
@@ -1510,6 +1558,8 @@ static int pipeline_stage_cblc_to_c(t_transpiler_context *context, void *user_da
         manifest += "\",\n      \"dependencies\": ";
         manifest += pipeline_manifest_dependencies(generated_text,
             ordered_units[index]->program_name);
+        manifest += ",\n      \"runtime_helpers\": ";
+        manifest += pipeline_manifest_runtime_helpers(generated_text);
         manifest += "\n    }";
         manifest_has_artifact = 1;
         if (generated_text)

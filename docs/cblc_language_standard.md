@@ -671,8 +671,11 @@ build/<target>/runtime/cblc_runtime_helpers.c
 build/<target>/cblc.manifest.json
 ```
 
-Each generated artifact includes a `dependencies` array of stable artifact IDs;
-the manifest should list source modules, generated artifacts, dependencies,
+Each generated artifact includes a `dependencies` array of stable artifact IDs.
+Embedded C targets additionally include `runtime_helpers`, an ordered array of
+helper IDs and their declared helper dependencies. This makes the exact
+embedded closure inspectable without treating the helper definitions as a
+separate file. The manifest should list source modules, generated artifacts, dependencies,
 target language, ABI version, compiler version, and hashes. It allows a build
 system to compile only required files, prevents duplicate helper definitions,
 and makes incremental builds reproducible. A `--runtime` or equivalent policy
@@ -863,23 +866,20 @@ remaining intrinsic and runtime artifact contracts:
   calls, truncation/status behavior, and future multi-argument signatures.
   Update the intrinsic registry and this ABI section together whenever an
   operation is added.
-- [ ] **Selective C runtime extraction (`CBLC-TODO-C-RUNTIME`).** Replace the
-  current whole-runtime C helper bundle with dependency-closed extraction.
-  Give every runtime helper a stable artifact ID, declare helper-to-helper
-  dependencies, collect helper references from semantic lowering and generated
-  call sites, compute a transitive closure, and emit only the required helper
-  definitions in deterministic order. Record the exact helper IDs and edges in
-  the manifest, preserve a shared-runtime mode for preinstalled runtimes, and
-  reject missing or cyclic contracts with deterministic diagnostics. Add tests
-  for empty, single-helper, transitive, duplicate, and unsupported-helper
-  requests plus generated C compile/link coverage.
+- [ ] **Selective C runtime extraction (`CBLC-TODO-C-RUNTIME`).** The C
+  backend now performs dependency-closed extraction: every helper has a stable
+  ID and declared edges, generated C receives only the referenced transitive
+  closure in deterministic order, and the C manifest records the selected IDs
+  and edges. Complete the release gate with an explicit shared-runtime mode,
+  public missing/cyclic-contract diagnostics, duplicate/unsupported requests,
+  and generated C compile/link coverage.
 
 | Area | Current status | Required hardening |
 | --- | --- | --- |
 | exact grammar | **partial** | Keep accepted syntax examples and parser tests synchronized with this document. |
 | method reuse | **partial** | C supports callable blocks for supported scalar/record/pointer/string parameters and scalar/record/string constructor/lifecycle bodies, including string members; COBOL supports receiver-specialized paragraphs for supported methods and custom constructors/destructors. Extend parameterized destructor ABI and other result kinds. |
 | built-in string intrinsics | **partial** | The operation registry, canonical parser operands, C helper routing, registry-driven arity validation, and reusable COBOL paragraphs for zero- and one-argument string operations are centralized; executable COBOL validation and broader ABI coverage remain release gates. |
-| runtime dependency closure | **partial** | Normal COBOL translation now emits and manifests the transitive standard-library closure with per-artifact dependency edges; semantic dependency IDs and selective C runtime extraction remain to be formalized. |
+| runtime dependency closure | **partial** | C output now emits and manifests the selected transitive C-helper closure; COBOL output emits the transitive standard-library closure. A shared-runtime policy and broader artifact-level dependency validation remain. |
 | forward file-control generation | **partial** | Define file declaration semantics, status/EOF behavior, and supported target clauses individually. |
 | reverse translation | **partial** | Keep reverse-recoverable syntax separate from forward language conformance. |
 | feature registry | **current framework** | Assign stable `CBLC-*` IDs and status records to every new capability. |

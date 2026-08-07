@@ -217,10 +217,72 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cli_c_translation_manifest_records_embedded_runtime_helpers)
+{
+    char directory_template[64];
+    char source_path[TRANSPILE_FILE_PATH_MAX];
+    char target_path[TRANSPILE_FILE_PATH_MAX];
+    char manifest_path[TRANSPILE_FILE_PATH_MAX];
+    char command[1024];
+    char file_buffer[131072];
+    const char *source;
+    int status;
+    int created_directory;
+
+    status = FT_FAILURE;
+    created_directory = 0;
+    ft_strlcpy(directory_template, "/tmp/ctoc_c_runtime_manifestXXXXXX",
+        sizeof(directory_template));
+    if (!mkdtemp(directory_template))
+        return (FT_FAILURE);
+    created_directory = 1;
+    if (std::snprintf(source_path, sizeof(source_path), "%s/main.cblc", directory_template) < 0
+        || std::snprintf(target_path, sizeof(target_path), "%s/main.c", directory_template) < 0
+        || std::snprintf(manifest_path, sizeof(manifest_path), "%s/cblc.manifest.json",
+            directory_template) < 0)
+        goto cleanup;
+    source = "char text[8];\n"
+        "void main()\n"
+        "{\n"
+        "    text = \"HI\";\n"
+        "    return;\n"
+        "}\n";
+    if (test_write_text_file(source_path, source) != FT_SUCCESS)
+        goto cleanup;
+    if (std::snprintf(command, sizeof(command),
+            "./ctoc_cobol_transpiler --direction cblc-to-c --input %s --output %s --output-dir %s",
+            source_path, "main.c", directory_template) < 0
+        || test_run_command(command) != FT_SUCCESS)
+        goto cleanup;
+    if (test_read_text_file(target_path, file_buffer, sizeof(file_buffer)) != FT_SUCCESS
+        || !ft_strnstr(file_buffer, "cblc_char_assign_literal",
+            std::strlen(file_buffer))
+        || ft_strnstr(file_buffer, "cblc_display_literal", std::strlen(file_buffer)))
+        goto cleanup;
+    if (test_read_text_file(manifest_path, file_buffer, sizeof(file_buffer)) != FT_SUCCESS
+        || !ft_strnstr(file_buffer, "\"runtime_helpers\": [{\"id\": \"cblc_string_length\"",
+            std::strlen(file_buffer))
+        || !ft_strnstr(file_buffer, "\"id\": \"cblc_char_assign_literal\"",
+            std::strlen(file_buffer))
+        || !ft_strnstr(file_buffer, "\"dependencies\": [\"cblc_string_length\"]",
+            std::strlen(file_buffer)))
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    test_remove_file(source_path);
+    test_remove_file(target_path);
+    test_remove_file(manifest_path);
+    if (created_directory)
+        rmdir(directory_template);
+    return (status);
+}
+
 static const t_test_case g_cli_standard_library_tests[] = {
     {"cli_standard_library_emits_all_programs", test_cli_standard_library_emits_all_programs},
     {"cli_cobol_translation_emits_required_standard_library_programs",
-        test_cli_cobol_translation_emits_required_standard_library_programs}
+        test_cli_cobol_translation_emits_required_standard_library_programs},
+    {"cli_c_translation_manifest_records_embedded_runtime_helpers",
+        test_cli_c_translation_manifest_records_embedded_runtime_helpers}
 };
 
 const t_test_case *get_cli_standard_library_tests(size_t *count)

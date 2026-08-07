@@ -239,8 +239,9 @@ are completed; keep completed items grouped separately from the remaining work t
     - [x] Assign stable artifact IDs to runtime helpers and declare helper-to-helper dependencies.
     - [x] Collect helper references from generated C call sites and compute a deterministic transitive closure.
     - [x] Emit only required helper definitions in C output; retain the complete bundle for standard-library packaging.
-    - [ ] Record helper IDs and dependency edges in manifests and reject missing or cyclic contracts deterministically.
-    - [x] Add empty, single-helper, and transitive registry-rendering tests; duplicate, unsupported-helper, manifest, and generated C compile/link coverage remain.
+    - [x] Record selected helper IDs and dependency edges in C translation manifests.
+    - [ ] Add explicit shared-runtime mode and public missing/cyclic-contract diagnostics.
+    - [x] Add empty, single-helper, transitive registry-rendering, manifest, and generated C extraction coverage; duplicate, unsupported-helper, and generated C compile/link coverage remain.
 
 ### Known Bugs / Diagnostics
 These issues track regressions uncovered in recent round-trip suites.
