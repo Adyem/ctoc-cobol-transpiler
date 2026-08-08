@@ -2,6 +2,7 @@
 #define TRANSPILE_MAIN_HPP
 
 #include <cstddef>
+#include <cstdio>
 
 #include "compatibility/libft_compat.hpp"
 
@@ -12,7 +13,7 @@
 // ===============================
 typedef struct s_runtime_file
 {
-    int descriptor;
+    std::FILE *stream;
 }   t_runtime_file;
 
 void runtime_file_init(t_runtime_file *file);

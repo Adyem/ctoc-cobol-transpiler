@@ -1,7 +1,5 @@
 #include "cblc_transpiler.hpp"
 
-#include <unistd.h>
-
 #include "compatibility/memory_compat.hpp"
 #include "compatibility/libft_compat.hpp"
 
@@ -9,7 +7,7 @@ static int runtime_line_validate_file(t_runtime_file *file)
 {
     if (!file)
         return (FT_FAILURE);
-    if (file->descriptor < 0)
+    if (!file->stream)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
@@ -19,7 +17,7 @@ int runtime_line_read_fixed(t_runtime_file *file, size_t record_length, t_runtim
 {
     char *buffer;
     size_t total_read;
-    ssize_t chunk;
+    size_t chunk;
 
     if (end_of_file)
         *end_of_file = 0;
@@ -35,8 +33,8 @@ int runtime_line_read_fixed(t_runtime_file *file, size_t record_length, t_runtim
     total_read = 0;
     while (total_read < record_length)
     {
-        chunk = read(file->descriptor, buffer + total_read, record_length - total_read);
-        if (chunk < 0)
+        if (runtime_file_read(file, buffer + total_read,
+                record_length - total_read + 1, &chunk) != FT_SUCCESS)
         {
             cma_free(buffer);
             return (FT_FAILURE);
@@ -77,7 +75,7 @@ int runtime_line_read_variable(t_runtime_file *file, char terminator, t_runtime_
     char *buffer;
     size_t capacity;
     size_t length;
-    ssize_t chunk;
+    size_t chunk;
     unsigned char byte;
     int reached_end;
     size_t index;
@@ -96,8 +94,7 @@ int runtime_line_read_variable(t_runtime_file *file, char terminator, t_runtime_
     reached_end = 0;
     while (1)
     {
-        chunk = read(file->descriptor, &byte, 1);
-        if (chunk < 0)
+        if (runtime_file_read(file, reinterpret_cast<char *>(&byte), 2, &chunk) != FT_SUCCESS)
         {
             cma_free(buffer);
             return (FT_FAILURE);

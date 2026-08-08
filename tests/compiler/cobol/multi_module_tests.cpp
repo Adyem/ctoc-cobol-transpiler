@@ -310,7 +310,7 @@ FT_TEST(test_cobol_transpiled_multi_module_separate_compile_logs_clean)
     expected_output = "WORKER READY\n   1\n";
     if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_join_path(directory, "SHOW-BANNER.so", module_path, sizeof(module_path)) != FT_SUCCESS)
+    if (test_join_path(directory, "SHOW-BANNER", module_path, sizeof(module_path)) != FT_SUCCESS)
     {
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -335,6 +335,13 @@ FT_TEST(test_cobol_transpiled_multi_module_separate_compile_logs_clean)
     if (test_run_command(command) != FT_SUCCESS)
     {
         std::printf("Assertion failed: cobc should compile worker module with captured log\n");
+        test_remove_file(module_path);
+        test_remove_file(worker_log_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_resolve_module_path(directory, "SHOW-BANNER", module_path, sizeof(module_path)) != FT_SUCCESS)
+    {
         test_remove_file(module_path);
         test_remove_file(worker_log_path);
         test_remove_directory(directory);
@@ -447,6 +454,7 @@ FT_TEST(test_cobol_transpiled_multi_module_separate_compile_logs_clean)
 
 FT_TEST(test_cobol_transpiled_multi_module_compiles_separately)
 {
+    char module_path_buffer[256];
     const char *module_path;
     const char *binary_path;
     const char *output_path;
@@ -456,7 +464,8 @@ FT_TEST(test_cobol_transpiled_multi_module_compiles_separately)
     int command_length;
 
     FT_REQUIRE_COBC();
-    module_path = "SHOW-BANNER.so";
+    ft_strlcpy(module_path_buffer, "SHOW-BANNER", sizeof(module_path_buffer));
+    module_path = module_path_buffer;
     binary_path = "test_transpiled_multi_module_separate.bin";
     output_path = "test_transpiled_multi_module_separate.txt";
     expected_output = "WORKER READY\n   1\n";
@@ -470,6 +479,12 @@ FT_TEST(test_cobol_transpiled_multi_module_compiles_separately)
     if (test_run_command(command) != FT_SUCCESS)
     {
         std::printf("Assertion failed: cobc should compile worker module separately\n");
+        test_remove_file(module_path);
+        return (FT_FAILURE);
+    }
+    if (test_resolve_module_path(".", "SHOW-BANNER", module_path_buffer,
+            sizeof(module_path_buffer)) != FT_SUCCESS)
+    {
         test_remove_file(module_path);
         return (FT_FAILURE);
     }
@@ -542,7 +557,7 @@ FT_TEST(test_cobol_transpiled_multi_module_executes_from_library_directory)
     expected_output = "WORKER READY\n   1\n";
     if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (test_join_path(directory, "SHOW-BANNER.so", module_path, sizeof(module_path)) != FT_SUCCESS)
+    if (test_join_path(directory, "SHOW-BANNER", module_path, sizeof(module_path)) != FT_SUCCESS)
     {
         test_cleanup_module_directory(directory, NULL, NULL, NULL);
         return (FT_FAILURE);
@@ -567,6 +582,11 @@ FT_TEST(test_cobol_transpiled_multi_module_executes_from_library_directory)
     if (test_run_command(command) != FT_SUCCESS)
     {
         std::printf("Assertion failed: cobc should compile worker module into library directory\n");
+        test_cleanup_module_directory(directory, module_path, binary_path, output_path);
+        return (FT_FAILURE);
+    }
+    if (test_resolve_module_path(directory, "SHOW-BANNER", module_path, sizeof(module_path)) != FT_SUCCESS)
+    {
         test_cleanup_module_directory(directory, module_path, binary_path, output_path);
         return (FT_FAILURE);
     }

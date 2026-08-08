@@ -1928,7 +1928,7 @@ static const t_cblc_struct_type *cblc_instantiate_template_struct_arguments(
     parameter_index = 0;
     while (parameter_index < argument_count)
     {
-        if (!arguments[parameter_index]
+        if (arguments[parameter_index][0] == '\0'
             || cblc_template_argument_shape(unit, arguments[parameter_index],
                 &argument_kinds[parameter_index], &argument_lengths[parameter_index],
                 &argument_pointer_depths[parameter_index],

@@ -3,7 +3,6 @@
 
 #include <cstdlib>
 #include <cstring>
-#include <unistd.h>
 
 static int cli_standard_library_set_environment(const char *name, const char *value)
 {
@@ -47,8 +46,7 @@ FT_TEST(test_cli_standard_library_emits_all_programs)
     entries = transpiler_standard_library_get_entries(&entry_count);
     created_directory = 0;
     validation_env_set = 0;
-    ft_strlcpy(directory_template, "/tmp/ctoc_standard_libraryXXXXXX", sizeof(directory_template));
-    if (!mkdtemp(directory_template))
+    if (test_create_temp_directory(directory_template, sizeof(directory_template)) != FT_SUCCESS)
         return (FT_FAILURE);
     created_directory = 1;
     if (cli_standard_library_set_environment("CTOC_SKIP_STANDARD_LIBRARY_VALIDATION", "1") != FT_SUCCESS)
@@ -141,7 +139,7 @@ cleanup:
         if (std::snprintf(manifest_path, sizeof(manifest_path), "%s/cblc.manifest.json",
                 directory_template) >= 0)
             test_remove_file(manifest_path);
-        rmdir(directory_template);
+        test_remove_directory(directory_template);
     }
     return (status);
 }
@@ -162,9 +160,7 @@ FT_TEST(test_cli_cobol_translation_emits_required_standard_library_programs)
 
     status = FT_FAILURE;
     created_directory = 0;
-    ft_strlcpy(directory_template, "/tmp/ctoc_required_libraryXXXXXX",
-        sizeof(directory_template));
-    if (!mkdtemp(directory_template))
+    if (test_create_temp_directory(directory_template, sizeof(directory_template)) != FT_SUCCESS)
         return (FT_FAILURE);
     created_directory = 1;
     if (std::snprintf(source_path, sizeof(source_path), "%s/main.cblc", directory_template) < 0
@@ -208,7 +204,7 @@ FT_TEST(test_cli_cobol_translation_emits_required_standard_library_programs)
             std::strlen(file_buffer))
         || ft_strnstr(file_buffer, "CBLC-ABS", std::strlen(file_buffer)))
         goto cleanup;
-    if (access(unrelated_path, F_OK) == 0)
+    if (test_read_text_file(unrelated_path, file_buffer, sizeof(file_buffer)) == FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -218,7 +214,7 @@ cleanup:
     test_remove_file(unrelated_path);
     test_remove_file(manifest_path);
     if (created_directory)
-        rmdir(directory_template);
+        test_remove_directory(directory_template);
     return (status);
 }
 
@@ -234,9 +230,7 @@ FT_TEST(test_cli_cobol_translation_can_deploy_complete_standard_library)
     int status;
 
     status = FT_FAILURE;
-    ft_strlcpy(directory_template, "/tmp/ctoc_all_libraryXXXXXX",
-        sizeof(directory_template));
-    if (!mkdtemp(directory_template))
+    if (test_create_temp_directory(directory_template, sizeof(directory_template)) != FT_SUCCESS)
         return (FT_FAILURE);
     if (std::snprintf(source_path, sizeof(source_path), "%s/main.cblc", directory_template) < 0
         || std::snprintf(target_path, sizeof(target_path), "%s/main.cob", directory_template) < 0
@@ -266,7 +260,7 @@ cleanup:
     test_remove_file(target_path);
     test_remove_file(all_path);
     test_remove_file(manifest_path);
-    rmdir(directory_template);
+    test_remove_directory(directory_template);
     return (status);
 }
 

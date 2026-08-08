@@ -4,8 +4,8 @@
 
 #include <cerrno>
 #include <cstdlib>
-#include <sys/wait.h>
-#include <unistd.h>
+#include <filesystem>
+#include <string>
 
 static int test_trim_transcript_lines(const char *source, char *buffer, size_t buffer_size)
 {
@@ -76,19 +76,19 @@ void test_cleanup_example_artifacts_with_log(const char *source_path, const char
 
 int test_create_temp_directory(char *buffer, size_t buffer_size)
 {
-    char template_path[256];
-    char *result;
-    size_t required;
-
     if (!buffer)
         return (FT_FAILURE);
     if (buffer_size == 0)
         return (FT_FAILURE);
-    ft_strlcpy(template_path, "/tmp/ctoc_compiler_testXXXXXX", sizeof(template_path));
-    result = mkdtemp(template_path);
-    if (!result)
+    std::filesystem::path directory = std::filesystem::temp_directory_path()
+        / std::filesystem::path("ctoc_compiler_test");
+    int suffix = 0;
+    while (std::filesystem::exists(directory))
+        directory = std::filesystem::temp_directory_path()
+            / std::filesystem::path("ctoc_compiler_test_" + std::to_string(++suffix));
+    if (!std::filesystem::create_directory(directory))
         return (FT_FAILURE);
-    required = ft_strlcpy(buffer, result, buffer_size);
+    size_t required = ft_strlcpy(buffer, directory.string().c_str(), buffer_size);
     if (required >= buffer_size)
         return (FT_FAILURE);
     return (FT_SUCCESS);
@@ -112,7 +112,7 @@ void test_remove_directory(const char *path)
 {
     if (!path || path[0] == '\0')
         return ;
-    rmdir(path);
+    std::filesystem::remove_all(path);
 }
 
 void test_cleanup_module_directory(const char *directory, const char *module_path, const char *binary_path,
@@ -130,62 +130,120 @@ void test_cleanup_module_directory(const char *directory, const char *module_pat
 
 int test_run_command_capture_status(const char *command, int *exit_status)
 {
-    int pipe_fds[2];
-    pid_t pid;
-    char buffer[256];
-    ssize_t bytes_read;
-    int status;
+    std::string command_text;
 
     if (!command || !exit_status)
         return (FT_FAILURE);
-    if (pipe(pipe_fds) != 0)
-        return (FT_FAILURE);
-    pid = fork();
-    if (pid < 0)
+    command_text = command;
     {
-        close(pipe_fds[0]);
-        close(pipe_fds[1]);
-        return (FT_FAILURE);
-    }
-    if (pid == 0)
-    {
-        if (dup2(pipe_fds[1], STDOUT_FILENO) < 0)
-            _exit(127);
-        if (dup2(pipe_fds[1], STDERR_FILENO) < 0)
-            _exit(127);
-        close(pipe_fds[0]);
-        close(pipe_fds[1]);
-        execl("/bin/sh", "sh", "-c", command, (char *)NULL);
-        _exit(127);
-    }
-    close(pipe_fds[1]);
-    while (1)
-    {
-        bytes_read = read(pipe_fds[0], buffer, sizeof(buffer));
-        if (bytes_read > 0)
-            continue ;
-        if (bytes_read == 0)
-            break ;
-        if (errno == EINTR)
-            continue ;
-        close(pipe_fds[0]);
-        while (waitpid(pid, &status, 0) < 0)
+        const std::string current_directory = std::filesystem::path("./").make_preferred().string();
+        size_t position = 0;
+        while ((position = command_text.find("./", position)) != std::string::npos)
         {
-            if (errno != EINTR)
-                return (FT_FAILURE);
+            command_text.replace(position, 2, current_directory);
+            position += current_directory.length();
         }
-        return (FT_FAILURE);
+        position = 0;
+        while ((position = command_text.find(current_directory, position)) != std::string::npos)
+        {
+            const size_t next = position + current_directory.length();
+            if (next < command_text.length()
+                && (command_text[next] == '/' || (next + 1 < command_text.length()
+                    && command_text[next + 1] == ':')))
+                command_text.erase(position, current_directory.length());
+            else
+                position = next;
+        }
+        position = 0;
+        while ((position = command_text.find("./C:", position)) != std::string::npos)
+            command_text.erase(position, 2);
+        position = 0;
+        while ((position = command_text.find(".\\C:", position)) != std::string::npos)
+            command_text.erase(position, 2);
     }
-    close(pipe_fds[0]);
-    while (waitpid(pid, &status, 0) < 0)
+    if (command_text.find("cobc") == std::string::npos
+        && command_text.find(" -o ") == std::string::npos)
     {
-        if (errno != EINTR)
-            return (FT_FAILURE);
+        size_t position = 0;
+        while ((position = command_text.find(".bin", position)) != std::string::npos)
+        {
+            size_t token_start = command_text.rfind(' ', position);
+            std::string candidate;
+
+            token_start = (token_start == std::string::npos ? 0 : token_start + 1);
+            if (token_start < position)
+            {
+                candidate = command_text.substr(token_start, position + 4 - token_start);
+                if (std::filesystem::exists(candidate.substr(0, candidate.length() - 4) + ".exe")
+                    || command_text.find("cd ") != std::string::npos)
+                {
+                    command_text.replace(position, 4, ".exe");
+                    position += 4;
+                    continue;
+                }
+            }
+            position += 4;
+        }
     }
-    if (WIFEXITED(status) == 0)
-        return (FT_FAILURE);
-    *exit_status = WEXITSTATUS(status);
+    if (std::system("cc --version > cc_probe.log 2>&1") != 0)
+    {
+        size_t position = 0;
+        while ((position = command_text.find("cc ", position)) != std::string::npos)
+        {
+            command_text.replace(position, 3, "g++ ");
+            position += 4;
+        }
+    }
+    std::remove("cc_probe.log");
+    {
+        const size_t separator = command_text.find(' ');
+        const size_t equals = command_text.find('=');
+
+        const std::string temporary_directory = std::filesystem::temp_directory_path().string();
+        if (temporary_directory.size() > 1 && temporary_directory[1] == ':'
+            && separator != std::string::npos && equals != std::string::npos && equals < separator)
+        {
+            const std::string assignment = command_text.substr(0, separator);
+            command_text = "set \"" + assignment + "\" &&" + command_text.substr(separator);
+        }
+    }
+    if (std::filesystem::temp_directory_path().string().size() > 1
+        && std::filesystem::temp_directory_path().string()[1] == ':')
+    {
+        size_t marker = 0;
+        while ((marker = command_text.find("&& ", marker)) != std::string::npos)
+        {
+            const size_t start = marker + 3;
+            const size_t separator = command_text.find(' ', start);
+            const size_t equals = command_text.find('=', start);
+            if (separator != std::string::npos && equals != std::string::npos && equals < separator)
+            {
+                const std::string assignment = command_text.substr(start, separator - start);
+                command_text.replace(start, separator - start, "set \"" + assignment + "\" &&");
+                marker = start + assignment.length() + 8;
+            }
+            else
+                marker += 3;
+        }
+    }
+    *exit_status = std::system(command_text.c_str());
     return (FT_SUCCESS);
+}
+
+int test_resolve_module_path(const char *directory, const char *base_name, char *buffer, size_t buffer_size)
+{
+    if (!directory || !base_name || !buffer || buffer_size == 0)
+        return (FT_FAILURE);
+    for (const std::filesystem::directory_entry &entry : std::filesystem::directory_iterator(directory))
+    {
+        if (entry.is_regular_file() && entry.path().stem().string() == base_name)
+        {
+            if (ft_strlcpy(buffer, entry.path().string().c_str(), buffer_size) >= buffer_size)
+                return (FT_FAILURE);
+            return (FT_SUCCESS);
+        }
+    }
+    return (FT_FAILURE);
 }
 
 int test_cobol_fixture_contains(const char *path, const char *snippet)

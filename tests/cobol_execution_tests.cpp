@@ -1,29 +1,17 @@
 #include "test_suites.hpp"
 
 #include <cstdlib>
-#include <unistd.h>
 
 #include "compatibility/libft_compat.hpp"
 #include "compatibility/printf_compat.hpp"
 
 static int cobol_create_temp_directory(char *buffer, size_t buffer_size)
 {
-    char template_path[256];
-    char *result;
-    size_t required;
-
     if (!buffer)
         return (FT_FAILURE);
     if (buffer_size == 0)
         return (FT_FAILURE);
-    ft_strlcpy(template_path, "/tmp/ctoc_cobol_testXXXXXX", sizeof(template_path));
-    result = mkdtemp(template_path);
-    if (!result)
-        return (FT_FAILURE);
-    required = ft_strlcpy(buffer, result, buffer_size);
-    if (required >= buffer_size)
-        return (FT_FAILURE);
-    return (FT_SUCCESS);
+    return (test_create_temp_directory(buffer, buffer_size));
 }
 
 static int cobol_join_path(const char *directory, const char *name, char *buffer, size_t buffer_size)
@@ -49,7 +37,7 @@ static void cobol_cleanup_artifacts(char *directory, char *first, char *second, 
     if (third && third[0] != '\0')
         test_remove_file(third);
     if (directory && directory[0] != '\0')
-        rmdir(directory);
+        test_remove_directory(directory);
 }
 
 FT_TEST(test_cobol_sample_copy_file_executes)

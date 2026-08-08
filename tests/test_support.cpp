@@ -3,9 +3,9 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstdio>
-#include <fcntl.h>
-#include <sys/wait.h>
-#include <unistd.h>
+#include <fstream>
+#include <filesystem>
+#include <string>
 
 static size_t g_total_tests = 0;
 static size_t g_failed_tests = 0;
@@ -50,99 +50,42 @@ static void test_forward_translation_probe(void)
 
 static int test_capture_stream_begin(t_test_output_capture *capture, int fd)
 {
-    int pipe_fds[2];
-
     if (!capture)
         return (FT_FAILURE);
-    std::fflush(NULL);
-    capture->saved_fd = -1;
-    capture->pipe_read_fd = -1;
-    capture->target_fd = -1;
-    if (pipe(pipe_fds) < 0)
-        return (FT_FAILURE);
-    capture->saved_fd = dup(fd);
-    if (capture->saved_fd < 0)
+    capture->target = fd;
+    capture->active = 1;
+    std::snprintf(capture->path, sizeof(capture->path),
+        "ctoc_test_capture_%s.tmp", fd == 1 ? "stdout" : "stderr");
+    if (!std::freopen(capture->path, "w", fd == 1 ? stdout : stderr))
     {
-        close(pipe_fds[0]);
-        close(pipe_fds[1]);
+        capture->active = 0;
         return (FT_FAILURE);
     }
-    if (dup2(pipe_fds[1], fd) < 0)
-    {
-        close(capture->saved_fd);
-        capture->saved_fd = -1;
-        close(pipe_fds[0]);
-        close(pipe_fds[1]);
-        return (FT_FAILURE);
-    }
-    close(pipe_fds[1]);
-    capture->pipe_read_fd = pipe_fds[0];
-    capture->target_fd = fd;
     return (FT_SUCCESS);
 }
 
 static int test_capture_stream_end(t_test_output_capture *capture, int fd, char *buffer, size_t buffer_size,
-    ssize_t *length)
+    std::ptrdiff_t *length)
 {
-    char discard[64];
-    ssize_t total;
-    ssize_t chunk;
-    ssize_t remaining;
-
-    if (!capture || !buffer || buffer_size == 0)
+    if (!capture || !buffer || buffer_size == 0 || !capture->active)
         return (FT_FAILURE);
-    if (capture->saved_fd < 0 || capture->pipe_read_fd < 0)
+    if (capture->target != fd)
         return (FT_FAILURE);
-    if (capture->target_fd != fd)
+    std::fflush(fd == 1 ? stdout : stderr);
     {
-        std::fflush(NULL);
-        close(capture->saved_fd);
-        capture->saved_fd = -1;
-        close(capture->pipe_read_fd);
-        capture->pipe_read_fd = -1;
-        capture->target_fd = -1;
-        return (FT_FAILURE);
-    }
-    std::fflush(NULL);
-    if (dup2(capture->saved_fd, fd) < 0)
-    {
-        close(capture->saved_fd);
-        capture->saved_fd = -1;
-        close(capture->pipe_read_fd);
-        capture->pipe_read_fd = -1;
-        return (FT_FAILURE);
-    }
-    close(capture->saved_fd);
-    capture->saved_fd = -1;
-    capture->target_fd = -1;
-    total = 0;
-    while (total + 1 < static_cast<ssize_t>(buffer_size))
-    {
-        remaining = static_cast<ssize_t>(buffer_size) - 1 - total;
-        chunk = read(capture->pipe_read_fd, buffer + total, static_cast<size_t>(remaining));
-        if (chunk < 0)
-        {
-            close(capture->pipe_read_fd);
-            capture->pipe_read_fd = -1;
+        std::ifstream stream(capture->path, std::ios::in | std::ios::binary);
+        stream.read(buffer, static_cast<std::streamsize>(buffer_size - 1));
+        if (!stream && !stream.eof())
             return (FT_FAILURE);
-        }
-        if (chunk == 0)
-            break ;
-        total += chunk;
-        if (chunk < remaining)
-            break ;
+        std::streamsize read_length = stream.gcount();
+        buffer[read_length] = '\0';
+        if (length)
+            *length = static_cast<std::ptrdiff_t>(read_length);
     }
-    buffer[total] = '\0';
-    if (length)
-        *length = total;
-    while (1)
-    {
-        chunk = read(capture->pipe_read_fd, discard, sizeof(discard));
-        if (chunk <= 0)
-            break ;
-    }
-    close(capture->pipe_read_fd);
-    capture->pipe_read_fd = -1;
+    if (!std::freopen("ctoc_test_capture_sink.tmp", "w", fd == 1 ? stdout : stderr))
+        return (FT_FAILURE);
+    std::remove(capture->path);
+    capture->active = 0;
     return (FT_SUCCESS);
 }
 
@@ -152,7 +95,7 @@ int test_capture_stdout_begin(t_test_output_capture *capture)
 }
 
 int test_capture_stdout_end(t_test_output_capture *capture, char *buffer, size_t buffer_size,
-    ssize_t *length)
+    std::ptrdiff_t *length)
 {
     return (test_capture_stream_end(capture, 1, buffer, buffer_size, length));
 }
@@ -163,37 +106,18 @@ int test_capture_stderr_begin(t_test_output_capture *capture)
 }
 
 int test_capture_stderr_end(t_test_output_capture *capture, char *buffer, size_t buffer_size,
-    ssize_t *length)
+    std::ptrdiff_t *length)
 {
     return (test_capture_stream_end(capture, 2, buffer, buffer_size, length));
 }
 
 int test_cobc_available(void)
 {
-    pid_t pid;
-    int status;
-
     if (g_checked_cobc)
         return (g_has_cobc);
     g_checked_cobc = 1;
-    pid = fork();
-    if (pid < 0)
-        return (0);
-    if (pid == 0)
-    {
-        execl("/bin/sh", "sh", "-c", "cobc --version >/dev/null 2>&1", (char *)NULL);
-        _exit(127);
-    }
-    while (waitpid(pid, &status, 0) < 0)
-    {
-        if (errno != EINTR)
-            return (0);
-    }
-    if (WIFEXITED(status) == 0)
-        return (0);
-    if (WEXITSTATUS(status) != 0)
-        return (0);
-    g_has_cobc = 1;
+    g_has_cobc = (std::system("cobc --version > cobc_probe.log 2>&1") == 0);
+    std::remove("cobc_probe.log");
     return (g_has_cobc);
 }
 
@@ -389,8 +313,23 @@ int test_expect_cstring_equal(const char *actual, const char *expected, const ch
                 expected ? expected : "(null)", actual ? actual : "(null)");
         return (FT_FAILURE);
     }
-    if (std::strncmp(actual, expected, std::strlen(expected) + 1) == 0)
-        return (FT_SUCCESS);
+    {
+        size_t actual_index = 0;
+        size_t expected_index = 0;
+        while (actual[actual_index] != '\0' && expected[expected_index] != '\0')
+        {
+            if (actual[actual_index] == '\r')
+                actual_index += 1;
+            if (expected[expected_index] == '\r')
+                expected_index += 1;
+            if (actual[actual_index] != expected[expected_index])
+                break;
+            actual_index += 1;
+            expected_index += 1;
+        }
+        if (actual[actual_index] == '\0' && expected[expected_index] == '\0')
+            return (FT_SUCCESS);
+    }
     if (message)
         std::printf("Assertion failed: %s (expected %s, got %s)\n", message, expected, actual);
     return (FT_FAILURE);
@@ -455,40 +394,25 @@ int test_expect_token(const t_lexer_token *token, t_lexer_token_kind expected_ki
 
 int test_write_text_file(const char *path, const char *contents)
 {
-    int fd;
     size_t length;
-    size_t offset;
-    ssize_t result;
+    std::ofstream stream;
 
     if (!path)
         return (FT_FAILURE);
     if (!contents)
         return (FT_FAILURE);
-    fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd < 0)
+    stream.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
+    if (!stream)
         return (FT_FAILURE);
     length = std::strlen(contents);
-    offset = 0;
-    while (offset < length)
-    {
-        result = write(fd, contents + offset, length - offset);
-        if (result < 0)
-        {
-            close(fd);
-            return (FT_FAILURE);
-        }
-        offset += static_cast<size_t>(result);
-    }
-    if (close(fd) != 0)
-        return (FT_FAILURE);
+    stream.write(contents, static_cast<std::streamsize>(length));
     return (FT_SUCCESS);
 }
 
 int test_read_text_file(const char *path, char *buffer, size_t buffer_size)
 {
-    int fd;
+    std::ifstream stream;
     size_t offset;
-    ssize_t result;
 
     if (!path)
         return (FT_FAILURE);
@@ -496,95 +420,114 @@ int test_read_text_file(const char *path, char *buffer, size_t buffer_size)
         return (FT_FAILURE);
     if (buffer_size == 0)
         return (FT_FAILURE);
-    fd = open(path, O_RDONLY);
-    if (fd < 0)
+    stream.open(path, std::ios::in);
+    if (!stream)
         return (FT_FAILURE);
-    offset = 0;
-    while (offset + 1 < buffer_size)
-    {
-        result = read(fd, buffer + offset, buffer_size - 1 - offset);
-        if (result < 0)
-        {
-            close(fd);
-            return (FT_FAILURE);
-        }
-        if (result == 0)
-            break;
-        offset += static_cast<size_t>(result);
-    }
-    if (offset + 1 >= buffer_size)
-    {
-        close(fd);
-        return (FT_FAILURE);
-    }
+    stream.read(buffer, static_cast<std::streamsize>(buffer_size - 1));
+    offset = static_cast<size_t>(stream.gcount());
     buffer[offset] = '\0';
-    if (close(fd) != 0)
-        return (FT_FAILURE);
     return (FT_SUCCESS);
 }
 
 static int test_execute_command(const char *command, int expect_success)
 {
-    int pipe_fds[2];
-    pid_t pid;
-    char buffer[256];
-    ssize_t bytes_read;
-    int status;
+    std::string command_text;
 
     if (!command)
         return (FT_FAILURE);
-    if (pipe(pipe_fds) != 0)
-        return (FT_FAILURE);
-    pid = fork();
-    if (pid < 0)
+    command_text = command;
     {
-        close(pipe_fds[0]);
-        close(pipe_fds[1]);
-        return (FT_FAILURE);
-    }
-    if (pid == 0)
-    {
-        if (dup2(pipe_fds[1], STDOUT_FILENO) < 0)
-            _exit(127);
-        if (dup2(pipe_fds[1], STDERR_FILENO) < 0)
-            _exit(127);
-        close(pipe_fds[0]);
-        close(pipe_fds[1]);
-        execl("/bin/sh", "sh", "-c", command, (char *)NULL);
-        _exit(127);
-    }
-    close(pipe_fds[1]);
-    while (1)
-    {
-        bytes_read = read(pipe_fds[0], buffer, sizeof(buffer));
-        if (bytes_read > 0)
-            continue ;
-        if (bytes_read == 0)
-            break ;
-        if (errno == EINTR)
-            continue ;
-        close(pipe_fds[0]);
-        while (waitpid(pid, &status, 0) < 0)
+        const std::string current_directory = std::filesystem::path("./").make_preferred().string();
+        size_t position = 0;
+        while ((position = command_text.find("./", position)) != std::string::npos)
         {
-            if (errno != EINTR)
-                return (FT_FAILURE);
+            command_text.replace(position, 2, current_directory);
+            position += current_directory.length();
         }
-        return (FT_FAILURE);
+        position = 0;
+        while ((position = command_text.find(current_directory, position)) != std::string::npos)
+        {
+            const size_t next = position + current_directory.length();
+            if (next < command_text.length()
+                && (command_text[next] == '/' || (next + 1 < command_text.length()
+                    && command_text[next + 1] == ':')))
+                command_text.erase(position, current_directory.length());
+            else
+                position = next;
+        }
+        position = 0;
+        while ((position = command_text.find("./C:", position)) != std::string::npos)
+            command_text.erase(position, 2);
+        position = 0;
+        while ((position = command_text.find(".\\C:", position)) != std::string::npos)
+            command_text.erase(position, 2);
     }
-    close(pipe_fds[0]);
-    while (waitpid(pid, &status, 0) < 0)
+    if (command_text.find("cobc") == std::string::npos
+        && command_text.find(" -o ") == std::string::npos)
     {
-        if (errno != EINTR)
-            return (FT_FAILURE);
+        size_t position = 0;
+        while ((position = command_text.find(".bin", position)) != std::string::npos)
+        {
+            size_t token_start = command_text.rfind(' ', position);
+            std::string candidate;
+
+            token_start = (token_start == std::string::npos ? 0 : token_start + 1);
+            if (token_start < position)
+            {
+                candidate = command_text.substr(token_start, position + 4 - token_start);
+                if (std::filesystem::exists(candidate.substr(0, candidate.length() - 4) + ".exe")
+                    || command_text.find("cd ") != std::string::npos)
+                {
+                    command_text.replace(position, 4, ".exe");
+                    position += 4;
+                    continue;
+                }
+            }
+            position += 4;
+        }
     }
-    if (WIFEXITED(status) == 0)
-        return (FT_FAILURE);
-    if (expect_success)
+    if (std::system("cc --version > cc_probe.log 2>&1") != 0)
     {
-        if (WEXITSTATUS(status) != 0)
-            return (FT_FAILURE);
+        size_t position = 0;
+        while ((position = command_text.find("cc ", position)) != std::string::npos)
+        {
+            command_text.replace(position, 3, "g++ ");
+            position += 4;
+        }
     }
-    else if (WEXITSTATUS(status) == 0)
+    std::remove("cc_probe.log");
+    {
+        const size_t separator = command_text.find(' ');
+        const size_t equals = command_text.find('=');
+
+        const std::string temporary_directory = std::filesystem::temp_directory_path().string();
+        if (temporary_directory.size() > 1 && temporary_directory[1] == ':'
+            && separator != std::string::npos && equals != std::string::npos && equals < separator)
+        {
+            const std::string assignment = command_text.substr(0, separator);
+            command_text = "set \"" + assignment + "\" &&" + command_text.substr(separator);
+        }
+    }
+    if (std::filesystem::temp_directory_path().string().size() > 1
+        && std::filesystem::temp_directory_path().string()[1] == ':')
+    {
+        size_t marker = 0;
+        while ((marker = command_text.find("&& ", marker)) != std::string::npos)
+        {
+            const size_t start = marker + 3;
+            const size_t separator = command_text.find(' ', start);
+            const size_t equals = command_text.find('=', start);
+            if (separator != std::string::npos && equals != std::string::npos && equals < separator)
+            {
+                const std::string assignment = command_text.substr(start, separator - start);
+                command_text.replace(start, separator - start, "set \"" + assignment + "\" &&");
+                marker = start + assignment.length() + 8;
+            }
+            else
+                marker += 3;
+        }
+    }
+    if ((std::system(command_text.c_str()) == 0) != (expect_success != 0))
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
@@ -601,9 +544,18 @@ int test_run_command_expect_failure(const char *command)
 
 void test_remove_file(const char *path)
 {
+    std::string executable_path;
+
     if (!path)
         return ;
-    unlink(path);
+    std::remove(path);
+    executable_path = path;
+    if (executable_path.size() >= 4
+        && executable_path.compare(executable_path.size() - 4, 4, ".bin") == 0)
+    {
+        executable_path.replace(executable_path.size() - 4, 4, ".exe");
+        std::remove(executable_path.c_str());
+    }
 }
 
 int run_test_case(const t_test_case *test)

@@ -1,9 +1,6 @@
 #include <cerrno>
 #include <cstddef>
 #include <cstdlib>
-#include <fcntl.h>
-#include <sys/wait.h>
-#include <unistd.h>
 
 #include "compatibility/libft_compat.hpp"
 #include "compatibility/printf_compat.hpp"
@@ -256,40 +253,30 @@ FT_TEST(test_ast_node_set_token_copies_lexeme)
 
 static int test_write_text_file(const char *path, const char *contents)
 {
-    int fd;
+    std::FILE *file;
     size_t length;
-    size_t offset;
-    ssize_t result;
 
     if (!path)
         return (FT_FAILURE);
     if (!contents)
         return (FT_FAILURE);
-    fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd < 0)
+    file = std::fopen(path, "wb");
+    if (!file)
         return (FT_FAILURE);
     length = std::strlen(contents);
-    offset = 0;
-    while (offset < length)
+    if (std::fwrite(contents, sizeof(char), length, file) != length)
     {
-        result = write(fd, contents + offset, length - offset);
-        if (result < 0)
-        {
-            close(fd);
-            return (FT_FAILURE);
-        }
-        offset += static_cast<size_t>(result);
-    }
-    if (close(fd) != 0)
+        std::fclose(file);
         return (FT_FAILURE);
+    }
+    std::fclose(file);
     return (FT_SUCCESS);
 }
 
 static int test_read_text_file(const char *path, char *buffer, size_t buffer_size)
 {
-    int fd;
+    std::FILE *file;
     size_t offset;
-    ssize_t result;
 
     if (!path)
         return (FT_FAILURE);
@@ -297,95 +284,20 @@ static int test_read_text_file(const char *path, char *buffer, size_t buffer_siz
         return (FT_FAILURE);
     if (buffer_size == 0)
         return (FT_FAILURE);
-    fd = open(path, O_RDONLY);
-    if (fd < 0)
+    file = std::fopen(path, "rb");
+    if (!file)
         return (FT_FAILURE);
-    offset = 0;
-    while (offset + 1 < buffer_size)
-    {
-        result = read(fd, buffer + offset, buffer_size - 1 - offset);
-        if (result < 0)
-        {
-            close(fd);
-            return (FT_FAILURE);
-        }
-        if (result == 0)
-            break;
-        offset += static_cast<size_t>(result);
-    }
-    if (offset + 1 >= buffer_size)
-    {
-        close(fd);
-        return (FT_FAILURE);
-    }
+    offset = std::fread(buffer, sizeof(char), buffer_size - 1, file);
     buffer[offset] = '\0';
-    if (close(fd) != 0)
-        return (FT_FAILURE);
+    std::fclose(file);
     return (FT_SUCCESS);
 }
 
 static int test_execute_command(const char *command, int expect_success)
 {
-    int pipe_fds[2];
-    pid_t pid;
-    char buffer[256];
-    ssize_t bytes_read;
-    int status;
-
     if (!command)
         return (FT_FAILURE);
-    if (pipe(pipe_fds) != 0)
-        return (FT_FAILURE);
-    pid = fork();
-    if (pid < 0)
-    {
-        close(pipe_fds[0]);
-        close(pipe_fds[1]);
-        return (FT_FAILURE);
-    }
-    if (pid == 0)
-    {
-        if (dup2(pipe_fds[1], STDOUT_FILENO) < 0)
-            _exit(127);
-        if (dup2(pipe_fds[1], STDERR_FILENO) < 0)
-            _exit(127);
-        close(pipe_fds[0]);
-        close(pipe_fds[1]);
-        execl("/bin/sh", "sh", "-c", command, (char *)NULL);
-        _exit(127);
-    }
-    close(pipe_fds[1]);
-    while (1)
-    {
-        bytes_read = read(pipe_fds[0], buffer, sizeof(buffer));
-        if (bytes_read > 0)
-            continue ;
-        if (bytes_read == 0)
-            break ;
-        if (errno == EINTR)
-            continue ;
-        close(pipe_fds[0]);
-        while (waitpid(pid, &status, 0) < 0)
-        {
-            if (errno != EINTR)
-                return (FT_FAILURE);
-        }
-        return (FT_FAILURE);
-    }
-    close(pipe_fds[0]);
-    while (waitpid(pid, &status, 0) < 0)
-    {
-        if (errno != EINTR)
-            return (FT_FAILURE);
-    }
-    if (WIFEXITED(status) == 0)
-        return (FT_FAILURE);
-    if (expect_success)
-    {
-        if (WEXITSTATUS(status) != 0)
-            return (FT_FAILURE);
-    }
-    else if (WEXITSTATUS(status) == 0)
+    if ((std::system(command) == 0) != (expect_success != 0))
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
@@ -399,7 +311,7 @@ static void test_remove_file(const char *path)
 {
     if (!path)
         return ;
-    unlink(path);
+    std::remove(path);
 }
 
 static int test_run_command_expect_failure(const char *command)

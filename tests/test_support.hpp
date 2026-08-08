@@ -2,7 +2,7 @@
 #define TEST_SUPPORT_HPP
 
 #include <cstddef>
-#include <sys/types.h>
+#include <cstddef>
 
 #include "compatibility/memory_compat.hpp"
 #include "compatibility/libft_compat.hpp"
@@ -20,9 +20,9 @@ typedef struct s_test_case
 
 typedef struct s_test_output_capture
 {
-    int saved_fd;
-    int pipe_read_fd;
-    int target_fd;
+    int active;
+    int target;
+    char path[128];
 }   t_test_output_capture;
 
 #ifndef TEST_MODULE
@@ -95,15 +95,17 @@ int test_require_forward_translation_dependency(const char *test_name);
 int test_run_command(const char *command);
 int test_run_command_expect_failure(const char *command);
 void test_remove_file(const char *path);
+int test_create_temp_directory(char *buffer, size_t buffer_size);
+void test_remove_directory(const char *path);
 int run_test_case(const t_test_case *test);
 int run_test_suite(const t_test_case *tests, size_t count);
 void test_report_summary(void);
 int test_capture_stdout_begin(t_test_output_capture *capture);
 int test_capture_stdout_end(t_test_output_capture *capture, char *buffer, size_t buffer_size,
-    ssize_t *length);
+    std::ptrdiff_t *length);
 int test_capture_stderr_begin(t_test_output_capture *capture);
 int test_capture_stderr_end(t_test_output_capture *capture, char *buffer, size_t buffer_size,
-    ssize_t *length);
+    std::ptrdiff_t *length);
 
 #define FT_REQUIRE_COBC() \
     if (test_require_cobc_dependency(__func__) != FT_SUCCESS) \

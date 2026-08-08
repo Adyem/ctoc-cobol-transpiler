@@ -14,7 +14,11 @@ LSP_NAME    = cblc_lsp$(EXE_EXT)
 ifdef FORWARD_TRANSLATION
 export CTOC_ENABLE_FORWARD_TRANSLATION := $(FORWARD_TRANSLATION)
 endif
-PYTHON          ?= python3
+ifeq ($(OS),Windows_NT)
+    PYTHON      ?= python
+else
+    PYTHON      ?= python3
+endif
 LINT_SCRIPT      = scripts/lint_sources.py
 FUZZ_SCRIPT      = scripts/fuzz_transpiler.py
 COVERAGE_SCRIPT  = scripts/coverage_report.py
@@ -25,9 +29,15 @@ FUZZ_ITERATIONS ?= 50
 FUZZ_MODE ?= all
 FUZZ_ARGS ?=
 
-COBC_ON_PATH := $(shell command -v $(COBC) 2>/dev/null)
-GOINFRE_COBC := $(GOINFRE_LOCAL_PREFIX)/bin/cobc
-GOINFRE_COBC_AVAILABLE := $(shell test -x "$(GOINFRE_COBC)" && printf yes)
+ifeq ($(OS),Windows_NT)
+    COBC_ON_PATH :=
+    GOINFRE_COBC :=
+    GOINFRE_COBC_AVAILABLE :=
+else
+    COBC_ON_PATH := $(shell command -v $(COBC) 2>/dev/null)
+    GOINFRE_COBC := $(GOINFRE_LOCAL_PREFIX)/bin/cobc
+    GOINFRE_COBC_AVAILABLE := $(shell test -x "$(GOINFRE_COBC)" && printf yes)
+endif
 
 ifeq ($(COBC_ON_PATH),)
 ifeq ($(GOINFRE_COBC_AVAILABLE),yes)
@@ -163,7 +173,7 @@ ifneq ($(REPRODUCIBLE),0)
 endif
 
 ifeq ($(OS),Windows_NT)
-    MKDIR   = mkdir
+    MKDIR   = $(PYTHON) -c "import os,sys; os.makedirs(sys.argv[1], exist_ok=True)"
     RMDIR   = rmdir /S /Q
     RM      = del /F /Q
 else
@@ -366,9 +376,9 @@ DEPS        = $(OBJS:.o=.d) $(LSP_OBJ:.o=.d) $(TEST_OBJS:.o=.d)
 
 all: dirs transpiler lsp
 
-transpiler: $(TARGET)
+transpiler: dirs $(TARGET)
 
-lsp: $(LSP_NAME)
+lsp: dirs $(LSP_NAME)
 
 tests: dirs $(TEST_NAME)
 
@@ -411,15 +421,12 @@ debug:
 	$(MAKE) all DEBUG=1
 
 $(TARGET): $(OBJS)
-	@printf '\033[1;36m[CTOC BUILD] Linking %s\033[0m\n' "$@"
 	@$(CC) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
 
 $(LSP_NAME): $(LSP_OBJ) $(OBJS_NO_MAIN)
-	@printf '\033[1;36m[CTOC BUILD] Linking %s\033[0m\n' "$@"
 	@$(CC) $(CFLAGS) $(LSP_OBJ) $(OBJS_NO_MAIN) -o $@ $(LDFLAGS)
 
 $(TEST_NAME): $(TEST_OBJS) $(OBJS_NO_MAIN) $(TARGET)
-	@printf '\033[1;36m[CTOC BUILD] Linking %s\033[0m\n' "$@"
 	@$(CC) $(CFLAGS) $(TEST_OBJS) $(OBJS_NO_MAIN) -o $@ $(LDFLAGS)
 
 $(LSP_OBJ): $(LSP_SRC)
@@ -429,21 +436,10 @@ $(LSP_OBJ): $(LSP_SRC)
 $(OBJ_DIR)/%.o: %.cpp
 	@-$(MKDIR) $(dir $@)
 	@$(CC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
-	@if [ $(TOTAL_OBJS) -gt 0 ] && [[ " $(OBJS) " == *" $@ "* ]]; then \
-		built=0; \
-		for obj in $(OBJS); do \
-			[ -f "$$obj" ] && built=$$((built + 1)); \
-		done; \
-		printf '\033[1;36m[CTOC PROGRESS] %s (%d/%d)\033[0m\n' "$<" $$built $(TOTAL_OBJS); \
-	fi
 
 $(OBJ_DIR_TEST)/%.o: %.cpp
 	@-$(MKDIR) $(dir $@)
 	@$(CC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
-	@if [ $(TOTAL_TEST_OBJS) -gt 0 ]; then \
-		built=$$(find $(OBJ_DIR_TEST) -type f -name '*.o' | wc -l); \
-		printf '\033[1;36m[CTOC TEST PROGRESS] %s (%d/%d)\033[0m\n' "$<" $$built $(TOTAL_TEST_OBJS); \
-	fi
 
 -include $(DEPS)
 
@@ -461,7 +457,11 @@ fclean: clean
 re: fclean all
 
 test: $(TEST_NAME)
+ifeq ($(OS),Windows_NT)
+	@set "PATH=C:\ProgramData\chocolatey\lib\gnucobol\tools\bin;%PATH%" && .\$(TEST_NAME)
+else
 	@./$(TEST_NAME)
+endif
 
 both: all debug
 
