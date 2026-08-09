@@ -355,6 +355,53 @@ static unsigned long long cblc_struct_layout_fingerprint(
     return (hash);
 }
 
+static size_t cblc_exception_payload_size(const t_cblc_translation_unit *unit,
+    const t_cblc_struct_type *type, size_t depth)
+{
+    size_t total;
+    size_t index;
+
+    if (!unit || !type || depth > CBLC_TEMPLATE_PARAMETER_MAX)
+        return (0);
+    total = 0;
+    index = 0;
+    while (index < type->field_count)
+    {
+        const t_cblc_struct_field *field;
+        size_t element_size;
+        size_t element_count;
+        size_t field_size;
+
+        field = &type->fields[index];
+        element_count = field->array_count == 0 ? 1 : field->array_count;
+        if (field->kind == CBLC_DATA_KIND_INT)
+            element_size = sizeof(int);
+        else if (field->kind == CBLC_DATA_KIND_CHAR)
+            element_size = field->length == 0 ? 1 : field->length;
+        else if (field->kind == CBLC_DATA_KIND_STRING)
+            element_size = (field->length == 0 ? 1 : field->length) +
+                sizeof(size_t) * 2;
+        else if (field->kind == CBLC_DATA_KIND_STRUCT)
+        {
+            const t_cblc_struct_type *nested_type;
+
+            nested_type = cblc_find_struct_type(unit, field->struct_type_name);
+            element_size = cblc_exception_payload_size(unit, nested_type, depth + 1);
+        }
+        else
+            element_size = sizeof(void *);
+        if (element_size == 0 || element_count > CBLC_EXCEPTION_PAYLOAD_MAX
+            || element_size > CBLC_EXCEPTION_PAYLOAD_MAX / element_count)
+            return (CBLC_EXCEPTION_PAYLOAD_MAX + 1);
+        field_size = element_size * element_count;
+        if (total > CBLC_EXCEPTION_PAYLOAD_MAX - field_size)
+            return (CBLC_EXCEPTION_PAYLOAD_MAX + 1);
+        total += field_size;
+        index += 1;
+    }
+    return (total);
+}
+
 static int cblc_type_ref_equal(const t_cblc_type_ref *left,
     const t_cblc_type_ref *right)
 {
@@ -659,8 +706,22 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
         std::memset(type, 0, sizeof(*type));
         ft_strlcpy(type->source_name, signature->name, sizeof(type->source_name));
         cblc_identifier_to_cobol(type->source_name, type->cobol_name, sizeof(type->cobol_name));
+        type->has_base_type = signature->has_base_type;
+        type->base_is_public = signature->base_is_public;
+        type->exception_abi_version = signature->exception_abi_version;
+        type->exception_type_id = signature->exception_type_id;
+        type->exception_payload_size = signature->exception_payload_size;
+        ft_strlcpy(type->base_type_name, signature->base_type_name,
+            sizeof(type->base_type_name));
         type->is_class = signature->kind == TRANSPILE_TYPE_CLASS;
         type->is_imported = 1;
+        type->has_base_type = signature->has_base_type;
+        type->base_is_public = signature->base_is_public;
+        type->exception_abi_version = signature->exception_abi_version;
+        type->exception_type_id = signature->exception_type_id;
+        type->exception_payload_size = signature->exception_payload_size;
+        ft_strlcpy(type->base_type_name, signature->base_type_name,
+            sizeof(type->base_type_name));
         unit->struct_type_count += 1;
     }
     else
@@ -679,6 +740,7 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
     }
     type->has_default_constructor = signature->has_default_constructor;
     type->has_destructor = signature->has_destructor;
+    type->exception_payload_size = signature->exception_payload_size;
     type->layout_fingerprint = signature->layout_fingerprint;
     type->is_template = signature->is_template;
     type->template_parameter_count = signature->template_parameter_count;
@@ -741,6 +803,10 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
                 sizeof(type->methods[index].source_name));
             cblc_identifier_to_cobol(type->methods[index].source_name,
                 type->methods[index].cobol_name, sizeof(type->methods[index].cobol_name));
+            if (std::strncmp(type->methods[index].cobol_name, "CBLC-USER-", 10) == 0)
+                std::memmove(type->methods[index].cobol_name,
+                    type->methods[index].cobol_name + 10,
+                    std::strlen(type->methods[index].cobol_name + 10) + 1);
             type->methods[index].return_kind = static_cast<t_cblc_function_return_kind>(
                 signature->methods[index].return_kind);
             ft_strlcpy(type->methods[index].return_type_name,
@@ -796,6 +862,13 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
                 type->methods[index].statement_capacity = signature->methods[index].statement_count;
             }
             type->methods[index].has_definition = signature->methods[index].has_definition;
+            type->methods[index].exception_type_count =
+                signature->methods[index].exception_type_count;
+            std::memcpy(type->methods[index].exception_type_ids,
+                signature->methods[index].exception_type_ids,
+                sizeof(type->methods[index].exception_type_ids));
+            type->methods[index].exception_types_unknown =
+                signature->methods[index].exception_types_unknown;
             if (cblc_register_imported_parameter_storage(unit,
                     type->methods[index].parameters,
                     type->methods[index].parameter_count, 1) != FT_SUCCESS)
@@ -862,6 +935,13 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
             }
             type->constructors[index].has_definition =
                 signature->constructors[index].has_definition;
+            type->constructors[index].exception_type_count =
+                signature->constructors[index].exception_type_count;
+            std::memcpy(type->constructors[index].exception_type_ids,
+                signature->constructors[index].exception_type_ids,
+                sizeof(type->constructors[index].exception_type_ids));
+            type->constructors[index].exception_types_unknown =
+                signature->constructors[index].exception_types_unknown;
             if (cblc_register_imported_parameter_storage(unit,
                     type->constructors[index].parameters,
                     type->constructors[index].parameter_count, 1) != FT_SUCCESS)

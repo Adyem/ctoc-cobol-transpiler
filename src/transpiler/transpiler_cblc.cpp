@@ -1,5 +1,7 @@
 #include "cblc_transpiler.hpp"
 
+#include <cstdint>
+
 #include "compatibility/memory_compat.hpp"
 #include "compatibility/libft_compat.hpp"
 #include "compatibility/printf_compat.hpp"
@@ -9,6 +11,7 @@ typedef struct s_cobol_text_builder
     char *data;
     size_t length;
     size_t capacity;
+    int free_format;
 }   t_cobol_text_builder;
 
 typedef struct s_cblc_constructor_parse_state
@@ -40,6 +43,10 @@ static int cblc_parse_call(const char **cursor, t_cblc_translation_unit *unit,
 static int cblc_parse_method_call(const char **cursor, t_cblc_translation_unit *unit,
     t_cblc_function *function);
 static int cblc_parse_return(const char **cursor, t_cblc_translation_unit *unit,
+    t_cblc_function *function);
+static int cblc_parse_try_statement(const char **cursor, t_cblc_translation_unit *unit,
+    t_cblc_function *function);
+static int cblc_parse_throw_statement(const char **cursor, t_cblc_translation_unit *unit,
     t_cblc_function *function);
 static int cblc_capture_lifecycle_body(const char **cursor, t_cblc_translation_unit *unit,
     const t_cblc_struct_type *type, t_cblc_statement **out_statements, size_t *out_count,
@@ -180,9 +187,11 @@ static int cblc_parse_string_literal(const char **cursor, char *buffer, size_t b
 #include "src/cblc/transpiler_cblc_lifecycle_emit.inc"
 
 static int cblc_emit_lifecycle_statement(const t_cblc_translation_unit *unit,
-    const t_cblc_statement *statement, t_cobol_text_builder *builder);
+    const t_cblc_statement *statement, t_cobol_text_builder *builder,
+    const t_cblc_function *caller, size_t statement_index);
 static int cblc_emit_method_statement(const t_cblc_translation_unit *unit,
-    const t_cblc_statement *statement, t_cobol_text_builder *builder);
+    const t_cblc_statement *statement, t_cobol_text_builder *builder,
+    const t_cblc_function *caller, size_t statement_index);
 static int cblc_emit_local_call_argument_moves(const t_cblc_translation_unit *unit,
     const t_cblc_function *target_function, const t_cblc_statement *statement,
     t_cobol_text_builder *builder);

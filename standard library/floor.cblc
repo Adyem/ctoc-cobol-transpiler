@@ -1,0 +1,13 @@
+void F(double operand, double result, int status)
+{
+    status = 0;
+    result = std::floor(operand);
+    if (operand < result)
+    {
+        result = result - 1;
+    }
+    if (operand != result)
+    {
+        status = 1;
+    }
+}

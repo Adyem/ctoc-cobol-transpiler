@@ -1,0 +1,13 @@
+void F(double operand, double result, int status)
+{
+    status = 0;
+    result = 0;
+    if (operand > 709)
+    {
+        status = 1;
+    }
+    else
+    {
+        result = std::exp(operand);
+    }
+}

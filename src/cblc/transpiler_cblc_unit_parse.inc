@@ -191,9 +191,12 @@ static int cblc_parse_file_declaration(const char **cursor, t_cblc_translation_u
 {
     char first[TRANSPILE_IDENTIFIER_MAX];
     char second[TRANSPILE_IDENTIFIER_MAX];
+    char third[TRANSPILE_IDENTIFIER_MAX];
     char path[TRANSPILE_FILE_PATH_MAX];
     const char *lookahead;
     t_cblc_file_declaration *file;
+    t_transpiler_file_organization organization;
+    int first_is_organization;
 
     if (!cursor || !*cursor || !unit)
         return (FT_FAILURE);
@@ -206,11 +209,50 @@ static int cblc_parse_file_declaration(const char **cursor, t_cblc_translation_u
         return (FT_FAILURE);
     cblc_skip_whitespace(cursor);
     second[0] = '\0';
+    third[0] = '\0';
+    organization = TRANSPILE_FILE_ORGANIZATION_LINE_SEQUENTIAL;
+    first_is_organization = 0;
+    if (std::strncmp(first, "indexed", sizeof(first)) == 0)
+    {
+        organization = TRANSPILE_FILE_ORGANIZATION_INDEXED;
+        first_is_organization = 1;
+    }
+    else if (std::strncmp(first, "relative", sizeof(first)) == 0)
+    {
+        organization = TRANSPILE_FILE_ORGANIZATION_RELATIVE;
+        first_is_organization = 1;
+    }
+    else if (std::strncmp(first, "sequential", sizeof(first)) == 0)
+    {
+        organization = TRANSPILE_FILE_ORGANIZATION_SEQUENTIAL;
+        first_is_organization = 1;
+    }
     lookahead = *cursor;
     if (cblc_parse_identifier(&lookahead, second, sizeof(second)) == FT_SUCCESS)
     {
         *cursor = lookahead;
         cblc_skip_whitespace(cursor);
+    }
+    if (!first_is_organization && second[0])
+    {
+        if (std::strncmp(second, "indexed", sizeof(second)) == 0)
+        {
+            organization = TRANSPILE_FILE_ORGANIZATION_INDEXED;
+            lookahead = *cursor;
+            if (cblc_parse_identifier(&lookahead, third, sizeof(third)) != FT_SUCCESS)
+                return (FT_FAILURE);
+            *cursor = lookahead;
+            cblc_skip_whitespace(cursor);
+        }
+        else if (std::strncmp(second, "relative", sizeof(second)) == 0)
+        {
+            organization = TRANSPILE_FILE_ORGANIZATION_RELATIVE;
+            lookahead = *cursor;
+            if (cblc_parse_identifier(&lookahead, third, sizeof(third)) != FT_SUCCESS)
+                return (FT_FAILURE);
+            *cursor = lookahead;
+            cblc_skip_whitespace(cursor);
+        }
     }
     if (**cursor != '"' || cblc_parse_string_literal(cursor, path, sizeof(path)) != FT_SUCCESS)
         return (FT_FAILURE);
@@ -218,7 +260,7 @@ static int cblc_parse_file_declaration(const char **cursor, t_cblc_translation_u
     if (**cursor != ';')
         return (FT_FAILURE);
     *cursor += 1;
-    if (cblc_find_file(unit, second[0] ? second : first))
+    if (cblc_find_file(unit, third[0] ? third : (second[0] ? second : first)))
         return (FT_FAILURE);
     if (unit->file_count >= unit->file_capacity
         && cblc_translation_unit_ensure_file_capacity(unit,
@@ -226,7 +268,24 @@ static int cblc_parse_file_declaration(const char **cursor, t_cblc_translation_u
         return (FT_FAILURE);
     file = &unit->files[unit->file_count++];
     std::memset(file, 0, sizeof(*file));
-    if (second[0])
+    file->organization = organization;
+    if (first_is_organization)
+    {
+        ft_strlcpy(file->source_name, second, sizeof(file->source_name));
+        file->role = TRANSPILE_FILE_ROLE_DATA;
+    }
+    else if (third[0])
+    {
+        if (std::strncmp(first, "input", sizeof(first)) != 0
+            && std::strncmp(first, "output", sizeof(first)) != 0
+            && std::strncmp(first, "data", sizeof(first)) != 0)
+            return (FT_FAILURE);
+        ft_strlcpy(file->source_name, third, sizeof(file->source_name));
+        file->role = std::strncmp(first, "input", sizeof(first)) == 0
+            ? TRANSPILE_FILE_ROLE_INPUT : (std::strncmp(first, "output", sizeof(first)) == 0
+                ? TRANSPILE_FILE_ROLE_OUTPUT : TRANSPILE_FILE_ROLE_DATA);
+    }
+    else if (second[0])
     {
         ft_strlcpy(file->source_name, second, sizeof(file->source_name));
         if (std::strncmp(first, "input", sizeof(first)) == 0)
@@ -254,6 +313,7 @@ void cblc_translation_unit_init(t_cblc_translation_unit *unit)
     if (!unit)
         return ;
     unit->source_text = NULL;
+    unit->source_file_id = 0;
     unit->data_items = NULL;
     unit->data_count = 0;
     unit->data_capacity = 0;
@@ -306,6 +366,7 @@ void cblc_translation_unit_init(t_cblc_translation_unit *unit)
     unit->entry_function_index = static_cast<size_t>(-1);
     unit->helper_literal_counter = 0;
     unit->helper_status_index = -1;
+    unit->is_native_standard_library = 0;
     unit->program_name[0] = '\0';
     unit->active_scope_id = 0;
     cblc_register_builtin_string_type(unit);
@@ -409,6 +470,7 @@ void cblc_translation_unit_dispose(t_cblc_translation_unit *unit)
     }
     unit->data_items = NULL;
     unit->source_text = NULL;
+    unit->source_file_id = 0;
     unit->data_count = 0;
     unit->data_capacity = 0;
     unit->scopes = NULL;
@@ -457,6 +519,24 @@ void cblc_translation_unit_dispose(t_cblc_translation_unit *unit)
     unit->active_scope_id = 0;
 }
 
+static size_t cblc_source_file_id(const char *text)
+{
+    std::uint32_t hash;
+
+    if (!text)
+        return (0);
+    hash = 2166136261u;
+    while (*text != '\0')
+    {
+        hash ^= static_cast<unsigned char>(*text);
+        hash *= 16777619u;
+        text += 1;
+    }
+    if (hash == 0)
+        hash = 1;
+    return (static_cast<size_t>(hash));
+}
+
 int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit)
 {
     const char *cursor;
@@ -464,6 +544,7 @@ int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit)
     if (!text || !unit)
         return (FT_FAILURE);
     unit->source_text = text;
+    unit->source_file_id = cblc_source_file_id(text);
     g_cblc_constructor_parse_state.type = NULL;
     g_cblc_constructor_parse_state.initialized_fields = NULL;
     g_cblc_constructor_parse_state.active = 0;

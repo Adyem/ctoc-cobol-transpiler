@@ -1,0 +1,48 @@
+int F(string first, string second)
+{
+    int result;
+    int index;
+    int limit;
+    result = 0;
+    index = 0;
+    limit = first.len;
+    if (second.len < limit)
+    {
+        limit = second.len;
+    }
+    while (index < limit)
+    {
+        if (first[index] < second[index])
+        {
+            result = -1;
+            index = limit;
+        }
+        else
+        {
+            if (first[index] > second[index])
+            {
+                result = 1;
+                index = limit;
+            }
+            else
+            {
+                index = index + 1;
+            }
+        }
+    }
+    if (result == 0)
+    {
+        if (first.len < second.len)
+        {
+            result = -1;
+        }
+        else
+        {
+            if (first.len > second.len)
+            {
+                result = 1;
+            }
+        }
+    }
+    return result;
+}

@@ -466,6 +466,18 @@ static int cblc_parse_cobol_reference_base(const char *reference, char *base_nam
     return (FT_SUCCESS);
 }
 
+static thread_local int g_cblc_native_standard_library_expression_mode = 0;
+
+void cblc_set_native_standard_library_expression_mode(int enabled)
+{
+    g_cblc_native_standard_library_expression_mode = enabled ? 1 : 0;
+}
+
+int cblc_native_standard_library_expression_mode_enabled(void)
+{
+    return (g_cblc_native_standard_library_expression_mode);
+}
+
 static int cblc_translate_expression_for_cobol(const char *expression, char *buffer,
     size_t buffer_size)
 {
@@ -483,6 +495,95 @@ static int cblc_translate_expression_for_cobol(const char *expression, char *buf
         if (character == ' ')
         {
             index += 1;
+            continue ;
+        }
+        if (character == '\'' || character == '"')
+        {
+            char literal[TRANSPILE_STATEMENT_TEXT_MAX];
+            size_t literal_length;
+            char quote;
+
+            quote = character;
+            literal_length = 0;
+            while (expression[index] != '\0')
+            {
+                if (literal_length + 1 >= sizeof(literal))
+                    return (FT_FAILURE);
+                literal[literal_length++] = expression[index];
+                if (expression[index] == quote && literal_length > 1
+                    && expression[index - 1] != '\\')
+                {
+                    index += 1;
+                    break ;
+                }
+                index += 1;
+            }
+            if (literal_length == 0 || literal[literal_length - 1] != quote)
+                return (FT_FAILURE);
+            literal[literal_length] = '\0';
+            if (std::strcmp(literal, "'\\0'") == 0
+                || std::strcmp(literal, "\"\\0\"") == 0)
+                ft_strlcpy(literal, "LOW-VALUE", sizeof(literal));
+            if (cblc_expression_append(buffer, buffer_size, literal) != FT_SUCCESS)
+                return (FT_FAILURE);
+            continue ;
+        }
+        if (character == '(' || character == ')')
+        {
+            char parenthesis[2];
+
+            parenthesis[0] = character;
+            parenthesis[1] = '\0';
+            if (cblc_expression_append(buffer, buffer_size, parenthesis) != FT_SUCCESS)
+                return (FT_FAILURE);
+            index += 1;
+            continue ;
+        }
+        if (character == '<' || character == '>' || character == '='
+            || character == '!')
+        {
+            char operator_buffer[8];
+            size_t operator_length;
+
+            operator_length = 1;
+            operator_buffer[0] = character;
+            if ((expression[index + 1] == '=' && (character == '<'
+                    || character == '>' || character == '=' || character == '!')))
+            {
+                operator_buffer[operator_length++] = '=';
+                index += 1;
+            }
+            operator_buffer[operator_length] = '\0';
+            if (std::strcmp(operator_buffer, "==") == 0)
+                operator_buffer[0] = '=', operator_buffer[1] = '\0';
+            else if (std::strcmp(operator_buffer, "!=") == 0)
+                ft_strlcpy(operator_buffer, "NOT =", sizeof(operator_buffer));
+            else if (std::strcmp(operator_buffer, "!") == 0)
+                ft_strlcpy(operator_buffer, "NOT", sizeof(operator_buffer));
+            if (cblc_expression_append(buffer, buffer_size, operator_buffer) != FT_SUCCESS)
+                return (FT_FAILURE);
+            index += 1;
+            continue ;
+        }
+        if (character == '&' && expression[index + 1] == '&')
+        {
+            if (cblc_expression_append(buffer, buffer_size, "AND") != FT_SUCCESS)
+                return (FT_FAILURE);
+            index += 2;
+            continue ;
+        }
+        if (character == '|' && expression[index + 1] == '|')
+        {
+            if (cblc_expression_append(buffer, buffer_size, "OR") != FT_SUCCESS)
+                return (FT_FAILURE);
+            index += 2;
+            continue ;
+        }
+        if (character == '*' && expression[index + 1] == '*')
+        {
+            if (cblc_expression_append(buffer, buffer_size, "**") != FT_SUCCESS)
+                return (FT_FAILURE);
+            index += 2;
             continue ;
         }
         if (character == '+' || character == '-' || character == '*' || character == '/')
@@ -538,7 +639,109 @@ static int cblc_translate_expression_for_cobol(const char *expression, char *buf
                 if (cblc_translate_expression_for_cobol(index_expression, translated_index,
                         sizeof(translated_index)) != FT_SUCCESS)
                     return (FT_FAILURE);
-                if (std::snprintf(mapped, sizeof(mapped), "%s(%s + 1)", token,
+                if (g_cblc_native_standard_library_expression_mode
+                    && (std::strcmp(token, "first") == 0
+                        || std::strcmp(token, "second") == 0
+                        || std::strcmp(token, "F-FIRST") == 0
+                        || std::strcmp(token, "F-SECOND") == 0
+                        || std::strcmp(token, "F-SOURCE") == 0
+                        || std::strcmp(token, "F-TARGET") == 0
+                        || std::strcmp(token, "F-DESTINATION") == 0
+                        || std::strcmp(token, "F-LEFT") == 0
+                        || std::strcmp(token, "F-RIGHT") == 0
+                        || std::strcmp(token, "F-X") == 0
+                        || std::strcmp(token, "source") == 0
+                        || std::strcmp(token, "target") == 0
+                        || std::strcmp(token, "destination") == 0
+                        || std::strcmp(token, "left") == 0
+                        || std::strcmp(token, "right") == 0
+                        || std::strcmp(token, "x") == 0
+                        || std::strcmp(token, "source_string") == 0
+                        || std::strcmp(token, "target_string") == 0
+                        || std::strcmp(token, "destination_string") == 0
+                        || std::strcmp(token, "left_string") == 0
+                        || std::strcmp(token, "right_string") == 0))
+                {
+                    if (std::strcmp(token, "F-FIRST") == 0
+                        || std::strcmp(token, "F-SECOND") == 0)
+                    {
+                        if (std::snprintf(mapped, sizeof(mapped), "%s-BUF(%s + 1:1)",
+                            token, translated_index) < 0)
+                            return (FT_FAILURE);
+                    }
+                    else if (std::strcmp(token, "F-SOURCE") == 0
+                        && std::snprintf(mapped, sizeof(mapped), "F-SOURCE-BUF(%s + 1:1)",
+                            translated_index) < 0)
+                        return (FT_FAILURE);
+                    else if (std::strcmp(token, "F-TARGET") == 0
+                        && std::snprintf(mapped, sizeof(mapped), "F-TARGET-BUF(%s + 1:1)",
+                            translated_index) < 0)
+                        return (FT_FAILURE);
+                    else if (std::strcmp(token, "F-DESTINATION") == 0
+                        && std::snprintf(mapped, sizeof(mapped), "F-DESTINATION-BUF(%s + 1:1)",
+                            translated_index) < 0)
+                        return (FT_FAILURE);
+                    else if (std::strcmp(token, "F-LEFT") == 0
+                        && std::snprintf(mapped, sizeof(mapped), "F-LEFT-BUF(%s + 1:1)",
+                            translated_index) < 0)
+                        return (FT_FAILURE);
+                    else if (std::strcmp(token, "F-RIGHT") == 0
+                        && std::snprintf(mapped, sizeof(mapped), "F-RIGHT-BUF(%s + 1:1)",
+                            translated_index) < 0)
+                        return (FT_FAILURE);
+                    else if (std::strcmp(token, "F-X") == 0
+                        && std::snprintf(mapped, sizeof(mapped), "F-X-BUF(%s + 1:1)",
+                            translated_index) < 0)
+                        return (FT_FAILURE);
+                    else if (std::strcmp(token, "source_string") == 0
+                        && std::snprintf(mapped, sizeof(mapped), "F-SOURCE-STRING-BUF(%s + 1:1)",
+                            translated_index) < 0)
+                        return (FT_FAILURE);
+                    else if (std::strcmp(token, "source") == 0
+                        && std::snprintf(mapped, sizeof(mapped), "F-SOURCE-BUF(%s + 1:1)",
+                            translated_index) < 0)
+                        return (FT_FAILURE);
+                    else if (std::strcmp(token, "target") == 0
+                        && std::snprintf(mapped, sizeof(mapped), "F-TARGET-BUF(%s + 1:1)",
+                            translated_index) < 0)
+                        return (FT_FAILURE);
+                    else if (std::strcmp(token, "destination") == 0
+                        && std::snprintf(mapped, sizeof(mapped), "F-DESTINATION-BUF(%s + 1:1)",
+                            translated_index) < 0)
+                        return (FT_FAILURE);
+                    else if (std::strcmp(token, "left") == 0
+                        && std::snprintf(mapped, sizeof(mapped), "F-LEFT-BUF(%s + 1:1)",
+                            translated_index) < 0)
+                        return (FT_FAILURE);
+                    else if (std::strcmp(token, "right") == 0
+                        && std::snprintf(mapped, sizeof(mapped), "F-RIGHT-BUF(%s + 1:1)",
+                            translated_index) < 0)
+                        return (FT_FAILURE);
+                    else if (std::strcmp(token, "x") == 0
+                        && std::snprintf(mapped, sizeof(mapped), "F-X-BUF(%s + 1:1)",
+                            translated_index) < 0)
+                        return (FT_FAILURE);
+                    else if (std::strcmp(token, "target_string") == 0
+                        && std::snprintf(mapped, sizeof(mapped), "F-TARGET-STRING-BUF(%s + 1:1)",
+                            translated_index) < 0)
+                        return (FT_FAILURE);
+                    else if (std::strcmp(token, "destination_string") == 0
+                        && std::snprintf(mapped, sizeof(mapped), "F-DESTINATION-STRING-BUF(%s + 1:1)",
+                            translated_index) < 0)
+                        return (FT_FAILURE);
+                    else if (std::strcmp(token, "left_string") == 0
+                        && std::snprintf(mapped, sizeof(mapped), "F-LEFT-STRING-BUF(%s + 1:1)",
+                            translated_index) < 0)
+                        return (FT_FAILURE);
+                    else if (std::strcmp(token, "right_string") == 0
+                        && std::snprintf(mapped, sizeof(mapped), "F-RIGHT-STRING-BUF(%s + 1:1)",
+                            translated_index) < 0)
+                        return (FT_FAILURE);
+                }
+                else
+                if (std::snprintf(mapped, sizeof(mapped),
+                        g_cblc_native_standard_library_expression_mode
+                            ? "%s(%s + 1:1)" : "%s(%s + 1)", token,
                         translated_index) < 0)
                     return (FT_FAILURE);
                 token_index += 1;
@@ -573,7 +776,19 @@ static int cblc_translate_expression_for_cobol(const char *expression, char *buf
                 ft_strlcpy(mapped, token, sizeof(mapped));
             }
             else
-                ft_strlcpy(mapped, token, sizeof(mapped));
+            {
+                size_t mapped_index;
+
+                mapped_index = 0;
+                while (token[mapped_index] != '\0'
+                    && mapped_index + 1 < sizeof(mapped))
+                {
+                    mapped[mapped_index] = token[mapped_index] == '_'
+                        ? '-' : token[mapped_index];
+                    mapped_index += 1;
+                }
+                mapped[mapped_index] = '\0';
+            }
             if (cblc_expression_append(buffer, buffer_size, mapped) != FT_SUCCESS)
                 return (FT_FAILURE);
             index = token_index;
@@ -640,6 +855,7 @@ static int cblc_parse_data_reference_text(const char **cursor, t_cblc_translatio
             if (has_index)
                 return (FT_FAILURE);
             if (item->array_count == 0 && item->kind != CBLC_DATA_KIND_STRUCT_POINTER
+                && item->kind != CBLC_DATA_KIND_STRING
                 && cblc_pointer_element_kind(item->kind, &pointer_element_kind) != FT_SUCCESS)
                 return (FT_FAILURE);
             {

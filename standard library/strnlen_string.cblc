@@ -1,0 +1,14 @@
+int F(string source, int request)
+{
+    int result;
+    result = source.len;
+    if (request < result)
+    {
+        result = request;
+    }
+    if (result < 0)
+    {
+        result = 0;
+    }
+    return result;
+}

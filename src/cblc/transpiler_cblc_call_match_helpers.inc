@@ -99,6 +99,10 @@ static int cblc_argument_matches_parameter(const t_cblc_translation_unit *unit,
             return (0);
         if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_INT)
             return (item->kind == CBLC_DATA_KIND_INT);
+        if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_DOUBLE)
+            return (item->kind == CBLC_DATA_KIND_DOUBLE);
+        if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_CHAR)
+            return (item->kind == CBLC_DATA_KIND_CHAR);
         if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_STRING)
             return (item->kind == CBLC_DATA_KIND_STRING
                 && parameter->length > 0 && item->length == parameter->length);
@@ -120,12 +124,25 @@ static int cblc_argument_matches_parameter(const t_cblc_translation_unit *unit,
     }
     if (item && item->array_count > 0
         && (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_INT
+            || parameter->kind == TRANSPILE_FUNCTION_PARAMETER_CHAR
             || parameter->kind == TRANSPILE_FUNCTION_PARAMETER_STRING
             || parameter->kind == TRANSPILE_FUNCTION_PARAMETER_STRUCT))
         return (0);
     if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_INT)
     {
         if (item && item->kind == CBLC_DATA_KIND_STRUCT)
+            return (0);
+        return (1);
+    }
+    if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_DOUBLE)
+    {
+        if (item && item->kind != CBLC_DATA_KIND_DOUBLE)
+            return (0);
+        return (1);
+    }
+    if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_CHAR)
+    {
+        if (item && item->kind != CBLC_DATA_KIND_CHAR)
             return (0);
         return (1);
     }

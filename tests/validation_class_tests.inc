@@ -1899,7 +1899,7 @@ FT_TEST(test_cblc_generate_cobol_emits_class_methods)
     if (!ft_strnstr(generated_cobol, "PERFORM CBLC-METHOD-COUNTER-CURRENT.",
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol,
-            "COMPUTE CBLC-RESULT-COUNTER-CURRENT = COUNTER-VALUE.",
+            "COMPUTE CBLC-RESULT-COUNTER-CURRENT = COUNTER-CBLC-USER-VALUE.",
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol,
             "COMPUTE TOTAL = CBLC-RESULT-COUNTER-CURRENT.",

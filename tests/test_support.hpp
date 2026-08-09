@@ -22,6 +22,7 @@ typedef struct s_test_output_capture
 {
     int active;
     int target;
+    int saved_fd;
     char path[128];
 }   t_test_output_capture;
 

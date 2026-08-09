@@ -98,6 +98,208 @@ static int cblc_register_scope(t_cblc_translation_unit *unit, size_t parent_id,
     return (FT_SUCCESS);
 }
 
+static void cblc_exception_source_position(const t_cblc_translation_unit *unit,
+    const char *position, size_t *line, size_t *column);
+
+static int cblc_parse_condition(const char **cursor, t_cblc_translation_unit *unit,
+    char *condition, size_t condition_size)
+{
+    const char *condition_start;
+    size_t condition_length;
+    size_t depth;
+    char quote;
+    char raw_condition[TRANSPILE_STATEMENT_TEXT_MAX];
+    size_t normalized_length;
+    size_t condition_index;
+
+    if (!cursor || !*cursor || !unit || !condition || condition_size == 0)
+        return (FT_FAILURE);
+    cblc_skip_whitespace(cursor);
+    if (**cursor != '(')
+        return (FT_FAILURE);
+    *cursor += 1;
+    condition_start = *cursor;
+    depth = 1;
+    quote = '\0';
+    while (**cursor != '\0' && depth > 0)
+    {
+        if (quote != '\0')
+        {
+            if (**cursor == quote && (*cursor == condition_start
+                    || (*cursor)[-1] != '\\'))
+                quote = '\0';
+        }
+        else if (**cursor == '\'' || **cursor == '"')
+            quote = **cursor;
+        else if (**cursor == '(')
+            depth += 1;
+        else if (**cursor == ')')
+            depth -= 1;
+        *cursor += 1;
+    }
+    if (depth != 0)
+        return (FT_FAILURE);
+    condition_length = static_cast<size_t>((*cursor - 1) - condition_start);
+    while (condition_length > 0
+        && (condition_start[condition_length - 1] == ' '
+            || condition_start[condition_length - 1] == '\t'
+            || condition_start[condition_length - 1] == '\n'
+            || condition_start[condition_length - 1] == '\r'))
+        condition_length -= 1;
+    if (condition_length == 0 || condition_length >= sizeof(raw_condition))
+        return (FT_FAILURE);
+    std::memcpy(raw_condition, condition_start, condition_length);
+    raw_condition[condition_length] = '\0';
+    normalized_length = 0;
+    condition_index = 0;
+    while (raw_condition[condition_index] != '\0')
+    {
+        if (raw_condition[condition_index] == '\''
+            || raw_condition[condition_index] == '"')
+        {
+            char literal_quote;
+
+            literal_quote = raw_condition[condition_index++];
+            if (normalized_length + 1 >= condition_size)
+                return (FT_FAILURE);
+            condition[normalized_length++] = literal_quote;
+            while (raw_condition[condition_index] != '\0')
+            {
+                char literal_character;
+
+                literal_character = raw_condition[condition_index++];
+                if (normalized_length + 1 >= condition_size)
+                    return (FT_FAILURE);
+                condition[normalized_length++] = literal_character;
+                if (literal_character == literal_quote)
+                    break ;
+            }
+            continue ;
+        }
+        if (cblc_is_identifier_char(raw_condition[condition_index]))
+        {
+            char identifier[TRANSPILE_IDENTIFIER_MAX];
+            size_t identifier_length;
+            t_cblc_data_item *item;
+            const char *mapped_name;
+            size_t mapped_length;
+            char mapped_identifier[TRANSPILE_IDENTIFIER_MAX];
+
+            identifier_length = 0;
+            while (cblc_is_identifier_char(raw_condition[condition_index]))
+            {
+                if (identifier_length + 1 >= sizeof(identifier))
+                    return (FT_FAILURE);
+                identifier[identifier_length++] = raw_condition[condition_index++];
+            }
+            identifier[identifier_length] = '\0';
+            item = cblc_find_data_item(unit, identifier);
+            mapped_name = item ? item->cobol_name : NULL;
+            if (!mapped_name)
+            {
+                cblc_identifier_to_cobol(identifier, mapped_identifier,
+                    sizeof(mapped_identifier));
+                mapped_name = mapped_identifier;
+            }
+            mapped_length = std::strlen(mapped_name);
+            if (normalized_length + mapped_length + 1 > condition_size)
+                return (FT_FAILURE);
+            std::memcpy(condition + normalized_length, mapped_name, mapped_length);
+            normalized_length += mapped_length;
+            if (item && item->kind == CBLC_DATA_KIND_STRING
+                && raw_condition[condition_index] == '.'
+                && std::strncmp(raw_condition + condition_index, ".len",
+                    sizeof(".len") - 1) == 0)
+            {
+                if (normalized_length + std::strlen("-LEN") + 1 > condition_size)
+                    return (FT_FAILURE);
+                std::memcpy(condition + normalized_length, "-LEN", std::strlen("-LEN"));
+                normalized_length += std::strlen("-LEN");
+                condition_index += std::strlen(".len");
+            }
+            continue ;
+        }
+        if (normalized_length + 1 >= condition_size)
+            return (FT_FAILURE);
+        condition[normalized_length++] = raw_condition[condition_index++];
+    }
+    condition[normalized_length] = '\0';
+    return (FT_SUCCESS);
+}
+
+static int cblc_parse_generic_while(const char **cursor, t_cblc_translation_unit *unit,
+    t_cblc_function *function)
+{
+    const char *start;
+    char condition[TRANSPILE_STATEMENT_TEXT_MAX];
+
+    if (!cursor || !*cursor || !unit || !function)
+        return (FT_FAILURE);
+    start = *cursor;
+    if (!cblc_match_keyword(cursor, "while"))
+        return (FT_FAILURE);
+    if (cblc_parse_condition(cursor, unit, condition, sizeof(condition)) != FT_SUCCESS)
+        goto fail;
+    cblc_skip_whitespace(cursor);
+    if (**cursor != '{')
+        goto fail;
+    if (cblc_append_statement(function, CBLC_STATEMENT_WHILE_BEGIN,
+            NULL, condition, 0) != FT_SUCCESS)
+        goto fail;
+    cblc_exception_source_position(unit, start,
+        &function->statements[function->statement_count - 1].exception_source_line,
+        &function->statements[function->statement_count - 1].exception_source_column);
+    if (cblc_parse_statement_block(cursor, unit, function, 1) != FT_SUCCESS
+        || cblc_append_statement(function, CBLC_STATEMENT_WHILE_END, NULL, NULL, 0)
+            != FT_SUCCESS)
+        goto fail;
+    return (FT_SUCCESS);
+fail:
+    *cursor = start;
+    return (FT_FAILURE);
+}
+
+static int cblc_parse_generic_if(const char **cursor, t_cblc_translation_unit *unit,
+    t_cblc_function *function)
+{
+    const char *start;
+    char condition[TRANSPILE_STATEMENT_TEXT_MAX];
+
+    if (!cursor || !*cursor || !unit || !function)
+        return (FT_FAILURE);
+    start = *cursor;
+    if (!cblc_match_keyword(cursor, "if")
+        || cblc_parse_condition(cursor, unit, condition, sizeof(condition)) != FT_SUCCESS)
+        goto fail;
+    cblc_skip_whitespace(cursor);
+    if (**cursor != '{'
+        || cblc_append_statement(function, CBLC_STATEMENT_IF_BEGIN, NULL, condition, 0)
+            != FT_SUCCESS)
+        goto fail;
+    cblc_exception_source_position(unit, start,
+        &function->statements[function->statement_count - 1].exception_source_line,
+        &function->statements[function->statement_count - 1].exception_source_column);
+    if (cblc_parse_statement_block(cursor, unit, function, 1) != FT_SUCCESS)
+        goto fail;
+    cblc_skip_whitespace(cursor);
+    if (cblc_match_keyword(cursor, "else"))
+    {
+        cblc_skip_whitespace(cursor);
+        if (**cursor != '{'
+            || cblc_append_statement(function, CBLC_STATEMENT_IF_ELSE, NULL, NULL, 0)
+                != FT_SUCCESS
+            || cblc_parse_statement_block(cursor, unit, function, 1) != FT_SUCCESS)
+            goto fail;
+    }
+    if (cblc_append_statement(function, CBLC_STATEMENT_IF_END, NULL, NULL, 0)
+        != FT_SUCCESS)
+        goto fail;
+    return (FT_SUCCESS);
+fail:
+    *cursor = start;
+    return (FT_FAILURE);
+}
+
 static int cblc_parse_statement_block(const char **cursor, t_cblc_translation_unit *unit,
     t_cblc_function *function, int allow_return)
 {
@@ -156,6 +358,10 @@ static int cblc_parse_statement_block(const char **cursor, t_cblc_translation_un
                 return (FT_FAILURE);
             continue ;
         }
+        if (cblc_parse_try_statement(cursor, unit, function) == FT_SUCCESS)
+            continue ;
+        if (cblc_parse_throw_statement(cursor, unit, function) == FT_SUCCESS)
+            continue ;
         if (cblc_match_keyword(cursor, "return"))
         {
             (*cursor) -= std::strlen("return");
@@ -174,6 +380,10 @@ static int cblc_parse_statement_block(const char **cursor, t_cblc_translation_un
             continue ;
         }
         if (cblc_parse_file_read_while(cursor, unit, function) == FT_SUCCESS)
+            continue ;
+        if (cblc_parse_generic_while(cursor, unit, function) == FT_SUCCESS)
+            continue ;
+        if (cblc_parse_generic_if(cursor, unit, function) == FT_SUCCESS)
             continue ;
         if (cblc_parse_file_statement(cursor, unit, function) == FT_SUCCESS)
             continue ;
@@ -227,6 +437,40 @@ static int cblc_capture_lifecycle_body(const char **cursor, t_cblc_translation_u
         if (lifecycle_function.statements)
             cma_free(lifecycle_function.statements);
         return (FT_FAILURE);
+    }
+    {
+        size_t statement_index;
+
+        statement_index = 0;
+        while (statement_index < lifecycle_function.statement_count)
+        {
+            t_cblc_statement_type statement_type;
+
+            statement_type = lifecycle_function.statements[statement_index].type;
+            if (statement_type == CBLC_STATEMENT_THROW
+                || statement_type == CBLC_STATEMENT_TRY_BEGIN
+                || statement_type == CBLC_STATEMENT_CATCH_BEGIN
+                || statement_type == CBLC_STATEMENT_CATCH_END
+                || statement_type == CBLC_STATEMENT_TRY_END
+                || statement_type == CBLC_STATEMENT_CALL
+                || statement_type == CBLC_STATEMENT_CALL_ASSIGN
+                || statement_type == CBLC_STATEMENT_METHOD_CALL
+                || statement_type == CBLC_STATEMENT_METHOD_CALL_ASSIGN
+                || statement_type == CBLC_STATEMENT_FILE_OPEN
+                || statement_type == CBLC_STATEMENT_FILE_READ
+                || statement_type == CBLC_STATEMENT_FILE_WRITE
+                || statement_type == CBLC_STATEMENT_FILE_CLOSE)
+            {
+                unit->parse_error_code = TRANSPILE_ERROR_EXCEPTION_DESTRUCTOR_THROW;
+                std::snprintf(unit->parse_error_message,
+                    sizeof(unit->parse_error_message),
+                    "destructor for '%s' cannot contain throwing operations or exception handling",
+                    type->source_name);
+                cma_free(lifecycle_function.statements);
+                return (FT_FAILURE);
+            }
+            statement_index += 1;
+        }
     }
     *out_statements = lifecycle_function.statements;
     *out_count = lifecycle_function.statement_count;
@@ -344,6 +588,14 @@ static int cblc_parse_constructor_member_initializer(const char **cursor,
         return (FT_FAILURE);
     if (cblc_find_field_index(type, member_name, &field_index) != FT_SUCCESS)
         return (FT_FAILURE);
+    if (type->has_base_type)
+    {
+        const t_cblc_struct_type *base_type;
+
+        base_type = cblc_find_struct_type(unit, type->base_type_name);
+        if (base_type && field_index < base_type->field_count)
+            return (FT_FAILURE);
+    }
     if (seen_fields[field_index])
         return (FT_FAILURE);
     item = cblc_find_data_item(unit, member_name);
@@ -484,6 +736,9 @@ static int cblc_capture_constructor_body(const char **cursor, t_cblc_translation
     int *seen_fields;
     size_t saved_data_count;
     size_t index;
+    size_t base_field_count;
+    const t_cblc_struct_type *base_type;
+    const t_cblc_constructor *base_constructor;
     const t_cblc_struct_type *saved_access_type;
     int status;
 
@@ -522,6 +777,119 @@ static int cblc_capture_constructor_body(const char **cursor, t_cblc_translation
     g_cblc_constructor_parse_state.initialized_fields = seen_fields;
     g_cblc_constructor_parse_state.active = 1;
     g_cblc_member_access_type = type;
+    base_type = NULL;
+    base_constructor = NULL;
+    base_field_count = 0;
+    if (type->has_base_type)
+    {
+        base_type = cblc_find_struct_type(unit, type->base_type_name);
+        if (!base_type)
+        {
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        base_field_count = base_type->field_count;
+        base_constructor = cblc_find_constructor_for_arguments(unit, base_type,
+            NULL, 0);
+        if (base_type->constructor_count > 0
+            && (!base_constructor || !base_constructor->has_definition))
+        {
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        if (base_constructor)
+        {
+            size_t base_statement_index;
+
+            base_statement_index = 0;
+            while (base_statement_index < base_constructor->statement_count)
+            {
+                if (cblc_append_existing_statement(constructor_function,
+                        &base_constructor->statements[base_statement_index]) != FT_SUCCESS)
+                {
+                    status = FT_FAILURE;
+                    goto cleanup;
+                }
+                base_statement_index += 1;
+            }
+            index = 0;
+            while (index < base_field_count)
+            {
+                const t_cblc_data_item *base_field_item;
+
+                base_field_item = cblc_find_data_item(unit,
+                    base_type->fields[index].source_name);
+                if (!base_field_item)
+                {
+                    status = FT_FAILURE;
+                    goto cleanup;
+                }
+                if (base_field_item->kind == CBLC_DATA_KIND_STRING
+                    || base_field_item->kind == CBLC_DATA_KIND_STRUCT)
+                {
+                    if (constructor_function->local_destructor_count
+                        >= constructor_function->local_destructor_capacity
+                        && cblc_function_ensure_local_destructor_capacity(
+                            constructor_function,
+                            constructor_function->local_destructor_capacity == 0 ? 4
+                            : constructor_function->local_destructor_capacity * 2)
+                            != FT_SUCCESS)
+                    {
+                        status = FT_FAILURE;
+                        goto cleanup;
+                    }
+                    ft_strlcpy(constructor_function->local_destructor_targets[
+                            constructor_function->local_destructor_count],
+                        base_field_item->cobol_name, TRANSPILE_IDENTIFIER_MAX);
+                    constructor_function->local_destructor_count += 1;
+                }
+                index += 1;
+            }
+        }
+        else
+        {
+            index = 0;
+            while (index < base_field_count)
+            {
+                const t_cblc_data_item *base_field_item;
+
+                base_field_item = cblc_find_data_item(unit,
+                    base_type->fields[index].source_name);
+                if (!base_field_item)
+                {
+                    status = FT_FAILURE;
+                    goto cleanup;
+                }
+                if (base_field_item->kind == CBLC_DATA_KIND_STRING
+                    || base_field_item->kind == CBLC_DATA_KIND_STRUCT)
+                {
+                    if (cblc_append_statement(constructor_function,
+                            CBLC_STATEMENT_DEFAULT_CONSTRUCT,
+                            base_field_item->cobol_name, NULL, 0) != FT_SUCCESS)
+                    {
+                        status = FT_FAILURE;
+                        goto cleanup;
+                    }
+                    if (constructor_function->local_destructor_count
+                        >= constructor_function->local_destructor_capacity
+                        && cblc_function_ensure_local_destructor_capacity(
+                            constructor_function,
+                            constructor_function->local_destructor_capacity == 0 ? 4
+                            : constructor_function->local_destructor_capacity * 2)
+                            != FT_SUCCESS)
+                    {
+                        status = FT_FAILURE;
+                        goto cleanup;
+                    }
+                    ft_strlcpy(constructor_function->local_destructor_targets[
+                            constructor_function->local_destructor_count],
+                        base_field_item->cobol_name, TRANSPILE_IDENTIFIER_MAX);
+                    constructor_function->local_destructor_count += 1;
+                }
+                index += 1;
+            }
+        }
+    }
     cblc_skip_whitespace(cursor);
     if (**cursor == ':')
     {
@@ -544,7 +912,7 @@ static int cblc_capture_constructor_body(const char **cursor, t_cblc_translation
             break ;
         }
     }
-    index = 0;
+    index = base_field_count;
     while (index < type->field_count)
     {
         t_cblc_data_item *field_item;
@@ -571,20 +939,65 @@ static int cblc_capture_constructor_body(const char **cursor, t_cblc_translation
         statement_index = 0;
         while (statement_index < field_functions[index].statement_count)
         {
+            size_t appended_statement_index;
+
             if (cblc_append_existing_statement(constructor_function,
                     &field_functions[index].statements[statement_index]) != FT_SUCCESS)
             {
                 status = FT_FAILURE;
                 goto cleanup;
             }
+            appended_statement_index = constructor_function->statement_count - 1;
+            constructor_function->statements[appended_statement_index]
+                .exception_cleanup_count = 0;
+            if (constructor_function->local_destructor_count
+                < CBLC_EXCEPTION_CLEANUP_MAX)
+            {
+                size_t cleanup_index;
+
+                cleanup_index = constructor_function->local_destructor_count;
+                while (cleanup_index > 0
+                    && constructor_function->statements[appended_statement_index]
+                        .exception_cleanup_count < CBLC_EXCEPTION_CLEANUP_MAX)
+                {
+                    cleanup_index -= 1;
+                    ft_strlcpy(constructor_function->statements[appended_statement_index]
+                            .exception_cleanup_targets[constructor_function->statements[
+                                appended_statement_index].exception_cleanup_count],
+                        constructor_function->local_destructor_targets[cleanup_index],
+                        sizeof(constructor_function->statements[appended_statement_index]
+                            .exception_cleanup_targets[0]));
+                    constructor_function->statements[appended_statement_index]
+                        .exception_cleanup_count += 1;
+                }
+            }
             statement_index += 1;
+        }
+        if ((field_item->kind == CBLC_DATA_KIND_STRING
+                || field_item->kind == CBLC_DATA_KIND_STRUCT)
+            && constructor_function->local_destructor_count
+                < CBLC_EXCEPTION_CLEANUP_MAX)
+        {
+            if (constructor_function->local_destructor_count
+                >= constructor_function->local_destructor_capacity
+                && cblc_function_ensure_local_destructor_capacity(constructor_function,
+                    constructor_function->local_destructor_capacity == 0 ? 4
+                    : constructor_function->local_destructor_capacity * 2) != FT_SUCCESS)
+            {
+                status = FT_FAILURE;
+                goto cleanup;
+            }
+            ft_strlcpy(constructor_function->local_destructor_targets[
+                    constructor_function->local_destructor_count],
+                field_item->cobol_name, TRANSPILE_IDENTIFIER_MAX);
+            constructor_function->local_destructor_count += 1;
         }
         index += 1;
     }
     status = cblc_parse_statement_block(cursor, unit, constructor_function, 0);
     if (status != FT_SUCCESS)
         goto cleanup;
-    index = 0;
+    index = base_field_count;
     while (index < type->field_count)
     {
         if (type->fields[index].is_const && !seen_fields[index])
@@ -670,10 +1083,25 @@ static int cblc_inject_entry_lifecycle(t_cblc_translation_unit *unit)
     {
         const t_cblc_data_item *item;
         const t_cblc_struct_type *type;
+        size_t parameter_index;
+        int is_entry_parameter;
 
         item = &unit->data_items[index];
+        is_entry_parameter = 0;
+        parameter_index = 0;
+        while (parameter_index < function->parameter_count)
+        {
+            if (std::strncmp(item->cobol_name,
+                    function->parameters[parameter_index].cobol_name,
+                    sizeof(item->cobol_name)) == 0)
+            {
+                is_entry_parameter = 1;
+                break ;
+            }
+            parameter_index += 1;
+        }
         if (item->is_template_item || item->is_alias || item->is_function_local
-            || std::strchr(item->source_name, '.'))
+            || std::strchr(item->source_name, '.') || is_entry_parameter)
         {
             index += 1;
             continue ;

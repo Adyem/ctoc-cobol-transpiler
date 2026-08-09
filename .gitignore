@@ -5,6 +5,7 @@ ctoc_cobol_transpiler_debug
 imported_test_failures.log
 objs/
 objs_tests/
+src/standard_library/transpiler_standard_library_embedded.hpp
 *.o
 *.so
 *.exe

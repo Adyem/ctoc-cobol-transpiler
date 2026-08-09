@@ -400,7 +400,7 @@ FT_TEST(test_cblc_cli_split_class_multi_module_executes)
         goto cleanup;
     }
     command_length = std::snprintf(command, sizeof(command),
-        "cobc -x -free -o %s %s %s %s > %s 2>&1",
+        "cobc -x -Wno-dialect -o %s %s %s %s > %s 2>&1",
         binary_path, main_output_path, implementation_output_path, declaration_output_path,
         compile_log_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command))

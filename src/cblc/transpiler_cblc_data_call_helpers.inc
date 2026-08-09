@@ -409,6 +409,61 @@ static int cblc_append_statement(t_cblc_function *function, t_cblc_statement_typ
     statement->call_is_external = 0;
     statement->call_arguments[0] = '\0';
     statement->call_argument_count = 0;
+    statement->exception_region_id = 0;
+    statement->exception_type_id = 0;
+    statement->exception_type_name[0] = '\0';
+    statement->exception_is_catch_all = 0;
+    statement->exception_catch_is_reference = 0;
+    statement->exception_is_rethrow = 0;
+    statement->exception_from_catch = 0;
+    statement->exception_to_outer_region = 0;
+    statement->exception_payload_is_struct = 0;
+    statement->exception_payload_requires_copy = 0;
+    statement->exception_payload_is_string = 0;
+    statement->exception_payload_struct_type[0] = '\0';
+    statement->exception_payload_cobol_name[0] = '\0';
+    statement->exception_source_line = 0;
+    statement->exception_source_column = 0;
+    statement->exception_has_region = 0;
+    statement->exception_may_throw = 0;
+    statement->exception_cleanup_base = 0;
+    statement->exception_cleanup_count = 0;
+    std::memset(statement->exception_cleanup_targets, 0,
+        sizeof(statement->exception_cleanup_targets));
+    if (function->exception_in_catch)
+    {
+        statement->exception_region_id = function->exception_region_depth > 0
+            ? function->exception_region_stack[function->exception_region_depth - 1]
+            : function->active_catch_region_id;
+        statement->exception_cleanup_base = function->exception_region_depth > 0
+            ? function->exception_cleanup_base_stack[function->exception_region_depth - 1]
+            : function->active_catch_cleanup_base;
+        statement->exception_has_region = 1;
+        statement->exception_from_catch = 1;
+        statement->exception_to_outer_region = function->exception_region_depth > 0;
+    }
+    else if (function->exception_region_depth > 0)
+    {
+        statement->exception_region_id = function->exception_region_stack[
+            function->exception_region_depth - 1];
+        statement->exception_cleanup_base = function->exception_cleanup_base_stack[
+            function->exception_region_depth - 1];
+        statement->exception_has_region = 1;
+    }
+    while (function->local_destructor_count > statement->exception_cleanup_base
+        && statement->exception_cleanup_count < function->local_destructor_count
+            - statement->exception_cleanup_base
+        && statement->exception_cleanup_count < CBLC_EXCEPTION_CLEANUP_MAX)
+    {
+        size_t cleanup_index;
+
+        cleanup_index = function->local_destructor_count
+            - statement->exception_cleanup_count - 1;
+        ft_strlcpy(statement->exception_cleanup_targets[statement->exception_cleanup_count],
+            function->local_destructor_targets[cleanup_index],
+            sizeof(statement->exception_cleanup_targets[statement->exception_cleanup_count]));
+        statement->exception_cleanup_count += 1;
+    }
     if (target)
         ft_strlcpy(statement->target, target, sizeof(statement->target));
     if (source)
@@ -434,6 +489,32 @@ static int cblc_append_existing_statement(t_cblc_function *function,
     ft_strlcpy(appended->call_arguments, statement->call_arguments,
         sizeof(appended->call_arguments));
     appended->call_argument_count = statement->call_argument_count;
+    appended->exception_region_id = statement->exception_region_id;
+    appended->exception_type_id = statement->exception_type_id;
+    ft_strlcpy(appended->exception_type_name, statement->exception_type_name,
+        sizeof(appended->exception_type_name));
+    appended->exception_is_catch_all = statement->exception_is_catch_all;
+    appended->exception_catch_is_reference = statement->exception_catch_is_reference;
+    appended->exception_is_rethrow = statement->exception_is_rethrow;
+    appended->exception_from_catch = statement->exception_from_catch;
+    appended->exception_to_outer_region = statement->exception_to_outer_region;
+    appended->exception_payload_is_struct = statement->exception_payload_is_struct;
+    appended->exception_payload_requires_copy = statement->exception_payload_requires_copy;
+    appended->exception_payload_is_string = statement->exception_payload_is_string;
+    ft_strlcpy(appended->exception_payload_struct_type,
+        statement->exception_payload_struct_type,
+        sizeof(appended->exception_payload_struct_type));
+    ft_strlcpy(appended->exception_payload_cobol_name,
+        statement->exception_payload_cobol_name,
+        sizeof(appended->exception_payload_cobol_name));
+    appended->exception_source_line = statement->exception_source_line;
+    appended->exception_source_column = statement->exception_source_column;
+    appended->exception_has_region = statement->exception_has_region;
+    appended->exception_may_throw = statement->exception_may_throw;
+    appended->exception_cleanup_base = statement->exception_cleanup_base;
+    appended->exception_cleanup_count = statement->exception_cleanup_count;
+    std::memcpy(appended->exception_cleanup_targets, statement->exception_cleanup_targets,
+        sizeof(appended->exception_cleanup_targets));
     return (FT_SUCCESS);
 }
 

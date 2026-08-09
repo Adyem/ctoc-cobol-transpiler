@@ -1,0 +1,6 @@
+int F(string source)
+{
+    int result;
+    result = source.len;
+    return result;
+}

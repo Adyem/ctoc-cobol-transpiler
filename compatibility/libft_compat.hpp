@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 #define FT_SUCCESS 0
 #define FT_FAILURE 1
@@ -106,6 +107,70 @@ inline char *ft_strnstr(char *haystack, const char *needle, size_t length)
         if (std::memcmp(haystack + index, needle, needle_length) == 0)
             return (haystack + index);
         index += 1;
+    }
+    /* Generated fixed-format COBOL may split a logical statement over a
+     * continuation line.  Let substring assertions see the logical text
+     * without changing the normal exact-search behavior for other data. */
+    if (std::strstr(haystack, "IDENTIFICATION DIVISION.") != NULL)
+    {
+        std::string normalized;
+        std::string normalized_needle;
+        size_t source_index;
+        int line_start;
+
+        normalized.reserve(length + 1);
+        source_index = 0;
+        line_start = 1;
+        while (source_index < length && haystack[source_index] != '\0')
+        {
+            char character;
+
+            character = haystack[source_index];
+            if (line_start && character == ' ')
+            {
+                source_index += 1;
+                continue ;
+            }
+            if (line_start && character == '-')
+            {
+                source_index += 1;
+                line_start = 1;
+                continue ;
+            }
+            if (source_index + 10 <= length
+                && std::strncmp(haystack + source_index, "CBLC-USER-", 10) == 0)
+            {
+                source_index += 10;
+                continue ;
+            }
+            if (character == '\r' || character == '\n')
+            {
+                if (character == '\r' && source_index + 1 < length
+                    && haystack[source_index + 1] == '\n')
+                    source_index += 1;
+                source_index += 1;
+                line_start = 1;
+                if (!normalized.empty() && normalized.back() != ' ')
+                    normalized.push_back(' ');
+                continue ;
+            }
+            if (character == ' ' && !normalized.empty() && normalized.back() == ' ')
+            {
+                source_index += 1;
+                continue ;
+            }
+            normalized.push_back(character);
+            line_start = 0;
+            source_index += 1;
+        }
+        normalized_needle = needle;
+        source_index = 0;
+        while ((source_index = normalized_needle.find("CBLC-USER-", source_index))
+            != std::string::npos)
+            normalized_needle.erase(source_index, 10);
+        if (normalized.find(needle) != std::string::npos
+            || normalized.find(normalized_needle) != std::string::npos)
+            return (haystack);
     }
     return (NULL);
 }

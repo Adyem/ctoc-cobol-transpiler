@@ -1,0 +1,30 @@
+void F(double operand, int scale, double result, int status)
+{
+    int index;
+    status = 0;
+    if (scale < 0 || scale > 18)
+    {
+        status = 2;
+    }
+    else
+    {
+        result = operand;
+        index = 0;
+        while (index < scale)
+        {
+            result = result * 10;
+            index = index + 1;
+        }
+        result = std::floor(result);
+        index = 0;
+        while (index < scale)
+        {
+            result = result / 10;
+            index = index + 1;
+        }
+        if (operand != result)
+        {
+            status = 1;
+        }
+    }
+}

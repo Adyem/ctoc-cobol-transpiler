@@ -203,6 +203,189 @@ static int cblc_parse_numeric_expression(const char **cursor, t_cblc_translation
             break ;
         if (expect_operand)
         {
+            if (std::strncmp(*cursor, "std::", 5) == 0
+                && (std::strncmp(*cursor, "std::fabs", 9) == 0
+                    || std::strncmp(*cursor, "std::floor", 10) == 0
+                    || std::strncmp(*cursor, "std::ceil", 9) == 0
+                    || std::strncmp(*cursor, "std::exp", 8) == 0
+                    || std::strncmp(*cursor, "std::log", 8) == 0
+                    || std::strncmp(*cursor, "std::sin", 8) == 0
+                    || std::strncmp(*cursor, "std::cos", 8) == 0
+                    || std::strncmp(*cursor, "std::tan", 8) == 0
+                    || std::strncmp(*cursor, "std::sqrt", 9) == 0
+                    || std::strncmp(*cursor, "std::pow", 8) == 0
+                    || std::strncmp(*cursor, "std::ord", 8) == 0
+                    || std::strncmp(*cursor, "std::odd", 8) == 0
+                    || std::strncmp(*cursor, "std::date_serial", 16) == 0))
+            {
+                char intrinsic[TRANSPILE_IDENTIFIER_MAX];
+                char argument[TRANSPILE_IDENTIFIER_MAX];
+                char second_argument[TRANSPILE_IDENTIFIER_MAX];
+                char mapped[TRANSPILE_STATEMENT_TEXT_MAX];
+                const t_cblc_data_item *argument_item;
+                const char *cobol_name;
+
+                if (cblc_parse_identifier(cursor, intrinsic, sizeof(intrinsic)) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                cblc_skip_whitespace(cursor);
+                if (**cursor != '(')
+                    return (FT_FAILURE);
+                *cursor += 1;
+                cblc_skip_whitespace(cursor);
+                if (std::strcmp(intrinsic, "std::ord") == 0)
+                {
+                    if (**cursor == '\'')
+                    {
+                        char literal_value;
+
+                        if (cblc_parse_char_literal(cursor, &literal_value) != FT_SUCCESS)
+                            return (FT_FAILURE);
+                        cblc_skip_whitespace(cursor);
+                        if (**cursor != ')')
+                            return (FT_FAILURE);
+                        *cursor += 1;
+                        if (std::snprintf(mapped, sizeof(mapped), "FUNCTION ORD('%c')",
+                                literal_value) < 0
+                            || cblc_expression_append(buffer, buffer_size, mapped)
+                                != FT_SUCCESS)
+                            return (FT_FAILURE);
+                        expect_operand = 0;
+                        continue ;
+                    }
+                    t_cblc_data_item *ord_item;
+                    int ord_is_length;
+                    char ord_reference[TRANSPILE_STATEMENT_TEXT_MAX];
+                    char translated_ord_reference[TRANSPILE_STATEMENT_TEXT_MAX];
+                    char ord_base[TRANSPILE_IDENTIFIER_MAX];
+                    char ord_index[TRANSPILE_STATEMENT_TEXT_MAX];
+                    char *ord_open;
+                    char *ord_close;
+                    size_t ord_base_length;
+                    size_t ord_index_length;
+
+                    if (cblc_parse_data_reference_text(cursor, unit, &ord_item,
+                            &ord_is_length, ord_reference, sizeof(ord_reference)) != FT_SUCCESS
+                        || ord_is_length
+                        || (ord_item->kind != CBLC_DATA_KIND_CHAR
+                            && ord_item->kind != CBLC_DATA_KIND_CHAR_POINTER
+                            && ord_item->kind != CBLC_DATA_KIND_STRING))
+                        return (FT_FAILURE);
+                    cblc_skip_whitespace(cursor);
+                    if (**cursor != ')')
+                        return (FT_FAILURE);
+                    *cursor += 1;
+                    if (cblc_translate_expression_for_cobol(ord_reference,
+                            translated_ord_reference, sizeof(translated_ord_reference))
+                            != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    ord_open = std::strchr(translated_ord_reference, '(');
+                    ord_close = std::strrchr(translated_ord_reference, ')');
+                    if (!ord_open)
+                    {
+                        if (std::snprintf(mapped, sizeof(mapped), "FUNCTION ORD(%s)",
+                                translated_ord_reference) < 0
+                            || cblc_expression_append(buffer, buffer_size, mapped)
+                                != FT_SUCCESS)
+                            return (FT_FAILURE);
+                        expect_operand = 0;
+                        continue ;
+                    }
+                    if (!ord_open || !ord_close || ord_close <= ord_open
+                        || static_cast<size_t>(ord_open - translated_ord_reference)
+                            >= sizeof(ord_base)
+                        || static_cast<size_t>(ord_close - ord_open - 1)
+                            >= sizeof(ord_index))
+                        return (FT_FAILURE);
+                    ord_base_length = static_cast<size_t>(ord_open - translated_ord_reference);
+                    std::memcpy(ord_base, translated_ord_reference, ord_base_length);
+                    ord_base[ord_base_length] = '\0';
+                    if (ord_item->kind == CBLC_DATA_KIND_STRING)
+                        ft_strlcat(ord_base, "-BUF", sizeof(ord_base));
+                    ord_index_length = static_cast<size_t>(ord_close - ord_open - 1);
+                    std::memcpy(ord_index, ord_open + 1, ord_index_length);
+                    ord_index[ord_index_length] = '\0';
+                    if (std::snprintf(mapped, sizeof(mapped), "FUNCTION ORD(%s(%s:1))",
+                            ord_base, ord_index) < 0
+                        || cblc_expression_append(buffer, buffer_size, mapped) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    expect_operand = 0;
+                    continue ;
+                }
+                if (cblc_parse_identifier(cursor, argument, sizeof(argument)) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                argument_item = cblc_find_data_item(unit, argument);
+                if (!argument_item || (argument_item->kind != CBLC_DATA_KIND_INT
+                        && argument_item->kind != CBLC_DATA_KIND_DOUBLE))
+                    return (FT_FAILURE);
+                cobol_name = argument_item->cobol_name;
+                cblc_skip_whitespace(cursor);
+                if (std::strcmp(intrinsic, "std::pow") == 0)
+                {
+                    const t_cblc_data_item *second_item;
+
+                    if (**cursor != ',')
+                        return (FT_FAILURE);
+                    *cursor += 1;
+                    cblc_skip_whitespace(cursor);
+                    if (cblc_parse_identifier(cursor, second_argument,
+                            sizeof(second_argument)) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    second_item = cblc_find_data_item(unit, second_argument);
+                    if (!second_item || (second_item->kind != CBLC_DATA_KIND_INT
+                            && second_item->kind != CBLC_DATA_KIND_DOUBLE))
+                        return (FT_FAILURE);
+                    cblc_skip_whitespace(cursor);
+                    if (**cursor != ')')
+                        return (FT_FAILURE);
+                    *cursor += 1;
+                    if (std::snprintf(mapped, sizeof(mapped), "%s ** %s", cobol_name,
+                            second_item->cobol_name) < 0)
+                        return (FT_FAILURE);
+                    if (cblc_expression_append(buffer, buffer_size, mapped) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    expect_operand = 0;
+                    continue ;
+                }
+                if (**cursor != ')')
+                    return (FT_FAILURE);
+                *cursor += 1;
+                if (std::strcmp(intrinsic, "std::fabs") == 0)
+                    ft_strlcpy(mapped, "FUNCTION ABS(", sizeof(mapped));
+                else if (std::strcmp(intrinsic, "std::floor") == 0)
+                    ft_strlcpy(mapped, "FUNCTION INTEGER-PART(", sizeof(mapped));
+                else if (std::strcmp(intrinsic, "std::ceil") == 0)
+                    ft_strlcpy(mapped, "FUNCTION INTEGER-PART(", sizeof(mapped));
+                else if (std::strcmp(intrinsic, "std::date_serial") == 0)
+                    ft_strlcpy(mapped, "FUNCTION INTEGER-OF-DATE(", sizeof(mapped));
+                else if (std::strcmp(intrinsic, "std::odd") == 0)
+                {
+                    if (std::snprintf(mapped, sizeof(mapped), "FUNCTION MOD(%s, 2)",
+                            cobol_name) < 0)
+                        return (FT_FAILURE);
+                    if (cblc_expression_append(buffer, buffer_size, mapped) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    expect_operand = 0;
+                    continue ;
+                }
+                else
+                {
+                    const char *function_name;
+
+                    function_name = std::strcmp(intrinsic, "std::exp") == 0 ? "EXP"
+                        : (std::strcmp(intrinsic, "std::log") == 0 ? "LOG"
+                            : (std::strcmp(intrinsic, "std::sin") == 0 ? "SIN"
+                                : (std::strcmp(intrinsic, "std::cos") == 0 ? "COS"
+                                    : (std::strcmp(intrinsic, "std::tan") == 0 ? "TAN" : "SQRT"))));
+                    if (std::snprintf(mapped, sizeof(mapped), "FUNCTION %s(", function_name) < 0)
+                        return (FT_FAILURE);
+                }
+                ft_strlcat(mapped, cobol_name, sizeof(mapped));
+                ft_strlcat(mapped, ")", sizeof(mapped));
+                if (cblc_expression_append(buffer, buffer_size, mapped) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                expect_operand = 0;
+                continue ;
+            }
             if (std::strncmp(*cursor, "sizeof", std::strlen("sizeof")) == 0)
             {
                 char sizeof_buffer[32];
@@ -261,8 +444,9 @@ static int cblc_parse_numeric_expression(const char **cursor, t_cblc_translation
                 size_t length;
 
                 length = 0;
-                while ((*cursor)[length] >= '0' && (*cursor)[length] <= '9'
-                    && length + 1 < sizeof(number_token))
+                while (((((*cursor)[length] >= '0' && (*cursor)[length] <= '9')
+                    || (*cursor)[length] == '.')
+                    && length + 1 < sizeof(number_token)))
                 {
                     number_token[length] = (*cursor)[length];
                     length += 1;
@@ -306,8 +490,14 @@ static int cblc_parse_numeric_expression(const char **cursor, t_cblc_translation
                     continue ;
                 }
                 if (item->kind != CBLC_DATA_KIND_INT
+                    && item->kind != CBLC_DATA_KIND_DOUBLE
+                    && item->kind != CBLC_DATA_KIND_CHAR
                     && !(item->kind == CBLC_DATA_KIND_INT_POINTER
-                        && std::strchr(reference, '[')))
+                        && (std::strchr(reference, '[') || std::strchr(reference, '(')))
+                    && !(item->kind == CBLC_DATA_KIND_CHAR_POINTER
+                        && (std::strchr(reference, '[') || std::strchr(reference, '(')))
+                    && !(item->kind == CBLC_DATA_KIND_STRING
+                        && (std::strchr(reference, '[') || std::strchr(reference, '('))))
                     return (FT_FAILURE);
                 if (cblc_expression_append(buffer, buffer_size, reference) != FT_SUCCESS)
                     return (FT_FAILURE);
@@ -425,8 +615,9 @@ static int cblc_parse_numeric_expression_until_paren(const char **cursor,
                 size_t length;
 
                 length = 0;
-                while ((*cursor)[length] >= '0' && (*cursor)[length] <= '9'
-                    && length + 1 < sizeof(number_token))
+                while (((((*cursor)[length] >= '0' && (*cursor)[length] <= '9')
+                    || (*cursor)[length] == '.')
+                    && length + 1 < sizeof(number_token)))
                 {
                     number_token[length] = (*cursor)[length];
                     length += 1;
@@ -470,8 +661,14 @@ static int cblc_parse_numeric_expression_until_paren(const char **cursor,
                     continue ;
                 }
                 if (item->kind != CBLC_DATA_KIND_INT
+                    && item->kind != CBLC_DATA_KIND_DOUBLE
+                    && item->kind != CBLC_DATA_KIND_CHAR
                     && !(item->kind == CBLC_DATA_KIND_INT_POINTER
-                        && std::strchr(reference, '[')))
+                        && (std::strchr(reference, '[') || std::strchr(reference, '(')))
+                    && !(item->kind == CBLC_DATA_KIND_CHAR_POINTER
+                        && (std::strchr(reference, '[') || std::strchr(reference, '(')))
+                    && !(item->kind == CBLC_DATA_KIND_STRING
+                        && (std::strchr(reference, '[') || std::strchr(reference, '('))))
                     return (FT_FAILURE);
                 if (cblc_expression_append(buffer, buffer_size, reference) != FT_SUCCESS)
                     return (FT_FAILURE);

@@ -5,6 +5,7 @@ static void cobol_text_builder_init(t_cobol_text_builder *builder)
     builder->data = NULL;
     builder->length = 0;
     builder->capacity = 0;
+    builder->free_format = 0;
 }
 
 static void cobol_text_builder_dispose(t_cobol_text_builder *builder)
@@ -16,6 +17,7 @@ static void cobol_text_builder_dispose(t_cobol_text_builder *builder)
     builder->data = NULL;
     builder->length = 0;
     builder->capacity = 0;
+    builder->free_format = 0;
 }
 
 static int cobol_text_builder_reserve(t_cobol_text_builder *builder, size_t desired_capacity)
@@ -65,6 +67,56 @@ static int cobol_text_builder_append_string(t_cobol_text_builder *builder, const
 
 static int cobol_text_builder_append_line(t_cobol_text_builder *builder, const char *text)
 {
+    const char *to_clause;
+    const char *break_cursor;
+    size_t text_length;
+
+    if (!builder)
+        return (FT_FAILURE);
+    if (!text)
+        return (FT_SUCCESS);
+    text_length = std::strlen(text);
+    if (builder->free_format)
+    {
+        if (cobol_text_builder_append_string(builder, text) != FT_SUCCESS
+            || cobol_text_builder_append_string(builder, "\n") != FT_SUCCESS)
+            return (FT_FAILURE);
+        return (FT_SUCCESS);
+    }
+    to_clause = std::strstr(text, "TO ");
+    if (text_length > 72 && to_clause && to_clause > text)
+    {
+        if (cobol_text_builder_append_span(builder, text,
+                static_cast<size_t>(to_clause - text)) != FT_SUCCESS
+            || cobol_text_builder_append_string(builder, " \n") != FT_SUCCESS
+            || cobol_text_builder_append_string(builder, "      -    ") != FT_SUCCESS
+            || cobol_text_builder_append_string(builder, to_clause) != FT_SUCCESS
+            || cobol_text_builder_append_string(builder, "\n") != FT_SUCCESS)
+            return (FT_FAILURE);
+        return (FT_SUCCESS);
+    }
+    if (text_length > 72)
+    {
+        size_t break_limit;
+
+        break_limit = 65;
+        if (break_limit >= text_length)
+            break_limit = text_length - 1;
+        break_cursor = text + break_limit;
+        while (break_cursor > text + 11 && *break_cursor != ' ')
+            break_cursor -= 1;
+        if (break_cursor > text + 11 && *break_cursor == ' ')
+        {
+            if (cobol_text_builder_append_span(builder, text,
+                    static_cast<size_t>(break_cursor - text)) != FT_SUCCESS
+                || cobol_text_builder_append_string(builder, " \n") != FT_SUCCESS
+                || cobol_text_builder_append_string(builder, "      -    ") != FT_SUCCESS
+                || cobol_text_builder_append_string(builder, break_cursor + 1) != FT_SUCCESS
+                || cobol_text_builder_append_string(builder, "\n") != FT_SUCCESS)
+                return (FT_FAILURE);
+            return (FT_SUCCESS);
+        }
+    }
     if (cobol_text_builder_append_string(builder, text) != FT_SUCCESS)
         return (FT_FAILURE);
     if (cobol_text_builder_append_string(builder, "\n") != FT_SUCCESS)
@@ -138,6 +190,33 @@ static int cblc_parse_identifier(const char **cursor, char *buffer, size_t buffe
     return (FT_SUCCESS);
 }
 
+static int cblc_cobol_identifier_is_reserved(const char *identifier)
+{
+    static const char *reserved_words[] = {
+        "ACCEPT", "ADD", "ALLOCATE", "ALTER", "AND", "CALL", "CANCEL",
+        "CLOSE", "COMPUTE", "CONFIGURATION", "DATA", "DELETE", "DISPLAY",
+        "DIVIDE", "DIVISION", "ELSE", "END-IF", "END-PERFORM", "END-READ",
+        "END-WRITE", "ENVIRONMENT", "EVALUATE", "FD", "FILE", "FREE",
+        "GOBACK", "IF", "IN", "INSPECT", "INPUT-OUTPUT", "MOVE", "MULTIPLY",
+        "NOT", "NULL", "OF", "ON", "OPEN", "OR", "OUTPUT", "PERFORM", "PIC",
+        "PROCEDURE", "PROGRAM-ID", "READ", "RECORD", "REDEFINES", "RETURNING",
+        "SECTION", "SET", "STOP", "STRING", "SUBTRACT", "THEN", "TO", "UNTIL",
+        "USING", "VALUE", "WHEN", "WRITE", "WORKING-STORAGE"
+    };
+    size_t index;
+
+    if (!identifier || identifier[0] == '\0')
+        return (0);
+    index = 0;
+    while (index < sizeof(reserved_words) / sizeof(reserved_words[0]))
+    {
+        if (std::strcmp(identifier, reserved_words[index]) == 0)
+            return (1);
+        index += 1;
+    }
+    return (0);
+}
+
 static void cblc_identifier_to_cobol(const char *identifier, char *buffer, size_t buffer_size)
 {
     size_t index;
@@ -158,6 +237,13 @@ static void cblc_identifier_to_cobol(const char *identifier, char *buffer, size_
         index += 1;
     }
     buffer[index] = '\0';
+    if (cblc_cobol_identifier_is_reserved(buffer))
+    {
+        char safe_buffer[TRANSPILE_IDENTIFIER_MAX];
+
+        if (std::snprintf(safe_buffer, sizeof(safe_buffer), "CBLC-USER-%s", buffer) >= 0)
+            ft_strlcpy(buffer, safe_buffer, buffer_size);
+    }
 }
 
 static void cblc_build_string_component_name(const char *base, const char *suffix, char *buffer,
@@ -179,7 +265,12 @@ static int cblc_string_item_uses_dynamic_storage(const t_cblc_data_item *item)
 {
     if (!item || item->kind != CBLC_DATA_KIND_STRING)
         return (0);
+    if (cblc_native_standard_library_expression_mode_enabled())
+        return (0);
     if (item->is_const || item->array_count > 0 || item->is_alias)
+        return (0);
+    if (cblc_native_standard_library_expression_mode_enabled()
+        && !item->is_function_local && item->owner_function_name[0] != '\0')
         return (0);
     if (std::strstr(item->source_name, "->"))
         return (0);

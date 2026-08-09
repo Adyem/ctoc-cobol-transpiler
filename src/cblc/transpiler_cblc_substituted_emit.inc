@@ -472,10 +472,12 @@ static int cblc_emit_substituted_statement(const t_cblc_translation_unit *unit,
         return (FT_SUCCESS);
     if (substituted.type == CBLC_STATEMENT_DEFAULT_CONSTRUCT
         || substituted.type == CBLC_STATEMENT_DESTRUCT)
-        return (cblc_emit_lifecycle_statement(unit, &substituted, builder));
+        return (cblc_emit_lifecycle_statement(unit, &substituted, builder,
+            NULL, static_cast<size_t>(-1)));
     if (substituted.type == CBLC_STATEMENT_METHOD_CALL
         || substituted.type == CBLC_STATEMENT_METHOD_CALL_ASSIGN)
-        return (cblc_emit_method_statement(unit, &substituted, builder));
+        return (cblc_emit_method_statement(unit, &substituted, builder, NULL,
+            static_cast<size_t>(-1)));
     (void)function;
     return (FT_FAILURE);
 }

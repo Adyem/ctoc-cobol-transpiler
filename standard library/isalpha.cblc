@@ -1,0 +1,12 @@
+void F(char current_char, int result)
+{
+    result = 0;
+    if (current_char >= 'A' && current_char <= 'Z')
+    {
+        result = 1;
+    }
+    if (current_char >= 'a' && current_char <= 'z')
+    {
+        result = 1;
+    }
+}

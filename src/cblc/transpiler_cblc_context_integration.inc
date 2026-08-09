@@ -43,6 +43,74 @@ static int cblc_context_module_imports_module(const t_transpiler_context *contex
     return (0);
 }
 
+static int cblc_validate_exception_abi(const t_transpiler_context *context,
+    const char *requesting_module, const char *provider_module, const char *symbol_name,
+    size_t abi_version, int required)
+{
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+    if (!context || !requesting_module || !provider_module || !symbol_name)
+        return (FT_FAILURE);
+    if (abi_version == CBLC_EXCEPTION_ABI_VERSION
+        || (!required && abi_version == 0))
+        return (FT_SUCCESS);
+    if (std::snprintf(message, sizeof(message),
+            "exception ABI mismatch for '%s' imported by module '%s' from module '%s' (version %zu, expected %d)",
+            symbol_name, requesting_module, provider_module, abi_version,
+            CBLC_EXCEPTION_ABI_VERSION) < 0)
+        return (FT_FAILURE);
+    transpiler_diagnostics_push(&const_cast<t_transpiler_context *>(context)->diagnostics,
+        TRANSPILE_SEVERITY_ERROR, TRANSPILE_ERROR_EXCEPTION_ABI_MISMATCH, message);
+    transpiler_context_record_error(const_cast<t_transpiler_context *>(context),
+        TRANSPILE_ERROR_EXCEPTION_ABI_MISMATCH);
+    return (FT_FAILURE);
+}
+
+static int cblc_validate_exception_policy(const t_transpiler_context *context,
+    const char *requesting_module, const char *provider_module, const char *symbol_name,
+    unsigned long long policy_fingerprint, int required)
+{
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+    if (!context || !requesting_module || !provider_module || !symbol_name)
+        return (FT_FAILURE);
+    if (policy_fingerprint == CBLC_EXCEPTION_RUNTIME_POLICY_FINGERPRINT
+        || (!required && policy_fingerprint == 0))
+        return (FT_SUCCESS);
+    if (std::snprintf(message, sizeof(message),
+            "exception runtime policy mismatch for '%s' imported by module '%s' from module '%s' (fingerprint %llu, expected %llu)",
+            symbol_name, requesting_module, provider_module,
+            policy_fingerprint, CBLC_EXCEPTION_RUNTIME_POLICY_FINGERPRINT) < 0)
+        return (FT_FAILURE);
+    transpiler_diagnostics_push(&const_cast<t_transpiler_context *>(context)->diagnostics,
+        TRANSPILE_SEVERITY_ERROR, TRANSPILE_ERROR_EXCEPTION_POLICY_MISMATCH, message);
+    transpiler_context_record_error(const_cast<t_transpiler_context *>(context),
+        TRANSPILE_ERROR_EXCEPTION_POLICY_MISMATCH);
+    return (FT_FAILURE);
+}
+
+static int cblc_validate_exception_payload_size(const t_transpiler_context *context,
+    const char *requesting_module, const char *provider_module,
+    const char *type_name, size_t payload_size)
+{
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+    if (!context || !requesting_module || !provider_module || !type_name)
+        return (FT_FAILURE);
+    if (payload_size <= CBLC_EXCEPTION_PAYLOAD_MAX)
+        return (FT_SUCCESS);
+    if (std::snprintf(message, sizeof(message),
+            "exception payload metadata for '%s' imported by module '%s' from module '%s' requires size %zu, exceeding the configured limit %d",
+            type_name, requesting_module, provider_module, payload_size,
+            CBLC_EXCEPTION_PAYLOAD_MAX) < 0)
+        return (FT_FAILURE);
+    transpiler_diagnostics_push(&const_cast<t_transpiler_context *>(context)->diagnostics,
+        TRANSPILE_SEVERITY_ERROR, TRANSPILE_ERROR_EXCEPTION_PAYLOAD_OVERFLOW, message);
+    transpiler_context_record_error(const_cast<t_transpiler_context *>(context),
+        TRANSPILE_ERROR_EXCEPTION_PAYLOAD_OVERFLOW);
+    return (FT_FAILURE);
+}
+
 int cblc_import_translation_unit_type_stubs(t_transpiler_context *context, const char *module_name,
     t_cblc_translation_unit *unit)
 {
@@ -62,6 +130,23 @@ int cblc_import_translation_unit_type_stubs(t_transpiler_context *context, const
             && types[index].visibility == TRANSPILE_SYMBOL_PUBLIC
             && cblc_context_module_imports_module(context, module_name, types[index].module))
         {
+            if (!types[index].is_template
+                && (types[index].exception_abi_version != 0
+                || types[index].exception_policy_fingerprint != 0
+                || types[index].exception_payload_size != 0))
+            {
+                if (cblc_validate_exception_abi(context, module_name, types[index].module,
+                        types[index].name, types[index].exception_abi_version, 1) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                if (cblc_validate_exception_policy(context, module_name, types[index].module,
+                        types[index].name, types[index].exception_policy_fingerprint, 1)
+                    != FT_SUCCESS)
+                    return (FT_FAILURE);
+                if (cblc_validate_exception_payload_size(context, module_name,
+                        types[index].module, types[index].name,
+                        types[index].exception_payload_size) != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
             if (cblc_register_imported_type_stub(unit, &types[index]) != FT_SUCCESS)
                 return (FT_FAILURE);
         }
@@ -110,6 +195,14 @@ int cblc_import_translation_unit_function_stubs(t_transpiler_context *context,
             index += 1;
             continue ;
         }
+        if (signature->may_throw
+            && cblc_validate_exception_abi(context, module_name, signature->module,
+                signature->name, signature->exception_abi_version, 1) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (signature->may_throw
+            && cblc_validate_exception_policy(context, module_name, signature->module,
+                signature->name, signature->exception_policy_fingerprint, 1) != FT_SUCCESS)
+            return (FT_FAILURE);
         existing = cblc_find_function_in_unit(unit, signature->name);
         if (existing)
         {
@@ -133,6 +226,11 @@ int cblc_import_translation_unit_function_stubs(t_transpiler_context *context,
         ft_strlcpy(function->return_source_name, signature->return_source_name,
             sizeof(function->return_source_name));
         function->saw_return = signature->saw_return;
+        function->may_throw = signature->may_throw;
+        function->exception_type_count = signature->exception_type_count;
+        std::memcpy(function->exception_type_ids, signature->exception_type_ids,
+            sizeof(function->exception_type_ids));
+        function->exception_types_unknown = signature->exception_types_unknown;
         function->parameter_count = signature->parameter_count;
         function->is_template = 1;
         function->template_parameter_count = signature->template_parameter_count;
@@ -187,6 +285,126 @@ int cblc_import_translation_unit_function_stubs(t_transpiler_context *context,
     return (FT_SUCCESS);
 }
 
+static void cblc_merge_member_exception_summary(const t_cblc_translation_unit *unit,
+    const t_cblc_statement *statement, t_cblc_function *function)
+{
+    const t_cblc_data_item *receiver;
+    const t_cblc_struct_type *type;
+    t_cblc_function summary;
+
+    if (!unit || !statement || !function)
+        return ;
+    std::memset(&summary, 0, sizeof(summary));
+    if (statement->type == CBLC_STATEMENT_METHOD_CALL
+        || statement->type == CBLC_STATEMENT_METHOD_CALL_ASSIGN)
+    {
+        const t_cblc_method *method;
+        const char *receiver_name;
+
+        receiver_name = statement->type == CBLC_STATEMENT_METHOD_CALL
+            ? statement->target : statement->source;
+        receiver = cblc_find_data_item_by_cobol(unit, receiver_name);
+        type = receiver ? cblc_find_receiver_type(unit, receiver) : NULL;
+        method = type ? cblc_find_method_on_type(type, statement->call_identifier) : NULL;
+        if (!method)
+            return ;
+        summary.exception_type_count = method->exception_type_count;
+        std::memcpy(summary.exception_type_ids, method->exception_type_ids,
+            sizeof(summary.exception_type_ids));
+        summary.exception_types_unknown = method->exception_types_unknown;
+        if (method->statements)
+            cblc_collect_statement_exception_summary(method->statements,
+                method->statement_count, &summary);
+        cblc_function_merge_exception_summary(function, summary.exception_type_count,
+            summary.exception_type_ids, summary.exception_types_unknown);
+    }
+    else if (statement->type == CBLC_STATEMENT_DEFAULT_CONSTRUCT)
+    {
+        const t_cblc_constructor *constructor;
+
+        receiver = cblc_find_data_item_by_cobol(unit, statement->target);
+        if (!receiver || receiver->kind != CBLC_DATA_KIND_STRUCT)
+            return ;
+        type = cblc_find_struct_type(unit, receiver->struct_type_name);
+        constructor = type ? cblc_find_constructor_for_arguments(unit, type,
+            statement->call_arguments, statement->call_argument_count) : NULL;
+        if (!constructor)
+            return ;
+        summary.exception_type_count = constructor->exception_type_count;
+        std::memcpy(summary.exception_type_ids, constructor->exception_type_ids,
+            sizeof(summary.exception_type_ids));
+        summary.exception_types_unknown = constructor->exception_types_unknown;
+        if (constructor->statements)
+            cblc_collect_statement_exception_summary(constructor->statements,
+                constructor->statement_count, &summary);
+        cblc_function_merge_exception_summary(function, summary.exception_type_count,
+            summary.exception_type_ids, summary.exception_types_unknown);
+    }
+}
+
+static int cblc_propagate_local_exception_summaries(t_cblc_translation_unit *unit)
+{
+    size_t pass;
+    int changed;
+
+    if (!unit)
+        return (FT_FAILURE);
+    pass = 0;
+    do
+    {
+        changed = 0;
+        size_t function_index = 0;
+        while (function_index < unit->function_count)
+        {
+            t_cblc_function *function;
+            size_t statement_index;
+
+            function = &unit->functions[function_index];
+            statement_index = 0;
+            while (statement_index < function->statement_count)
+            {
+                t_cblc_statement *statement;
+                const t_cblc_function *target;
+                size_t old_count;
+                int old_unknown;
+
+                statement = &function->statements[statement_index];
+                old_count = function->exception_type_count;
+                old_unknown = function->exception_types_unknown;
+                cblc_merge_member_exception_summary(unit, statement, function);
+                if (old_count != function->exception_type_count
+                    || old_unknown != function->exception_types_unknown)
+                    changed = 1;
+                if ((statement->type != CBLC_STATEMENT_CALL
+                        && statement->type != CBLC_STATEMENT_CALL_ASSIGN)
+                    || statement->call_is_external)
+                {
+                    statement_index += 1;
+                    continue ;
+                }
+                target = cblc_find_function_in_unit(unit, statement->call_identifier);
+                if (!target)
+                {
+                    statement_index += 1;
+                    continue ;
+                }
+                old_count = function->exception_type_count;
+                old_unknown = function->exception_types_unknown;
+                cblc_function_merge_exception_summary(function,
+                    target->exception_type_count, target->exception_type_ids,
+                    target->exception_types_unknown);
+                if (old_count != function->exception_type_count
+                    || old_unknown != function->exception_types_unknown)
+                    changed = 1;
+                statement_index += 1;
+            }
+            function_index += 1;
+        }
+        pass += 1;
+    } while (changed && pass <= unit->function_count + CBLC_EXCEPTION_THROW_SET_MAX);
+    return (FT_SUCCESS);
+}
+
 int cblc_resolve_translation_unit_calls(t_transpiler_context *context, const char *module_name,
     t_cblc_translation_unit *unit)
 {
@@ -218,6 +436,8 @@ int cblc_resolve_translation_unit_calls(t_transpiler_context *context, const cha
                     || std::strncmp(statement->call_identifier, "std::realloc",
                         sizeof(statement->call_identifier)) == 0
                     || std::strncmp(statement->call_identifier, "std::free",
+                        sizeof(statement->call_identifier)) == 0
+                    || std::strncmp(statement->call_identifier, "std::odd",
                         sizeof(statement->call_identifier)) == 0)
                 {
                     statement->call_is_external = 0;
@@ -282,6 +502,12 @@ int cblc_resolve_translation_unit_calls(t_transpiler_context *context, const cha
                         }
                         argument_index += 1;
                     }
+                    statement->exception_may_throw = local_target->may_throw
+                        || cblc_function_may_throw(unit, local_target, 0);
+                    cblc_function_merge_exception_summary(function,
+                        local_target->exception_type_count,
+                        local_target->exception_type_ids,
+                        local_target->exception_types_unknown);
                     statement->call_is_external = 0;
                 }
                 else
@@ -316,6 +542,22 @@ int cblc_resolve_translation_unit_calls(t_transpiler_context *context, const cha
                     if (!transpiler_context_resolve_function_access(context, module_name,
                             signature->module, signature->name))
                         return (FT_FAILURE);
+                    if (signature->may_throw
+                        && cblc_validate_exception_abi(context, module_name,
+                            signature->module, signature->name,
+                            signature->exception_abi_version, 1) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    if (signature->may_throw
+                        && cblc_validate_exception_policy(context, module_name,
+                            signature->module, signature->name,
+                            signature->exception_policy_fingerprint, 1) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    statement->exception_may_throw = signature->may_throw;
+                    cblc_function_merge_exception_summary(function,
+                        signature->exception_type_count,
+                        signature->exception_type_ids,
+                        signature->exception_types_unknown
+                        || (signature->may_throw && signature->exception_type_count == 0));
                     if (signature->parameter_count != statement->call_argument_count)
                     {
                         char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
@@ -383,6 +625,8 @@ int cblc_resolve_translation_unit_calls(t_transpiler_context *context, const cha
         }
         function_index += 1;
     }
+    if (cblc_propagate_local_exception_summaries(unit) != FT_SUCCESS)
+        return (FT_FAILURE);
     return (FT_SUCCESS);
 }
 
@@ -467,6 +711,11 @@ static int cblc_export_type_methods(t_transpiler_type_signature *signature,
     index = 0;
     while (index < type->method_count)
     {
+        t_cblc_function summary;
+
+        std::memset(&summary, 0, sizeof(summary));
+        cblc_collect_statement_exception_summary(type->methods[index].statements,
+            type->methods[index].statement_count, &summary);
         ft_strlcpy(signature->methods[index].name, type->methods[index].source_name,
             sizeof(signature->methods[index].name));
         signature->methods[index].return_kind = static_cast<int>(type->methods[index].return_kind);
@@ -501,6 +750,10 @@ static int cblc_export_type_methods(t_transpiler_type_signature *signature,
         }
         signature->methods[index].parameter_count = type->methods[index].parameter_count;
         signature->methods[index].has_definition = type->methods[index].has_definition;
+        signature->methods[index].exception_type_count = summary.exception_type_count;
+        std::memcpy(signature->methods[index].exception_type_ids,
+            summary.exception_type_ids, sizeof(summary.exception_type_ids));
+        signature->methods[index].exception_types_unknown = summary.exception_types_unknown;
         if (type->methods[index].statement_count > 0 && type->methods[index].statements)
         {
             signature->methods[index].statements = static_cast<t_cblc_statement *>(cma_calloc(
@@ -537,6 +790,11 @@ static int cblc_export_type_constructors(t_transpiler_type_signature *signature,
     index = 0;
     while (index < type->constructor_count)
     {
+        t_cblc_function summary;
+
+        std::memset(&summary, 0, sizeof(summary));
+        cblc_collect_statement_exception_summary(type->constructors[index].statements,
+            type->constructors[index].statement_count, &summary);
         parameter_index = 0;
         while (parameter_index < type->constructors[index].parameter_count
             && parameter_index < TRANSPILE_FUNCTION_PARAMETER_MAX)
@@ -565,6 +823,10 @@ static int cblc_export_type_constructors(t_transpiler_type_signature *signature,
             type->constructors[index].parameter_count;
         signature->constructors[index].has_definition =
             type->constructors[index].has_definition;
+        signature->constructors[index].exception_type_count = summary.exception_type_count;
+        std::memcpy(signature->constructors[index].exception_type_ids,
+            summary.exception_type_ids, sizeof(summary.exception_type_ids));
+        signature->constructors[index].exception_types_unknown = summary.exception_types_unknown;
         if (type->constructors[index].statement_count > 0
             && type->constructors[index].statements)
         {
@@ -650,7 +912,7 @@ static int cblc_type_has_exportable_definitions(const t_cblc_struct_type *type)
 }
 
 int cblc_register_translation_unit_exports(t_transpiler_context *context, const char *module_name,
-    const t_cblc_translation_unit *unit)
+    t_cblc_translation_unit *unit)
 {
     size_t entry_index;
     size_t index;
@@ -659,6 +921,8 @@ int cblc_register_translation_unit_exports(t_transpiler_context *context, const 
     if (!context || !module_name || !unit)
         return (FT_FAILURE);
     if (module_name[0] == '\0')
+        return (FT_FAILURE);
+    if (cblc_propagate_local_exception_summaries(unit) != FT_SUCCESS)
         return (FT_FAILURE);
     index = 0;
     while (index < unit->struct_type_count)
@@ -672,6 +936,17 @@ int cblc_register_translation_unit_exports(t_transpiler_context *context, const 
             std::memset(&signature, 0, sizeof(signature));
             ft_strlcpy(signature.name, unit->struct_types[index].source_name,
                 sizeof(signature.name));
+            signature.has_base_type = unit->struct_types[index].has_base_type;
+            signature.base_is_public = unit->struct_types[index].base_is_public;
+            signature.exception_abi_version = CBLC_EXCEPTION_ABI_VERSION;
+            signature.exception_policy_fingerprint =
+                CBLC_EXCEPTION_RUNTIME_POLICY_FINGERPRINT;
+            signature.exception_type_id = cblc_exception_type_id(
+                unit->struct_types[index].source_name);
+            signature.exception_payload_size = cblc_exception_payload_size(
+                unit, &unit->struct_types[index], 0);
+            ft_strlcpy(signature.base_type_name, unit->struct_types[index].base_type_name,
+                sizeof(signature.base_type_name));
             signature.kind = TRANSPILE_TYPE_STRUCT;
             if (unit->struct_types[index].is_class)
                 signature.kind = TRANSPILE_TYPE_CLASS;
@@ -792,6 +1067,38 @@ int cblc_register_translation_unit_exports(t_transpiler_context *context, const 
             ft_strlcpy(signature.return_source_name, unit->functions[index].return_source_name,
                 sizeof(signature.return_source_name));
             signature.saw_return = unit->functions[index].saw_return;
+            signature.may_throw = cblc_function_may_throw(unit,
+                &unit->functions[index], 0);
+            signature.exception_abi_version = CBLC_EXCEPTION_ABI_VERSION;
+            signature.exception_policy_fingerprint =
+                CBLC_EXCEPTION_RUNTIME_POLICY_FINGERPRINT;
+            signature.exception_type_count = unit->functions[index].exception_type_count;
+            std::memcpy(signature.exception_type_ids,
+                unit->functions[index].exception_type_ids,
+                sizeof(signature.exception_type_ids));
+            signature.exception_types_unknown = unit->functions[index].exception_types_unknown
+                || (signature.may_throw && signature.exception_type_count == 0);
+            size_t summary_statement_index = 0;
+            while (summary_statement_index < unit->functions[index].statement_count)
+            {
+                const t_cblc_statement *summary_statement;
+
+                summary_statement = &unit->functions[index].statements[summary_statement_index];
+                if (summary_statement->exception_is_rethrow
+                    || summary_statement->type == CBLC_STATEMENT_FILE_OPEN
+                    || summary_statement->type == CBLC_STATEMENT_FILE_CLOSE
+                    || summary_statement->type == CBLC_STATEMENT_FILE_READ
+                    || summary_statement->type == CBLC_STATEMENT_FILE_WRITE
+                    || ((summary_statement->type == CBLC_STATEMENT_CALL
+                        || summary_statement->type == CBLC_STATEMENT_CALL_ASSIGN)
+                        && summary_statement->exception_may_throw
+                        && summary_statement->call_is_external))
+                {
+                    signature.exception_types_unknown = 1;
+                    break ;
+                }
+                summary_statement_index += 1;
+            }
             signature.visibility = TRANSPILE_SYMBOL_PUBLIC;
             signature.is_template = unit->functions[index].is_template;
             signature.template_parameter_count =

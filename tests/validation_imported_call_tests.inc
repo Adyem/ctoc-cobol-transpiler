@@ -47,6 +47,295 @@ static int cblc_test_expect_last_diagnostic_code(const t_transpiler_context *con
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_cblc_resolve_translation_unit_calls_rejects_exception_abi_mismatch)
+{
+    const char *main_source;
+    const char *worker_source;
+    const t_transpiler_function_signature *functions;
+    t_cblc_translation_unit main_unit;
+    t_cblc_translation_unit worker_unit;
+    t_transpiler_context context;
+    size_t function_count;
+    size_t index;
+    int context_initialized;
+    int status;
+
+    main_source = "import \"worker_mod\";\n"
+        "void main() { worker(); }\n";
+    worker_source = "void worker() { throw 7; }\n";
+    cblc_translation_unit_init(&main_unit);
+    cblc_translation_unit_init(&worker_unit);
+    context_initialized = 0;
+    status = FT_FAILURE;
+    if (cblc_test_prepare_imported_worker_context(main_source, worker_source, &main_unit,
+            &worker_unit, &context, &context_initialized, 1) != FT_SUCCESS)
+        goto cleanup;
+    functions = transpiler_context_get_functions(&context, &function_count);
+    index = 0;
+    while (index < function_count)
+    {
+        if (std::strcmp(functions[index].name, "worker") == 0
+            && std::strcmp(functions[index].module, "worker_mod") == 0)
+        {
+            t_transpiler_function_signature *mutable_signature;
+
+            mutable_signature = const_cast<t_transpiler_function_signature *>(
+                &functions[index]);
+            mutable_signature->exception_abi_version = CBLC_EXCEPTION_ABI_VERSION + 1;
+            break ;
+        }
+        index += 1;
+    }
+    if (cblc_resolve_translation_unit_calls(&context, "main_mod", &main_unit)
+        != FT_FAILURE)
+    {
+        std::printf("Assertion failed: incompatible throwing exception ABI should be rejected\n");
+        goto cleanup;
+    }
+    if (cblc_test_expect_last_diagnostic_code(&context,
+            TRANSPILE_ERROR_EXCEPTION_ABI_MISMATCH,
+            "exception ABI mismatch should record a dedicated diagnostic") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&main_unit);
+    cblc_translation_unit_dispose(&worker_unit);
+    if (context_initialized)
+        transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_cblc_resolve_translation_unit_calls_rejects_exception_policy_mismatch)
+{
+    const char *main_source;
+    const char *worker_source;
+    const t_transpiler_function_signature *functions;
+    t_cblc_translation_unit main_unit;
+    t_cblc_translation_unit worker_unit;
+    t_transpiler_context context;
+    size_t function_count;
+    size_t index;
+    int context_initialized;
+    int status;
+
+    main_source = "import \"worker_mod\";\n"
+        "void main() { worker(); }\n";
+    worker_source = "void worker() { throw 7; }\n";
+    cblc_translation_unit_init(&main_unit);
+    cblc_translation_unit_init(&worker_unit);
+    context_initialized = 0;
+    status = FT_FAILURE;
+    if (cblc_test_prepare_imported_worker_context(main_source, worker_source, &main_unit,
+            &worker_unit, &context, &context_initialized, 1) != FT_SUCCESS)
+        goto cleanup;
+    functions = transpiler_context_get_functions(&context, &function_count);
+    index = 0;
+    while (index < function_count)
+    {
+        if (std::strcmp(functions[index].name, "worker") == 0
+            && std::strcmp(functions[index].module, "worker_mod") == 0)
+        {
+            t_transpiler_function_signature *mutable_signature;
+
+            mutable_signature = const_cast<t_transpiler_function_signature *>(
+                &functions[index]);
+            mutable_signature->exception_policy_fingerprint = 0;
+            break ;
+        }
+        index += 1;
+    }
+    if (cblc_resolve_translation_unit_calls(&context, "main_mod", &main_unit)
+        != FT_FAILURE)
+    {
+        std::printf("Assertion failed: incompatible exception runtime policy should be rejected\n");
+        goto cleanup;
+    }
+    if (cblc_test_expect_last_diagnostic_code(&context,
+            TRANSPILE_ERROR_EXCEPTION_POLICY_MISMATCH,
+            "exception runtime policy mismatch should record a dedicated diagnostic")
+        != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&main_unit);
+    cblc_translation_unit_dispose(&worker_unit);
+    if (context_initialized)
+        transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_cblc_import_translation_unit_types_rejects_exception_abi_mismatch)
+{
+    const char *main_source;
+    const char *worker_source;
+    const t_transpiler_type_signature *types;
+    t_cblc_translation_unit main_unit;
+    t_cblc_translation_unit worker_unit;
+    t_transpiler_context context;
+    size_t type_count;
+    size_t index;
+    int context_initialized;
+    int status;
+
+    main_source = "import \"worker_mod\";\nvoid main() { }\n";
+    worker_source = "class Error { public: int code; };\n"
+        "void worker() { return; }\n";
+    cblc_translation_unit_init(&main_unit);
+    cblc_translation_unit_init(&worker_unit);
+    context_initialized = 0;
+    status = FT_FAILURE;
+    if (cblc_test_prepare_imported_worker_context(main_source, worker_source, &main_unit,
+            &worker_unit, &context, &context_initialized, 1) != FT_SUCCESS)
+        goto cleanup;
+    types = transpiler_context_get_types(&context, &type_count);
+    index = 0;
+    while (index < type_count)
+    {
+        if (std::strcmp(types[index].name, "Error") == 0
+            && std::strcmp(types[index].module, "worker_mod") == 0)
+        {
+            t_transpiler_type_signature *mutable_signature;
+
+            mutable_signature = const_cast<t_transpiler_type_signature *>(&types[index]);
+            mutable_signature->exception_abi_version = CBLC_EXCEPTION_ABI_VERSION + 1;
+            break ;
+        }
+        index += 1;
+    }
+    if (cblc_import_translation_unit_type_stubs(&context, "main_mod", &main_unit)
+        != FT_FAILURE)
+    {
+        std::printf("Assertion failed: incompatible exception type ABI should be rejected\n");
+        goto cleanup;
+    }
+    if (cblc_test_expect_last_diagnostic_code(&context,
+            TRANSPILE_ERROR_EXCEPTION_ABI_MISMATCH,
+            "exception type ABI mismatch should record a dedicated diagnostic") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&main_unit);
+    cblc_translation_unit_dispose(&worker_unit);
+    if (context_initialized)
+        transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_cblc_import_translation_unit_types_rejects_exception_policy_mismatch)
+{
+    const char *main_source;
+    const char *worker_source;
+    const t_transpiler_type_signature *types;
+    t_cblc_translation_unit main_unit;
+    t_cblc_translation_unit worker_unit;
+    t_transpiler_context context;
+    size_t type_count;
+    size_t index;
+    int context_initialized;
+    int status;
+
+    main_source = "import \"worker_mod\";\nvoid main() { }\n";
+    worker_source = "class Error { public: int code; };\n"
+        "void worker() { return; }\n";
+    cblc_translation_unit_init(&main_unit);
+    cblc_translation_unit_init(&worker_unit);
+    context_initialized = 0;
+    status = FT_FAILURE;
+    if (cblc_test_prepare_imported_worker_context(main_source, worker_source, &main_unit,
+            &worker_unit, &context, &context_initialized, 1) != FT_SUCCESS)
+        goto cleanup;
+    types = transpiler_context_get_types(&context, &type_count);
+    index = 0;
+    while (index < type_count)
+    {
+        if (std::strcmp(types[index].name, "Error") == 0
+            && std::strcmp(types[index].module, "worker_mod") == 0)
+        {
+            t_transpiler_type_signature *mutable_signature;
+
+            mutable_signature = const_cast<t_transpiler_type_signature *>(&types[index]);
+            mutable_signature->exception_policy_fingerprint = 0;
+            break ;
+        }
+        index += 1;
+    }
+    if (cblc_import_translation_unit_type_stubs(&context, "main_mod", &main_unit)
+        != FT_FAILURE)
+    {
+        std::printf("Assertion failed: incompatible exception type runtime policy should be rejected\n");
+        goto cleanup;
+    }
+    if (cblc_test_expect_last_diagnostic_code(&context,
+            TRANSPILE_ERROR_EXCEPTION_POLICY_MISMATCH,
+            "exception type runtime policy mismatch should record a dedicated diagnostic")
+        != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&main_unit);
+    cblc_translation_unit_dispose(&worker_unit);
+    if (context_initialized)
+        transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_cblc_import_translation_unit_types_rejects_exception_payload_overflow)
+{
+    const char *main_source;
+    const char *worker_source;
+    const t_transpiler_type_signature *types;
+    t_cblc_translation_unit main_unit;
+    t_cblc_translation_unit worker_unit;
+    t_transpiler_context context;
+    size_t type_count;
+    size_t index;
+    int context_initialized;
+    int status;
+
+    main_source = "import \"worker_mod\";\nvoid main() { }\n";
+    worker_source = "class Error { public: int code; };\n"
+        "void worker() { return; }\n";
+    cblc_translation_unit_init(&main_unit);
+    cblc_translation_unit_init(&worker_unit);
+    context_initialized = 0;
+    status = FT_FAILURE;
+    if (cblc_test_prepare_imported_worker_context(main_source, worker_source, &main_unit,
+            &worker_unit, &context, &context_initialized, 1) != FT_SUCCESS)
+        goto cleanup;
+    types = transpiler_context_get_types(&context, &type_count);
+    index = 0;
+    while (index < type_count)
+    {
+        if (std::strcmp(types[index].name, "Error") == 0
+            && std::strcmp(types[index].module, "worker_mod") == 0)
+        {
+            t_transpiler_type_signature *mutable_signature;
+
+            mutable_signature = const_cast<t_transpiler_type_signature *>(&types[index]);
+            mutable_signature->exception_payload_size = CBLC_EXCEPTION_PAYLOAD_MAX + 1;
+            break ;
+        }
+        index += 1;
+    }
+    if (cblc_import_translation_unit_type_stubs(&context, "main_mod", &main_unit)
+        != FT_FAILURE)
+    {
+        std::printf("Assertion failed: oversized exception payload metadata should be rejected\n");
+        goto cleanup;
+    }
+    if (cblc_test_expect_last_diagnostic_code(&context,
+            TRANSPILE_ERROR_EXCEPTION_PAYLOAD_OVERFLOW,
+            "payload overflow should record a dedicated diagnostic") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&main_unit);
+    cblc_translation_unit_dispose(&worker_unit);
+    if (context_initialized)
+        transpiler_context_dispose(&context);
+    return (status);
+}
+
 FT_TEST(test_cblc_resolve_translation_unit_calls_accepts_external_parameterized_calls)
 {
     const char *main_source;
@@ -1360,8 +1649,11 @@ FT_TEST(test_cblc_generate_cobol_emits_external_pointer_return_with_argument)
     if (test_expect_success(cblc_generate_cobol(&main_unit, &generated_cobol),
             "external pointer return with argument should generate COBOL") != FT_SUCCESS)
         goto cleanup;
-    if (!generated_cobol || !ft_strnstr(generated_cobol,
-            "CALL 'WORKER' USING BY REFERENCE INPUT BY REFERENCE OUTPUT",
+    if (!generated_cobol || !ft_strnstr(generated_cobol, "CALL 'WORKER' USING",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "INPUT",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "CBLC-USER-OUTPUT",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should pass pointer argument and return target\n");
@@ -1488,6 +1780,64 @@ FT_TEST(test_cblc_generate_cobol_emits_external_int_return_linkage)
 cleanup:
     if (generated_cobol)
         cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&main_unit);
+    cblc_translation_unit_dispose(&worker_unit);
+    if (context_initialized)
+        transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_propagates_external_exception_context)
+{
+    const char *main_source;
+    const char *worker_source;
+    t_cblc_translation_unit main_unit;
+    t_cblc_translation_unit worker_unit;
+    t_transpiler_context context;
+    char *generated_main;
+    char *generated_worker;
+    int context_initialized;
+    int status;
+
+    main_source = "import \"worker_mod\";\n"
+        "void main() {\n"
+        "    try { string owned_text(8); worker(); }\n"
+        "    catch (int caught_value) { display(caught_value); }\n"
+        "}\n";
+    worker_source = "void worker() { throw 7; }\n";
+    cblc_translation_unit_init(&main_unit);
+    cblc_translation_unit_init(&worker_unit);
+    generated_main = NULL;
+    generated_worker = NULL;
+    context_initialized = 0;
+    status = FT_FAILURE;
+    if (cblc_test_prepare_imported_worker_context(main_source, worker_source,
+            &main_unit, &worker_unit, &context, &context_initialized, 1) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_resolve_translation_unit_calls(&context, "main_mod", &main_unit) != FT_SUCCESS
+        || cblc_generate_cobol(&main_unit, &generated_main) != FT_SUCCESS
+        || cblc_generate_cobol(&worker_unit, &generated_worker) != FT_SUCCESS)
+        goto cleanup;
+    if (!ft_strnstr(generated_main,
+            "CALL 'WORKER' USING BY REFERENCE CBLC-EX-CONTEXT.",
+            std::strlen(generated_main))
+        || !ft_strnstr(generated_main, "IF CBLC-EX-ACTIVE = 'Y'",
+            std::strlen(generated_main))
+        || !ft_strnstr(generated_main, "CBLC-EX-CLEANUP-MAIN-",
+            std::strlen(generated_main))
+        || !ft_strnstr(generated_worker,
+            "PROCEDURE DIVISION USING CBLC-EX-CONTEXT.",
+            std::strlen(generated_worker)))
+    {
+        std::printf("Assertion failed: external throwing calls should share the hidden exception context\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_main)
+        cma_free(generated_main);
+    if (generated_worker)
+        cma_free(generated_worker);
     cblc_translation_unit_dispose(&main_unit);
     cblc_translation_unit_dispose(&worker_unit);
     if (context_initialized)

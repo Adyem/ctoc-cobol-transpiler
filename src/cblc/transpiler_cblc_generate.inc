@@ -1,3 +1,6 @@
+static size_t cblc_native_result_digits(const t_cblc_translation_unit *unit,
+    const char *cobol_name);
+
 static int cblc_string_item_is_array_member(const t_cblc_translation_unit *unit,
     const t_cblc_data_item *item)
 {
@@ -63,9 +66,6 @@ static int cblc_emit_reusable_method_paragraphs(const t_cblc_translation_unit *u
             if (cblc_method_paragraph_name(receiver, method, paragraph_name,
                     sizeof(paragraph_name)) != FT_SUCCESS)
                 return (FT_FAILURE);
-            if (std::snprintf(line, sizeof(line), "       %s.", paragraph_name) < 0
-                || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
-                return (FT_FAILURE);
             {
                 char result_name[TRANSPILE_IDENTIFIER_MAX];
                 const char *assign_target;
@@ -78,18 +78,67 @@ static int cblc_emit_reusable_method_paragraphs(const t_cblc_translation_unit *u
                         return (FT_FAILURE);
                     assign_target = result_name;
                 }
-                if (cblc_emit_method_body(unit, receiver, method, assign_target,
-                        builder) != FT_SUCCESS)
-                    return (FT_FAILURE);
+                if (cblc_method_has_exception_control(method))
+                {
+                    if (cblc_emit_method_exception_body(unit, receiver, method,
+                            assign_target ? assign_target : "", builder) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                }
+                else
+                {
+                    if (std::snprintf(line, sizeof(line), "       %s.", paragraph_name) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                        || cblc_emit_method_body(unit, receiver, method, assign_target,
+                            builder) != FT_SUCCESS
+                        || cobol_text_builder_append_line(builder, "           EXIT.")
+                            != FT_SUCCESS)
+                        return (FT_FAILURE);
+                }
             }
-            if (cobol_text_builder_append_line(builder, "           EXIT.") != FT_SUCCESS
-                || cobol_text_builder_append_line(builder, "") != FT_SUCCESS)
+            if (cobol_text_builder_append_line(builder, "") != FT_SUCCESS)
                 return (FT_FAILURE);
             method_index += 1;
         }
         data_index += 1;
     }
     return (FT_SUCCESS);
+}
+
+static int cblc_unit_uses_exceptions(const t_cblc_translation_unit *unit)
+{
+    size_t function_index;
+
+    if (!unit)
+        return (0);
+    function_index = 0;
+    while (function_index < unit->function_count)
+    {
+        size_t statement_index;
+
+        statement_index = 0;
+        while (statement_index < unit->functions[function_index].statement_count)
+        {
+            t_cblc_statement_type type;
+
+            type = unit->functions[function_index].statements[statement_index].type;
+            if (type == CBLC_STATEMENT_TRY_BEGIN
+                || type == CBLC_STATEMENT_CATCH_BEGIN
+                || type == CBLC_STATEMENT_THROW)
+                return (1);
+            if ((type == CBLC_STATEMENT_CALL || type == CBLC_STATEMENT_CALL_ASSIGN)
+                && cblc_statement_call_may_throw(unit,
+                    &unit->functions[function_index].statements[statement_index]))
+                return (1);
+            if (cblc_statement_method_may_throw(unit,
+                    &unit->functions[function_index].statements[statement_index])
+                || cblc_statement_constructor_may_throw(unit,
+                    &unit->functions[function_index].statements[statement_index]))
+                return (1);
+            statement_index += 1;
+        }
+        function_index += 1;
+    }
+    return (0);
 }
 
 static int cblc_emit_reusable_lifecycle_paragraphs(const t_cblc_translation_unit *unit,
@@ -135,20 +184,30 @@ static int cblc_emit_reusable_lifecycle_paragraphs(const t_cblc_translation_unit
             if (cblc_constructor_paragraph_name(receiver, constructor_index,
                     paragraph_name, sizeof(paragraph_name)) != FT_SUCCESS)
                 return (FT_FAILURE);
-            if (std::snprintf(line, sizeof(line), "       %s.", paragraph_name) < 0
-                || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
-                return (FT_FAILURE);
-            statement_index = 0;
-            while (statement_index < constructor->statement_count)
+            if (cblc_constructor_has_exception_control(constructor))
             {
-                if (cblc_emit_substituted_statement(unit, NULL,
-                        &constructor->statements[statement_index], receiver->cobol_name,
-                        builder) != FT_SUCCESS)
+                if (cblc_emit_constructor_exception_body(unit, receiver, constructor,
+                        constructor_index, builder) != FT_SUCCESS)
                     return (FT_FAILURE);
-                statement_index += 1;
             }
-            if (cobol_text_builder_append_line(builder, "           EXIT.") != FT_SUCCESS
-                || cobol_text_builder_append_line(builder, "") != FT_SUCCESS)
+            else
+            {
+                if (std::snprintf(line, sizeof(line), "       %s.", paragraph_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                statement_index = 0;
+                while (statement_index < constructor->statement_count)
+                {
+                    if (cblc_emit_substituted_statement(unit, NULL,
+                            &constructor->statements[statement_index], receiver->cobol_name,
+                            builder) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    statement_index += 1;
+                }
+                if (cobol_text_builder_append_line(builder, "           EXIT.") != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            if (cobol_text_builder_append_line(builder, "") != FT_SUCCESS)
                 return (FT_FAILURE);
             constructor_index += 1;
         }
@@ -264,7 +323,10 @@ static int cblc_emit_reusable_string_intrinsic_results(
     while (data_index < unit->data_count)
     {
         const t_cblc_data_item *item;
-        const char *names[] = {"len", "capacity", "empty"};
+        const char *native_names[] = {"len"};
+        const char *regular_names[] = {"len", "capacity", "empty"};
+        const char **names;
+        size_t name_count;
         size_t name_index;
 
         item = &unit->data_items[data_index];
@@ -274,16 +336,21 @@ static int cblc_emit_reusable_string_intrinsic_results(
             data_index += 1;
             continue ;
         }
+        names = unit->is_native_standard_library ? native_names : regular_names;
+        name_count = unit->is_native_standard_library
+            ? sizeof(native_names) / sizeof(native_names[0])
+            : sizeof(regular_names) / sizeof(regular_names[0]);
         name_index = 0;
-        while (name_index < sizeof(names) / sizeof(names[0]))
+        while (name_index < name_count)
         {
             char result_name[TRANSPILE_IDENTIFIER_MAX];
             char line[256];
 
             if (cblc_intrinsic_result_name(item, names[name_index], result_name,
                     sizeof(result_name)) != FT_SUCCESS
-                || std::snprintf(line, sizeof(line), "       01 %s PIC S9(9) VALUE 0.",
-                    result_name) < 0
+                || std::snprintf(line, sizeof(line), "       01 %s PIC S9(%zu) VALUE 0.",
+                    result_name,
+                    cblc_native_result_digits(unit, result_name)) < 0
                 || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
                 return (FT_FAILURE);
             name_index += 1;
@@ -395,7 +462,10 @@ static int cblc_emit_reusable_string_intrinsic_paragraphs(
     while (data_index < unit->data_count)
     {
         const t_cblc_data_item *item;
-        const char *names[] = {"len", "capacity", "empty", "clear"};
+        const char *native_names[] = {"len"};
+        const char *regular_names[] = {"len", "capacity", "empty", "clear"};
+        const char **names;
+        size_t name_count;
         size_t name_index;
 
         item = &unit->data_items[data_index];
@@ -405,8 +475,12 @@ static int cblc_emit_reusable_string_intrinsic_paragraphs(
             data_index += 1;
             continue ;
         }
+        names = unit->is_native_standard_library ? native_names : regular_names;
+        name_count = unit->is_native_standard_library
+            ? sizeof(native_names) / sizeof(native_names[0])
+            : sizeof(regular_names) / sizeof(regular_names[0]);
         name_index = 0;
-        while (name_index < sizeof(names) / sizeof(names[0]))
+        while (name_index < name_count)
         {
             char paragraph_name[TRANSPILE_IDENTIFIER_MAX];
             char result_name[TRANSPILE_IDENTIFIER_MAX];
@@ -579,7 +653,8 @@ static int cblc_emit_reusable_parameterized_string_intrinsic_paragraphs(
                         || cobol_text_builder_append_line(builder, "               END-IF") != FT_SUCCESS
                         || std::snprintf(line, sizeof(line),
                             "               IF %s-LEN + %s > %zu",
-                            receiver->cobol_name, argument_one_length, receiver->length) < 0)
+                            receiver->cobol_name, argument_one_length, receiver->length) < 0
+                        || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
                         return (FT_FAILURE);
                     if (std::snprintf(line, sizeof(line),
                             "                   ALLOCATE %s-LEN + %s CHARACTERS RETURNING %s-PTR",
@@ -767,6 +842,94 @@ static int cblc_emit_reusable_parameterized_string_intrinsic_paragraphs(
     return (FT_SUCCESS);
 }
 
+static size_t cblc_native_result_digits(const t_cblc_translation_unit *unit,
+    const char *cobol_name)
+{
+    if (!unit || !unit->is_native_standard_library || !cobol_name)
+        return (9);
+    if (std::strcmp(cobol_name, "F-RESULT") != 0
+        && std::strcmp(cobol_name, "F-OPERAND") != 0
+        && std::strcmp(cobol_name, "CBLC-RETURN-F") != 0)
+        return (9);
+    if (std::strcmp(unit->program_name, "CBLC-ATOL") == 0
+        || std::strcmp(unit->program_name, "CBLC-ATOL-STRING") == 0)
+        return (18);
+    if (std::strcmp(unit->program_name, "CBLC-ATOLL") == 0
+        || std::strcmp(unit->program_name, "CBLC-ATOLL-STRING") == 0)
+        return (36);
+    if (std::strcmp(unit->program_name, "CBLC-ABS") == 0)
+        return (18);
+    return (9);
+}
+
+static int cblc_native_parameter_is_by_value(const t_cblc_translation_unit *unit,
+    size_t parameter_index)
+{
+    const char *program_name;
+
+    if (!unit || !unit->is_native_standard_library)
+        return (0);
+    program_name = unit->program_name;
+    if (std::strcmp(program_name, "CBLC-STRLEN") == 0)
+        return (parameter_index == 1);
+    if (std::strcmp(program_name, "CBLC-STRNLEN") == 0)
+        return (parameter_index == 1 || parameter_index == 2);
+    if (std::strcmp(program_name, "CBLC-STRTOD") == 0)
+        return (parameter_index == 1);
+    if (std::strcmp(program_name, "CBLC-TOUPPER") == 0
+        || std::strcmp(program_name, "CBLC-TOLOWER") == 0)
+        return (parameter_index == 1);
+    if (std::strcmp(program_name, "CBLC-STRCMP") == 0
+        || std::strcmp(program_name, "CBLC-STRCPY") == 0)
+        return (parameter_index == 1 || parameter_index == 3);
+    if (std::strcmp(program_name, "CBLC-STRNCPY") == 0)
+        return (parameter_index == 1 || parameter_index == 3 || parameter_index == 4);
+    if (std::strcmp(program_name, "CBLC-STRCAT") == 0)
+        return (parameter_index == 1 || parameter_index == 3 || parameter_index == 5);
+    if (std::strcmp(program_name, "CBLC-STRNCPY-STRING") == 0
+        || std::strcmp(program_name, "CBLC-MEMCMP-STRING") == 0)
+        return (parameter_index == 2);
+    return (0);
+}
+
+static int cblc_native_parameter_is_status(const t_cblc_function *entry_function,
+    size_t parameter_index)
+{
+    if (!entry_function || parameter_index >= entry_function->parameter_count)
+        return (0);
+    return (std::strstr(entry_function->parameters[parameter_index].cobol_name,
+            "STATUS") != NULL);
+}
+
+static int cblc_native_parameter_uses_comp5(const t_cblc_translation_unit *unit,
+    const t_cblc_function *entry_function, size_t parameter_index)
+{
+    const char *program_name;
+    const char *parameter_name;
+
+    if (!unit || !entry_function || parameter_index >= entry_function->parameter_count
+        || entry_function->parameters[parameter_index].kind
+            != TRANSPILE_FUNCTION_PARAMETER_INT)
+        return (0);
+    if (cblc_native_parameter_is_status(entry_function, parameter_index))
+        return (0);
+    program_name = unit->program_name;
+    parameter_name = entry_function->parameters[parameter_index].cobol_name;
+    if (std::strcmp(program_name, "CBLC-ABS") == 0)
+        return (1);
+    if (std::strstr(parameter_name, "RESULT") != NULL)
+        return (0);
+    if (std::strstr(parameter_name, "LENGTH") != NULL
+        || std::strstr(parameter_name, "LIMIT") != NULL
+        || std::strstr(parameter_name, "REQUEST") != NULL
+        || std::strstr(parameter_name, "SERIAL") != NULL
+        || std::strstr(parameter_name, "SCALE") != NULL
+        || std::strstr(parameter_name, "DURATION") != NULL
+        || std::strstr(parameter_name, "COMPARISON") != NULL)
+        return (1);
+    return (0);
+}
+
 int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
 {
     t_cobol_text_builder builder;
@@ -774,6 +937,7 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
     size_t index;
     size_t entry_index;
     const t_cblc_function *entry_function;
+    int entry_uses_exception_context;
 
     if (!unit || !out_text)
         return (FT_FAILURE);
@@ -786,7 +950,14 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
     entry_function = NULL;
     if (unit->function_count > 0 && entry_index < unit->function_count)
         entry_function = &unit->functions[entry_index];
+    entry_uses_exception_context = entry_function
+        && cblc_is_external_entry_function(unit)
+        && cblc_unit_uses_exceptions(unit);
     cobol_text_builder_init(&builder);
+    builder.free_format = unit->is_native_standard_library ? 1 : 0;
+    if (unit->is_native_standard_library
+        && cobol_text_builder_append_line(&builder, ">>SOURCE FORMAT IS FREE") != FT_SUCCESS)
+        goto cleanup;
     if (cobol_text_builder_append_line(&builder, "       IDENTIFICATION DIVISION.") != FT_SUCCESS)
         goto cleanup;
     if (std::snprintf(line, sizeof(line), "       PROGRAM-ID. %s.", unit->program_name) < 0)
@@ -803,8 +974,22 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
         index = 0;
         while (index < unit->file_count)
         {
-            if (std::snprintf(line, sizeof(line), "           SELECT %s ASSIGN TO \"%s\".",
-                    unit->files[index].cobol_name, unit->files[index].path) < 0
+            const char *organization_clause;
+            const char *record_key_clause;
+
+            organization_clause = unit->files[index].organization
+                == TRANSPILE_FILE_ORGANIZATION_INDEXED ? " ORGANIZATION IS INDEXED"
+                : (unit->files[index].organization == TRANSPILE_FILE_ORGANIZATION_RELATIVE
+                    ? " ORGANIZATION IS RELATIVE" : "");
+            record_key_clause = unit->files[index].organization
+                == TRANSPILE_FILE_ORGANIZATION_INDEXED ? " RECORD KEY IS " : "";
+            if (std::snprintf(line, sizeof(line),
+                    "           SELECT %s ASSIGN TO \"%s\"%s%s%s%s FILE STATUS IS %s-STATUS.",
+                    unit->files[index].cobol_name, unit->files[index].path,
+                    organization_clause, record_key_clause,
+                    record_key_clause[0] != '\0' ? unit->files[index].cobol_name : "",
+                    record_key_clause[0] != '\0' ? "-RECORD" : "",
+                    unit->files[index].cobol_name) < 0
                 || cobol_text_builder_append_line(&builder, line) != FT_SUCCESS)
                 goto cleanup;
             index += 1;
@@ -836,10 +1021,61 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
     }
     if (cobol_text_builder_append_line(&builder, "       WORKING-STORAGE SECTION.") != FT_SUCCESS)
         goto cleanup;
+    if (cblc_unit_uses_exceptions(unit) && !entry_uses_exception_context)
+    {
+        if (cobol_text_builder_append_line(&builder,
+                "       01 CBLC-EX-CONTEXT.") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "          05 CBLC-EX-ACTIVE PIC X VALUE 'N'.") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "          05 CBLC-EX-MATCHED PIC X VALUE 'N'.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-TYPE-ID PIC 9(10) COMP-5 VALUE 0.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-DYNAMIC-TYPE-ID PIC 9(10) COMP-5 VALUE 0.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-PAYLOAD-SIZE PIC 9(9) COMP-5 VALUE 0.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-PAYLOAD-OWNER PIC X VALUE 'N'.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-SOURCE-FILE-ID PIC 9(10) COMP-5 VALUE 0.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-SOURCE-LINE PIC 9(9) COMP-5 VALUE 0.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-SOURCE-COLUMN PIC 9(9) COMP-5 VALUE 0.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-RAISING PIC X VALUE 'N'.") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "          05 CBLC-EX-CLEANING PIC X VALUE 'N'.") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "          05 CBLC-EX-SECONDARY-TYPE-ID PIC 9(10) COMP-5 VALUE 0.") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "          05 CBLC-EX-SECONDARY-SOURCE-LINE PIC 9(9) COMP-5 VALUE 0.") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "          05 CBLC-EX-SECONDARY-SOURCE-COLUMN PIC 9(9) COMP-5 VALUE 0.") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "          05 CBLC-EX-INT-PAYLOAD PIC S9(9) VALUE 0.") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "          05 CBLC-EX-STRING.") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "             10 CBLC-EX-STRING-LEN PIC 9(4) COMP VALUE 0.") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "             10 CBLC-EX-STRING-BUF PIC X(256).") != FT_SUCCESS)
+            goto cleanup;
+    }
     if (unit->file_count > 0
         && cobol_text_builder_append_line(&builder,
             "       01 CBLC-EOF-FLAG PIC X VALUE 'N'.") != FT_SUCCESS)
         goto cleanup;
+    index = 0;
+    while (index < unit->file_count)
+    {
+        if (std::snprintf(line, sizeof(line), "       01 %s-STATUS PIC X(2) VALUE SPACES.",
+                unit->files[index].cobol_name) < 0
+            || cobol_text_builder_append_line(&builder, line) != FT_SUCCESS)
+            goto cleanup;
+        index += 1;
+    }
     index = 0;
     while (index < unit->copy_include_count)
     {
@@ -923,20 +1159,33 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
         {
             if (unit->data_items[index].array_count > 0)
             {
-                if (std::snprintf(line, sizeof(line), "       01 %s PIC S9(9) OCCURS %zu TIMES.",
+                if (std::snprintf(line, sizeof(line), "       01 %s PIC S9(9)%s OCCURS %zu TIMES.",
                         unit->data_items[index].cobol_name,
+                        unit->is_native_standard_library ? " COMP-5" : "",
                         unit->data_items[index].array_count) < 0)
                     goto cleanup;
             }
             else if (unit->data_items[index].is_const
                 && unit->data_items[index].has_initializer)
             {
-                if (std::snprintf(line, sizeof(line), "       01 %s PIC S9(9) VALUE %s.",
+                if (std::snprintf(line, sizeof(line), "       01 %s PIC S9(%zu)%s VALUE %s.",
                         unit->data_items[index].cobol_name,
+                        cblc_native_result_digits(unit,
+                            unit->data_items[index].cobol_name),
+                        unit->is_native_standard_library ? " COMP-5" : "",
                         unit->data_items[index].initializer_text) < 0)
                     goto cleanup;
             }
-            else if (std::snprintf(line, sizeof(line), "       01 %s PIC S9(9).",
+            else if (std::snprintf(line, sizeof(line), "       01 %s PIC S9(%zu)%s.",
+                    unit->data_items[index].cobol_name,
+                    cblc_native_result_digits(unit,
+                        unit->data_items[index].cobol_name),
+                    unit->is_native_standard_library ? " COMP-5" : "") < 0)
+                goto cleanup;
+        }
+        else if (unit->data_items[index].kind == CBLC_DATA_KIND_DOUBLE)
+        {
+            if (std::snprintf(line, sizeof(line), "       01 %s USAGE COMP-2.",
                     unit->data_items[index].cobol_name) < 0)
                 goto cleanup;
         }
@@ -1046,7 +1295,8 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
     }
     if (cblc_emit_reusable_method_results(unit, &builder) != FT_SUCCESS)
         goto cleanup;
-    if (cblc_emit_reusable_string_intrinsic_arguments(unit, &builder) != FT_SUCCESS)
+    if (!unit->is_native_standard_library
+        && cblc_emit_reusable_string_intrinsic_arguments(unit, &builder) != FT_SUCCESS)
         goto cleanup;
     if (cblc_emit_reusable_string_intrinsic_results(unit, &builder) != FT_SUCCESS)
         goto cleanup;
@@ -1095,16 +1345,131 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
     }
     if (entry_function && cblc_is_external_entry_function(unit)
         && (entry_function->parameter_count > 0
-            || entry_function->return_kind != CBLC_FUNCTION_RETURN_VOID))
+            || entry_function->return_kind != CBLC_FUNCTION_RETURN_VOID
+            || entry_uses_exception_context))
     {
         if (cobol_text_builder_append_line(&builder, "       LINKAGE SECTION.") != FT_SUCCESS)
+            goto cleanup;
+        if (entry_uses_exception_context
+            && (cobol_text_builder_append_line(&builder,
+                    "       01 CBLC-EX-CONTEXT.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-ACTIVE PIC X.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-MATCHED PIC X.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-TYPE-ID PIC 9(10) COMP-5.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-DYNAMIC-TYPE-ID PIC 9(10) COMP-5.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-PAYLOAD-SIZE PIC 9(9) COMP-5.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-PAYLOAD-OWNER PIC X.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-SOURCE-FILE-ID PIC 9(10) COMP-5.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-SOURCE-LINE PIC 9(9) COMP-5.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-SOURCE-COLUMN PIC 9(9) COMP-5.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-RAISING PIC X.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-CLEANING PIC X.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-SECONDARY-TYPE-ID PIC 9(10) COMP-5.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-SECONDARY-SOURCE-LINE PIC 9(9) COMP-5.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-SECONDARY-SOURCE-COLUMN PIC 9(9) COMP-5.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-INT-PAYLOAD PIC S9(9).") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "          05 CBLC-EX-STRING.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "             10 CBLC-EX-STRING-LEN PIC 9(4) COMP.") != FT_SUCCESS
+                || cobol_text_builder_append_line(&builder,
+                    "             10 CBLC-EX-STRING-BUF PIC X(256).") != FT_SUCCESS))
             goto cleanup;
         index = 0;
         while (index < entry_function->parameter_count)
         {
             if (entry_function->parameters[index].kind == TRANSPILE_FUNCTION_PARAMETER_INT)
             {
-                if (std::snprintf(line, sizeof(line), "       01 %s PIC S9(9).",
+                size_t integer_digits;
+                int status_parameter;
+
+                integer_digits = 9;
+                status_parameter = cblc_native_parameter_is_status(entry_function, index);
+                if (unit->is_native_standard_library && index == 2
+                    && (std::strcmp(unit->program_name, "CBLC-ATOL") == 0
+                        || std::strcmp(unit->program_name, "CBLC-ATOL-STRING") == 0))
+                    integer_digits = 18;
+                if (unit->is_native_standard_library && index == 2
+                    && (std::strcmp(unit->program_name, "CBLC-ATOLL") == 0
+                        || std::strcmp(unit->program_name, "CBLC-ATOLL-STRING") == 0))
+                    integer_digits = 36;
+                if (unit->is_native_standard_library
+                    && std::strcmp(unit->program_name, "CBLC-ABS") == 0)
+                    integer_digits = 18;
+                if (unit->is_native_standard_library
+                    && std::strcmp(unit->program_name, "CBLC-DATE-YYYYMMDD") == 0
+                    && index == 1)
+                {
+                    if (std::snprintf(line, sizeof(line), "       01 %s PIC 9(4).",
+                            entry_function->parameters[index].cobol_name) < 0)
+                        goto cleanup;
+                }
+                else if (unit->is_native_standard_library
+                    && std::strcmp(unit->program_name, "CBLC-DATE-YYYYMMDD") == 0
+                    && index == 2)
+                {
+                    if (std::snprintf(line, sizeof(line), "       01 %s PIC 9(2).",
+                            entry_function->parameters[index].cobol_name) < 0)
+                        goto cleanup;
+                }
+                else if (unit->is_native_standard_library
+                    && std::strcmp(unit->program_name, "CBLC-DATE-YYYYMMDD") == 0
+                    && index == 3)
+                {
+                    if (std::snprintf(line, sizeof(line), "       01 %s PIC 9(2).",
+                            entry_function->parameters[index].cobol_name) < 0)
+                        goto cleanup;
+                }
+                else if (unit->is_native_standard_library
+                    && std::strcmp(unit->program_name, "CBLC-DATE-YYYYMMDD") == 0
+                    && index == 4)
+                {
+                    if (std::snprintf(line, sizeof(line), "       01 %s PIC 9(8) COMP-3.",
+                            entry_function->parameters[index].cobol_name) < 0)
+                        goto cleanup;
+                }
+                else if (status_parameter
+                    && (std::strcmp(unit->program_name, "CBLC-STRCPY") != 0
+                        && std::strcmp(unit->program_name, "CBLC-STRNCPY") != 0
+                        && std::strcmp(unit->program_name, "CBLC-STRCAT") != 0
+                        && std::strcmp(unit->program_name, "CBLC-TOUPPER") != 0
+                        && std::strcmp(unit->program_name, "CBLC-TOLOWER") != 0))
+                {
+                    if (std::snprintf(line, sizeof(line), "       01 %s PIC 9.",
+                            entry_function->parameters[index].cobol_name) < 0)
+                        goto cleanup;
+                }
+                else if (std::snprintf(line, sizeof(line), "       01 %s PIC S9(%zu)%s.",
+                            entry_function->parameters[index].cobol_name,
+                            integer_digits,
+                            cblc_native_parameter_uses_comp5(unit, entry_function, index)
+                                ? " COMP-5" : "") < 0)
+                    goto cleanup;
+            }
+            else if (entry_function->parameters[index].kind == TRANSPILE_FUNCTION_PARAMETER_DOUBLE)
+            {
+                if (std::snprintf(line, sizeof(line), "       01 %s USAGE COMP-2.",
+                        entry_function->parameters[index].cobol_name) < 0)
+                    goto cleanup;
+            }
+            else if (entry_function->parameters[index].kind == TRANSPILE_FUNCTION_PARAMETER_CHAR)
+            {
+                if (std::snprintf(line, sizeof(line), "       01 %s PIC X.",
                         entry_function->parameters[index].cobol_name) < 0)
                     goto cleanup;
             }
@@ -1113,9 +1478,42 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
                 || entry_function->parameters[index].kind == TRANSPILE_FUNCTION_PARAMETER_INT_POINTER
                 || entry_function->parameters[index].kind == TRANSPILE_FUNCTION_PARAMETER_STRUCT_POINTER)
             {
-                if (std::snprintf(line, sizeof(line), "       01 %s USAGE POINTER.",
+                if (unit->is_native_standard_library
+                    && entry_function->parameters[index].kind
+                        == TRANSPILE_FUNCTION_PARAMETER_CHAR_POINTER)
+                {
+                    if (std::snprintf(line, sizeof(line), "       01 %s PIC X(255).",
+                            entry_function->parameters[index].cobol_name) < 0)
+                        goto cleanup;
+                }
+                else if (std::snprintf(line, sizeof(line), "       01 %s USAGE POINTER.",
                         entry_function->parameters[index].cobol_name) < 0)
                     goto cleanup;
+            }
+            else if (entry_function->parameters[index].kind
+                == TRANSPILE_FUNCTION_PARAMETER_STRING)
+            {
+                size_t parameter_length;
+
+                parameter_length = entry_function->parameters[index].length;
+                if (parameter_length == 0)
+                    parameter_length = 255;
+                if (std::snprintf(line, sizeof(line), "       01 %s.",
+                        entry_function->parameters[index].cobol_name) < 0
+                    || cobol_text_builder_append_line(&builder, line) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line),
+                        "          05 %s-LEN PIC 9(4) COMP.",
+                        entry_function->parameters[index].cobol_name) < 0
+                    || cobol_text_builder_append_line(&builder, line) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line),
+                        "          05 %s-BUF PIC X(%zu).",
+                        entry_function->parameters[index].cobol_name,
+                        parameter_length) < 0)
+                    goto cleanup;
+                if (cobol_text_builder_append_line(&builder, line) != FT_SUCCESS)
+                    goto cleanup;
+                index += 1;
+                continue ;
             }
             else
                 goto cleanup;
@@ -1133,10 +1531,19 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
             return_item = &unit->data_items[entry_function->return_item_index];
             if (return_item->kind == CBLC_DATA_KIND_INT)
             {
-                if (std::snprintf(line, sizeof(line), "       01 %s PIC S9(9).",
-                        entry_function->return_cobol_name) < 0)
+                if (std::snprintf(line, sizeof(line), "       01 %s PIC S9(%zu).",
+                        entry_function->return_cobol_name,
+                        cblc_native_result_digits(unit,
+                            entry_function->return_cobol_name)) < 0)
                     goto cleanup;
                 if (cobol_text_builder_append_line(&builder, line) != FT_SUCCESS)
+                    goto cleanup;
+            }
+            else if (return_item->kind == CBLC_DATA_KIND_DOUBLE)
+            {
+                if (std::snprintf(line, sizeof(line), "       01 %s USAGE COMP-2.",
+                        entry_function->return_cobol_name) < 0
+                    || cobol_text_builder_append_line(&builder, line) != FT_SUCCESS)
                     goto cleanup;
             }
             else if (return_item->kind == CBLC_DATA_KIND_STRUCT)
@@ -1156,27 +1563,50 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
                 goto cleanup;
         }
         ft_strlcpy(line, "       PROCEDURE DIVISION USING", sizeof(line));
+        if (entry_uses_exception_context)
+            ft_strlcat(line, " CBLC-EX-CONTEXT", sizeof(line));
         if (entry_function->parameter_count == 0
-            && entry_function->return_kind == CBLC_FUNCTION_RETURN_VOID)
+            && entry_function->return_kind == CBLC_FUNCTION_RETURN_VOID
+            && !entry_uses_exception_context)
             goto cleanup;
         index = 0;
         while (index < entry_function->parameter_count)
         {
-            if (std::strlen(line) + 1
-                + std::strlen(entry_function->parameters[index].cobol_name)
-                + 1 >= sizeof(line))
+            char clause[TRANSPILE_IDENTIFIER_MAX + 32];
+            int by_value;
+
+            by_value = unit->is_native_standard_library
+                && entry_function->parameters[index].kind == TRANSPILE_FUNCTION_PARAMETER_INT
+                && cblc_native_parameter_is_by_value(unit, index);
+            if (std::snprintf(clause, sizeof(clause), " %s%s",
+                    by_value ? "BY VALUE " : (unit->is_native_standard_library
+                        ? "BY REFERENCE " : ""),
+                    entry_function->parameters[index].cobol_name) < 0)
                 goto cleanup;
-            ft_strlcat(line, " ", sizeof(line));
-            ft_strlcat(line, entry_function->parameters[index].cobol_name, sizeof(line));
+            if (std::strlen(line) + std::strlen(clause) >= 65)
+            {
+                if (cobol_text_builder_append_line(&builder, line) != FT_SUCCESS)
+                    goto cleanup;
+                ft_strlcpy(line, "           ", sizeof(line));
+            }
+            ft_strlcat(line, clause, sizeof(line));
             index += 1;
         }
         if (entry_function->return_kind != CBLC_FUNCTION_RETURN_VOID)
         {
-            if (std::strlen(line) + 1
-                + std::strlen(entry_function->return_cobol_name) + 1 >= sizeof(line))
+            char clause[TRANSPILE_IDENTIFIER_MAX + 2];
+
+            if (std::snprintf(clause, sizeof(clause), " %s%s",
+                    unit->is_native_standard_library ? "BY REFERENCE " : "",
+                    entry_function->return_cobol_name) < 0)
                 goto cleanup;
-            ft_strlcat(line, " ", sizeof(line));
-            ft_strlcat(line, entry_function->return_cobol_name, sizeof(line));
+            if (std::strlen(line) + std::strlen(clause) >= 65)
+            {
+                if (cobol_text_builder_append_line(&builder, line) != FT_SUCCESS)
+                    goto cleanup;
+                ft_strlcpy(line, "           ", sizeof(line));
+            }
+            ft_strlcat(line, clause, sizeof(line));
         }
         if (std::strlen(line) + 2 >= sizeof(line))
             goto cleanup;
@@ -1217,12 +1647,34 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
         goto cleanup;
     if (cblc_emit_reusable_string_intrinsic_paragraphs(unit, &builder) != FT_SUCCESS)
         goto cleanup;
-    if (cblc_emit_reusable_parameterized_string_intrinsic_paragraphs(unit, &builder)
-        != FT_SUCCESS)
+    if (!unit->is_native_standard_library
+        && cblc_emit_reusable_parameterized_string_intrinsic_paragraphs(unit, &builder)
+            != FT_SUCCESS)
     {
         goto cleanup;
     }
     if (cblc_emit_reusable_lifecycle_paragraphs(unit, &builder) != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_unit_uses_exceptions(unit)
+        && (cobol_text_builder_append_line(&builder, "       CBLC-TERMINATE.") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "           DISPLAY \"Fatal CBL-C double exception\"") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "           DISPLAY \"Original exception type: \" CBLC-EX-TYPE-ID") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "           DISPLAY \"Original exception file ID: \" CBLC-EX-SOURCE-FILE-ID") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "           DISPLAY \"Original exception line: \" CBLC-EX-SOURCE-LINE") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "           DISPLAY \"Original exception column: \" CBLC-EX-SOURCE-COLUMN") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "           DISPLAY \"Secondary exception type: \" CBLC-EX-SECONDARY-TYPE-ID") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "           DISPLAY \"Secondary exception line: \" CBLC-EX-SECONDARY-SOURCE-LINE") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder,
+                "           DISPLAY \"Secondary exception column: \" CBLC-EX-SECONDARY-SOURCE-COLUMN") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder, "           STOP RUN.") != FT_SUCCESS
+            || cobol_text_builder_append_line(&builder, "") != FT_SUCCESS))
         goto cleanup;
     if (std::snprintf(line, sizeof(line), "       END PROGRAM %s.",
             unit->program_name) < 0)

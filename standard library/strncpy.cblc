@@ -1,0 +1,50 @@
+void F(char *destination_char, int destination_length, char *source_char, int source_length, int request, int status)
+{
+    int index;
+    int source_limit;
+    int destination_limit;
+    int copy_limit;
+    status = 0;
+    source_limit = source_length;
+    destination_limit = destination_length;
+    copy_limit = request;
+    if (source_limit > 255)
+    {
+        source_limit = 255;
+    }
+    if (destination_limit > 255)
+    {
+        destination_limit = 255;
+    }
+    if (copy_limit < 0)
+    {
+        copy_limit = 0;
+    }
+    if (copy_limit > 255)
+    {
+        copy_limit = 255;
+        status = 1;
+    }
+    if (copy_limit > source_limit)
+    {
+        copy_limit = source_limit;
+        status = 1;
+    }
+    if (copy_limit > destination_limit)
+    {
+        copy_limit = destination_limit;
+        status = 1;
+    }
+    index = 0;
+    while (index < destination_limit)
+    {
+        destination_char[index] = ' ';
+        index = index + 1;
+    }
+    index = 0;
+    while (index < copy_limit)
+    {
+            destination_char[index] = source_char[index];
+        index = index + 1;
+    }
+}

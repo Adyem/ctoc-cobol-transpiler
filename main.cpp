@@ -514,6 +514,29 @@ static int pipeline_write_standard_library_artifact(t_transpiler_context *contex
     return (FT_SUCCESS);
 }
 
+static int pipeline_generate_standard_library_program(
+    const t_transpiler_standard_library_entry *entry, char **out_text, int *used_native)
+{
+    const char *legacy_enabled;
+
+    if (!entry || !out_text || !used_native)
+        return (FT_FAILURE);
+    *used_native = 0;
+    legacy_enabled = std::getenv("CTOC_LEGACY_STANDARD_LIBRARY");
+    if (!(legacy_enabled && legacy_enabled[0] != '\0' && legacy_enabled[0] != '0')
+        && transpiler_standard_library_get_native_source(entry->program_name))
+    {
+        if (transpiler_standard_library_generate_native(entry->program_name, out_text)
+            == FT_SUCCESS)
+        {
+            *used_native = 1;
+            return (FT_SUCCESS);
+        }
+        *out_text = NULL;
+    }
+    return (entry->generator(out_text));
+}
+
 static int pipeline_emit_required_standard_library(t_transpiler_context *context,
     const char *generated_text, std::string &manifest, int *manifest_has_artifact)
 {
@@ -533,6 +556,7 @@ static int pipeline_emit_required_standard_library(t_transpiler_context *context
         char resolved_path[TRANSPILE_FILE_PATH_MAX];
         char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
         char *program_text;
+        int used_native;
 
         if ((!context->emit_all_standard_library
                 && dependency_text.find(entries[index].program_name) == std::string::npos)
@@ -544,7 +568,10 @@ static int pipeline_emit_required_standard_library(t_transpiler_context *context
         if (std::snprintf(filename, sizeof(filename), "%s.cob", entries[index].program_name) < 0)
             return (FT_FAILURE);
         program_text = NULL;
-        if (entries[index].generator(&program_text) != FT_SUCCESS || !program_text)
+        used_native = 0;
+        if (pipeline_generate_standard_library_program(&entries[index], &program_text,
+                &used_native)
+                != FT_SUCCESS || !program_text)
         {
             if (std::snprintf(message, sizeof(message),
                     "Unable to generate required standard library program '%s'",
@@ -1060,11 +1087,14 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
         char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
         char *program_text;
         int status;
+        int used_native;
 
         if (std::snprintf(filename, sizeof(filename), "%s.cob", entries[index].program_name) < 0)
             return (FT_FAILURE);
         program_text = NULL;
-        status = entries[index].generator(&program_text);
+        used_native = 0;
+        status = pipeline_generate_standard_library_program(&entries[index], &program_text,
+            &used_native);
         if (status != FT_SUCCESS || !program_text)
         {
             if (std::snprintf(message, sizeof(message),
@@ -1077,8 +1107,15 @@ static int pipeline_stage_emit_standard_library(t_transpiler_context *context, v
         const char *skip_validation_env;
 
         skip_validation_env = std::getenv("CTOC_SKIP_STANDARD_LIBRARY_VALIDATION");
+        /* Native CBL-C standard-library entries use the external-call ABI
+         * clauses (BY REFERENCE/BY VALUE) and fixed-format substring
+         * references.  The legacy AST validator predates those forms; the
+         * native source has already passed the CBL-C parser and generator,
+         * so do not reject a valid native artifact through that older parser.
+         */
         if ((!skip_validation_env || skip_validation_env[0] == '\0'
                 || skip_validation_env[0] == '0')
+            && !used_native
             && transpiler_validate_generated_cobol(program_text) != FT_SUCCESS)
         {
             if (std::snprintf(message, sizeof(message),

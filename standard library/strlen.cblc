@@ -1,0 +1,23 @@
+int F(char *source_char, int declared_length)
+{
+    int result;
+    int index;
+    result = 0;
+    index = 0;
+    while (index < declared_length)
+    {
+        if (source_char[index] == '\0')
+        {
+            index = declared_length;
+        }
+        else
+        {
+            if (source_char[index] != ' ')
+            {
+                result = index + 1;
+            }
+            index = index + 1;
+        }
+    }
+    return result;
+}

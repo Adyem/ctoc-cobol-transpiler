@@ -1149,6 +1149,14 @@ static int transpiler_context_type_signatures_compatible(
         return (0);
     if (left->kind != right->kind
         || std::strncmp(left->name, right->name, sizeof(left->name)) != 0
+        || left->has_base_type != right->has_base_type
+        || left->base_is_public != right->base_is_public
+        || left->exception_abi_version != right->exception_abi_version
+        || left->exception_policy_fingerprint != right->exception_policy_fingerprint
+        || left->exception_type_id != right->exception_type_id
+        || left->exception_payload_size != right->exception_payload_size
+        || std::strncmp(left->base_type_name, right->base_type_name,
+            sizeof(left->base_type_name)) != 0
         || left->field_count != right->field_count
         || left->method_count != right->method_count
         || left->constructor_count != right->constructor_count
@@ -2976,6 +2984,13 @@ int transpiler_context_register_function_signature_record(t_transpiler_context *
         return (FT_FAILURE);
     registered = const_cast<t_transpiler_function_signature *>(registered_const);
     registered->return_kind = record->return_kind;
+    registered->may_throw = record->may_throw;
+    registered->exception_abi_version = record->exception_abi_version;
+    registered->exception_policy_fingerprint = record->exception_policy_fingerprint;
+    registered->exception_type_count = record->exception_type_count;
+    std::memcpy(registered->exception_type_ids, record->exception_type_ids,
+        sizeof(registered->exception_type_ids));
+    registered->exception_types_unknown = record->exception_types_unknown;
     ft_strlcpy(registered->return_type_name, record->return_type_name,
         sizeof(registered->return_type_name));
     registered->is_template = record->is_template;
@@ -3112,6 +3127,40 @@ int transpiler_context_register_type_signature(t_transpiler_context *context, co
         transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
             TRANSPILE_ERROR_MODULE_UNKNOWN, message);
         transpiler_context_record_error(context, TRANSPILE_ERROR_MODULE_UNKNOWN);
+        return (FT_FAILURE);
+    }
+    if (source_signature->exception_type_id != 0)
+    {
+        index = 0;
+        while (index < context->type_count)
+        {
+            if (context->types[index].exception_type_id == source_signature->exception_type_id
+                && std::strncmp(context->types[index].name, source_signature->name,
+                    TRANSPILE_IDENTIFIER_MAX) != 0)
+            {
+                std::snprintf(message, sizeof(message),
+                    "exception type ID %zu is shared by incompatible types '%s' and '%s'",
+                    source_signature->exception_type_id, context->types[index].name,
+                    source_signature->name);
+                transpiler_diagnostics_push(&context->diagnostics,
+                    TRANSPILE_SEVERITY_ERROR,
+                    TRANSPILE_ERROR_EXCEPTION_TYPE_ID_COLLISION, message);
+                transpiler_context_record_error(context,
+                    TRANSPILE_ERROR_EXCEPTION_TYPE_ID_COLLISION);
+                return (FT_FAILURE);
+            }
+            index += 1;
+        }
+    }
+    if (source_signature->exception_payload_size > CBLC_EXCEPTION_PAYLOAD_MAX)
+    {
+        std::snprintf(message, sizeof(message),
+            "exception type '%s' requires payload size %zu, exceeding the configured limit %d",
+            source_signature->name, source_signature->exception_payload_size,
+            CBLC_EXCEPTION_PAYLOAD_MAX);
+        transpiler_diagnostics_push(&context->diagnostics, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_EXCEPTION_PAYLOAD_OVERFLOW, message);
+        transpiler_context_record_error(context, TRANSPILE_ERROR_EXCEPTION_PAYLOAD_OVERFLOW);
         return (FT_FAILURE);
     }
     index = 0;

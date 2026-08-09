@@ -7,6 +7,7 @@
 #include "compatibility/libft_compat.hpp"
 
 #define CBLC_TEMPLATE_PARAMETER_MAX 4
+#define CBLC_EXCEPTION_THROW_SET_MAX 64
 
 // ===============================
 // Core runtime support utilities
@@ -296,6 +297,8 @@ typedef enum e_transpiler_function_parameter_kind
 {
     TRANSPILE_FUNCTION_PARAMETER_UNKNOWN = 0,
     TRANSPILE_FUNCTION_PARAMETER_INT,
+    TRANSPILE_FUNCTION_PARAMETER_DOUBLE,
+    TRANSPILE_FUNCTION_PARAMETER_CHAR,
     TRANSPILE_FUNCTION_PARAMETER_STRING,
     TRANSPILE_FUNCTION_PARAMETER_STRUCT,
     TRANSPILE_FUNCTION_PARAMETER_VOID_POINTER,
@@ -325,6 +328,12 @@ typedef struct s_transpiler_function_signature
     char return_cobol_name[TRANSPILE_IDENTIFIER_MAX];
     char return_source_name[TRANSPILE_IDENTIFIER_MAX];
     int saw_return;
+    int may_throw;
+    size_t exception_abi_version;
+    unsigned long long exception_policy_fingerprint;
+    size_t exception_type_count;
+    size_t exception_type_ids[CBLC_EXCEPTION_THROW_SET_MAX];
+    int exception_types_unknown;
     t_cblc_statement *statements;
     size_t statement_count;
     int is_template;
@@ -371,6 +380,9 @@ typedef struct s_transpiler_type_method_signature
     t_cblc_statement *statements;
     size_t statement_count;
     int has_definition;
+    size_t exception_type_count;
+    size_t exception_type_ids[CBLC_EXCEPTION_THROW_SET_MAX];
+    int exception_types_unknown;
 }   t_transpiler_type_method_signature;
 
 typedef struct s_transpiler_type_constructor_signature
@@ -386,11 +398,21 @@ typedef struct s_transpiler_type_constructor_signature
     t_cblc_statement *statements;
     size_t statement_count;
     int has_definition;
+    size_t exception_type_count;
+    size_t exception_type_ids[CBLC_EXCEPTION_THROW_SET_MAX];
+    int exception_types_unknown;
 }   t_transpiler_type_constructor_signature;
 
 typedef struct s_transpiler_type_signature
 {
     char name[TRANSPILE_IDENTIFIER_MAX];
+    char base_type_name[TRANSPILE_IDENTIFIER_MAX];
+    int has_base_type;
+    int base_is_public;
+    size_t exception_abi_version;
+    unsigned long long exception_policy_fingerprint;
+    size_t exception_type_id;
+    size_t exception_payload_size;
     char module[TRANSPILE_MODULE_NAME_MAX];
     t_transpiler_type_kind kind;
     t_transpiler_symbol_visibility visibility;
@@ -460,6 +482,11 @@ typedef struct s_transpiler_data_signature
 #define TRANSPILE_ERROR_TEMPLATE_UNSUPPORTED_PARAMETER 1026
 #define TRANSPILE_ERROR_TEMPLATE_UNKNOWN_ARGUMENT 1027
 #define TRANSPILE_ERROR_TEMPLATE_INSTANTIATION_FAILED 1028
+#define TRANSPILE_ERROR_EXCEPTION_ABI_MISMATCH 1029
+#define TRANSPILE_ERROR_EXCEPTION_TYPE_ID_COLLISION 1030
+#define TRANSPILE_ERROR_EXCEPTION_PAYLOAD_OVERFLOW 1031
+#define TRANSPILE_ERROR_EXCEPTION_DESTRUCTOR_THROW 1032
+#define TRANSPILE_ERROR_EXCEPTION_POLICY_MISMATCH 1033
 
 typedef enum e_transpiler_file_role
 {
@@ -1238,6 +1265,7 @@ typedef enum e_cblc_data_kind
 {
     CBLC_DATA_KIND_CHAR = 0,
     CBLC_DATA_KIND_INT,
+    CBLC_DATA_KIND_DOUBLE,
     CBLC_DATA_KIND_STRING,
     CBLC_DATA_KIND_STRUCT,
     CBLC_DATA_KIND_VOID_POINTER,
@@ -1291,6 +1319,7 @@ typedef enum e_cblc_function_return_kind
 {
     CBLC_FUNCTION_RETURN_VOID = 0,
     CBLC_FUNCTION_RETURN_INT,
+    CBLC_FUNCTION_RETURN_DOUBLE,
     CBLC_FUNCTION_RETURN_STRUCT,
     CBLC_FUNCTION_RETURN_VOID_POINTER,
     CBLC_FUNCTION_RETURN_CHAR_POINTER,
@@ -1305,6 +1334,12 @@ typedef enum e_cblc_member_visibility
 }   t_cblc_member_visibility;
 
 #define TRANSPILE_STATEMENT_TEXT_MAX 256
+#define CBLC_EXCEPTION_REGION_MAX 128
+#define CBLC_EXCEPTION_CLEANUP_MAX 64
+#define CBLC_EXCEPTION_ABI_VERSION 1
+#define CBLC_EXCEPTION_RUNTIME_POLICY_FINGERPRINT 0x43424C43504F4C31ULL
+#define CBLC_EXCEPTION_STRING_PAYLOAD_MAX 256
+#define CBLC_EXCEPTION_PAYLOAD_MAX 65536
 
 typedef struct s_cblc_data_item
 {
@@ -1381,6 +1416,9 @@ typedef struct s_cblc_method
     size_t statement_count;
     size_t statement_capacity;
     int has_definition;
+    size_t exception_type_count;
+    size_t exception_type_ids[CBLC_EXCEPTION_THROW_SET_MAX];
+    int exception_types_unknown;
 }   t_cblc_method;
 
 typedef struct s_cblc_constructor
@@ -1391,12 +1429,21 @@ typedef struct s_cblc_constructor
     size_t statement_count;
     size_t statement_capacity;
     int has_definition;
+    size_t exception_type_count;
+    size_t exception_type_ids[CBLC_EXCEPTION_THROW_SET_MAX];
+    int exception_types_unknown;
 }   t_cblc_constructor;
 
 typedef struct s_cblc_struct_type
 {
     char source_name[TRANSPILE_IDENTIFIER_MAX];
     char cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    char base_type_name[TRANSPILE_IDENTIFIER_MAX];
+    int has_base_type;
+    int base_is_public;
+    size_t exception_abi_version;
+    size_t exception_type_id;
+    size_t exception_payload_size;
     t_cblc_struct_field *fields;
     size_t field_count;
     size_t field_capacity;
@@ -1483,9 +1530,11 @@ typedef struct s_cblc_file_declaration
     char source_name[TRANSPILE_IDENTIFIER_MAX];
     char cobol_name[TRANSPILE_IDENTIFIER_MAX];
     t_transpiler_file_role role;
+    t_transpiler_file_organization organization;
     char path[TRANSPILE_FILE_PATH_MAX];
     size_t record_length;
     char record_source_name[TRANSPILE_IDENTIFIER_MAX];
+    char record_key_source_name[TRANSPILE_IDENTIFIER_MAX];
 }   t_cblc_file_declaration;
 
 typedef enum e_cblc_statement_type
@@ -1505,7 +1554,16 @@ typedef enum e_cblc_statement_type
     CBLC_STATEMENT_FILE_WRITE,
     CBLC_STATEMENT_FILE_CLOSE,
     CBLC_STATEMENT_WHILE_BEGIN,
-    CBLC_STATEMENT_WHILE_END
+    CBLC_STATEMENT_WHILE_END,
+    CBLC_STATEMENT_IF_BEGIN,
+    CBLC_STATEMENT_IF_ELSE,
+    CBLC_STATEMENT_IF_END,
+    CBLC_STATEMENT_TRY_BEGIN,
+    CBLC_STATEMENT_TRY_BODY_END,
+    CBLC_STATEMENT_CATCH_BEGIN,
+    CBLC_STATEMENT_CATCH_END,
+    CBLC_STATEMENT_TRY_END,
+    CBLC_STATEMENT_THROW
 }   t_cblc_statement_type;
 
 struct s_cblc_statement
@@ -1518,6 +1576,26 @@ struct s_cblc_statement
     int call_is_external;
     char call_arguments[TRANSPILE_STATEMENT_TEXT_MAX];
     size_t call_argument_count;
+    size_t exception_region_id;
+    size_t exception_type_id;
+    char exception_type_name[TRANSPILE_IDENTIFIER_MAX];
+    int exception_is_catch_all;
+    int exception_catch_is_reference;
+    int exception_is_rethrow;
+    int exception_from_catch;
+    int exception_to_outer_region;
+    int exception_payload_is_struct;
+    int exception_payload_requires_copy;
+    int exception_payload_is_string;
+    char exception_payload_struct_type[TRANSPILE_IDENTIFIER_MAX];
+    char exception_payload_cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    size_t exception_source_line;
+    size_t exception_source_column;
+    int exception_has_region;
+    int exception_may_throw;
+    size_t exception_cleanup_base;
+    size_t exception_cleanup_count;
+    char exception_cleanup_targets[CBLC_EXCEPTION_CLEANUP_MAX][TRANSPILE_IDENTIFIER_MAX];
 };
 
 typedef struct s_cblc_function
@@ -1530,6 +1608,10 @@ typedef struct s_cblc_function
     size_t statement_count;
     size_t statement_capacity;
     int saw_return;
+    int may_throw;
+    size_t exception_type_count;
+    size_t exception_type_ids[CBLC_EXCEPTION_THROW_SET_MAX];
+    int exception_types_unknown;
     t_cblc_function_return_kind return_kind;
     char return_type_name[TRANSPILE_IDENTIFIER_MAX];
     int return_item_index;
@@ -1546,11 +1628,19 @@ typedef struct s_cblc_function
     size_t local_destructor_count;
     size_t local_destructor_capacity;
     size_t scope_id;
+    size_t exception_region_stack[CBLC_EXCEPTION_REGION_MAX];
+    size_t exception_cleanup_base_stack[CBLC_EXCEPTION_REGION_MAX];
+    size_t exception_region_depth;
+    size_t next_exception_region_id;
+    size_t active_catch_region_id;
+    size_t active_catch_cleanup_base;
+    int exception_in_catch;
 }   t_cblc_function;
 
 struct s_cblc_translation_unit
 {
     const char *source_text;
+    size_t source_file_id;
     t_cblc_data_item *data_items;
     size_t data_count;
     size_t data_capacity;
@@ -1596,6 +1686,7 @@ struct s_cblc_translation_unit
     size_t entry_function_index;
     size_t helper_literal_counter;
     int helper_status_index;
+    int is_native_standard_library;
     char program_name[TRANSPILE_IDENTIFIER_MAX];
     size_t active_scope_id;
 };
@@ -1604,9 +1695,11 @@ void cblc_translation_unit_init(t_cblc_translation_unit *unit);
 void cblc_translation_unit_dispose(t_cblc_translation_unit *unit);
 int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit);
 int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text);
+void cblc_set_native_standard_library_expression_mode(int enabled);
+int cblc_native_standard_library_expression_mode_enabled(void);
 int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text);
 int cblc_register_translation_unit_exports(t_transpiler_context *context, const char *module_name,
-    const t_cblc_translation_unit *unit);
+    t_cblc_translation_unit *unit);
 int cblc_import_translation_unit_type_stubs(t_transpiler_context *context, const char *module_name,
     t_cblc_translation_unit *unit);
 int cblc_import_translation_unit_function_stubs(t_transpiler_context *context,
@@ -1927,6 +2020,8 @@ const t_transpiler_standard_library_entry *transpiler_standard_library_get_entri
 const t_transpiler_standard_library_entry *transpiler_standard_library_lookup(const char *qualified_name);
 const t_transpiler_standard_library_entry *transpiler_standard_library_lookup_with_buffer_kind(
     const char *qualified_name, t_transpiler_standard_library_buffer_kind buffer_kind);
+const char *transpiler_standard_library_get_native_source(const char *program_name);
+int transpiler_standard_library_generate_native(const char *program_name, char **out_text);
 
 typedef struct s_transpiler_runtime_helper_entry
 {

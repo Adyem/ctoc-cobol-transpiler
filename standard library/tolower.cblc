@@ -1,0 +1,26 @@
+void F(char *t, int target_length, int status)
+{
+    int index;
+    char current;
+    status = 0;
+    index = 0;
+    while (index < target_length)
+    {
+        current = t[index];
+        if (current == '\0')
+        {
+            index = target_length;
+        }
+        else
+        {
+            if (current >= 'A')
+            {
+                if (current <= 'Z')
+                {
+                    t[index] = current + 32;
+                }
+            }
+            index = index + 1;
+        }
+    }
+}

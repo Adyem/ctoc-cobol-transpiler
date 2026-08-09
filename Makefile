@@ -29,6 +29,9 @@ FUZZ_ITERATIONS ?= 50
 FUZZ_MODE ?= all
 FUZZ_ARGS ?=
 
+STANDARD_LIBRARY_SOURCE_DIR = standard library
+STANDARD_LIBRARY_EMBEDDED_HEADER = src/standard_library/transpiler_standard_library_embedded.hpp
+
 ifeq ($(OS),Windows_NT)
     COBC_ON_PATH :=
     GOINFRE_COBC :=
@@ -93,51 +96,8 @@ SRC         = \
     src/transpiler/transpiler_cobol_reverse.cpp \
     src/standard_library/transpiler_standard_library.cpp \
     src/standard_library/transpiler_standard_library_state.cpp \
-    src/standard_library/transpiler_standard_library_strlen.cpp \
-    src/standard_library/transpiler_standard_library_strlen_string.cpp \
-    src/standard_library/transpiler_standard_library_strnlen.cpp \
-    src/standard_library/transpiler_standard_library_strnlen_string.cpp \
-    src/standard_library/transpiler_standard_library_strcmp.cpp \
-    src/standard_library/transpiler_standard_library_strcmp_string.cpp \
-    src/standard_library/transpiler_standard_library_strcpy.cpp \
-    src/standard_library/transpiler_standard_library_strcpy_string.cpp \
-    src/standard_library/transpiler_standard_library_strncpy.cpp \
-    src/standard_library/transpiler_standard_library_strncpy_string.cpp \
-    src/standard_library/transpiler_standard_library_memcmp.cpp \
-    src/standard_library/transpiler_standard_library_memcmp_string.cpp \
-    src/standard_library/transpiler_standard_library_strcat.cpp \
-    src/standard_library/transpiler_standard_library_strcat_string.cpp \
-    src/standard_library/transpiler_standard_library_strtod.cpp \
-    src/standard_library/transpiler_standard_library_strtod_string.cpp \
-    src/standard_library/transpiler_standard_library_abs.cpp \
-    src/standard_library/transpiler_standard_library_fabs.cpp \
-    src/standard_library/transpiler_standard_library_floor.cpp \
-    src/standard_library/transpiler_standard_library_ceil.cpp \
-    src/standard_library/transpiler_standard_library_exp.cpp \
-    src/standard_library/transpiler_standard_library_log.cpp \
-    src/standard_library/transpiler_standard_library_sin.cpp \
-    src/standard_library/transpiler_standard_library_cos.cpp \
-    src/standard_library/transpiler_standard_library_tan.cpp \
-    src/standard_library/transpiler_standard_library_rounded.cpp \
-    src/standard_library/transpiler_standard_library_banker_round.cpp \
-    src/standard_library/transpiler_standard_library_date_yyyymmdd.cpp \
-    src/standard_library/transpiler_standard_library_date_duration.cpp \
-    src/standard_library/transpiler_standard_library_atoi.cpp \
-    src/standard_library/transpiler_standard_library_atoi_string.cpp \
-    src/standard_library/transpiler_standard_library_atol.cpp \
-    src/standard_library/transpiler_standard_library_atol_string.cpp \
-    src/standard_library/transpiler_standard_library_atoll.cpp \
-    src/standard_library/transpiler_standard_library_atoll_string.cpp \
-    src/standard_library/transpiler_standard_library_powerof.cpp \
-    src/standard_library/transpiler_standard_library_sqrt.cpp \
-    src/standard_library/transpiler_standard_library_min.cpp \
-    src/standard_library/transpiler_standard_library_max.cpp \
-    src/standard_library/transpiler_standard_library_toupper.cpp \
-    src/standard_library/transpiler_standard_library_toupper_string.cpp \
-    src/standard_library/transpiler_standard_library_tolower.cpp \
-    src/standard_library/transpiler_standard_library_tolower_string.cpp \
-    src/standard_library/transpiler_standard_library_isdigit.cpp \
-    src/standard_library/transpiler_standard_library_isalpha.cpp
+    src/standard_library/transpiler_standard_library_native.cpp \
+    src/standard_library/transpiler_standard_library_compat.cpp \
 
 CC          = g++
 
@@ -226,6 +186,8 @@ else
 endif
 
 OBJS        = $(SRC:%.cpp=$(OBJ_DIR)/%.o)
+
+STANDARD_LIBRARY_NATIVE_OBJ = $(OBJ_DIR)/src/standard_library/transpiler_standard_library_native.o
 
 OBJS_NO_MAIN = $(filter-out $(OBJ_DIR)/main.o,$(OBJS))
 LSP_SRC     = src/lsp/cblc_lsp.cpp
@@ -423,6 +385,11 @@ debug:
 $(TARGET): $(OBJS)
 	@$(CC) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
 
+$(STANDARD_LIBRARY_EMBEDDED_HEADER): scripts/embed_standard_library.py FORCE
+	@$(PYTHON) scripts/embed_standard_library.py --source-dir "$(STANDARD_LIBRARY_SOURCE_DIR)" --output "$@"
+
+$(STANDARD_LIBRARY_NATIVE_OBJ): $(STANDARD_LIBRARY_EMBEDDED_HEADER)
+
 $(LSP_NAME): $(LSP_OBJ) $(OBJS_NO_MAIN)
 	@$(CC) $(CFLAGS) $(LSP_OBJ) $(OBJS_NO_MAIN) -o $@ $(LDFLAGS)
 
@@ -442,6 +409,9 @@ $(OBJ_DIR_TEST)/%.o: %.cpp
 	@$(CC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
 -include $(DEPS)
+
+.PHONY: FORCE
+FORCE:
 
 clean:
 	-$(RMDIR) $(OBJ_DIR) $(OBJ_DIR_DEBUG) $(OBJ_DIR_TEST)

@@ -1,0 +1,26 @@
+void F(double operand, double result, int status)
+{
+    int parity;
+    status = 0;
+    result = std::floor(operand);
+    if (operand != result)
+    {
+        status = 1;
+        parity = result;
+        parity = parity / 2;
+        if (operand >= 0)
+        {
+            if (parity * 2 != result)
+            {
+                result = result + 1;
+            }
+        }
+        else
+        {
+            if (parity * 2 != result)
+            {
+                result = result - 1;
+            }
+        }
+    }
+}

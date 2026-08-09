@@ -1,0 +1,85 @@
+void F(char *source_char, int source_length, int result, int status)
+{
+    int index;
+    int negative;
+    int digit;
+    int started;
+    int digit_count;
+    char current;
+    result = 0;
+    status = 0;
+    negative = 0;
+    index = 0;
+    started = 0;
+    digit_count = 0;
+    while (index < source_length && started == 0)
+    {
+        if (started == 0 && source_char[index] == ' ')
+        {
+            index = index + 1;
+        }
+        else
+        {
+            started = 1;
+            started = 1;
+        }
+    }
+    if (started == 1 && source_char[index] == '-')
+    {
+        negative = 1;
+        index = index + 1;
+    }
+    else
+    {
+        if (source_char[index] == '+')
+        {
+            index = index + 1;
+        }
+    }
+    while (index < source_length)
+    {
+        if (source_char[index] == ' ')
+        {
+            index = source_length;
+        }
+        else
+        {
+            if (source_char[index] < '0')
+            {
+                status = 1;
+                result = 0;
+                index = source_length;
+            }
+            else
+            {
+                if (source_char[index] > '9')
+                {
+                    status = 1;
+                    result = 0;
+                    index = source_length;
+                }
+                else
+                {
+                    current = source_char[index];
+                    digit = std::ord(current) - std::ord('0');
+                    digit_count = digit_count + 1;
+                    if (digit_count > 36)
+                    {
+                        status = 1;
+                        result = 0;
+                        index = source_length;
+                    }
+                    else
+                    {
+                        result = result * 10 + digit;
+                        index = index + 1;
+                    }
+                }
+            }
+        }
+    }
+    if (negative == 1)
+    {
+        result = 0 - result;
+    }
+}

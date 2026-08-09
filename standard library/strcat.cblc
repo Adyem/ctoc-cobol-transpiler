@@ -1,0 +1,56 @@
+void F(char *destination_char, int destination_length, char *left_char, int left_length, char *right_char, int right_length, int status, int result_length)
+{
+    int index;
+    int limit;
+    int output_index;
+    status = 0;
+    result_length = 0;
+    limit = destination_length;
+    if (limit > 255)
+    {
+        limit = 255;
+    }
+    index = 0;
+    output_index = 0;
+    while (index < limit)
+    {
+        if (destination_char[index] != ' ')
+        {
+            output_index = index + 1;
+        }
+        index = index + 1;
+    }
+    result_length = output_index;
+    index = 0;
+    while (index < left_length)
+    {
+        if (output_index >= limit)
+        {
+            status = 1;
+            index = left_length;
+        }
+        else
+        {
+            destination_char[output_index] = left_char[index];
+            output_index = output_index + 1;
+            result_length = output_index;
+            index = index + 1;
+        }
+    }
+    index = 0;
+    while (index < right_length)
+    {
+        if (output_index >= limit)
+        {
+            status = 1;
+            index = right_length;
+        }
+        else
+        {
+            destination_char[output_index] = right_char[index];
+            output_index = output_index + 1;
+            result_length = output_index;
+            index = index + 1;
+        }
+    }
+}

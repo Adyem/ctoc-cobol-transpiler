@@ -1,12 +1,87 @@
 # Native COBOL Exception Handling and RAII Implementation Plan
 
-**Status:** design proposal; no exception syntax or ABI is implemented yet  
+**Status:** implementation in progress; the native COBOL lowering slice and versioned exception ABI are implemented, while the full payload ABI, runtime policy, and class hierarchy remain planned
 **Target:** CBL-C source with C++-like `try`, `catch`, and `throw`, lowered to portable generated COBOL  
 **Hard constraint:** no DWARF metadata, platform unwinder, C++ exception runtime, `setjmp`/`longjmp`, or hidden native stack walking
 
 ## 1. Intended result
 
 CBL-C should provide structured exceptions that feel familiar to a C++ programmer while retaining deterministic CBL-C object lifetimes and producing ordinary COBOL control flow.
+
+The current implementation covers parsing and lowering of integer and string throws,
+typed and catch-all handlers, rethrows, lexical cleanup metadata, propagation from local
+throwing calls through shared generated COBOL exception state, a fatal guard for
+double exceptions during generated raising or cleanup, and typed payload storage for
+trivially copyable user-defined structs/classes. It also supports recursively copyable
+payloads containing inline or dynamically owned string fields by generated field-wise
+`BUF`/`LEN` copying and allocation/free cleanup. Pointer fields, arrays, and user-defined
+destructors remain rejected until generated move/copy construction and destruction
+dispatch are available. Scalar, string, trivial-struct, and supported managed-struct
+`const Type&` catches bind to the active payload group. Directly throwing class methods
+are emitted as exception-aware paragraphs and callers check the shared context after
+method or constructor `PERFORM` calls.
+Constructor field progress is tracked in declaration order so a constructor failure
+cleans previously completed managed fields while leaving the currently failing field
+unclaimed. Nested constructor failure uses the same rule for the enclosing object.
+Single inheritance is now accepted for classes with one
+non-inherited base. Derived type IDs are included in base-catch matching, and a
+generated base payload view is materialized before the handler so base references and
+values use the base layout. Multiple inheritance and inherited constructor dispatch
+remain outside this slice.
+Only public inheritance participates in an external base catch; private and protected
+inheritance is preserved in imported metadata but is not treated as an accessible base
+conversion.
+For the supported single-base form, a defined zero-argument base constructor is emitted
+before derived-field and derived-body statements; a base requiring explicit constructor
+arguments is rejected until initializer-list forwarding is implemented.
+The complete design remains broader: multiple-inheritance matching, context parameters for every
+future exception-aware procedure shape, and source-location-rich diagnostics are release-gated
+follow-up work. The current ABI already passes the context to exception-aware external module
+entries and preserves a shared context for local paragraphs. Exported throwing function
+signatures now carry exception ABI version 1, and exported type signatures carry that
+version plus their deterministic exception type ID; imported throwing calls and type
+stubs reject incompatible versions. Generated context records now include and populate
+`CBLC-EX-PAYLOAD-SIZE` for scalar, string, struct, file-status, and allocation failures.
+Registration also rejects different exported
+type names that claim the same nonzero type ID with a dedicated diagnostic. Type IDs
+include the exception ABI version in their deterministic hash input. Runtime
+throws of strings whose live length exceeds the bounded 256-byte string payload
+storage terminate through `CBLC-TERMINATE` instead of silently truncating. The generated context also keeps
+separate dynamic-type and payload-owner fields so derived-to-base matching does not erase the
+concrete type identity and payload cleanup can be audited explicitly.
+Direct `throw` statements now populate a deterministic source file ID plus portable
+source line and column fields in that context; clearing a handled payload resets them,
+and `CBLC-TERMINATE` reports the original location when a double exception occurs.
+When the second failure is a direct `throw`, its own line and column are retained in
+secondary location fields and reported separately by `CBLC-TERMINATE`. Call-site frame
+chains remain future metadata. File, raw-call, allocation, and arithmetic failure
+adapters also retain the source position of their originating statement when available.
+Looped sequential-file reads now retain the position of the source `while (read(...))`
+operation as well.
+Destructors are rejected if their bodies contain direct throws, exception regions, or
+call/file operations whose non-throwing effect cannot yet be proven; cleanup therefore
+remains non-throwing in the implemented subset.
+External entry points in a unit with any possible exception are emitted with the hidden
+`CBLC-EX-CONTEXT` linkage item, so a throwing entry cannot return through an
+exception-unaware COBOL procedure signature. This boundary is covered by a generation
+regression test.
+The parser also preserves source line and column metadata on `TRY_BEGIN` and
+`CATCH_BEGIN` statements, extending the existing throw and adapter locations for future
+diagnostics and generated debug comments.
+Statement substitution used for constructor and method lowering preserves exception
+payload-copy requirements and source locations, so managed catches retain their ownership
+and diagnostic semantics after lowering.
+COBOL emission now protects exact COBOL reserved-word collisions in user identifiers
+with a deterministic `CBLC-USER-` prefix; this keeps exception payload declarations and
+their generated handler references valid, including class payloads caught by base type.
+Generated try/catch labels are qualified by their containing COBOL paragraph, so
+propagation across multiple exception-aware functions cannot collide at link or
+syntax-validation time.
+The current parser accepts one explicit base-class declaration and records its base fields in
+the concrete payload layout. Multiple inheritance, inherited constructor dispatch, access-path
+metadata remain future ABI work; the current type signature exports the single base name so
+separately compiled consumers preserve the same matching relationship. Inheritance must not be
+inferred from names.
 
 ```cblc
 try {
@@ -35,7 +110,7 @@ The required observable behavior is:
 6. Managed strings release owned dynamic storage at the end of their lifetime. Borrowed storage is never released by the borrower.
 7. A handled exception is destroyed after its handler and catch parameter finish. A rethrow preserves the same exception object.
 8. Generated programs implement propagation with COBOL data items, `CALL`, `IF`/`EVALUATE`, `PERFORM`, and generated paragraphs.
-9. If a second exception is raised while another exception is being created, propagated, or cleaned up, the program terminates immediately through `CBLC-TERMINATE`. The second exception must never replace, hide, or resume propagation of the first.
+9. If a second exception is raised while another exception is being created, propagated, or cleaned up, the program is aborted immediately through `CBLC-TERMINATE`. The second exception must never replace, hide, or resume propagation of the first. This is an explicit termination rule, not an uncaught-exception fallback.
 
 This is C++-like source behavior, not binary compatibility with the C++ exception ABI.
 
@@ -274,6 +349,11 @@ Track materialized temporaries explicitly. Except when lifetime extension is def
 
 This phase is necessary before supporting complex nested calls safely. Until implemented, reject expressions whose required temporary lifetime cannot be represented correctly.
 
+The current native CBL-C subset enforces this boundary conservatively: `throw` accepts
+literal values, existing scalar/string/struct objects, and rethrow, but does not accept
+temporary constructor expressions or other unnamed materializations. Those forms fail
+parsing instead of entering the exception context without a tracked owner.
+
 ### 6.6 Managed strings
 
 The current language defines `string` as a managed fixed-capacity value object, while the emitter can also use dynamic backing storage for relevant forms. Give every string value an explicit ownership category:
@@ -347,6 +427,17 @@ may throw unknown
 
 Known sets improve unreachable-catch diagnostics and allow call-site checks to be removed. Recursive call graphs need a fixed-point analysis. Imported declarations carry a conservative summary in their manifest. This effect system should remain internal initially and can later support `noexcept`, documentation, and optimization.
 
+The current implementation exports a bounded set of known exception type IDs plus an
+`unknown` flag. Direct typed throws populate the set; rethrows, file operations, and
+exception-capable external calls conservatively set `unknown`, so later optimizations
+cannot accidentally suppress propagation checks.
+Local call graphs are resolved with a bounded monotone fixed-point pass, so a throw is
+also visible through transitive calls regardless of function declaration order. Export
+registration performs this pass before publishing function metadata.
+The same bounded summary fields are now present on exported method and constructor
+signatures; direct member-body throws are recorded, while unresolved member effects
+remain marked unknown.
+
 ## 8. Class hierarchy and exception safety
 
 The existing `t_cblc_struct_type` currently models class/struct identity, fields, methods, constructors, and destructors but does not expose base-class metadata in the shown representation. Exception inheritance requires adding explicit base descriptors rather than inferring relationships from names.
@@ -373,17 +464,45 @@ COBOL has operation-specific failure mechanisms, not one portable general except
 
 `DECLARATIVES` and `USE AFTER STANDARD ERROR PROCEDURE` may support file-level adapters, but they must not implement lexical `try` by themselves. Their control rules and portability differ by dialect. Normalize any caught COBOL condition into the same exception context, then use the normal cleanup graph.
 
+The current lowering implements the arithmetic portion of this boundary for computations inside
+a `try`: generated `ON SIZE ERROR` clauses raise an integer-compatible numeric failure, apply
+the active/raising/cleaning double-exception guard, and enter ordinary handler dispatch. File-status
+handling is also implemented for the generated sequential-file model: each file has a `FILE STATUS`
+item, OPEN/CLOSE/WRITE failures and non-EOF READ failures become string payload exceptions, and
+status `10` remains ordinary `AT END` behavior. Native CBL-C indexed declarations using
+`file indexed <name> \"<path>\";` now emit `ORGANIZATION IS INDEXED`, a record key, and an
+`INVALID KEY` scope on writes; the resulting file status is normalized through the same
+string exception payload and cleanup path. External-call adapters remain release-gated
+follow-up work. Raw external calls made inside a `try` now use native
+`CALL ... ON EXCEPTION` lowering with the same integer-compatible context payload and
+double-exception guard; calls already using the exception-aware ABI continue to pass the
+shared context directly.
+Raw calls in a unit that already has exception-aware code are also adapted outside a
+lexical `try`: a native call failure fills the shared context and exits through the
+function's normal cleanup/propagation path. Units with no exception context retain the
+ordinary raw-call behavior. The effect analysis marks these adapted calls as potentially
+throwing so local callers still emit their immediate context checks.
+
 Raw external COBOL calls should use generated adapters with one of three declared policies:
 
 1. cannot throw;
 2. returns a status translated into a CBL-C exception; or
 3. exception-aware and accepts the CBL-C context ABI.
 
+Pointer allocation through the built-in `std::malloc`/`std::realloc` lowering is also
+checked inside a `try`: after native `ALLOCATE`, a null returned pointer is translated
+into the same integer-compatible exception context. This keeps allocation failure from
+silently continuing past a potentially throwing operation; allocation failure during
+active exception processing still terminates through the double-exception guard.
+Managed-string exception-payload copies perform the same null check while the raising
+state is active, so failure to construct or copy the payload reaches `CBLC-TERMINATE`
+instead of leaving a partially initialized exception visible to a handler.
+
 ## 10. Integration with existing features
 
 ### 10.1 Functions, methods, and constructors
 
-Add `may_throw` and exception ABI version to `t_cblc_function`, `t_cblc_method`, and constructor metadata. Generated method calls pass the receiver, logical arguments, optional result slot, then exception context. Constructor calls additionally expose construction progress to their failure cleanup blocks.
+Add `may_throw` and exception ABI version to `t_cblc_function`, `t_cblc_method`, and constructor metadata. Generated method calls pass the receiver, logical arguments, optional result slot, then exception context. Constructor calls additionally expose construction progress to their failure cleanup blocks. Function, method, and constructor exports carry bounded known throw IDs plus an unknown-effect flag.
 
 ### 10.2 Templates
 
@@ -397,8 +516,18 @@ Extend exported module metadata with:
 - maximum payload requirement;
 - exported throwable type IDs and hierarchy edges;
 - copy/move/destruct operation ownership;
-- per-function throw summary; and
+- per-function throw summary, consisting of bounded known exception type IDs plus an
+  unknown-effect flag; and
 - runtime policy fingerprint.
+
+The current implementation has begun this contract: throwing function signatures carry
+`exception_abi_version` and a runtime-policy fingerprint, type signatures carry the same
+version and fingerprint plus a deterministic `exception_type_id`, and import/call resolution
+rejects incompatible versions or policy fingerprints with dedicated diagnostics. Payload
+bounds and operation-owner registries remain future metadata fields; the current metadata
+now carries a bounded per-type payload-size requirement and rejects values above
+`CBLC_EXCEPTION_PAYLOAD_MAX`.
+Function signatures also carry the bounded throw summary described in section 7.3.
 
 Include these fields in incremental cache keys and layout fingerprints. A mismatched ABI must be a link/transpile diagnostic, never silently accepted.
 

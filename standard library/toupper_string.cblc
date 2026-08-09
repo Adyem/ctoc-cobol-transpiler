@@ -1,0 +1,19 @@
+void F(string x, int status)
+{
+    int index;
+    char current;
+    status = 0;
+    index = 0;
+    while (index < x.len)
+    {
+        current = x[index];
+        if (current >= 'a')
+        {
+            if (current <= 'z')
+            {
+                x[index] = current - 32;
+            }
+        }
+        index = index + 1;
+    }
+}

@@ -1113,8 +1113,11 @@ static int cblc_parse_qualified_method_definition(const char **cursor,
 static int cblc_parse_struct_definition(const char **cursor, t_cblc_translation_unit *unit)
 {
     t_cblc_struct_type *type;
+    const t_cblc_struct_type *base_type;
     char identifier[TRANSPILE_IDENTIFIER_MAX];
+    char base_identifier[TRANSPILE_IDENTIFIER_MAX];
     int is_class;
+    int base_is_public;
     t_cblc_member_visibility current_visibility;
 
     if (!cursor || !*cursor || !unit)
@@ -1131,9 +1134,6 @@ static int cblc_parse_struct_definition(const char **cursor, t_cblc_translation_
     if (cblc_find_struct_type(unit, identifier)
         || cblc_find_template_struct(unit, identifier))
         return (FT_FAILURE);
-    cblc_skip_whitespace(cursor);
-    if (**cursor != '{')
-        return (FT_FAILURE);
     if (unit->struct_type_count >= unit->struct_type_capacity)
     {
         if (cblc_translation_unit_ensure_struct_capacity(unit,
@@ -1145,10 +1145,66 @@ static int cblc_parse_struct_definition(const char **cursor, t_cblc_translation_
     ft_strlcpy(type->source_name, identifier, sizeof(type->source_name));
     cblc_identifier_to_cobol(identifier, type->cobol_name, sizeof(type->cobol_name));
     type->is_class = is_class;
+    base_is_public = 0;
     if (is_class)
         current_visibility = CBLC_MEMBER_VISIBILITY_PRIVATE;
     else
         current_visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
+    cblc_skip_whitespace(cursor);
+    if (**cursor == ':')
+    {
+        if (!is_class)
+            return (FT_FAILURE);
+        *cursor += 1;
+        cblc_skip_whitespace(cursor);
+        if (cblc_match_keyword(cursor, "public") != FT_SUCCESS)
+            base_is_public = 1;
+        else if (cblc_match_keyword(cursor, "protected") != FT_SUCCESS
+            || cblc_match_keyword(cursor, "private") != FT_SUCCESS)
+            base_is_public = 0;
+        else
+        {
+            /* Class inheritance defaults to private, as in C++. */
+        }
+        cblc_skip_whitespace(cursor);
+        if (cblc_parse_identifier(cursor, base_identifier, sizeof(base_identifier))
+            != FT_SUCCESS)
+            return (FT_FAILURE);
+        base_type = cblc_find_struct_type(unit, base_identifier);
+        if (!base_type || base_type == type || base_type->is_builtin
+            || base_type->has_base_type)
+            return (FT_FAILURE);
+        type->has_base_type = 1;
+        type->base_is_public = base_is_public;
+        ft_strlcpy(type->base_type_name, base_type->source_name,
+            sizeof(type->base_type_name));
+        {
+            size_t base_field_index;
+
+            base_field_index = 0;
+            while (base_field_index < base_type->field_count)
+            {
+                const t_cblc_struct_field *base_field;
+
+                base_field = &base_type->fields[base_field_index];
+                if (cblc_struct_type_append_field(type, base_field->source_name,
+                        base_field->length, base_field->array_count, base_field->kind,
+                        base_field->struct_type_name, base_field->is_const,
+                        base_field->visibility) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                type->fields[type->field_count - 1].is_borrowed = base_field->is_borrowed;
+                type->fields[type->field_count - 1].is_template_parameter =
+                    base_field->is_template_parameter;
+                ft_strlcpy(type->fields[type->field_count - 1].template_parameter_name,
+                    base_field->template_parameter_name,
+                    sizeof(type->fields[type->field_count - 1].template_parameter_name));
+                base_field_index += 1;
+            }
+        }
+        cblc_skip_whitespace(cursor);
+    }
+    if (**cursor != '{')
+        return (FT_FAILURE);
     *cursor += 1;
     while (**cursor != '\0')
     {
@@ -1356,6 +1412,12 @@ static int cblc_template_argument_shape(const t_cblc_translation_unit *unit,
         *kind = *pointer_depth == 0 ? CBLC_DATA_KIND_INT
             : (*pointer_depth == 1 ? CBLC_DATA_KIND_INT_POINTER
                 : CBLC_DATA_KIND_INT_POINTER_POINTER);
+    else if (std::strcmp(base, "double") == 0 || std::strcmp(base, "float") == 0)
+    {
+        if (*pointer_depth != 0)
+            return (FT_FAILURE);
+        *kind = CBLC_DATA_KIND_DOUBLE;
+    }
     else if (std::strcmp(base, "char") == 0)
     {
         if (*pointer_depth > 1)
@@ -2602,6 +2664,34 @@ static t_cblc_data_item *cblc_add_generated_int_item(t_cblc_translation_unit *un
     return (item);
 }
 
+static t_cblc_data_item *cblc_add_generated_double_item(t_cblc_translation_unit *unit,
+    const char *identifier)
+{
+    t_cblc_data_item *item;
+
+    if (!unit || !identifier)
+        return (NULL);
+    item = cblc_find_data_item(unit, identifier);
+    if (item)
+        return (item);
+    if (unit->data_count >= unit->data_capacity
+        && cblc_translation_unit_ensure_data_capacity(unit,
+            unit->data_capacity == 0 ? 4 : unit->data_capacity * 2) != FT_SUCCESS)
+        return (NULL);
+    item = &unit->data_items[unit->data_count];
+    std::memset(item, 0, sizeof(*item));
+    ft_strlcpy(item->source_name, identifier, sizeof(item->source_name));
+    cblc_identifier_to_cobol(identifier, item->cobol_name, sizeof(item->cobol_name));
+    item->owner_function_name[0] = '\0';
+    item->length = 0;
+    item->kind = CBLC_DATA_KIND_DOUBLE;
+    item->scope_id = unit->active_scope_id;
+    item->scope_depth = unit->scopes && unit->active_scope_id < unit->scope_count
+        ? unit->scopes[unit->active_scope_id].depth : 0;
+    unit->data_count += 1;
+    return (item);
+}
+
 static t_cblc_data_item *cblc_create_return_item(t_cblc_translation_unit *unit,
     const char *function_identifier, t_cblc_function_return_kind return_kind,
     const char *return_type_name)
@@ -2616,6 +2706,8 @@ static t_cblc_data_item *cblc_create_return_item(t_cblc_translation_unit *unit,
         return (NULL);
     if (return_kind == CBLC_FUNCTION_RETURN_INT)
         return (cblc_add_generated_int_item(unit, identifier));
+    if (return_kind == CBLC_FUNCTION_RETURN_DOUBLE)
+        return (cblc_add_generated_double_item(unit, identifier));
     if (return_kind == CBLC_FUNCTION_RETURN_VOID_POINTER)
     {
         cblc_identifier_to_cobol(identifier, cobol_name, sizeof(cobol_name));
@@ -2705,6 +2797,11 @@ static int cblc_parse_function_return_type(const char **cursor, const t_cblc_tra
         *out_kind = CBLC_FUNCTION_RETURN_INT;
         return (FT_SUCCESS);
     }
+    if (cblc_match_keyword(cursor, "double") || cblc_match_keyword(cursor, "float"))
+    {
+        *out_kind = CBLC_FUNCTION_RETURN_DOUBLE;
+        return (FT_SUCCESS);
+    }
     if (cblc_parse_identifier(cursor, identifier, sizeof(identifier)) != FT_SUCCESS)
     {
         *cursor = start;
@@ -2741,6 +2838,8 @@ static int cblc_function_return_matches_target(const t_cblc_function *function,
         return (0);
     if (function->return_kind == CBLC_FUNCTION_RETURN_INT)
         return (target_item->kind == CBLC_DATA_KIND_INT);
+    if (function->return_kind == CBLC_FUNCTION_RETURN_DOUBLE)
+        return (target_item->kind == CBLC_DATA_KIND_DOUBLE);
     if (function->return_kind == CBLC_FUNCTION_RETURN_STRUCT)
     {
         if (target_item->kind != CBLC_DATA_KIND_STRUCT)
@@ -2779,6 +2878,16 @@ static int cblc_parameter_kind_from_data_kind(t_cblc_data_kind kind,
     if (kind == CBLC_DATA_KIND_INT)
     {
         *out_kind = TRANSPILE_FUNCTION_PARAMETER_INT;
+        return (FT_SUCCESS);
+    }
+    if (kind == CBLC_DATA_KIND_DOUBLE)
+    {
+        *out_kind = TRANSPILE_FUNCTION_PARAMETER_DOUBLE;
+        return (FT_SUCCESS);
+    }
+    if (kind == CBLC_DATA_KIND_CHAR)
+    {
+        *out_kind = TRANSPILE_FUNCTION_PARAMETER_CHAR;
         return (FT_SUCCESS);
     }
     if (kind == CBLC_DATA_KIND_STRING)
@@ -2823,6 +2932,8 @@ static int cblc_function_return_kind_from_data_kind(t_cblc_data_kind kind,
         *out_kind = CBLC_FUNCTION_RETURN_VOID;
     else if (kind == CBLC_DATA_KIND_INT)
         *out_kind = CBLC_FUNCTION_RETURN_INT;
+    else if (kind == CBLC_DATA_KIND_DOUBLE)
+        *out_kind = CBLC_FUNCTION_RETURN_DOUBLE;
     else if (kind == CBLC_DATA_KIND_STRUCT)
         *out_kind = CBLC_FUNCTION_RETURN_STRUCT;
     else if (kind == CBLC_DATA_KIND_VOID_POINTER)
@@ -2866,9 +2977,38 @@ static int cblc_parse_parameter_type(const char **cursor, t_cblc_translation_uni
         *out_kind = CBLC_DATA_KIND_INT;
         return (FT_SUCCESS);
     }
+    if (cblc_match_keyword(cursor, "double") || cblc_match_keyword(cursor, "float"))
+    {
+        *out_kind = CBLC_DATA_KIND_DOUBLE;
+        return (FT_SUCCESS);
+    }
+    if (cblc_match_keyword(cursor, "char"))
+    {
+        *out_kind = CBLC_DATA_KIND_CHAR;
+        return (FT_SUCCESS);
+    }
     if (cblc_match_keyword(cursor, "string"))
     {
         *out_kind = CBLC_DATA_KIND_STRING;
+        cblc_skip_whitespace(cursor);
+        if (**cursor == '(')
+        {
+            size_t capacity;
+
+            *cursor += 1;
+            capacity = 0;
+            while (**cursor >= '0' && **cursor <= '9')
+            {
+                capacity = capacity * 10
+                    + static_cast<size_t>(**cursor - '0');
+                *cursor += 1;
+            }
+            cblc_skip_whitespace(cursor);
+            if (capacity == 0 || **cursor != ')' || !type_name || type_name_size == 0
+                || std::snprintf(type_name, type_name_size, "%zu", capacity) < 0)
+                return (FT_FAILURE);
+            *cursor += 1;
+        }
         return (FT_SUCCESS);
     }
     if (!unit || !type_name || type_name_size == 0)
@@ -2913,6 +3053,16 @@ static int cblc_data_kind_from_parameter_kind(t_transpiler_function_parameter_ki
     if (parameter_kind == TRANSPILE_FUNCTION_PARAMETER_INT)
     {
         *out_kind = CBLC_DATA_KIND_INT;
+        return (FT_SUCCESS);
+    }
+    if (parameter_kind == TRANSPILE_FUNCTION_PARAMETER_DOUBLE)
+    {
+        *out_kind = CBLC_DATA_KIND_DOUBLE;
+        return (FT_SUCCESS);
+    }
+    if (parameter_kind == TRANSPILE_FUNCTION_PARAMETER_CHAR)
+    {
+        *out_kind = CBLC_DATA_KIND_CHAR;
         return (FT_SUCCESS);
     }
     if (parameter_kind == TRANSPILE_FUNCTION_PARAMETER_STRING)
@@ -2961,6 +3111,7 @@ static int cblc_add_parameter_binding(t_cblc_translation_unit *unit,
     const t_cblc_struct_type *struct_type;
     t_cblc_data_item *actual_item;
     t_cblc_data_item *alias_item;
+    size_t parameter_length;
 
     if (!unit || !parameters || !parameter_count || !scope_source_name
         || !scope_cobol_name || !parameter_name)
@@ -2980,6 +3131,17 @@ static int cblc_add_parameter_binding(t_cblc_translation_unit *unit,
     struct_type = NULL;
     actual_item = cblc_find_data_item(unit, actual_source_name);
     alias_item = cblc_find_data_item(unit, parameter_name);
+    parameter_length = 0;
+    if (kind == CBLC_DATA_KIND_STRING)
+    {
+        parameter_length = 255;
+        if (type_name && type_name[0] != '\0')
+        {
+            parameter_length = static_cast<size_t>(std::strtoul(type_name, NULL, 10));
+            if (parameter_length == 0)
+                return (FT_FAILURE);
+        }
+    }
     if (kind == CBLC_DATA_KIND_STRUCT)
     {
         if (!type_name || type_name[0] == '\0')
@@ -3044,12 +3206,14 @@ static int cblc_add_parameter_binding(t_cblc_translation_unit *unit,
     else
     {
         if (!actual_item
-            && cblc_add_named_data_item(unit, actual_source_name, actual_cobol_name, kind, 0, 0,
-                    NULL, owner_function_name, 0, 0, 0) != FT_SUCCESS)
+            && cblc_add_named_data_item(unit, actual_source_name, actual_cobol_name, kind,
+                parameter_length, 0,
+                NULL, owner_function_name, 0, 0, 0) != FT_SUCCESS)
             return (FT_FAILURE);
         if (!alias_item
-            && cblc_add_named_data_item(unit, parameter_name, actual_cobol_name, kind, 0, 0,
-                    NULL, NULL, 0, 1, 0) != FT_SUCCESS)
+            && cblc_add_named_data_item(unit, parameter_name, actual_cobol_name, kind,
+                parameter_length, 0,
+                NULL, NULL, 0, 1, 0) != FT_SUCCESS)
             return (FT_FAILURE);
     }
     ft_strlcpy(parameters[*parameter_count].source_name, parameter_name,
@@ -3064,6 +3228,7 @@ static int cblc_add_parameter_binding(t_cblc_translation_unit *unit,
         ft_strlcpy(parameters[*parameter_count].type_name, type_name,
             sizeof(parameters[*parameter_count].type_name));
     parameters[*parameter_count].kind = parameter_kind;
+    parameters[*parameter_count].length = parameter_length;
     parameters[*parameter_count].array_count = 0;
     *parameter_count += 1;
     return (FT_SUCCESS);

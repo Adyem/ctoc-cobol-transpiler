@@ -106,9 +106,13 @@ int test_cblc_import_type_stubs_preserve_struct_pointer_method_return_metadata_f
 int test_cblc_import_type_stubs_register_struct_method_parameter_storage_from_signature(void);
 int test_cblc_import_type_stubs_do_not_follow_transitive_imports(void);
 int test_cblc_register_translation_unit_exports_records_entrypoint_and_helpers(void);
+int test_cblc_register_translation_unit_exports_records_exception_throw_summary(void);
+int test_cblc_resolve_translation_unit_propagates_transitive_exception_summary(void);
+int test_cblc_register_translation_unit_exports_records_method_exception_summary(void);
 int test_cblc_register_translation_unit_exports_skips_entrypoint_without_main(void);
 int test_cblc_register_translation_unit_exports_and_imports_public_data(void);
 int test_cblc_register_translation_unit_exports_reports_duplicate_entrypoint(void);
+int test_cblc_register_type_signatures_reject_exception_type_id_collision(void);
 int test_transpiler_context_scans_imports_and_orders_modules(void);
 int test_transpiler_context_orders_modules_deterministically(void);
 int test_transpiler_context_resolves_imports_by_file_name(void);
@@ -265,9 +269,13 @@ const t_test_case *get_transpiler_context_tests(size_t *count)
         {"cblc_import_type_stubs_register_struct_method_parameter_storage_from_signature", test_cblc_import_type_stubs_register_struct_method_parameter_storage_from_signature},
         {"cblc_import_type_stubs_do_not_follow_transitive_imports", test_cblc_import_type_stubs_do_not_follow_transitive_imports},
         {"cblc_register_translation_unit_exports_records_entrypoint_and_helpers", test_cblc_register_translation_unit_exports_records_entrypoint_and_helpers},
+        {"cblc_register_translation_unit_exports_records_exception_throw_summary", test_cblc_register_translation_unit_exports_records_exception_throw_summary},
+        {"cblc_resolve_translation_unit_propagates_transitive_exception_summary", test_cblc_resolve_translation_unit_propagates_transitive_exception_summary},
+        {"cblc_register_translation_unit_exports_records_method_exception_summary", test_cblc_register_translation_unit_exports_records_method_exception_summary},
         {"cblc_register_translation_unit_exports_skips_entrypoint_without_main", test_cblc_register_translation_unit_exports_skips_entrypoint_without_main},
         {"cblc_register_translation_unit_exports_and_imports_public_data", test_cblc_register_translation_unit_exports_and_imports_public_data},
         {"cblc_register_translation_unit_exports_reports_duplicate_entrypoint", test_cblc_register_translation_unit_exports_reports_duplicate_entrypoint},
+        {"cblc_register_type_signatures_reject_exception_type_id_collision", test_cblc_register_type_signatures_reject_exception_type_id_collision},
         {"transpiler_context_scans_imports_and_orders_modules", test_transpiler_context_scans_imports_and_orders_modules},
         {"transpiler_context_orders_modules_deterministically", test_transpiler_context_orders_modules_deterministically},
         {"transpiler_context_resolves_imports_by_file_name", test_transpiler_context_resolves_imports_by_file_name},

@@ -1,0 +1,9 @@
+void F(double left, double right, double result, int status)
+{
+    status = 0;
+    result = left;
+    if (right < result)
+    {
+        result = right;
+    }
+}

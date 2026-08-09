@@ -272,3 +272,201 @@ cleanup:
     transpiler_context_dispose(&context);
     return (status);
 }
+
+FT_TEST(test_cblc_register_translation_unit_exports_records_exception_throw_summary)
+{
+    t_transpiler_context context;
+    t_cblc_translation_unit unit;
+    const t_transpiler_function_signature *signature;
+    int status;
+
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(transpiler_context_register_module(&context, "summary_mod", NULL),
+            "module registration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_parse_translation_unit(
+            "void worker() {\n    throw 7;\n}\n", &unit),
+            "throwing translation unit should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_register_translation_unit_exports(&context, "summary_mod", &unit),
+            "export registration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    signature = transpiler_context_find_function(&context, "summary_mod", "worker");
+    if (!signature)
+    {
+        std::printf("Assertion failed: expected worker function to be registered\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(static_cast<int>(signature->exception_type_count), 1,
+            "known throw should export one exception type") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(static_cast<int>(signature->exception_type_ids[0] != 0), 1,
+            "known throw should export a nonzero exception type ID") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(signature->exception_types_unknown, 0,
+            "direct known throw should not be marked unknown") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_cblc_resolve_translation_unit_propagates_transitive_exception_summary)
+{
+    t_transpiler_context context;
+    t_cblc_translation_unit unit;
+    const t_transpiler_function_signature *exported_signature;
+    const char *source;
+    size_t index;
+    int status;
+
+    source = "void leaf() {\n    throw 7;\n}\n"
+        "void middle() {\n    leaf();\n}\n"
+        "void top() {\n    middle();\n}\n";
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(transpiler_context_register_module(&context, "effect_mod", NULL),
+            "module registration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "transitive throwing unit should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_register_translation_unit_exports(&context, "effect_mod", &unit),
+            "export registration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    exported_signature = transpiler_context_find_function(&context, "effect_mod", "top");
+    if (!exported_signature)
+    {
+        std::printf("Assertion failed: expected top export to be present\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(static_cast<int>(exported_signature->exception_type_count), 1,
+            "export should include transitive known exception type") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_resolve_translation_unit_calls(&context, "effect_mod", &unit),
+            "local calls should resolve") != FT_SUCCESS)
+        goto cleanup;
+    index = 0;
+    while (index < unit.function_count
+        && std::strncmp(unit.functions[index].source_name, "top",
+            sizeof(unit.functions[index].source_name)) != 0)
+        index += 1;
+    if (index == unit.function_count)
+    {
+        std::printf("Assertion failed: expected top function to be present\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(static_cast<int>(unit.functions[index].exception_type_count), 1,
+            "transitive call should propagate known exception type") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(unit.functions[index].exception_types_unknown, 0,
+            "transitive known call should remain precise") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_cblc_register_translation_unit_exports_records_method_exception_summary)
+{
+    t_transpiler_context context;
+    t_cblc_translation_unit unit;
+    const t_transpiler_type_signature *signature;
+    const char *source;
+    int status;
+
+    source = "class Worker {\n"
+        "    public:\n"
+        "    Worker() { throw 5; }\n"
+        "    void fail() { throw 4; }\n"
+        "};\n";
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_context_init(&context), "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(transpiler_context_register_module(&context, "method_mod", NULL),
+            "module registration should succeed") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "method source should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_register_translation_unit_exports(&context, "method_mod", &unit),
+            "method export should succeed") != FT_SUCCESS)
+        goto cleanup;
+    signature = transpiler_context_find_type(&context, "method_mod", "Worker");
+    if (!signature || signature->method_count != 1 || signature->constructor_count != 1)
+    {
+        std::printf("Assertion failed: expected exported Worker method\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(static_cast<int>(signature->methods[0].exception_type_count), 1,
+            "method should export one known exception type") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(signature->methods[0].exception_types_unknown, 0,
+            "direct method throw should remain precise") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(static_cast<int>(signature->constructors[0].exception_type_count), 1,
+            "constructor should export one known exception type") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    transpiler_context_dispose(&context);
+    return (status);
+}
+
+FT_TEST(test_cblc_register_type_signatures_reject_exception_type_id_collision)
+{
+    t_transpiler_context context;
+    t_transpiler_type_signature first;
+    t_transpiler_type_signature second;
+    int status;
+
+    status = FT_FAILURE;
+    if (test_expect_success(transpiler_context_init(&context),
+            "context init should succeed") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (transpiler_context_register_module(&context, "first_mod", NULL) != FT_SUCCESS
+        || transpiler_context_register_module(&context, "second_mod", NULL) != FT_SUCCESS)
+        goto cleanup;
+    std::memset(&first, 0, sizeof(first));
+    std::memset(&second, 0, sizeof(second));
+    ft_strlcpy(first.name, "FirstError", sizeof(first.name));
+    ft_strlcpy(second.name, "SecondError", sizeof(second.name));
+    first.kind = TRANSPILE_TYPE_CLASS;
+    second.kind = TRANSPILE_TYPE_CLASS;
+    first.visibility = TRANSPILE_SYMBOL_PUBLIC;
+    second.visibility = TRANSPILE_SYMBOL_PUBLIC;
+    first.exception_abi_version = CBLC_EXCEPTION_ABI_VERSION;
+    second.exception_abi_version = CBLC_EXCEPTION_ABI_VERSION;
+    first.exception_type_id = 777;
+    second.exception_type_id = 777;
+    if (transpiler_context_register_type_signature(&context, "first_mod", &first)
+        != FT_SUCCESS
+        || transpiler_context_register_type_signature(&context, "second_mod", &second)
+            != FT_FAILURE)
+    {
+        std::printf("Assertion failed: exception type ID collisions should be rejected\n");
+        goto cleanup;
+    }
+    if (context.diagnostics.count == 0
+        || context.diagnostics.items[context.diagnostics.count - 1].code
+            != TRANSPILE_ERROR_EXCEPTION_TYPE_ID_COLLISION)
+    {
+        std::printf("Assertion failed: type ID collision should use a dedicated diagnostic\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    transpiler_context_dispose(&context);
+    return (status);
+}
