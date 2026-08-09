@@ -7653,3 +7653,152 @@ cleanup:
     cblc_translation_unit_dispose(&unit);
     return (status);
 }
+
+FT_TEST(test_cblc_templates_materialize_independent_specializations)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    const t_cblc_struct_type *int_box;
+    const t_cblc_struct_type *char_box;
+    int status;
+
+    source = "template <typename T> struct box { T value; };\n"
+        "box<int> int_box;\n"
+        "box<char> char_box;\n"
+        "void main() { return; }\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    int_box = NULL;
+    char_box = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "independent template specializations should parse") != FT_SUCCESS)
+        goto cleanup;
+    for (size_t index = 0; index < unit.struct_type_count; ++index)
+    {
+        if (std::strcmp(unit.struct_types[index].source_name, "box__int") == 0)
+            int_box = &unit.struct_types[index];
+        if (std::strcmp(unit.struct_types[index].source_name, "box__char") == 0)
+            char_box = &unit.struct_types[index];
+    }
+    if (!int_box || !char_box || int_box->field_count != 1 || char_box->field_count != 1
+        || int_box->fields[0].kind != CBLC_DATA_KIND_INT
+        || char_box->fields[0].kind != CBLC_DATA_KIND_CHAR
+        || int_box->fields[0].is_template_parameter
+        || char_box->fields[0].is_template_parameter)
+    {
+        std::printf("Assertion failed: template specializations should own concrete field layouts\n");
+        goto cleanup;
+    }
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "independent template specializations should generate COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol
+        || !ft_strnstr(generated_cobol, "INT-BOX-VALUE", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "CHAR-BOX-VALUE", std::strlen(generated_cobol))
+        || ft_strnstr(generated_cobol, "T VALUE", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: concrete template fields should be emitted independently\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_try_catch_nested_rethrow_preserves_outer_dispatch)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    const char *inner_catch;
+    int status;
+
+    source = "void main() {\n"
+        "    try {\n"
+        "        try { throw 1; }\n"
+        "        catch (int inner_error) { throw 2; }\n"
+        "    }\n"
+        "    catch (int outer_error) { display(outer_error); }\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    inner_catch = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "nested rethrow source should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "nested rethrow source should generate COBOL") != FT_SUCCESS)
+        goto cleanup;
+    inner_catch = ft_strnstr(generated_cobol, "CBLC-TRY-MAIN-1-CATCH-0.",
+        std::strlen(generated_cobol));
+    if (!inner_catch
+        || !ft_strnstr(inner_catch, "PERFORM CBLC-EX-CLEAR-PAYLOAD",
+            std::strlen(inner_catch))
+        || !ft_strnstr(generated_cobol, "CBLC-TRY-MAIN-0-CATCH-0.",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "GO TO CBLC-TRY-MAIN-0-CATCH-0",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "MOVE 2 TO CBLC-EX-INT-PAYLOAD",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: nested rethrows should transfer to the enclosing handler\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_try_catch_double_exception_emits_abort_path)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    const char *terminate_label;
+    int status;
+
+    source = "void main() {\n"
+        "    try { throw 1; }\n"
+        "    catch (int first_error) { throw 2; }\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    terminate_label = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "double exception source should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "double exception source should generate COBOL") != FT_SUCCESS)
+        goto cleanup;
+    terminate_label = ft_strnstr(generated_cobol, "CBLC-TERMINATE.",
+        std::strlen(generated_cobol));
+    if (!terminate_label
+        || !ft_strnstr(generated_cobol,
+            "IF CBLC-EX-RAISING = 'Y' OR CBLC-EX-CLEANING = 'Y'",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "TO CBLC-EX-SECONDARY-TYPE-ID",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "PERFORM CBLC-TERMINATE",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(terminate_label, "STOP RUN.", std::strlen(terminate_label)))
+    {
+        std::printf("Assertion failed: exceptions raised during cleanup should abort through CBLC-TERMINATE\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}

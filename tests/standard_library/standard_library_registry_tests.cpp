@@ -949,3 +949,56 @@ FT_TEST(test_standard_library_generators_validate_out_parameter)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_standard_library_catalog_entries_have_native_cblc_sources)
+{
+    const t_transpiler_standard_library_entry *entries;
+    size_t count;
+    size_t index;
+
+    entries = transpiler_standard_library_get_entries(&count);
+    if (!entries || count == 0)
+    {
+        std::printf("Assertion failed: standard-library catalog should not be empty\n");
+        return (FT_FAILURE);
+    }
+    index = 0;
+    while (index < count)
+    {
+        const char *source;
+        char *generated;
+        char program_marker[128];
+
+        source = transpiler_standard_library_get_native_source(entries[index].program_name);
+        if (!source || !std::strstr(source, " F("))
+        {
+            std::printf("Assertion failed: %s should be backed by native CBL-C source\n",
+                entries[index].program_name);
+            return (FT_FAILURE);
+        }
+        generated = NULL;
+        if (transpiler_standard_library_generate_native(entries[index].program_name,
+                &generated) != FT_SUCCESS || !generated)
+        {
+            if (generated)
+                cma_free(generated);
+            std::printf("Assertion failed: %s native CBL-C source should regenerate\n",
+                entries[index].program_name);
+            return (FT_FAILURE);
+        }
+        if (std::snprintf(program_marker, sizeof(program_marker),
+                "PROGRAM-ID. %s.", entries[index].program_name) < 0
+            || !std::strstr(generated, program_marker)
+            || std::strstr(generated, "DWARF")
+            || std::strstr(generated, "__cxa_throw"))
+        {
+            cma_free(generated);
+            std::printf("Assertion failed: %s should emit native COBOL without C++ exception ABI text\n",
+                entries[index].program_name);
+            return (FT_FAILURE);
+        }
+        cma_free(generated);
+        index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
