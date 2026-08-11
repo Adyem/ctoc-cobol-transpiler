@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "mode": "cblc-to-cobol",
+  "runtime": "external-standard-library",
+  "template_contract": "CBLC-TEMPLATE-TYPE-SUBSTITUTION@6",
+  "artifacts": [
+    {
+      "kind": "standard-library",
+      "id": "CBLC-STRCMP",
+      "qualified_name": "std::strcmp",
+      "path": "CBLC-STRCMP.cob",
+      "hash": "fnv1a64:397806445c753065",
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-STRCMP-STRING",
+      "qualified_name": "std::strcmp",
+      "path": "CBLC-STRCMP-STRING.cob",
+      "hash": "fnv1a64:cda6590598a1796f",
+      "dependencies": ["CBLC-STRCMP"]
+    },
+    {
+      "kind": "target",
+      "id": "MESSAGE-SHOWCASE-CONSTANTS",
+      "path": "C:/Users/Adyem/Documents/Game_development/cbl-c_transiler/samples/feature_showcase/cobol/message_showcase_constants.cob",
+      "source_hash": "fnv1a64:564c648fdb9e8187",
+      "module_dependencies": [],
+      "hash": "fnv1a64:3f71df4d90b37b4e",
+      "dependencies": ["CBLC-STRCMP", "CBLC-STRCMP-STRING"]
+    },
+    {
+      "kind": "target",
+      "id": "SHOWCASE-PORTFOLIO",
+      "path": "C:/Users/Adyem/Documents/Game_development/cbl-c_transiler/samples/feature_showcase/cobol/message_showcase_ledger.cob",
+      "source_hash": "fnv1a64:a2007923796474cc",
+      "module_dependencies": [{"module":"message_showcase_constants","source_hash":"fnv1a64:564c648fdb9e8187"}],
+      "hash": "fnv1a64:66e386a9c94f1187",
+      "dependencies": ["CBLC-STRCMP", "CBLC-STRCMP-STRING"]
+    },
+    {
+      "kind": "target",
+      "id": "SHOWCASE-MEMORY",
+      "path": "C:/Users/Adyem/Documents/Game_development/cbl-c_transiler/samples/feature_showcase/cobol/message_showcase_memory.cob",
+      "source_hash": "fnv1a64:7041fcb779070375",
+      "module_dependencies": [],
+      "hash": "fnv1a64:9909d0722911f5bf",
+      "dependencies": []
+    },
+    {
+      "kind": "target",
+      "id": "SHOWCASE-TEXT",
+      "path": "C:/Users/Adyem/Documents/Game_development/cbl-c_transiler/samples/feature_showcase/cobol/message_showcase_text.cob",
+      "source_hash": "fnv1a64:b100cdf7ae9353d1",
+      "module_dependencies": [{"module":"message_showcase_constants","source_hash":"fnv1a64:564c648fdb9e8187"}],
+      "hash": "fnv1a64:79493172f43600e3",
+      "dependencies": ["CBLC-STRCMP", "CBLC-STRCMP-STRING"]
+    },
+    {
+      "kind": "target",
+      "id": "MAIN",
+      "path": "C:/Users/Adyem/Documents/Game_development/cbl-c_transiler/samples/feature_showcase/cobol/message_showcase_main.cob",
+      "source_hash": "fnv1a64:b3d372eb863b2f28",
+      "module_dependencies": [{"module":"message_showcase_text","source_hash":"fnv1a64:b100cdf7ae9353d1"},{"module":"message_showcase_ledger","source_hash":"fnv1a64:a2007923796474cc"},{"module":"message_showcase_memory","source_hash":"fnv1a64:7041fcb779070375"}],
+      "hash": "fnv1a64:ee2b1556284bfe73",
+      "dependencies": []
+    }
+  ]
+}

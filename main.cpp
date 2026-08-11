@@ -23,6 +23,36 @@ static int pipeline_emit_error(t_transpiler_context *context, const char *messag
     return (FT_FAILURE);
 }
 
+static int pipeline_inject_native_vector_template(char **source)
+{
+    const char *vector_source;
+    const char *error_source;
+    char *combined_source;
+    size_t combined_length;
+
+    if (!source || !*source)
+        return (FT_FAILURE);
+    if (!std::strstr(*source, "vector<") || std::strstr(*source, "class vector"))
+        return (FT_SUCCESS);
+    vector_source = transpiler_standard_library_get_native_source("CBLC-VECTOR");
+    error_source = transpiler_standard_library_get_native_source("CBLC-ERRORS");
+    if (!vector_source || !error_source)
+        return (FT_FAILURE);
+    combined_length = std::strlen(error_source) + std::strlen(vector_source)
+        + std::strlen(*source) + 3;
+    combined_source = static_cast<char *>(cma_calloc(combined_length, sizeof(char)));
+    if (!combined_source)
+        return (FT_FAILURE);
+    ft_strlcpy(combined_source, error_source, combined_length);
+    ft_strlcat(combined_source, "\n", combined_length);
+    ft_strlcat(combined_source, vector_source, combined_length);
+    ft_strlcat(combined_source, "\n", combined_length);
+    ft_strlcat(combined_source, *source, combined_length);
+    cma_free(*source);
+    *source = combined_source;
+    return (FT_SUCCESS);
+}
+
 static std::filesystem::path pipeline_normalize_path(const char *path)
 {
     std::error_code error;
@@ -1437,6 +1467,15 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
             status = FT_FAILURE;
             goto cleanup;
         }
+        if (pipeline_inject_native_vector_template(&sources[index]) != FT_SUCCESS)
+        {
+            if (std::snprintf(message, sizeof(message),
+                    "Unable to load the native vector template for '%s'",
+                    context->source_paths[index]) >= 0)
+                (void)pipeline_emit_error(context, message);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
         pipeline_choose_module_name(context->source_paths[index], unit, module_name,
             sizeof(module_name));
         ft_strlcpy(module_names[index], module_name, TRANSPILE_MODULE_NAME_MAX);
@@ -1520,7 +1559,12 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
         }
         if (cblc_parse_translation_unit(sources[source_index], unit) != FT_SUCCESS)
         {
-            if (std::snprintf(message, sizeof(message), "Failed to parse CBL-C source '%s'",
+            if (unit->parse_error_message[0] != '\0'
+                && std::snprintf(message, sizeof(message),
+                    "Failed to parse CBL-C source '%s': %s",
+                    context->source_paths[source_index], unit->parse_error_message) >= 0)
+                (void)pipeline_emit_error(context, message);
+            else if (std::snprintf(message, sizeof(message), "Failed to parse CBL-C source '%s'",
                     context->source_paths[source_index]) >= 0)
                 (void)pipeline_emit_error(context, message);
             status = FT_FAILURE;

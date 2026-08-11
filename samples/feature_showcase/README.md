@@ -23,6 +23,8 @@ and methods, arrays, and basic pointer access.
   constructor initialization, destructor cleanup, out-of-class methods, structs,
   strings, and a small malloc/free-backed scoring buffer.
 - `message_showcase_memory.cblc` — a short array and pointer example.
+- `message_showcase_main.cblc` — the entrypoint also demonstrates the native
+  `vector<int>` class with reservation, insertion, and value access methods.
 - `EXPECTED_OUTPUT.txt` — the transcript used by `make verify`.
 - `stdlib/` — populated by the `standard-library` CLI direction.
 - `cobol/message_showcase*.cob` — generated COBOL output.

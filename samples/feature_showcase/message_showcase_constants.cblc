@@ -2,5 +2,6 @@ const int reserve_target = 600000;
 const int earned_premium = 480000;
 string title("POLICY SNAPSHOT");
 string note(16);
+string suffix("!");
 int title_length;
 int note_length;

@@ -437,6 +437,10 @@ int cblc_resolve_translation_unit_calls(t_transpiler_context *context, const cha
                         sizeof(statement->call_identifier)) == 0
                     || std::strncmp(statement->call_identifier, "std::free",
                         sizeof(statement->call_identifier)) == 0
+                    || std::strncmp(statement->call_identifier, "CBLC-NEW",
+                        std::strlen("CBLC-NEW")) == 0
+                    || std::strncmp(statement->call_identifier, "CBLC-DELETE",
+                        std::strlen("CBLC-DELETE")) == 0
                     || std::strncmp(statement->call_identifier, "std::odd",
                         sizeof(statement->call_identifier)) == 0)
                 {
@@ -683,6 +687,8 @@ static int cblc_export_type_fields(t_transpiler_type_signature *signature,
         signature->fields[index].is_borrowed = type->fields[index].is_borrowed;
         signature->fields[index].is_template_parameter =
             type->fields[index].is_template_parameter;
+        signature->fields[index].template_parameter_pointer_depth =
+            type->fields[index].template_parameter_pointer_depth;
         ft_strlcpy(signature->fields[index].template_parameter_name,
             type->fields[index].template_parameter_name,
             sizeof(signature->fields[index].template_parameter_name));

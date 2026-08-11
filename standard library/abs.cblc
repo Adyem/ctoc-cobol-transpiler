@@ -1,14 +1,16 @@
-void F(int operand, int result, int status)
+int F(int operand)
 {
-    status = 0;
+    int result;
+    overflow_error error;
     result = operand;
     if (result < 0)
     {
         result = 0 - result;
         if (result < 0)
         {
-            result = 0;
-            status = 1;
+            error.code = 1;
+            throw error;
         }
     }
+    return result;
 }

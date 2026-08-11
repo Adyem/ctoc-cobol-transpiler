@@ -1,0 +1,362 @@
+template <typename T>
+class vector
+{
+    public:
+    T *data;
+    T *relocation;
+    int count;
+    int reserved;
+    int relocation_index;
+
+    vector()
+    {
+        data = NULL;
+        relocation = NULL;
+        count = 0;
+        reserved = 0;
+        relocation_index = 0;
+    }
+
+    vector(vector source)
+    {
+        data = NULL;
+        relocation = NULL;
+        count = source.count;
+        reserved = source.reserved;
+        relocation_index = 0;
+        if (reserved > 0)
+        {
+            data = new T[reserved];
+            while (relocation_index < count)
+            {
+                data[relocation_index] = source.data[relocation_index];
+                relocation_index = relocation_index + 1;
+            }
+        }
+    }
+
+    void operator=(vector source)
+    {
+        relocation = NULL;
+        relocation_index = 0;
+        if (source.reserved > 0)
+        {
+            relocation = new T[source.reserved];
+            while (relocation_index < source.count)
+            {
+                relocation[relocation_index] = source.data[relocation_index];
+                relocation_index = relocation_index + 1;
+            }
+        }
+        if (data != NULL)
+        {
+            delete[] data;
+        }
+        data = NULL;
+        count = source.count;
+        reserved = source.reserved;
+        data = relocation;
+        relocation = NULL;
+        relocation_index = 0;
+    }
+
+    ~vector()
+    {
+        delete[] data;
+    }
+
+    int size()
+    {
+        return count;
+    }
+
+    int capacity()
+    {
+        return reserved;
+    }
+
+    int max_size()
+    {
+        return 2147483647;
+    }
+
+    int empty()
+    {
+        if (count == 0)
+        {
+            return 1;
+        }
+        return 0;
+    }
+
+    void reserve(int requested)
+    {
+        if (requested > reserved && requested > 0)
+        {
+            relocation = new T[requested];
+            relocation_index = 0;
+            while (relocation_index < count)
+            {
+                relocation[relocation_index] = data[relocation_index];
+                relocation_index = relocation_index + 1;
+            }
+            delete[] data;
+            data = relocation;
+            relocation = NULL;
+            reserved = requested;
+        }
+    }
+
+    void shrink_to_fit()
+    {
+        if (count < reserved)
+        {
+            if (count == 0)
+            {
+                delete[] data;
+                data = NULL;
+                relocation = NULL;
+                reserved = 0;
+            }
+            else
+            {
+                relocation = new T[count];
+                relocation_index = 0;
+                while (relocation_index < count)
+                {
+                    relocation[relocation_index] = data[relocation_index];
+                    relocation_index = relocation_index + 1;
+                }
+                delete[] data;
+                data = relocation;
+                relocation = NULL;
+                reserved = count;
+            }
+        }
+    }
+
+    void push_back(T value)
+    {
+        if (count >= reserved)
+        {
+            if (reserved < 1)
+            {
+                relocation = new T[1];
+                relocation_index = 0;
+                while (relocation_index < count)
+                {
+                    relocation[relocation_index] = data[relocation_index];
+                    relocation_index = relocation_index + 1;
+                }
+                delete[] data;
+                data = relocation;
+                relocation = NULL;
+                reserved = 1;
+            }
+            else
+            {
+                relocation = new T[reserved * 2];
+                relocation_index = 0;
+                while (relocation_index < count)
+                {
+                    relocation[relocation_index] = data[relocation_index];
+                    relocation_index = relocation_index + 1;
+                }
+                delete[] data;
+                data = relocation;
+                relocation = NULL;
+                reserved = reserved * 2;
+            }
+        }
+        data[count] = value;
+        count = count + 1;
+    }
+
+    void pop_back()
+    {
+        if (count > 0)
+        {
+            count = count - 1;
+        }
+    }
+
+    T at(int index)
+    {
+        if (index < 0 || index >= count)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        return data[index];
+    }
+
+    T front()
+    {
+        return data[0];
+    }
+
+    T back()
+    {
+        return data[count - 1];
+    }
+
+    void emplace_back(T value)
+    {
+        if (count >= reserved)
+        {
+            if (reserved < 1)
+            {
+                relocation = new T[1];
+                relocation_index = 0;
+                while (relocation_index < count)
+                {
+                    relocation[relocation_index] = data[relocation_index];
+                    relocation_index = relocation_index + 1;
+                }
+                delete[] data;
+                data = relocation;
+                relocation = NULL;
+                reserved = 1;
+            }
+            else
+            {
+                relocation = new T[reserved * 2];
+                relocation_index = 0;
+                while (relocation_index < count)
+                {
+                    relocation[relocation_index] = data[relocation_index];
+                    relocation_index = relocation_index + 1;
+                }
+                delete[] data;
+                data = relocation;
+                relocation = NULL;
+                reserved = reserved * 2;
+            }
+        }
+        data[count] = value;
+        count = count + 1;
+    }
+
+    void insert(int index, T value)
+    {
+        int shift;
+
+        if (index < 0)
+        {
+            index = 0;
+        }
+        if (index > count)
+        {
+            index = count;
+        }
+        if (count >= reserved)
+        {
+            if (reserved < 1)
+            {
+                relocation = new T[1];
+                relocation_index = 0;
+                while (relocation_index < count)
+                {
+                    relocation[relocation_index] = data[relocation_index];
+                    relocation_index = relocation_index + 1;
+                }
+                delete[] data;
+                data = relocation;
+                relocation = NULL;
+                reserved = 1;
+            }
+            else
+            {
+                relocation = new T[reserved * 2];
+                relocation_index = 0;
+                while (relocation_index < count)
+                {
+                    relocation[relocation_index] = data[relocation_index];
+                    relocation_index = relocation_index + 1;
+                }
+                delete[] data;
+                data = relocation;
+                relocation = NULL;
+                reserved = reserved * 2;
+            }
+        }
+        shift = count;
+        while (shift > index)
+        {
+            data[shift] = data[shift - 1];
+            shift = shift - 1;
+        }
+        data[index] = value;
+        count = count + 1;
+    }
+
+    void erase(int index)
+    {
+        int shift;
+
+        if (index >= 0 && index < count)
+        {
+            shift = index;
+            while (shift < count - 1)
+            {
+                data[shift] = data[shift + 1];
+                shift = shift + 1;
+            }
+            count = count - 1;
+        }
+    }
+
+
+    void clear()
+    {
+        count = 0;
+    }
+
+    void assign(int requested, T value)
+    {
+        if (requested < 0)
+        {
+            requested = 0;
+        }
+        if (requested > reserved)
+        {
+            if (data != NULL)
+            {
+                delete[] data;
+            }
+            data = new T[requested];
+            relocation = NULL;
+            reserved = requested;
+        }
+        count = 0;
+        while (count < requested)
+        {
+            data[count] = value;
+            count = count + 1;
+        }
+    }
+
+    void resize(int requested)
+    {
+        if (requested < 0)
+        {
+            requested = 0;
+        }
+        if (requested > reserved)
+        {
+            relocation = new T[requested];
+            relocation_index = 0;
+            while (relocation_index < count)
+            {
+                relocation[relocation_index] = data[relocation_index];
+                relocation_index = relocation_index + 1;
+            }
+            delete[] data;
+            data = relocation;
+            relocation = NULL;
+            reserved = requested;
+        }
+        count = requested;
+    }
+};

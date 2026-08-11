@@ -359,6 +359,7 @@ typedef struct s_transpiler_type_field_signature
     int is_const;
     int is_borrowed;
     int is_template_parameter;
+    size_t template_parameter_pointer_depth;
     char template_parameter_name[TRANSPILE_IDENTIFIER_MAX];
     t_transpiler_symbol_visibility visibility;
 }   t_transpiler_type_field_signature;
@@ -1388,6 +1389,7 @@ typedef struct s_cblc_struct_field
     int is_const;
     int is_borrowed;
     int is_template_parameter;
+    size_t template_parameter_pointer_depth;
     char template_parameter_name[TRANSPILE_IDENTIFIER_MAX];
     t_cblc_member_visibility visibility;
 }   t_cblc_struct_field;
@@ -1416,6 +1418,8 @@ typedef struct s_cblc_method
     size_t statement_count;
     size_t statement_capacity;
     int has_definition;
+    int is_copy_assignment;
+    char implementation_program_name[TRANSPILE_IDENTIFIER_MAX];
     size_t exception_type_count;
     size_t exception_type_ids[CBLC_EXCEPTION_THROW_SET_MAX];
     int exception_types_unknown;
@@ -1429,6 +1433,7 @@ typedef struct s_cblc_constructor
     size_t statement_count;
     size_t statement_capacity;
     int has_definition;
+    int is_copy_constructor;
     size_t exception_type_count;
     size_t exception_type_ids[CBLC_EXCEPTION_THROW_SET_MAX];
     int exception_types_unknown;
@@ -1462,6 +1467,8 @@ typedef struct s_cblc_struct_type
     char template_argument_name[TRANSPILE_IDENTIFIER_MAX];
     unsigned long long layout_fingerprint;
     int has_default_constructor;
+    int has_copy_constructor;
+    int has_copy_assignment;
     t_cblc_constructor *constructors;
     size_t constructor_count;
     size_t constructor_capacity;
@@ -1944,11 +1951,36 @@ typedef enum e_transpiler_standard_library_buffer_kind
     TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING
 }   t_transpiler_standard_library_buffer_kind;
 
+typedef enum e_transpiler_standard_library_return_kind
+{
+    TRANSPILE_STANDARD_LIBRARY_RETURN_VOID = 0,
+    TRANSPILE_STANDARD_LIBRARY_RETURN_INT,
+    TRANSPILE_STANDARD_LIBRARY_RETURN_DOUBLE,
+    TRANSPILE_STANDARD_LIBRARY_RETURN_CHAR_POINTER,
+    TRANSPILE_STANDARD_LIBRARY_RETURN_STRING_OBJECT,
+    TRANSPILE_STANDARD_LIBRARY_RETURN_RESULT_OBJECT,
+    TRANSPILE_STANDARD_LIBRARY_RETURN_MULTI_OUTPUT
+}   t_transpiler_standard_library_return_kind;
+
+typedef enum e_transpiler_standard_library_failure_policy
+{
+    TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE = 0,
+    TRANSPILE_STANDARD_LIBRARY_FAILURE_THROWS,
+    TRANSPILE_STANDARD_LIBRARY_FAILURE_RESULT_OBJECT,
+    TRANSPILE_STANDARD_LIBRARY_FAILURE_COMPATIBILITY
+}   t_transpiler_standard_library_failure_policy;
+
 typedef struct s_transpiler_standard_library_entry
 {
     const char *qualified_name;
     t_transpiler_standard_library_buffer_kind buffer_kind;
     const char *program_name;
+    t_transpiler_standard_library_return_kind return_kind;
+    const char *public_return_type;
+    const char *public_parameters;
+    const char *hidden_abi_outputs;
+    t_transpiler_standard_library_failure_policy failure_policy;
+    unsigned int abi_version;
     int (*generator)(char **out_text);
 }   t_transpiler_standard_library_entry;
 
@@ -1972,6 +2004,9 @@ void transpiler_standard_library_note_strlen_string_usage(size_t declared_length
 size_t transpiler_standard_library_get_strlen_string_limit(void);
 int transpiler_standard_library_generate_date_duration(char **out_text);
 int transpiler_standard_library_generate_date_yyyymmdd(char **out_text);
+int transpiler_standard_library_generate_date_parse_result(char **out_text);
+int transpiler_standard_library_generate_parse_int_result(char **out_text);
+int transpiler_standard_library_generate_parse_double_result(char **out_text);
 int transpiler_standard_library_generate_strlen(char **out_text);
 int transpiler_standard_library_generate_strlen_string(char **out_text);
 int transpiler_standard_library_generate_strnlen_string(char **out_text);

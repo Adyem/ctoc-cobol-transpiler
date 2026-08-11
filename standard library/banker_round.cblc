@@ -1,10 +1,12 @@
-void F(double operand, int scale, double result, int status)
+double F(double operand, int scale)
 {
+    double result;
     int index;
-    status = 0;
+    invalid_argument error;
     if (scale < 0 || scale > 18)
     {
-        status = 2;
+        error.code = 2;
+        throw error;
     }
     else
     {
@@ -22,9 +24,6 @@ void F(double operand, int scale, double result, int status)
             result = result / 10;
             index = index + 1;
         }
-        if (operand != result)
-        {
-            status = 1;
-        }
     }
+    return result;
 }

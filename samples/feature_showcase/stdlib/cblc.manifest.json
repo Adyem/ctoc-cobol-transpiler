@@ -1,0 +1,439 @@
+{
+  "schema_version": 1,
+  "mode": "standard-library",
+  "template_contract": "CBLC-TEMPLATE-TYPE-SUBSTITUTION@6",
+  "artifacts": [
+    {
+      "kind": "standard-library",
+      "id": "CBLC-ABS",
+      "qualified_name": "std::abs",
+      "path": "CBLC-ABS.cob",
+      "hash": "fnv1a64:8f29d777138c910c",
+      "char_width": 256,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-ATOI",
+      "qualified_name": "std::atoi",
+      "path": "CBLC-ATOI.cob",
+      "hash": "fnv1a64:8a26a84656f44200",
+      "char_width": 255,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-ATOI-STRING",
+      "qualified_name": "std::atoi",
+      "path": "CBLC-ATOI-STRING.cob",
+      "hash": "fnv1a64:30b11a5796fc745a",
+      "char_width": 255,
+      "dependencies": ["CBLC-ATOI"]
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-ATOL",
+      "qualified_name": "std::atol",
+      "path": "CBLC-ATOL.cob",
+      "hash": "fnv1a64:b4fe3c006dd38e54",
+      "char_width": 255,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-ATOL-STRING",
+      "qualified_name": "std::atol",
+      "path": "CBLC-ATOL-STRING.cob",
+      "hash": "fnv1a64:acb3d8dc2128be52",
+      "char_width": 255,
+      "dependencies": ["CBLC-ATOL"]
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-ATOLL",
+      "qualified_name": "std::atoll",
+      "path": "CBLC-ATOLL.cob",
+      "hash": "fnv1a64:2270caf92515fc52",
+      "char_width": 255,
+      "dependencies": ["CBLC-ATOL"]
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-ATOLL-STRING",
+      "qualified_name": "std::atoll",
+      "path": "CBLC-ATOLL-STRING.cob",
+      "hash": "fnv1a64:5df315af34e90fc8",
+      "char_width": 255,
+      "dependencies": ["CBLC-ATOL", "CBLC-ATOLL"]
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-FABS",
+      "qualified_name": "std::fabs",
+      "path": "CBLC-FABS.cob",
+      "hash": "fnv1a64:de8a1b8c3ad5c6b9",
+      "char_width": 0,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-FLOOR",
+      "qualified_name": "std::floor",
+      "path": "CBLC-FLOOR.cob",
+      "hash": "fnv1a64:45d4ea7aa5195c85",
+      "char_width": 0,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-CEIL",
+      "qualified_name": "std::ceil",
+      "path": "CBLC-CEIL.cob",
+      "hash": "fnv1a64:c3299fe86f300535",
+      "char_width": 0,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-EXP",
+      "qualified_name": "std::exp",
+      "path": "CBLC-EXP.cob",
+      "hash": "fnv1a64:87e4d70560b3839e",
+      "char_width": 256,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-LOG",
+      "qualified_name": "std::log",
+      "path": "CBLC-LOG.cob",
+      "hash": "fnv1a64:d3314754ec433b89",
+      "char_width": 256,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-SIN",
+      "qualified_name": "std::sin",
+      "path": "CBLC-SIN.cob",
+      "hash": "fnv1a64:ea2adcd75acf9fac",
+      "char_width": 0,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-COS",
+      "qualified_name": "std::cos",
+      "path": "CBLC-COS.cob",
+      "hash": "fnv1a64:722a1601ea373b2b",
+      "char_width": 0,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-TAN",
+      "qualified_name": "std::tan",
+      "path": "CBLC-TAN.cob",
+      "hash": "fnv1a64:5feee8e52ab2df17",
+      "char_width": 0,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-ROUNDED",
+      "qualified_name": "std::round",
+      "path": "CBLC-ROUNDED.cob",
+      "hash": "fnv1a64:fa8cb81ca956640b",
+      "char_width": 0,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-BANKER-ROUND",
+      "qualified_name": "cblc::banker_round",
+      "path": "CBLC-BANKER-ROUND.cob",
+      "hash": "fnv1a64:c4ef56d799340e69",
+      "char_width": 256,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-DATE-PARSE-RESULT",
+      "qualified_name": "cblc::date_parse_yyyymmdd",
+      "path": "CBLC-DATE-PARSE-RESULT.cob",
+      "hash": "fnv1a64:6690182e230b35b1",
+      "char_width": 255,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-DATE-YYYYMMDD",
+      "qualified_name": "cblc::date_parse_yyyymmdd_legacy",
+      "path": "CBLC-DATE-YYYYMMDD.cob",
+      "hash": "fnv1a64:e1d78ddf047c4bb9",
+      "char_width": 255,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-PARSE-INT-RESULT",
+      "qualified_name": "cblc::parse_int",
+      "path": "CBLC-PARSE-INT-RESULT.cob",
+      "hash": "fnv1a64:2cd3f6365c77359d",
+      "char_width": 255,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-PARSE-DOUBLE-RESULT",
+      "qualified_name": "cblc::parse_double",
+      "path": "CBLC-PARSE-DOUBLE-RESULT.cob",
+      "hash": "fnv1a64:e19795b83fa0fda2",
+      "char_width": 255,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-DATE-DURATION",
+      "qualified_name": "cblc::date_duration_days",
+      "path": "CBLC-DATE-DURATION.cob",
+      "hash": "fnv1a64:190ec38c349bcd6f",
+      "char_width": 0,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-STRLEN",
+      "qualified_name": "std::strlen",
+      "path": "CBLC-STRLEN.cob",
+      "hash": "fnv1a64:f64cf54d64955c0f",
+      "char_width": 255,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-STRLEN-STRING",
+      "qualified_name": "std::strlen",
+      "path": "CBLC-STRLEN-STRING.cob",
+      "hash": "fnv1a64:ffeeb0067d550f72",
+      "char_width": 255,
+      "dependencies": ["CBLC-STRLEN"]
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-STRNLEN",
+      "qualified_name": "std::strnlen",
+      "path": "CBLC-STRNLEN.cob",
+      "hash": "fnv1a64:bf0ecd28ed046a57",
+      "char_width": 255,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-STRNLEN-STRING",
+      "qualified_name": "std::strnlen",
+      "path": "CBLC-STRNLEN-STRING.cob",
+      "hash": "fnv1a64:bd39696430a67add",
+      "char_width": 255,
+      "dependencies": ["CBLC-STRNLEN"]
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-STRCMP",
+      "qualified_name": "std::strcmp",
+      "path": "CBLC-STRCMP.cob",
+      "hash": "fnv1a64:7ef8c96df2cc9086",
+      "char_width": 255,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-STRCMP-STRING",
+      "qualified_name": "std::strcmp",
+      "path": "CBLC-STRCMP-STRING.cob",
+      "hash": "fnv1a64:99d1ea3375db223b",
+      "char_width": 255,
+      "dependencies": ["CBLC-STRCMP"]
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-STRCPY",
+      "qualified_name": "std::strcpy",
+      "path": "CBLC-STRCPY.cob",
+      "hash": "fnv1a64:baea0c530efea93f",
+      "char_width": 255,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-STRCPY-STRING",
+      "qualified_name": "std::strcpy",
+      "path": "CBLC-STRCPY-STRING.cob",
+      "hash": "fnv1a64:1bcfc63a6b9bc7a4",
+      "char_width": 255,
+      "dependencies": ["CBLC-STRCPY"]
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-STRNCPY",
+      "qualified_name": "std::strncpy",
+      "path": "CBLC-STRNCPY.cob",
+      "hash": "fnv1a64:2cd5a64ff0380fa1",
+      "char_width": 255,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-STRNCPY-STRING",
+      "qualified_name": "std::strncpy",
+      "path": "CBLC-STRNCPY-STRING.cob",
+      "hash": "fnv1a64:69be1faac0cf7ed1",
+      "char_width": 255,
+      "dependencies": ["CBLC-STRNCPY"]
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-MEMCMP",
+      "qualified_name": "std::memcmp",
+      "path": "CBLC-MEMCMP.cob",
+      "hash": "fnv1a64:0f69b980755d59fa",
+      "char_width": 255,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-MEMCMP-STRING",
+      "qualified_name": "std::memcmp",
+      "path": "CBLC-MEMCMP-STRING.cob",
+      "hash": "fnv1a64:ce4770c11f21515d",
+      "char_width": 255,
+      "dependencies": ["CBLC-MEMCMP"]
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-STRCAT",
+      "qualified_name": "std::strcat",
+      "path": "CBLC-STRCAT.cob",
+      "hash": "fnv1a64:1bbb7cd4deadc963",
+      "char_width": 255,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-STRCAT-STRING",
+      "qualified_name": "std::strcat",
+      "path": "CBLC-STRCAT-STRING.cob",
+      "hash": "fnv1a64:310dfcca28eee7ba",
+      "char_width": 255,
+      "dependencies": ["CBLC-STRCAT"]
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-STRTOD",
+      "qualified_name": "std::strtod",
+      "path": "CBLC-STRTOD.cob",
+      "hash": "fnv1a64:4003c3cf6a722134",
+      "char_width": 256,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-STRTOD-STRING",
+      "qualified_name": "std::strtod",
+      "path": "CBLC-STRTOD-STRING.cob",
+      "hash": "fnv1a64:66bcc2f300b96707",
+      "char_width": 255,
+      "dependencies": ["CBLC-STRTOD"]
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-POWEROF",
+      "qualified_name": "std::pow",
+      "path": "CBLC-POWEROF.cob",
+      "hash": "fnv1a64:dde0fafb6e43da31",
+      "char_width": 256,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-SQRT",
+      "qualified_name": "std::sqrt",
+      "path": "CBLC-SQRT.cob",
+      "hash": "fnv1a64:64eec90033e3b092",
+      "char_width": 256,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-MIN",
+      "qualified_name": "std::fmin",
+      "path": "CBLC-MIN.cob",
+      "hash": "fnv1a64:5e43ad8ba78336d2",
+      "char_width": 0,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-MAX",
+      "qualified_name": "std::fmax",
+      "path": "CBLC-MAX.cob",
+      "hash": "fnv1a64:230bc99ff3bd3810",
+      "char_width": 0,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-TOUPPER",
+      "qualified_name": "std::toupper",
+      "path": "CBLC-TOUPPER.cob",
+      "hash": "fnv1a64:37c3f76e45b37161",
+      "char_width": 255,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-TOUPPER-STRING",
+      "qualified_name": "std::toupper",
+      "path": "CBLC-TOUPPER-STRING.cob",
+      "hash": "fnv1a64:ce9d69db424945a8",
+      "char_width": 255,
+      "dependencies": ["CBLC-TOUPPER"]
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-TOLOWER",
+      "qualified_name": "std::tolower",
+      "path": "CBLC-TOLOWER.cob",
+      "hash": "fnv1a64:88b4f5f32f101c93",
+      "char_width": 255,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-TOLOWER-STRING",
+      "qualified_name": "std::tolower",
+      "path": "CBLC-TOLOWER-STRING.cob",
+      "hash": "fnv1a64:58560ac513a3eeba",
+      "char_width": 255,
+      "dependencies": ["CBLC-TOLOWER"]
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-ISDIGIT",
+      "qualified_name": "std::isdigit",
+      "path": "CBLC-ISDIGIT.cob",
+      "hash": "fnv1a64:9c0533123f301972",
+      "char_width": 0,
+      "dependencies": []
+    },
+    {
+      "kind": "standard-library",
+      "id": "CBLC-ISALPHA",
+      "qualified_name": "std::isalpha",
+      "path": "CBLC-ISALPHA.cob",
+      "hash": "fnv1a64:cd87b46c6e0a9e11",
+      "char_width": 0,
+      "dependencies": []
+    }
+  ]
+}

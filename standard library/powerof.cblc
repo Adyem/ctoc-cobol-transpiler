@@ -1,10 +1,12 @@
-void F(double base, double exponent, double result, int status)
+double F(double base, double exponent)
 {
-    status = 0;
+    double result;
+    domain_error error;
     result = 0;
     if (base == 0 && exponent <= 0)
     {
-        status = 1;
+        error.code = 1;
+        throw error;
     }
     else
     {
@@ -13,8 +15,8 @@ void F(double base, double exponent, double result, int status)
             result = std::floor(exponent);
             if (exponent != result)
             {
-                status = 1;
-                result = 0;
+                error.code = 1;
+                throw error;
             }
             else
             {
@@ -26,4 +28,5 @@ void F(double base, double exponent, double result, int status)
             result = std::pow(base, exponent);
         }
     }
+    return result;
 }

@@ -165,6 +165,8 @@ static int cblc_parse_pointer_allocation_assignment(const char **cursor,
     t_cblc_data_item *target_item);
 static int cblc_parse_std_free(const char **cursor, t_cblc_translation_unit *unit,
     t_cblc_function *function);
+static int cblc_parse_delete_statement(const char **cursor, t_cblc_translation_unit *unit,
+    t_cblc_function *function);
 static int cblc_register_scope(t_cblc_translation_unit *unit, size_t parent_id,
     const char *owner_function_name, size_t *out_scope_id);
 

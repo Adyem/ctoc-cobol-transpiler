@@ -1,0 +1,184 @@
+int date_parse_format_ok(char *input)
+{
+    int index;
+    int result;
+    char current;
+    index = 0;
+    result = 1;
+    while (index < 8)
+    {
+        current = input[index];
+        if (current < '0' || current > '9')
+        {
+            result = 0;
+        }
+        index = index + 1;
+    }
+    return result;
+}
+
+int date_parse_packed(char *input)
+{
+    int index;
+    int packed_result;
+    char current;
+    index = 0;
+    packed_result = 0;
+    while (index < 8)
+    {
+        current = input[index];
+        packed_result = packed_result * 10 + std::ord(current) - 48;
+        index = index + 1;
+    }
+    return packed_result;
+}
+
+struct DateParseResult
+{
+    int year;
+    int month;
+    int day;
+    int packed;
+    int serial;
+    int error;
+};
+
+DateParseResult F(char *input)
+{
+    DateParseResult result;
+    int year;
+    int month;
+    int day;
+    int packed;
+    int serial;
+    int error;
+    int format_ok;
+    int month_base;
+    int max_day;
+    int leap_year;
+    int previous_year;
+    int leap_count;
+
+    packed = date_parse_packed(input);
+    format_ok = date_parse_format_ok(input);
+    year = packed / 10000;
+    month_base = packed / 100;
+    month = month_base - year * 100;
+    day = packed - month_base * 100;
+    serial = 0;
+    error = 0;
+    if (format_ok == 0)
+    {
+        error = 1;
+    }
+    max_day = 31;
+    leap_year = 0;
+    if (year / 4 * 4 == year)
+    {
+        leap_year = 1;
+    }
+    if (year / 100 * 100 == year)
+    {
+        leap_year = 0;
+    }
+    if (year / 400 * 400 == year)
+    {
+        leap_year = 1;
+    }
+    if (month == 4 || month == 6 || month == 9 || month == 11)
+    {
+        max_day = 30;
+    }
+    if (month == 2)
+    {
+        max_day = 28;
+        if (leap_year == 1)
+        {
+            max_day = 29;
+        }
+    }
+    if (month < 1 || month > 12)
+    {
+        error = 2;
+    }
+    if (day < 1 || day > max_day)
+    {
+        error = 3;
+    }
+    if (error != 0)
+    {
+        year = 0;
+        month = 0;
+        day = 0;
+        packed = 0;
+        serial = 0;
+    }
+    if (error == 0)
+    {
+        previous_year = year - 1;
+        serial = year - 1601;
+        serial = serial * 365;
+        leap_count = previous_year / 4 - 400;
+        serial = serial + leap_count;
+        leap_count = previous_year / 100 - 16;
+        serial = serial - leap_count;
+        leap_count = previous_year / 400 - 4;
+        serial = serial + leap_count;
+        serial = serial + day;
+        if (month > 1)
+        {
+            serial = serial + 31;
+        }
+        if (month > 2)
+        {
+            serial = serial + 28;
+        }
+        if (month > 2 && leap_year == 1)
+        {
+            serial = serial + 1;
+        }
+        if (month > 3)
+        {
+            serial = serial + 31;
+        }
+        if (month > 4)
+        {
+            serial = serial + 30;
+        }
+        if (month > 5)
+        {
+            serial = serial + 31;
+        }
+        if (month > 6)
+        {
+            serial = serial + 30;
+        }
+        if (month > 7)
+        {
+            serial = serial + 31;
+        }
+        if (month > 8)
+        {
+            serial = serial + 31;
+        }
+        if (month > 9)
+        {
+            serial = serial + 30;
+        }
+        if (month > 10)
+        {
+            serial = serial + 31;
+        }
+        if (month > 11)
+        {
+            serial = serial + 30;
+        }
+    }
+    result.year = year;
+    result.month = month;
+    result.day = day;
+    result.packed = packed;
+    result.serial = serial;
+    result.error = error;
+    return result;
+}

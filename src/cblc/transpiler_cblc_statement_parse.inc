@@ -684,6 +684,33 @@ static int cblc_parse_assignment(const char **cursor, t_cblc_translation_unit *u
         return (FT_FAILURE);
     *cursor += 1;
     cblc_skip_whitespace(cursor);
+    if (std::strchr(target_reference, '[')
+        && target_item->kind == CBLC_DATA_KIND_STRUCT_POINTER)
+    {
+        size_t template_parameter_index;
+
+        if (cblc_active_template_parameter_index(target_item->struct_type_name,
+                &template_parameter_index) == FT_SUCCESS)
+        {
+            t_cblc_data_item *source_item;
+
+            if (cblc_parse_data_reference_text(cursor, unit, &source_item, NULL,
+                    source_reference, sizeof(source_reference)) != FT_SUCCESS
+                || !source_item
+                || (source_item->kind != CBLC_DATA_KIND_STRUCT
+                    && source_item->kind != CBLC_DATA_KIND_STRUCT_POINTER)
+                || std::strncmp(source_item->struct_type_name,
+                    target_item->struct_type_name,
+                    sizeof(source_item->struct_type_name)) != 0)
+                return (FT_FAILURE);
+            cblc_skip_whitespace(cursor);
+            if (**cursor != ';')
+                return (FT_FAILURE);
+            *cursor += 1;
+            return (cblc_append_statement(function, CBLC_STATEMENT_ASSIGNMENT,
+                target_reference, source_reference, 0));
+        }
+    }
     if (target_item->is_const)
     {
         size_t field_index;
@@ -982,6 +1009,13 @@ static int cblc_parse_assignment(const char **cursor, t_cblc_translation_unit *u
     }
     if (effective_target_kind == CBLC_DATA_KIND_DOUBLE)
     {
+        const char *call_start;
+
+        call_start = *cursor;
+        if (cblc_parse_method_call_assignment(cursor, unit, function, target_item)
+            == FT_SUCCESS)
+            return (FT_SUCCESS);
+        *cursor = call_start;
         if (cblc_parse_numeric_expression(cursor, unit, expression_buffer,
                 sizeof(expression_buffer)) != FT_SUCCESS)
             return (FT_FAILURE);
@@ -1053,8 +1087,7 @@ static int cblc_parse_assignment(const char **cursor, t_cblc_translation_unit *u
         const char *call_start;
 
         call_start = *cursor;
-        if (target_item->kind == effective_target_kind
-            && cblc_parse_pointer_allocation_assignment(cursor, unit, function, target_item)
+        if (cblc_parse_pointer_allocation_assignment(cursor, unit, function, target_item)
             == FT_SUCCESS)
             return (FT_SUCCESS);
         *cursor = call_start;
@@ -2261,7 +2294,8 @@ static int cblc_parse_return(const char **cursor, t_cblc_translation_unit *unit,
             return (FT_FAILURE);
         return (cblc_append_statement(function, CBLC_STATEMENT_RETURN, NULL, NULL, 0));
     }
-    if (function->return_kind == CBLC_FUNCTION_RETURN_INT)
+    if (function->return_kind == CBLC_FUNCTION_RETURN_INT
+        || function->return_kind == CBLC_FUNCTION_RETURN_DOUBLE)
     {
         if (cblc_parse_numeric_expression(cursor, unit, expression,
                 sizeof(expression)) != FT_SUCCESS)
@@ -2272,10 +2306,24 @@ static int cblc_parse_return(const char **cursor, t_cblc_translation_unit *unit,
         if (cblc_parse_data_reference_text(cursor, unit, &item, NULL, expression,
                 sizeof(expression)) != FT_SUCCESS)
             return (FT_FAILURE);
-        if (!item || item->kind != CBLC_DATA_KIND_STRUCT
-            || std::strncmp(item->struct_type_name, function->return_type_name,
-                sizeof(item->struct_type_name)) != 0)
+        if (!item)
             return (FT_FAILURE);
+        if (item->kind == CBLC_DATA_KIND_STRUCT
+            && std::strncmp(item->struct_type_name, function->return_type_name,
+                sizeof(item->struct_type_name)) == 0)
+            ;
+        else
+        {
+            size_t template_parameter_index;
+
+            if (item->kind != CBLC_DATA_KIND_STRUCT_POINTER
+                || std::strchr(expression, '[') == NULL
+                || cblc_active_template_parameter_index(item->struct_type_name,
+                    &template_parameter_index) != FT_SUCCESS
+                || std::strncmp(item->struct_type_name, function->return_type_name,
+                    sizeof(item->struct_type_name)) != 0)
+                return (FT_FAILURE);
+        }
     }
     else if (function->return_kind == CBLC_FUNCTION_RETURN_VOID_POINTER
         || function->return_kind == CBLC_FUNCTION_RETURN_CHAR_POINTER

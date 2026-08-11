@@ -1,7 +1,8 @@
-void F(char *first_char, int first_length, char *second_char, int second_length, int count, int result)
+int F(char *first_char, int first_length, char *second_char, int second_length, int count)
 {
     int index;
     int limit;
+    int result;
     result = 0;
     limit = count;
     if (limit < 0)
@@ -55,4 +56,5 @@ void F(char *first_char, int first_length, char *second_char, int second_length,
             }
         }
     }
+    return result;
 }

@@ -1,8 +1,7 @@
-void F(char *t, int target_length, int status)
+char * F(char *t, int target_length)
 {
     int index;
     char current;
-    status = 0;
     index = 0;
     while (index < target_length)
     {
@@ -23,4 +22,5 @@ void F(char *t, int target_length, int status)
             index = index + 1;
         }
     }
+    return t;
 }

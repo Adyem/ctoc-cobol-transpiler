@@ -203,10 +203,10 @@ FT_TEST(test_standard_library_lookup_enforces_std_prefix)
         std::printf("Assertion failed: cblc::date_parse_yyyymmdd should resolve to standard library entry\n");
         return (FT_FAILURE);
     }
-    if (std::strncmp(entry->program_name, "CBLC-DATE-YYYYMMDD",
-            std::strlen("CBLC-DATE-YYYYMMDD") + 1) != 0)
+    if (std::strncmp(entry->program_name, "CBLC-DATE-PARSE-RESULT",
+            std::strlen("CBLC-DATE-PARSE-RESULT") + 1) != 0)
     {
-        std::printf("Assertion failed: cblc::date_parse_yyyymmdd should map to CBLC-DATE-YYYYMMDD program\n");
+        std::printf("Assertion failed: cblc::date_parse_yyyymmdd should map to CBLC-DATE-PARSE-RESULT program\n");
         return (FT_FAILURE);
     }
     entry = transpiler_standard_library_lookup_with_buffer_kind("cblc::date_parse_yyyymmdd",
@@ -216,10 +216,10 @@ FT_TEST(test_standard_library_lookup_enforces_std_prefix)
         std::printf("Assertion failed: cblc::date_parse_yyyymmdd char overload should resolve to catalog entry\n");
         return (FT_FAILURE);
     }
-    if (std::strncmp(entry->program_name, "CBLC-DATE-YYYYMMDD",
-            std::strlen("CBLC-DATE-YYYYMMDD") + 1) != 0)
+    if (std::strncmp(entry->program_name, "CBLC-DATE-PARSE-RESULT",
+            std::strlen("CBLC-DATE-PARSE-RESULT") + 1) != 0)
     {
-        std::printf("Assertion failed: cblc::date_parse_yyyymmdd char overload should map to CBLC-DATE-YYYYMMDD program\n");
+        std::printf("Assertion failed: cblc::date_parse_yyyymmdd char overload should map to CBLC-DATE-PARSE-RESULT program\n");
         return (FT_FAILURE);
     }
     entry = transpiler_standard_library_lookup("cblc::date_duration_days");
@@ -699,6 +699,9 @@ FT_TEST(test_standard_library_catalog_lists_all_entries)
         {"std::round", TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE},
         {"cblc::banker_round", TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE},
         {"cblc::date_parse_yyyymmdd", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR},
+        {"cblc::date_parse_yyyymmdd_legacy", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR},
+        {"cblc::parse_int", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR},
+        {"cblc::parse_double", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR},
         {"cblc::date_duration_days", TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE},
         {"std::strlen", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR},
         {"std::strlen", TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING},
@@ -757,6 +760,27 @@ FT_TEST(test_standard_library_catalog_lists_all_entries)
             std::printf("Assertion failed: catalog entry %u should target buffer kind %d but was %d\n",
                 static_cast<unsigned int>(index + 1), expected[index].buffer_kind,
                 entries[index].buffer_kind);
+            return (FT_FAILURE);
+        }
+        if (!entries[index].public_return_type || !entries[index].public_parameters
+            || !entries[index].hidden_abi_outputs || entries[index].abi_version == 0)
+        {
+            std::printf("Assertion failed: catalog entry %u should have complete public and ABI metadata\n",
+                static_cast<unsigned int>(index + 1));
+            return (FT_FAILURE);
+        }
+        if (entries[index].failure_policy != TRANSPILE_STANDARD_LIBRARY_FAILURE_COMPATIBILITY
+            && std::strstr(entries[index].public_parameters, "status") != NULL)
+        {
+            std::printf("Assertion failed: catalog entry %u should not expose a status parameter\n",
+                static_cast<unsigned int>(index + 1));
+            return (FT_FAILURE);
+        }
+        if (entries[index].return_kind == TRANSPILE_STANDARD_LIBRARY_RETURN_RESULT_OBJECT
+            && std::strcmp(entries[index].public_return_type, "void") == 0)
+        {
+            std::printf("Assertion failed: result-object entry %u should expose a value type\n",
+                static_cast<unsigned int>(index + 1));
             return (FT_FAILURE);
         }
         index += 1;
@@ -998,6 +1022,42 @@ FT_TEST(test_standard_library_catalog_entries_have_native_cblc_sources)
         }
         cma_free(generated);
         index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_vector_template_is_embedded_as_cblc)
+{
+    const char *source;
+
+    source = transpiler_standard_library_get_native_source("CBLC-VECTOR");
+    if (!source || !std::strstr(source, "template <typename T>")
+        || !std::strstr(source, "class vector")
+        || !std::strstr(source, "vector(vector source)")
+        || !std::strstr(source, "void operator=(vector source)")
+        || !std::strstr(source, "~vector()")
+        || !std::strstr(source, "int size()")
+        || !std::strstr(source, "int capacity()")
+        || !std::strstr(source, "int max_size()")
+        || !std::strstr(source, "int empty()")
+        || !std::strstr(source, "void reserve(int requested)")
+        || !std::strstr(source, "void shrink_to_fit()")
+        || !std::strstr(source, "void resize(int requested)")
+        || !std::strstr(source, "void push_back(T value)")
+        || !std::strstr(source, "void pop_back()")
+        || !std::strstr(source, "void clear()")
+        || !std::strstr(source, "void assign(int requested, T value)")
+        || !std::strstr(source, "T at(int index)")
+        || !std::strstr(source, "T front()")
+        || !std::strstr(source, "T back()")
+        || !std::strstr(source, "void emplace_back(T value)")
+        || !std::strstr(source, "void insert(int index, T value)")
+        || !std::strstr(source, "void erase(int index)")
+        || std::strstr(source, "malloc")
+        || std::strstr(source, "free"))
+    {
+        std::printf("Assertion failed: CBLC-VECTOR should expose the native CBL-C vector template\n");
+        return (FT_FAILURE);
     }
     return (FT_SUCCESS);
 }

@@ -1,185 +1,165 @@
+>>SOURCE FORMAT IS FREE
        IDENTIFICATION DIVISION.
        PROGRAM-ID. CBLC-STRTOD.
+       ENVIRONMENT DIVISION.
        DATA DIVISION.
        WORKING-STORAGE SECTION.
-       01 IDX PIC 9(9) VALUE 000000000.
-       01 SCAN-LIMIT PIC 9(9) VALUE 000000000.
-       01 ACTUAL-LENGTH PIC 9(9) VALUE 000000000.
-       01 START-INDEX PIC 9(9) VALUE 000000001.
-       01 END-INDEX PIC 9(9) VALUE 000000000.
-       01 NORMALIZED-LENGTH PIC 9(9) VALUE 000000000.
-       01 NORMALIZED-BUFFER PIC X(255) VALUE SPACES.
-       01 CURRENT-CHAR PIC X VALUE SPACE.
-       01 HAS-ANY-DIGIT PIC 9 VALUE 0.
-       01 HAS-DECIMAL PIC 9 VALUE 0.
-       01 HAS-EXPONENT PIC 9 VALUE 0.
-       01 EXPONENT-DIGITS PIC 9(9) VALUE 000000000.
-       01 EXPECT-EXPONENT-SIGN PIC 9 VALUE 0.
+       01 F-RESULT USAGE COMP-2.
+       01 F-INDEX PIC S9(9) COMP-5.
+       01 F-NEGATIVE PIC S9(9) COMP-5.
+       01 F-STARTED PIC S9(9) COMP-5.
+       01 F-SEEN-DIGIT PIC S9(9) COMP-5.
+       01 F-SEEN-DOT PIC S9(9) COMP-5.
+       01 F-DECIMAL-PLACES PIC S9(9) COMP-5.
+       01 F-DIGIT PIC S9(9) COMP-5.
+       01 F-ERROR.
+       05 F-ERROR-CODE PIC S9(9).
+       01 F-CURRENT PIC X(1).
+       01 CBLC-EX-PAYLOAD-INVALID-ARGUMENT.
+       05 CBLC-EX-PAYLOAD-INVALID-ARGUMENT-CODE PIC S9(9).
+       01 CBLC-PTR-CURSOR USAGE POINTER VALUE NULL.
+       01 CBLC-PTR-OFFSET PIC S9(9) VALUE 0.
+       01 CBLC-PTR-CHAR BASED PIC X.
+       01 CBLC-PTR-INT BASED PIC S9(9).
+       01 CBLC-PTR-INT-PTR BASED USAGE POINTER.
+       01 CBLC-PTR-CHAR-2 BASED PIC X.
+       01 CBLC-PTR-INT-2 BASED PIC S9(9).
+       01 CBLC-PTR-INT-PTR-2 BASED USAGE POINTER.
        LINKAGE SECTION.
-       01 LNK-SOURCE PIC X(255).
-       01 LNK-SOURCE-LENGTH PIC S9(9) COMP-5.
-       01 LNK-RESULT USAGE COMP-2.
-       01 LNK-STATUS PIC 9.
-       PROCEDURE DIVISION USING BY REFERENCE LNK-SOURCE
-           BY VALUE LNK-SOURCE-LENGTH BY REFERENCE LNK-RESULT
-           BY REFERENCE LNK-STATUS.
-       MAIN.
-           MOVE 0 TO LNK-STATUS.
-           MOVE 0 TO LNK-RESULT.
-           MOVE LNK-SOURCE-LENGTH TO SCAN-LIMIT.
-           IF SCAN-LIMIT > 255
-               MOVE 255 TO SCAN-LIMIT
-           END-IF.
-           MOVE 0 TO ACTUAL-LENGTH.
-           MOVE 0 TO IDX.
-           PERFORM VARYING IDX FROM 1 BY 1 UNTIL IDX > SCAN-LIMIT
-               IF LNK-SOURCE(IDX:1) = LOW-VALUE
-                   EXIT PERFORM
-               END-IF
-               MOVE IDX TO ACTUAL-LENGTH
+       01 CBLC-EX-CONTEXT.
+          05 CBLC-EX-ACTIVE PIC X.
+          05 CBLC-EX-MATCHED PIC X.
+          05 CBLC-EX-TYPE-ID PIC 9(10) COMP-5.
+          05 CBLC-EX-DYNAMIC-TYPE-ID PIC 9(10) COMP-5.
+          05 CBLC-EX-PAYLOAD-SIZE PIC 9(9) COMP-5.
+          05 CBLC-EX-PAYLOAD-OWNER PIC X.
+          05 CBLC-EX-SOURCE-FILE-ID PIC 9(10) COMP-5.
+          05 CBLC-EX-SOURCE-LINE PIC 9(9) COMP-5.
+          05 CBLC-EX-SOURCE-COLUMN PIC 9(9) COMP-5.
+          05 CBLC-EX-RAISING PIC X.
+          05 CBLC-EX-CLEANING PIC X.
+          05 CBLC-EX-SECONDARY-TYPE-ID PIC 9(10) COMP-5.
+          05 CBLC-EX-SECONDARY-SOURCE-LINE PIC 9(9) COMP-5.
+          05 CBLC-EX-SECONDARY-SOURCE-COLUMN PIC 9(9) COMP-5.
+          05 CBLC-EX-INT-PAYLOAD PIC S9(9).
+          05 CBLC-EX-STRING.
+             10 CBLC-EX-STRING-LEN PIC 9(4) COMP.
+             10 CBLC-EX-STRING-BUF PIC X(256).
+       01 F-SOURCE-CHAR PIC X(255).
+       01 F-SOURCE-LENGTH PIC S9(9) COMP-5.
+       01 CBLC-RETURN-F USAGE COMP-2.
+       PROCEDURE DIVISION USING CBLC-EX-CONTEXT
+            BY REFERENCE F-SOURCE-CHAR BY VALUE F-SOURCE-LENGTH
+            BY REFERENCE CBLC-RETURN-F.
+       F.
+           COMPUTE F-RESULT = 0.
+           COMPUTE F-INDEX = 0.
+           COMPUTE F-NEGATIVE = 0.
+           COMPUTE F-STARTED = 0.
+           COMPUTE F-SEEN-DIGIT = 0.
+           COMPUTE F-SEEN-DOT = 0.
+           COMPUTE F-DECIMAL-PLACES = 0.
+           PERFORM UNTIL NOT (F-INDEX < F-SOURCE-LENGTH AND F-STARTED = 0)
+           MOVE F-SOURCE-CHAR(F-INDEX + 1:1) TO F-CURRENT
+           IF F-CURRENT = ' '
+           COMPUTE F-INDEX = F-INDEX + 1
+           ELSE
+           COMPUTE F-STARTED = 1
+           END-IF
            END-PERFORM.
-           IF ACTUAL-LENGTH = 0
-               MOVE SCAN-LIMIT TO ACTUAL-LENGTH
+           IF F-STARTED = 1 AND F-SOURCE-CHAR(F-INDEX + 1:1) = '-'
+           COMPUTE F-NEGATIVE = 1
+           COMPUTE F-INDEX = F-INDEX + 1
+           ELSE
+           IF F-STARTED = 1 AND F-SOURCE-CHAR(F-INDEX + 1:1) = '+'
+           COMPUTE F-INDEX = F-INDEX + 1
+           END-IF
            END-IF.
-           MOVE 1 TO START-INDEX.
-           PERFORM VARYING START-INDEX FROM 1 BY 1 UNTIL START-INDEX > ACTUAL-LENGTH
-               IF LNK-SOURCE(START-INDEX:1) NOT = SPACE
-                   EXIT PERFORM
-               END-IF
+           PERFORM UNTIL NOT (F-INDEX < F-SOURCE-LENGTH)
+           MOVE F-SOURCE-CHAR(F-INDEX + 1:1) TO F-CURRENT
+           IF F-CURRENT >= '0' AND F-CURRENT <= '9'
+           COMPUTE F-DIGIT = FUNCTION ORD(F-CURRENT) - FUNCTION ORD('0')
+           COMPUTE F-RESULT = F-RESULT * 10 + F-DIGIT
+           COMPUTE F-SEEN-DIGIT = 1
+           IF F-SEEN-DOT = 1
+           COMPUTE F-DECIMAL-PLACES = F-DECIMAL-PLACES + 1
+           END-IF
+           COMPUTE F-INDEX = F-INDEX + 1
+           ELSE
+           IF F-CURRENT = '.' AND F-SEEN-DOT = 0
+           COMPUTE F-SEEN-DOT = 1
+           COMPUTE F-INDEX = F-INDEX + 1
+           ELSE
+           IF F-CURRENT = ' '
+           COMPUTE F-INDEX = F-SOURCE-LENGTH
+           ELSE
+           COMPUTE F-ERROR-CODE = 1
+           IF CBLC-EX-RAISING = 'Y' OR CBLC-EX-CLEANING = 'Y'
+               MOVE 942785999 TO CBLC-EX-SECONDARY-TYPE-ID
+               MOVE 110 TO CBLC-EX-SECONDARY-SOURCE-LINE
+               MOVE 21 TO CBLC-EX-SECONDARY-SOURCE-COLUMN
+               PERFORM CBLC-TERMINATE
+           END-IF
+           MOVE 'Y' TO CBLC-EX-RAISING
+           MOVE F-ERROR TO CBLC-EX-PAYLOAD-INVALID-ARGUMENT
+           MOVE 4 TO CBLC-EX-PAYLOAD-SIZE
+           MOVE 942785999 TO CBLC-EX-TYPE-ID
+           MOVE 942785999 TO CBLC-EX-DYNAMIC-TYPE-ID
+           MOVE 110 TO CBLC-EX-SOURCE-LINE
+           MOVE 808241889 TO CBLC-EX-SOURCE-FILE-ID
+           MOVE 21 TO CBLC-EX-SOURCE-COLUMN
+           MOVE 'Y' TO CBLC-EX-PAYLOAD-OWNER
+           MOVE 'Y' TO CBLC-EX-ACTIVE
+           MOVE 'N' TO CBLC-EX-RAISING
+           GOBACK
+           COMPUTE F-RESULT = 0
+           COMPUTE F-INDEX = F-SOURCE-LENGTH
+           END-IF
+           END-IF
+           END-IF
            END-PERFORM.
-           IF START-INDEX > ACTUAL-LENGTH
-               MOVE 1 TO LNK-STATUS
-               MOVE 0 TO LNK-RESULT
-               GOBACK
+           IF F-SEEN-DIGIT = 0
+           COMPUTE F-ERROR-CODE = 1
+           IF CBLC-EX-RAISING = 'Y' OR CBLC-EX-CLEANING = 'Y'
+               MOVE 942785999 TO CBLC-EX-SECONDARY-TYPE-ID
+               MOVE 120 TO CBLC-EX-SECONDARY-SOURCE-LINE
+               MOVE 9 TO CBLC-EX-SECONDARY-SOURCE-COLUMN
+               PERFORM CBLC-TERMINATE
+           END-IF
+           MOVE 'Y' TO CBLC-EX-RAISING
+           MOVE F-ERROR TO CBLC-EX-PAYLOAD-INVALID-ARGUMENT
+           MOVE 4 TO CBLC-EX-PAYLOAD-SIZE
+           MOVE 942785999 TO CBLC-EX-TYPE-ID
+           MOVE 942785999 TO CBLC-EX-DYNAMIC-TYPE-ID
+           MOVE 120 TO CBLC-EX-SOURCE-LINE
+           MOVE 808241889 TO CBLC-EX-SOURCE-FILE-ID
+           MOVE 9 TO CBLC-EX-SOURCE-COLUMN
+           MOVE 'Y' TO CBLC-EX-PAYLOAD-OWNER
+           MOVE 'Y' TO CBLC-EX-ACTIVE
+           MOVE 'N' TO CBLC-EX-RAISING
+           GOBACK
            END-IF.
-           MOVE ACTUAL-LENGTH TO END-INDEX.
-           PERFORM UNTIL END-INDEX < START-INDEX
-               MOVE LNK-SOURCE(END-INDEX:1) TO CURRENT-CHAR
-               IF CURRENT-CHAR NOT = SPACE AND CURRENT-CHAR NOT = LOW-VALUE
-                   EXIT PERFORM
-               END-IF
-               COMPUTE END-INDEX = END-INDEX - 1
+           PERFORM UNTIL NOT (F-DECIMAL-PLACES > 0)
+           COMPUTE F-RESULT = F-RESULT / 10
+           COMPUTE F-DECIMAL-PLACES = F-DECIMAL-PLACES - 1
            END-PERFORM.
-           IF END-INDEX < START-INDEX
-               MOVE 1 TO LNK-STATUS
-               MOVE 0 TO LNK-RESULT
-               GOBACK
+           IF F-NEGATIVE = 1
+           COMPUTE F-RESULT = 0 - F-RESULT
            END-IF.
-           MOVE 0 TO NORMALIZED-LENGTH.
-           MOVE SPACES TO NORMALIZED-BUFFER.
-           MOVE 0 TO HAS-ANY-DIGIT.
-           MOVE 0 TO HAS-DECIMAL.
-           MOVE 0 TO HAS-EXPONENT.
-           MOVE 0 TO EXPONENT-DIGITS.
-           MOVE 0 TO EXPECT-EXPONENT-SIGN.
-           PERFORM VARYING IDX FROM START-INDEX BY 1 UNTIL IDX > END-INDEX
-               MOVE LNK-SOURCE(IDX:1) TO CURRENT-CHAR
-               IF CURRENT-CHAR = SPACE OR CURRENT-CHAR = LOW-VALUE
-                   MOVE 1 TO LNK-STATUS
-                   MOVE 0 TO LNK-RESULT
-                   GOBACK
-               END-IF
-               EVALUATE TRUE
-                   WHEN CURRENT-CHAR >= "0" AND CURRENT-CHAR <= "9"
-                       IF NORMALIZED-LENGTH >= 255
-                           MOVE 1 TO LNK-STATUS
-                           MOVE 0 TO LNK-RESULT
-                           GOBACK
-                       END-IF
-                       ADD 1 TO NORMALIZED-LENGTH
-                       MOVE CURRENT-CHAR TO NORMALIZED-BUFFER(NORMALIZED-LENGTH:1)
-                       MOVE 1 TO HAS-ANY-DIGIT
-                       IF HAS-EXPONENT = 1
-                           ADD 1 TO EXPONENT-DIGITS
-                       END-IF
-                       MOVE 0 TO EXPECT-EXPONENT-SIGN
-                   WHEN CURRENT-CHAR = "."
-                       IF HAS-DECIMAL = 1 OR HAS-EXPONENT = 1
-                           MOVE 1 TO LNK-STATUS
-                           MOVE 0 TO LNK-RESULT
-                           GOBACK
-                       END-IF
-                       IF NORMALIZED-LENGTH >= 255
-                           MOVE 1 TO LNK-STATUS
-                           MOVE 0 TO LNK-RESULT
-                           GOBACK
-                       END-IF
-                       ADD 1 TO NORMALIZED-LENGTH
-                       MOVE "." TO NORMALIZED-BUFFER(NORMALIZED-LENGTH:1)
-                       MOVE 1 TO HAS-DECIMAL
-                   WHEN CURRENT-CHAR = "E" OR CURRENT-CHAR = "e"
-                       IF HAS-EXPONENT = 1 OR HAS-ANY-DIGIT = 0
-                           MOVE 1 TO LNK-STATUS
-                           MOVE 0 TO LNK-RESULT
-                           GOBACK
-                       END-IF
-                       IF NORMALIZED-LENGTH >= 255
-                           MOVE 1 TO LNK-STATUS
-                           MOVE 0 TO LNK-RESULT
-                           GOBACK
-                       END-IF
-                       ADD 1 TO NORMALIZED-LENGTH
-                       MOVE "E" TO NORMALIZED-BUFFER(NORMALIZED-LENGTH:1)
-                       MOVE 1 TO HAS-EXPONENT
-                       MOVE 0 TO EXPONENT-DIGITS
-                       MOVE 1 TO EXPECT-EXPONENT-SIGN
-                   WHEN CURRENT-CHAR = "+" OR CURRENT-CHAR = "-"
-                       IF NORMALIZED-LENGTH = 0
-                           IF NORMALIZED-LENGTH >= 255
-                               MOVE 1 TO LNK-STATUS
-                               MOVE 0 TO LNK-RESULT
-                               GOBACK
-                           END-IF
-                           ADD 1 TO NORMALIZED-LENGTH
-                           MOVE CURRENT-CHAR TO NORMALIZED-BUFFER(NORMALIZED-LENGTH:1)
-                       ELSE
-                           IF EXPECT-EXPONENT-SIGN = 1
-                               IF NORMALIZED-LENGTH >= 255
-                                   MOVE 1 TO LNK-STATUS
-                                   MOVE 0 TO LNK-RESULT
-                                   GOBACK
-                               END-IF
-                               ADD 1 TO NORMALIZED-LENGTH
-                               MOVE CURRENT-CHAR TO NORMALIZED-BUFFER(NORMALIZED-LENGTH:1)
-                               MOVE 0 TO EXPECT-EXPONENT-SIGN
-                           ELSE
-                               MOVE 1 TO LNK-STATUS
-                               MOVE 0 TO LNK-RESULT
-                               GOBACK
-                           END-IF
-                       END-IF
-                   WHEN OTHER
-                       MOVE 1 TO LNK-STATUS
-                       MOVE 0 TO LNK-RESULT
-                       GOBACK
-               END-EVALUATE
-           END-PERFORM.
-           IF NORMALIZED-LENGTH = 0
-               MOVE 1 TO LNK-STATUS
-               MOVE 0 TO LNK-RESULT
-               GOBACK
-           END-IF.
-           IF HAS-ANY-DIGIT = 0
-               MOVE 1 TO LNK-STATUS
-               MOVE 0 TO LNK-RESULT
-               GOBACK
-           END-IF.
-           IF HAS-EXPONENT = 1 AND EXPONENT-DIGITS = 0
-               MOVE 1 TO LNK-STATUS
-               MOVE 0 TO LNK-RESULT
-               GOBACK
-           END-IF.
-           IF EXPECT-EXPONENT-SIGN = 1
-               MOVE 1 TO LNK-STATUS
-               MOVE 0 TO LNK-RESULT
-               GOBACK
-           END-IF.
-           COMPUTE LNK-RESULT = FUNCTION NUMVAL(NORMALIZED-BUFFER(1:NORMALIZED-LENGTH))
-               ON SIZE ERROR
-                   MOVE 1 TO LNK-STATUS
-                   MOVE 0 TO LNK-RESULT
-                   GOBACK
-           END-COMPUTE.
-           MOVE 0 TO LNK-STATUS.
+           MOVE F-RESULT TO CBLC-RETURN-F.
            GOBACK.
+           GOBACK.
+
+       CBLC-TERMINATE.
+           DISPLAY "Fatal CBL-C double exception"
+           DISPLAY "Original exception type: " CBLC-EX-TYPE-ID
+           DISPLAY "Original exception file ID: " CBLC-EX-SOURCE-FILE-ID
+           DISPLAY "Original exception line: " CBLC-EX-SOURCE-LINE
+           DISPLAY "Original exception column: " CBLC-EX-SOURCE-COLUMN
+           DISPLAY "Secondary exception type: " CBLC-EX-SECONDARY-TYPE-ID
+           DISPLAY "Secondary exception line: " CBLC-EX-SECONDARY-SOURCE-LINE
+           DISPLAY "Secondary exception column: " CBLC-EX-SECONDARY-SOURCE-COLUMN
+           STOP RUN.
+
        END PROGRAM CBLC-STRTOD.
+

@@ -92,7 +92,7 @@ static int cblc_argument_matches_parameter(const t_cblc_translation_unit *unit,
 
     if (!unit || !argument || !parameter)
         return (0);
-    item = cblc_find_data_item_const(unit, argument);
+    item = cblc_find_data_item_for_emit_by_source(unit, argument);
     if (parameter->array_count > 0)
     {
         if (!item || item->array_count != parameter->array_count)
@@ -524,6 +524,8 @@ static int cblc_emit_parameter_argument_moves(const t_cblc_translation_unit *uni
             size_t element_index;
 
             item = cblc_find_data_item_const(unit, argument);
+            if (!item)
+                item = cblc_find_data_item_for_emit_by_source(unit, argument);
             if (!item || item->array_count != parameters[index].array_count)
                 return (FT_FAILURE);
             if (parameters[index].kind == TRANSPILE_FUNCTION_PARAMETER_STRING)
@@ -631,6 +633,8 @@ static int cblc_emit_parameter_argument_moves(const t_cblc_translation_unit *uni
             const t_cblc_data_item *item;
 
             item = cblc_find_data_item_const(unit, argument);
+            if (!item)
+                item = cblc_find_data_item_for_emit_by_source(unit, argument);
             if (!item || item->kind != CBLC_DATA_KIND_STRUCT)
                 return (FT_FAILURE);
             if (std::snprintf(line, sizeof(line), "           MOVE %s TO %s.",
@@ -643,9 +647,11 @@ static int cblc_emit_parameter_argument_moves(const t_cblc_translation_unit *uni
             char line_length[256];
             char line_buffer[256];
 
-            item = cblc_find_data_item_const(unit, argument);
+            item = cblc_find_data_item_for_emit_by_source(unit, argument);
             if (!item || item->kind != CBLC_DATA_KIND_STRING)
+            {
                 return (FT_FAILURE);
+            }
             if (std::snprintf(line_buffer, sizeof(line_buffer), "           MOVE %s-BUF TO %s-BUF.",
                     item->cobol_name, parameters[index].cobol_name) < 0)
                 return (FT_FAILURE);
@@ -663,7 +669,7 @@ static int cblc_emit_parameter_argument_moves(const t_cblc_translation_unit *uni
         {
             const t_cblc_data_item *item;
 
-            item = cblc_find_data_item_const(unit, argument);
+            item = cblc_find_data_item_for_emit_by_source(unit, argument);
             if (!item || !cblc_data_kind_is_pointer(item->kind))
                 return (FT_FAILURE);
             if (std::snprintf(line, sizeof(line), "           SET %s TO %s.",

@@ -1,9 +1,10 @@
-void F(double left, double right, double result, int status)
+double F(double left, double right)
 {
-    status = 0;
+    double result;
     result = left;
     if (right < result)
     {
         result = right;
     }
+    return result;
 }

@@ -1,18 +1,10 @@
-void F(int start_serial, int end_serial, int duration, int comparison, int status)
+int F(int start_serial, int end_serial)
 {
-    status = 0;
+    int duration;
     duration = end_serial - start_serial;
-    comparison = 0;
     if (duration < 0)
     {
-        comparison = -1;
         duration = 0 - duration;
     }
-    else
-    {
-        if (duration > 0)
-        {
-            comparison = 1;
-        }
-    }
+    return duration;
 }

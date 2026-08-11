@@ -1,6 +1,7 @@
 int F(string source)
 {
     int result;
-    result = source.len;
+    String object(source);
+    result = object.strlen();
     return result;
 }

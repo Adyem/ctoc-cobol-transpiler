@@ -1,46 +1,7 @@
 int F(string first, string second, int count)
 {
     int result;
-    int index;
-    int limit;
-    result = 0;
-    limit = count;
-    if (limit < 0)
-    {
-        limit = 0;
-    }
-    if (limit > first.len)
-    {
-        limit = first.len;
-    }
-    if (limit > second.len)
-    {
-        limit = second.len;
-    }
-    if (limit > 255)
-    {
-        limit = 255;
-    }
-    index = 0;
-    while (index < limit)
-    {
-        if (first[index] < second[index])
-        {
-            result = -1;
-            index = limit;
-        }
-        else
-        {
-            if (first[index] > second[index])
-            {
-                result = 1;
-                index = limit;
-            }
-            else
-            {
-                index = index + 1;
-            }
-        }
-    }
+    String object(first);
+    result = object.memcmp(second, count);
     return result;
 }

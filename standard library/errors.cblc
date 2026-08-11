@@ -1,0 +1,35 @@
+class invalid_argument
+{
+    public:
+    int code;
+};
+
+class domain_error
+{
+    public:
+    int code;
+};
+
+class range_error
+{
+    public:
+    int code;
+};
+
+class overflow_error
+{
+    public:
+    int code;
+};
+
+class length_error
+{
+    public:
+    int code;
+};
+
+class out_of_range
+{
+    public:
+    int code;
+};

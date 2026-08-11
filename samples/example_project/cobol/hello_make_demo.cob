@@ -11,4 +11,3 @@
            STOP RUN.
 
        END PROGRAM MAIN.
-

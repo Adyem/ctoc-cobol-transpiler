@@ -1,19 +1,6 @@
-void F(string destination, string source, int status)
+void F(string destination, string source)
 {
-    int index;
-    int copy_limit;
-    status = 0;
-    copy_limit = source.len;
-    if (copy_limit > 255)
-    {
-        copy_limit = 255;
-        status = 1;
-    }
-    destination = "";
-    index = 0;
-    while (index < copy_limit)
-    {
-        destination[index] = source[index];
-        index = index + 1;
-    }
+    String object(destination);
+    object.strcpy(source);
+    destination = object.value;
 }

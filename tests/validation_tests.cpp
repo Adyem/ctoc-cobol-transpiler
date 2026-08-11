@@ -2,6 +2,128 @@
 
 #include "compatibility/memory_compat.hpp"
 
+FT_TEST(test_standard_library_migrated_helpers_use_direct_returns)
+{
+    static const char *program_names[] = {
+        "CBLC-ABS", "CBLC-FABS", "CBLC-ISALPHA", "CBLC-ISDIGIT",
+        "CBLC-MEMCMP", "CBLC-STRCMP", "CBLC-STRTOD"
+    };
+    size_t index;
+
+    index = 0;
+    while (index < sizeof(program_names) / sizeof(program_names[0]))
+    {
+        char *generated_cobol;
+
+        generated_cobol = NULL;
+        if (transpiler_standard_library_generate_native(program_names[index],
+                &generated_cobol) != FT_SUCCESS || !generated_cobol)
+        {
+            if (generated_cobol)
+                cma_free(generated_cobol);
+            std::printf("Assertion failed: migrated helper %s should generate\n",
+                program_names[index]);
+            return (FT_FAILURE);
+        }
+        if (!ft_strnstr(generated_cobol, "CBLC-RETURN-F",
+                std::strlen(generated_cobol))
+            || ft_strnstr(generated_cobol, "LNK-STATUS",
+                std::strlen(generated_cobol)))
+        {
+            std::printf("Assertion failed: migrated helper %s should expose a direct return and no status\n",
+                program_names[index]);
+            cma_free(generated_cobol);
+            return (FT_FAILURE);
+        }
+        cma_free(generated_cobol);
+        index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_date_parse_returns_multi_field_value)
+{
+    char *generated_cobol;
+    const char *fields[] = {
+        "CBLC-RETURN-F-YEAR", "CBLC-RETURN-F-MONTH", "CBLC-RETURN-F-DAY",
+        "CBLC-RETURN-F-PACKED", "CBLC-RETURN-F-SERIAL", "CBLC-RETURN-F-ERROR"
+    };
+    size_t index;
+
+    generated_cobol = NULL;
+    if (transpiler_standard_library_generate_date_parse_result(&generated_cobol)
+        != FT_SUCCESS || !generated_cobol)
+    {
+        if (generated_cobol)
+            cma_free(generated_cobol);
+        std::printf("Assertion failed: date parser result should generate\n");
+        return (FT_FAILURE);
+    }
+    index = 0;
+    while (index < sizeof(fields) / sizeof(fields[0]))
+    {
+        if (!std::strstr(generated_cobol, fields[index]))
+        {
+            std::printf("Assertion failed: date parser result should contain field %s\n",
+                fields[index]);
+            cma_free(generated_cobol);
+            return (FT_FAILURE);
+        }
+        index += 1;
+    }
+    if (std::strstr(generated_cobol, "CALL 'DATE-PARSE-")
+        || !std::strstr(generated_cobol, "PERFORM DATE-PARSE-PACKED"))
+    {
+        std::printf("Assertion failed: date parser helpers should remain local paragraphs\n");
+        cma_free(generated_cobol);
+        return (FT_FAILURE);
+    }
+    cma_free(generated_cobol);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_typed_parsers_return_multi_field_values)
+{
+    static const char *program_names[] = {
+        "CBLC-PARSE-INT-RESULT", "CBLC-PARSE-DOUBLE-RESULT"
+    };
+    static const char *fields[] = {"CBLC-RETURN-F-CONSUMED", "CBLC-RETURN-F-ERROR"};
+    size_t program_index;
+
+    program_index = 0;
+    while (program_index < sizeof(program_names) / sizeof(program_names[0]))
+    {
+        char *generated_cobol;
+        size_t field_index;
+
+        generated_cobol = NULL;
+        if (transpiler_standard_library_generate_native(program_names[program_index],
+                &generated_cobol) != FT_SUCCESS || !generated_cobol)
+        {
+            if (generated_cobol)
+                cma_free(generated_cobol);
+            std::printf("Assertion failed: typed parser %s should generate\n",
+                program_names[program_index]);
+            return (FT_FAILURE);
+        }
+        field_index = 0;
+        while (field_index < sizeof(fields) / sizeof(fields[0]))
+        {
+            if (!std::strstr(generated_cobol, fields[field_index]))
+            {
+                std::printf("Assertion failed: typed parser %s should contain %s\n",
+                    program_names[program_index], fields[field_index]);
+                cma_free(generated_cobol);
+                return (FT_FAILURE);
+            }
+            field_index += 1;
+        }
+        cma_free(generated_cobol);
+        program_index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_cblc_intrinsic_registry_is_complete_for_builtin_string_methods)
 {
     static const char *expected_names[] = {
@@ -91,6 +213,122 @@ FT_TEST(test_transpiler_validation_accepts_string_declaration)
             "validator should accept string declarations") != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
+}
+
+FT_TEST(test_cblc_string_class_exposes_native_helper_methods)
+{
+    static const char *method_names[] = {
+        "atoi", "atol", "atoll", "strlen", "strnlen", "strcmp",
+        "strcpy", "strncpy", "memcmp", "strcat", "strtod", "toupper",
+        "tolower"
+    };
+    static const char *program_names[] = {
+        "CBLC-ATOI-STRING", "CBLC-ATOL-STRING", "CBLC-ATOLL-STRING",
+        "CBLC-STRLEN-STRING", "CBLC-STRNLEN-STRING", "CBLC-STRCMP-STRING",
+        "CBLC-STRCPY-STRING", "CBLC-STRNCPY-STRING", "CBLC-MEMCMP-STRING",
+        "CBLC-STRCAT-STRING", "CBLC-STRTOD-STRING", "CBLC-TOUPPER-STRING",
+        "CBLC-TOLOWER-STRING"
+    };
+    const t_cblc_struct_type *string_type;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    const char *source;
+    size_t index;
+    int status;
+
+    source = "string text(16);\n"
+        "string other(16);\n"
+        "int result;\n"
+        "void main() {\n"
+        "    result = text.strlen();\n"
+        "    result = text.strnlen(4);\n"
+        "    result = text.strcmp(other);\n"
+        "    text.strcpy(other);\n"
+        "    text.strncpy(other, 4);\n"
+        "    result = text.memcmp(other, 4);\n"
+        "    text.strcat(other, other);\n"
+        "    text.toupper();\n"
+        "    text.tolower();\n"
+        "    return;\n"
+        "}\n";
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "string native helper method calls should parse") != FT_SUCCESS)
+    {
+        std::printf("string helper diagnostic: parse failed\n");
+        goto cleanup;
+    }
+    string_type = NULL;
+    for (size_t type_index = 0; type_index < unit.struct_type_count; ++type_index)
+    {
+        if (std::strcmp(unit.struct_types[type_index].source_name, "string") == 0)
+        {
+            string_type = &unit.struct_types[type_index];
+            break;
+        }
+    }
+    if (!string_type || !string_type->is_class)
+    {
+        std::printf("Assertion failed: managed string should be represented as a class type (type=%p)\n",
+            static_cast<const void *>(string_type));
+        goto cleanup;
+    }
+    index = 0;
+    while (index < sizeof(method_names) / sizeof(method_names[0]))
+    {
+        const t_cblc_method *method;
+
+        method = NULL;
+        for (size_t method_index = 0; method_index < string_type->method_count;
+            ++method_index)
+        {
+            if (std::strcmp(string_type->methods[method_index].source_name,
+                    method_names[index]) == 0)
+            {
+                method = &string_type->methods[method_index];
+                break;
+            }
+        }
+        if (!method || std::strcmp(method->implementation_program_name,
+                program_names[index]) != 0)
+        {
+            std::printf("Assertion failed: string helper should be a native class method (%s got %s)\n",
+                method_names[index], method ? method->implementation_program_name : "<missing>");
+            goto cleanup;
+        }
+        index += 1;
+    }
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "string native helper methods should generate COBOL") != FT_SUCCESS)
+    {
+        std::printf("string helper diagnostic: generation failed\n");
+        goto cleanup;
+    }
+    index = 3;
+    while (index < sizeof(method_names) / sizeof(method_names[0]))
+    {
+        if (index == 10)
+        {
+            index += 1;
+            continue;
+        }
+        if (!generated_cobol || !ft_strnstr(generated_cobol, program_names[index],
+                std::strlen(generated_cobol)))
+        {
+            std::printf("Assertion failed: generated COBOL should call each string helper program (%s)\n",
+                program_names[index]);
+            goto cleanup;
+        }
+        index += 1;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
 }
 
 FT_TEST(test_transpiler_validation_accepts_string_assignment_and_length_usage)
@@ -1261,7 +1499,7 @@ FT_TEST(test_cblc_template_class_instantiates_members)
     if (!generated_cobol
         || std::strstr(generated_cobol, "T VALUE")
         || !std::strstr(generated_cobol,
-            "CBLC-METHOD-ITEM-CBLC-TPL-BOX-INT-SET"))
+            "CBLC-METHOD-ITEM-CBLC-TPL-BOX-INT-CBLC-USER-SET"))
     {
         std::printf("Assertion failed: class template member output should be concrete\n");
         goto cleanup;
@@ -7115,6 +7353,12 @@ cleanup:
 const t_test_case *get_validation_tests(size_t *count)
 {
     static const t_test_case tests[] = {
+        {"standard_library_migrated_helpers_use_direct_returns",
+            test_standard_library_migrated_helpers_use_direct_returns},
+        {"standard_library_date_parse_returns_multi_field_value",
+            test_standard_library_date_parse_returns_multi_field_value},
+        {"standard_library_typed_parsers_return_multi_field_values",
+            test_standard_library_typed_parsers_return_multi_field_values},
         {"cblc_generate_cobol_emits_native_try_catch_dispatch",
             test_cblc_generate_cobol_emits_native_try_catch_dispatch},
         {"cblc_generate_cobol_requires_exception_context_for_external_throwing_entry",
@@ -7194,6 +7438,8 @@ const t_test_case *get_validation_tests(size_t *count)
         {"transpiler_validation_accepts_valid_cblc", test_transpiler_validation_accepts_valid_cblc},
         {"transpiler_validation_rejects_cblc_without_return", test_transpiler_validation_rejects_cblc_without_return},
         {"transpiler_validation_accepts_string_declaration", test_transpiler_validation_accepts_string_declaration},
+        {"cblc_string_class_exposes_native_helper_methods",
+            test_cblc_string_class_exposes_native_helper_methods},
         {"transpiler_validation_accepts_string_assignment_and_length_usage",
             test_transpiler_validation_accepts_string_assignment_and_length_usage},
         {"transpiler_validation_accepts_int_array_and_string_array_declarations",

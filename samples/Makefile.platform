@@ -1,0 +1,75 @@
+# Shared platform helpers for the sample Makefiles.
+#
+# The recipes deliberately stay small and use the native command interpreter
+# on each platform.  This keeps the samples usable from both Unix make and
+# the Windows make bundled with the project.
+
+ifeq ($(OS),Windows_NT)
+EXE_EXT ?= .exe
+MODULE_EXT ?= .dll
+PYTHON ?= python
+
+SAMPLE_MKDIR = $(PYTHON) -c "import os,sys; os.makedirs(sys.argv[1], exist_ok=True)" "$(1)"
+SAMPLE_TOUCH = $(PYTHON) -c "import sys; open(sys.argv[1], 'a').close()" "$(1)"
+SAMPLE_REQUIRE_FILE = if not exist "$(1)" (echo The required file "$(1)" was not emitted. & exit /b 1) &
+SAMPLE_REMOVE_FILES = $(foreach file,$(1),if exist "$(file)" del /f /q "$(file)" >NUL 2>NUL &)
+SAMPLE_REMOVE_DIR = if exist "$(1)" rmdir /s /q "$(1)"
+SAMPLE_COBC_AVAILABLE = where "$(COBC)" >NUL 2>NUL
+SAMPLE_RUN = .\$(1)
+SAMPLE_RUN_WITH_LIBRARY = set "COB_LIBRARY_PATH=$(1)" && .\$(2)
+SAMPLE_RUN_WITH_FILES = set "COB_LIBRARY_PATH=$(1)" && .\$(2) && $(PYTHON) -c "import sys; [print(path) for path in sys.argv[1:]]" $(3)
+SAMPLE_PREPARE_EXPECTED = $(PYTHON) -c "import sys; source=open(sys.argv[1]).read(); open(sys.argv[2], 'w').write(source.replace('.so', sys.argv[3]))" "$(1)" "$(2)" "$(3)"
+SAMPLE_COMPARE_OUTPUT = fc /n "$(1)" "$(2)"
+SAMPLE_SKIP_VALIDATION = set CTOC_SKIP_STANDARD_LIBRARY_VALIDATION=1 &&
+else
+EXE_EXT ?=
+MODULE_EXT ?= .so
+PYTHON ?= python3
+
+SAMPLE_MKDIR = mkdir -p "$(1)"
+SAMPLE_TOUCH = touch "$(1)"
+SAMPLE_REQUIRE_FILE = test -f "$(1)" || { printf 'The required file "%s" was not emitted.\n' "$(1)" >&2; exit 1; };
+SAMPLE_REMOVE_FILES = rm -f $(1)
+SAMPLE_REMOVE_DIR = rmdir "$(1)" 2>/dev/null || true
+SAMPLE_COBC_AVAILABLE = command -v "$(COBC)" >/dev/null 2>&1
+SAMPLE_RUN = ./$(1)
+SAMPLE_RUN_WITH_LIBRARY = COB_LIBRARY_PATH="$(1)" ./$(2)
+SAMPLE_RUN_WITH_FILES = COB_LIBRARY_PATH="$(1)" ./$(2) && $(PYTHON) -c "import sys; [print(path) for path in sys.argv[1:]]" $(3)
+SAMPLE_PREPARE_EXPECTED = $(PYTHON) -c "import sys; source=open(sys.argv[1]).read(); open(sys.argv[2], 'w').write(source.replace('.so', sys.argv[3]))" "$(1)" "$(2)" "$(3)"
+SAMPLE_COMPARE_OUTPUT = diff -u "$(1)" "$(2)"
+SAMPLE_SKIP_VALIDATION = CTOC_SKIP_STANDARD_LIBRARY_VALIDATION=1
+endif
+
+ifeq ($(OS),Windows_NT)
+COBC_ON_PATH := $(shell where $(COBC) 2>NUL)
+GOINFRE_COBC :=
+GOINFRE_COBC_AVAILABLE :=
+else
+COBC_ON_PATH := $(shell command -v $(COBC) 2>/dev/null)
+GOINFRE_COBC := $(GOINFRE_LOCAL_PREFIX)/bin/cobc
+GOINFRE_COBC_AVAILABLE := $(shell test -x "$(GOINFRE_COBC)" && printf yes)
+endif
+
+ifeq ($(COBC_ON_PATH),)
+ifeq ($(GOINFRE_COBC_AVAILABLE),yes)
+COBC := $(GOINFRE_COBC)
+export PATH := $(GOINFRE_LOCAL_PREFIX)/bin:$(PATH)
+export LD_LIBRARY_PATH := $(GOINFRE_LOCAL_PREFIX)/lib:$(GOINFRE_LOCAL_PREFIX)/lib64$(if $(LD_LIBRARY_PATH),:$(LD_LIBRARY_PATH))
+export CPATH := $(GOINFRE_LOCAL_PREFIX)/include$(if $(CPATH),:$(CPATH))
+export LIBRARY_PATH := $(GOINFRE_LOCAL_PREFIX)/lib:$(GOINFRE_LOCAL_PREFIX)/lib64$(if $(LIBRARY_PATH),:$(LIBRARY_PATH))
+endif
+endif
+
+.PHONY: ensure_cobc
+
+ifeq ($(OS),Windows_NT)
+ensure_cobc:
+	@$(SAMPLE_COBC_AVAILABLE) || (echo Unable to locate "$(COBC)" on PATH. & exit /b 1)
+else
+ensure_cobc:
+	@if ! $(SAMPLE_COBC_AVAILABLE); then \
+		printf 'Unable to locate "$(COBC)" on PATH or at "$(GOINFRE_COBC)".\n' >&2; \
+		printf 'Run "make -C $(REPO_ROOT) install_cobc_goinfre" to install it locally.\n' >&2; \
+		exit 1; \
+	fi
+endif

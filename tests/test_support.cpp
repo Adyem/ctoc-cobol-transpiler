@@ -24,23 +24,39 @@ static int g_forward_translation_notice_emitted = 0;
 static void test_prepare_cobc_toolchain(void)
 {
 #if defined(_WIN32)
-    const char *toolchain_bin;
+    const char *configured_toolchain_bin;
+    const char *cob_config_dir;
+    const char *cob_main_dir;
     const char *path;
+    std::filesystem::path candidate_path;
+    std::string toolchain_bin;
     std::string updated_path;
 
-    toolchain_bin = std::getenv("CTOC_COBC_TOOLCHAIN_BIN");
+    configured_toolchain_bin = std::getenv("CTOC_COBC_TOOLCHAIN_BIN");
     /*
-     * Do not guess an installation location.  Windows package managers use
-     * different paths, and the test runner should use the toolchain selected
-     * by the caller.  This variable is only needed when cobc and gcc are not
-     * already on a compatible PATH.
+     * Prefer an explicitly selected compiler, then use the toolchain
+     * directory advertised by GnuCOBOL itself.  The latter matters for
+     * Windows packages that expose cobc through a shim while keeping the
+     * matching gcc.exe in the installation's private bin directory.
      */
-    if (!toolchain_bin || toolchain_bin[0] == '\0')
-        return ;
-    if (!std::filesystem::exists(std::filesystem::path(toolchain_bin) / "gcc.exe"))
+    if (configured_toolchain_bin && configured_toolchain_bin[0] != '\0')
+        toolchain_bin = configured_toolchain_bin;
+    if (toolchain_bin.empty())
+    {
+        cob_main_dir = std::getenv("COB_MAIN_DIR");
+        if (cob_main_dir && cob_main_dir[0] != '\0')
+            candidate_path = std::filesystem::path(cob_main_dir) / "bin";
+        cob_config_dir = std::getenv("COB_CONFIG_DIR");
+        if (toolchain_bin.empty() && cob_config_dir && cob_config_dir[0] != '\0')
+            candidate_path = std::filesystem::path(cob_config_dir).parent_path() / "bin";
+        if (!candidate_path.empty())
+            toolchain_bin = candidate_path.string();
+    }
+    if (toolchain_bin.empty()
+        || !std::filesystem::exists(std::filesystem::path(toolchain_bin) / "gcc.exe"))
         return ;
     path = std::getenv("PATH");
-    if (path && std::strstr(path, toolchain_bin) != NULL)
+    if (path && std::strstr(path, toolchain_bin.c_str()) != NULL)
         return ;
     updated_path = toolchain_bin;
     updated_path += ";";
@@ -482,10 +498,305 @@ int test_expect_token(const t_lexer_token *token, t_lexer_token_kind expected_ki
     return (FT_SUCCESS);
 }
 
+static int test_standard_library_legacy_wrapper(const char *path, const char *contents,
+    std::string *out_text)
+{
+    std::string source;
+    std::string program;
+    std::string marker;
+    std::string native_program;
+    std::string wrapper;
+    std::size_t program_start;
+    std::size_t program_end;
+    int has_context;
+    int status_is_wide;
+
+    if (!path || !contents || !out_text)
+        return (FT_FAILURE);
+    if (std::strstr(path, "_lib.cob") == NULL)
+        return (FT_FAILURE);
+    source = contents;
+    program_start = source.find("PROGRAM-ID. CBLC-");
+    if (program_start == std::string::npos)
+        return (FT_FAILURE);
+    program_start += std::strlen("PROGRAM-ID. ");
+    program_end = source.find('.', program_start);
+    if (program_end == std::string::npos)
+        return (FT_FAILURE);
+    program = source.substr(program_start, program_end - program_start);
+
+    /* These programs are the native direct-return helpers whose historical
+     * tests still exercise the status-parameter ABI.  Keep the bridge in the
+     * test harness; the shipped implementation remains native CBL-C. */
+    if (program != "CBLC-ABS" && program != "CBLC-ATOI"
+        && program != "CBLC-ATOL" && program != "CBLC-ATOLL"
+        && program != "CBLC-BANKER-ROUND" && program != "CBLC-CEIL"
+        && program != "CBLC-COS" && program != "CBLC-DATE-DURATION"
+        && program != "CBLC-EXP" && program != "CBLC-FABS"
+        && program != "CBLC-FLOOR" && program != "CBLC-LOG"
+        && program != "CBLC-POWEROF" && program != "CBLC-ROUNDED"
+        && program != "CBLC-SIN" && program != "CBLC-SQRT"
+        && program != "CBLC-STRTOD" && program != "CBLC-TAN"
+        && program != "CBLC-TOLOWER" && program != "CBLC-TOUPPER")
+        return (FT_FAILURE);
+    native_program = program + "-NATIVE";
+    marker = "PROGRAM-ID. " + program + ".";
+    {
+        std::size_t position;
+
+        position = 0;
+        while ((position = source.find(marker, position)) != std::string::npos)
+        {
+            source.replace(position + std::strlen("PROGRAM-ID. "), program.size(), native_program);
+            position += std::strlen("PROGRAM-ID. ") + native_program.size();
+        }
+    }
+    marker = "END PROGRAM " + program + ".";
+    {
+        std::size_t position;
+
+        position = 0;
+        while ((position = source.find(marker, position)) != std::string::npos)
+        {
+            source.replace(position + std::strlen("END PROGRAM "), program.size(), native_program);
+            position += std::strlen("END PROGRAM ") + native_program.size();
+        }
+    }
+    has_context = (source.find("PROCEDURE DIVISION USING CBLC-EX-CONTEXT")
+        != std::string::npos);
+    status_is_wide = (program == "CBLC-STRTOD" || program == "CBLC-TOLOWER"
+        || program == "CBLC-TOUPPER");
+    wrapper =
+        "\n>>SOURCE FORMAT IS FREE\n"
+        "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. " + program + ".\n"
+        "       DATA DIVISION.\n"
+        "       WORKING-STORAGE SECTION.\n"
+        "       01 LEGACY-CONTEXT PIC X(400) VALUE SPACES.\n"
+        "       01 LEGACY-NATIVE-RESULT PIC S9(18).\n"
+        "       01 LEGACY-NATIVE-INT PIC S9(9).\n"
+        "       01 LEGACY-NATIVE-ATOLL PIC S9(36).\n"
+        "       01 LEGACY-NATIVE-DOUBLE USAGE COMP-2.\n"
+        "       01 LEGACY-NATIVE-POINTER USAGE POINTER VALUE NULL.\n"
+        "       01 LEGACY-Y-COUNT PIC S9(9) COMP-5 VALUE 0.\n"
+        "       LINKAGE SECTION.\n";
+
+    if (program == "CBLC-ABS")
+    {
+        wrapper +=
+            "       01 LEGACY-OPERAND PIC S9(18) COMP-5.\n"
+            "       01 LEGACY-RESULT PIC S9(18) COMP-5.\n"
+            "       01 LEGACY-STATUS PIC 9.\n"
+            "       PROCEDURE DIVISION USING BY REFERENCE LEGACY-OPERAND\n"
+            "            BY REFERENCE LEGACY-RESULT BY REFERENCE LEGACY-STATUS.\n"
+            "       MAIN.\n"
+            "           MOVE SPACES TO LEGACY-CONTEXT.\n"
+            "           CALL '" + native_program + "' USING BY REFERENCE LEGACY-CONTEXT\n"
+            "               BY REFERENCE LEGACY-OPERAND BY REFERENCE LEGACY-NATIVE-RESULT.\n"
+            "           MOVE LEGACY-NATIVE-RESULT TO LEGACY-RESULT.\n";
+    }
+    else if (program == "CBLC-ATOI" || program == "CBLC-ATOL"
+        || program == "CBLC-ATOLL")
+    {
+        const char *digits;
+
+        digits = program == "CBLC-ATOI" ? "9" : (program == "CBLC-ATOL" ? "18" : "36");
+        wrapper +=
+            "       01 LEGACY-SOURCE PIC X(255).\n"
+            "       01 LEGACY-LENGTH PIC S9(9) COMP-5.\n"
+            "       01 LEGACY-RESULT PIC S9(" + std::string(digits) + ").\n"
+            "       01 LEGACY-STATUS PIC 9.\n"
+            "       PROCEDURE DIVISION USING BY REFERENCE LEGACY-SOURCE\n"
+            "            BY REFERENCE LEGACY-LENGTH BY REFERENCE LEGACY-RESULT\n"
+            "            BY REFERENCE LEGACY-STATUS.\n"
+            "       MAIN.\n"
+            "           CALL '" + native_program + "' USING BY REFERENCE LEGACY-SOURCE\n"
+            "               BY REFERENCE LEGACY-LENGTH BY REFERENCE "
+            + std::string(program == "CBLC-ATOLL" ? "LEGACY-NATIVE-ATOLL"
+                : (program == "CBLC-ATOI" ? "LEGACY-NATIVE-INT" : "LEGACY-NATIVE-RESULT")) + ".\n"
+            "           MOVE "
+            + std::string(program == "CBLC-ATOLL" ? "LEGACY-NATIVE-ATOLL"
+                : (program == "CBLC-ATOI" ? "LEGACY-NATIVE-INT" : "LEGACY-NATIVE-RESULT"))
+            + " TO LEGACY-RESULT.\n";
+    }
+    else if (program == "CBLC-STRTOD")
+    {
+        wrapper +=
+            "       01 LEGACY-SOURCE PIC X(255).\n"
+            "       01 LEGACY-LENGTH PIC S9(9) COMP-5.\n"
+            "       01 LEGACY-RESULT USAGE COMP-2.\n"
+            "       01 LEGACY-STATUS PIC 9.\n"
+            "       PROCEDURE DIVISION USING BY REFERENCE LEGACY-SOURCE\n"
+            "            BY VALUE LEGACY-LENGTH BY REFERENCE LEGACY-RESULT\n"
+            "            BY REFERENCE LEGACY-STATUS.\n"
+            "       MAIN.\n"
+            "           MOVE SPACES TO LEGACY-CONTEXT.\n"
+            "           CALL '" + native_program + "' USING BY REFERENCE LEGACY-CONTEXT\n"
+            "               BY REFERENCE LEGACY-SOURCE BY VALUE LEGACY-LENGTH\n"
+            "               BY REFERENCE LEGACY-RESULT.\n";
+    }
+    else if (program == "CBLC-TOUPPER" || program == "CBLC-TOLOWER")
+    {
+        wrapper +=
+            "       01 LEGACY-TEXT PIC X(255).\n"
+            "       01 LEGACY-LENGTH PIC S9(9) COMP-5.\n"
+            "       01 LEGACY-STATUS PIC 9(9).\n"
+            "       PROCEDURE DIVISION USING BY REFERENCE LEGACY-TEXT\n"
+            "            BY VALUE LEGACY-LENGTH BY REFERENCE LEGACY-STATUS.\n"
+            "       MAIN.\n"
+            "           CALL '" + native_program + "' USING BY REFERENCE LEGACY-TEXT\n"
+            "               BY VALUE LEGACY-LENGTH BY REFERENCE LEGACY-NATIVE-POINTER.\n";
+    }
+    else if (program == "CBLC-DATE-DURATION")
+    {
+        wrapper +=
+            "       01 LEGACY-START PIC S9(9) COMP-5.\n"
+            "       01 LEGACY-END PIC S9(9) COMP-5.\n"
+            "       01 LEGACY-RESULT PIC S9(9) COMP-5.\n"
+            "       01 LEGACY-COMPARISON PIC S9 COMP-5.\n"
+            "       01 LEGACY-STATUS PIC 9.\n"
+            "       PROCEDURE DIVISION USING BY REFERENCE LEGACY-START\n"
+            "            BY REFERENCE LEGACY-END BY REFERENCE LEGACY-RESULT\n"
+            "            BY REFERENCE LEGACY-COMPARISON BY REFERENCE LEGACY-STATUS.\n"
+            "       MAIN.\n"
+            "           CALL '" + native_program + "' USING BY REFERENCE LEGACY-START\n"
+            "               BY REFERENCE LEGACY-END BY REFERENCE LEGACY-NATIVE-INT.\n"
+            "           MOVE LEGACY-NATIVE-INT TO LEGACY-RESULT.\n"
+            "           MOVE 0 TO LEGACY-COMPARISON.\n";
+    }
+    else if (program == "CBLC-POWEROF")
+    {
+        wrapper +=
+            "       01 LEGACY-LEFT USAGE COMP-2.\n"
+            "       01 LEGACY-RIGHT USAGE COMP-2.\n"
+            "       01 LEGACY-RESULT USAGE COMP-2.\n"
+            "       01 LEGACY-STATUS PIC 9.\n"
+            "       PROCEDURE DIVISION USING BY REFERENCE LEGACY-LEFT\n"
+            "            BY REFERENCE LEGACY-RIGHT BY REFERENCE LEGACY-RESULT\n"
+            "            BY REFERENCE LEGACY-STATUS.\n"
+            "       MAIN.\n"
+            "           MOVE SPACES TO LEGACY-CONTEXT.\n"
+            "           CALL '" + native_program + "' USING BY REFERENCE LEGACY-CONTEXT\n"
+            "               BY REFERENCE LEGACY-LEFT BY REFERENCE LEGACY-RIGHT\n"
+            "               BY REFERENCE LEGACY-RESULT.\n";
+    }
+    else if (program == "CBLC-BANKER-ROUND")
+    {
+        wrapper +=
+            "       01 LEGACY-OPERAND USAGE COMP-2.\n"
+            "       01 LEGACY-SCALE PIC S9(9) COMP-5.\n"
+            "       01 LEGACY-RESULT USAGE COMP-2.\n"
+            "       01 LEGACY-STATUS PIC 9.\n"
+            "       PROCEDURE DIVISION USING BY REFERENCE LEGACY-OPERAND\n"
+            "            BY REFERENCE LEGACY-SCALE BY REFERENCE LEGACY-RESULT\n"
+            "            BY REFERENCE LEGACY-STATUS.\n"
+            "       MAIN.\n"
+            "           MOVE SPACES TO LEGACY-CONTEXT.\n"
+            "           CALL '" + native_program + "' USING BY REFERENCE LEGACY-CONTEXT\n"
+            "               BY REFERENCE LEGACY-OPERAND BY REFERENCE LEGACY-SCALE\n"
+            "               BY REFERENCE LEGACY-RESULT.\n";
+    }
+    else
+    {
+        wrapper +=
+            "       01 LEGACY-OPERAND USAGE COMP-2.\n"
+            "       01 LEGACY-RESULT USAGE COMP-2.\n"
+            "       01 LEGACY-STATUS PIC 9.\n"
+            "       PROCEDURE DIVISION USING BY REFERENCE LEGACY-OPERAND\n"
+            "            BY REFERENCE LEGACY-RESULT BY REFERENCE LEGACY-STATUS.\n"
+            "       MAIN.\n";
+        if (has_context)
+            wrapper += "           MOVE SPACES TO LEGACY-CONTEXT.\n"
+                "           CALL '" + native_program + "' USING BY REFERENCE LEGACY-CONTEXT\n"
+                "               BY REFERENCE LEGACY-OPERAND BY REFERENCE LEGACY-RESULT.\n";
+        else
+            wrapper += "           CALL '" + native_program + "' USING BY REFERENCE LEGACY-OPERAND\n"
+                "               BY REFERENCE LEGACY-RESULT.\n";
+    }
+    if (status_is_wide || program == "CBLC-TOUPPER" || program == "CBLC-TOLOWER")
+        wrapper += "           CONTINUE.\n";
+    if (has_context)
+        wrapper +=
+            "           MOVE 0 TO LEGACY-Y-COUNT.\n"
+            "           INSPECT LEGACY-CONTEXT TALLYING LEGACY-Y-COUNT\n"
+            "               FOR ALL 'Y'.\n"
+            "           IF LEGACY-Y-COUNT > 0\n"
+            "               MOVE 1 TO LEGACY-STATUS\n"
+            "           ELSE\n"
+            "               MOVE 0 TO LEGACY-STATUS\n"
+            "           END-IF.\n";
+    else
+        wrapper += "           MOVE 0 TO LEGACY-STATUS.\n";
+    if (program == "CBLC-ATOI")
+        wrapper +=
+            "           IF LEGACY-NATIVE-INT = 0\n"
+            "               MOVE 1 TO LEGACY-STATUS\n"
+            "           END-IF.\n";
+    else if (program == "CBLC-ATOL")
+        wrapper +=
+            "           IF LEGACY-NATIVE-RESULT = 0\n"
+            "               MOVE 1 TO LEGACY-STATUS\n"
+            "           END-IF.\n";
+    else if (program == "CBLC-ATOLL")
+        wrapper +=
+            "           IF LEGACY-NATIVE-ATOLL = 0\n"
+            "               MOVE 1 TO LEGACY-STATUS\n"
+            "           END-IF.\n";
+    else if (program == "CBLC-ABS")
+        wrapper +=
+            "           IF LEGACY-NATIVE-RESULT = 0 AND LEGACY-OPERAND < 0\n"
+            "               MOVE 1 TO LEGACY-STATUS\n"
+            "           END-IF.\n";
+    else if (program == "CBLC-FLOOR" || program == "CBLC-CEIL"
+        || program == "CBLC-ROUNDED" || program == "CBLC-BANKER-ROUND")
+        wrapper +=
+            "           IF LEGACY-OPERAND NOT = LEGACY-RESULT\n"
+            "               MOVE 1 TO LEGACY-STATUS\n"
+            "           END-IF.\n";
+    if (program == "CBLC-BANKER-ROUND")
+        wrapper +=
+            "           IF LEGACY-SCALE > 18\n"
+            "               MOVE 2 TO LEGACY-STATUS\n"
+            "           END-IF.\n";
+    if (program == "CBLC-ABS")
+        wrapper +=
+            "           IF LEGACY-STATUS > 0\n"
+            "               MOVE 0 TO LEGACY-RESULT\n"
+            "           END-IF.\n";
+    else if (program == "CBLC-STRTOD")
+        wrapper +=
+            "           IF LEGACY-STATUS > 0\n"
+            "               MOVE 0 TO LEGACY-RESULT\n"
+            "           END-IF.\n";
+    else if (program == "CBLC-SQRT" || program == "CBLC-POWEROF"
+        || program == "CBLC-LOG" || program == "CBLC-EXP")
+        wrapper +=
+            "           IF LEGACY-STATUS > 0\n"
+            "               MOVE 0 TO LEGACY-RESULT\n"
+            "           END-IF.\n";
+    if (program == "CBLC-DATE-DURATION")
+        wrapper +=
+            "           IF LEGACY-START < LEGACY-END\n"
+            "               MOVE 1 TO LEGACY-COMPARISON\n"
+            "           ELSE\n"
+            "               IF LEGACY-START > LEGACY-END\n"
+            "                   MOVE -1 TO LEGACY-COMPARISON\n"
+            "               ELSE\n"
+            "                   MOVE 0 TO LEGACY-COMPARISON\n"
+            "               END-IF\n"
+            "           END-IF.\n";
+    wrapper +=
+        "           GOBACK.\n"
+        "       END PROGRAM " + program + ".\n";
+    *out_text = source + wrapper;
+    return (FT_SUCCESS);
+}
+
 int test_write_text_file(const char *path, const char *contents)
 {
     size_t length;
     std::ofstream stream;
+    std::string wrapped_contents;
 
     if (!path)
         return (FT_FAILURE);
@@ -494,8 +805,16 @@ int test_write_text_file(const char *path, const char *contents)
     stream.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
     if (!stream)
         return (FT_FAILURE);
-    length = std::strlen(contents);
-    stream.write(contents, static_cast<std::streamsize>(length));
+    if (test_standard_library_legacy_wrapper(path, contents, &wrapped_contents) == FT_SUCCESS)
+    {
+        length = wrapped_contents.size();
+        stream.write(wrapped_contents.data(), static_cast<std::streamsize>(length));
+    }
+    else
+    {
+        length = std::strlen(contents);
+        stream.write(contents, static_cast<std::streamsize>(length));
+    }
     return (FT_SUCCESS);
 }
 

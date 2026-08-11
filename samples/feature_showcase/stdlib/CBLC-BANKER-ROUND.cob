@@ -1,72 +1,90 @@
+>>SOURCE FORMAT IS FREE
        IDENTIFICATION DIVISION.
        PROGRAM-ID. CBLC-BANKER-ROUND.
+       ENVIRONMENT DIVISION.
        DATA DIVISION.
        WORKING-STORAGE SECTION.
-       01 WS-SCALE-POWER PIC 9(18) COMP-3 VALUE 1.
-       01 WS-SCALED PIC S9(18)V9(18) COMP-3 VALUE 0.
-       01 WS-INTEGER PIC S9(18) COMP-3 VALUE 0.
-       01 WS-FRACTION PIC 9V9(18) COMP-3 VALUE 0.
-       01 WS-ABS-INTEGER PIC 9(18) COMP-3 VALUE 0.
-       01 WS-REMAINDER PIC 9 COMP-3 VALUE 0.
-       01 WS-HALF PIC 9V9 COMP-3 VALUE 0.5.
-       01 WS-TWO PIC 9 COMP-3 VALUE 2.
+       01 F-RESULT USAGE COMP-2.
+       01 F-INDEX PIC S9(9) COMP-5.
+       01 F-ERROR.
+       05 F-ERROR-CODE PIC S9(9).
+       01 CBLC-EX-PAYLOAD-INVALID-ARGUMENT.
+       05 CBLC-EX-PAYLOAD-INVALID-ARGUMENT-CODE PIC S9(9).
        LINKAGE SECTION.
-       01 LNK-OPERAND USAGE COMP-2.
-       01 LNK-SCALE PIC S9(4) COMP-5.
-       01 LNK-RESULT USAGE COMP-2.
-       01 LNK-STATUS PIC 9.
-       PROCEDURE DIVISION USING BY REFERENCE LNK-OPERAND
-           BY REFERENCE LNK-SCALE BY REFERENCE LNK-RESULT
-           BY REFERENCE LNK-STATUS.
-       MAIN.
-           MOVE 0 TO LNK-STATUS.
-           IF LNK-SCALE < 0 OR LNK-SCALE > 18
-               MOVE 2 TO LNK-STATUS
-               MOVE 0 TO LNK-RESULT
-               GOBACK
-           END-IF.
-           COMPUTE WS-SCALE-POWER = 10 ** LNK-SCALE
-               ON SIZE ERROR
-                   MOVE 2 TO LNK-STATUS
-                   MOVE 0 TO LNK-RESULT
-                   GOBACK
-           END-COMPUTE.
-           COMPUTE WS-SCALED = LNK-OPERAND * WS-SCALE-POWER
-               ON SIZE ERROR
-                   MOVE 2 TO LNK-STATUS
-                   MOVE 0 TO LNK-RESULT
-                   GOBACK
-           END-COMPUTE.
-           COMPUTE WS-INTEGER = FUNCTION INTEGER-PART(WS-SCALED).
-           COMPUTE WS-FRACTION = FUNCTION ABS(WS-SCALED - WS-INTEGER).
-           MOVE WS-INTEGER TO WS-SCALED.
-           IF WS-FRACTION > 0
-               MOVE 1 TO LNK-STATUS
+       01 CBLC-EX-CONTEXT.
+          05 CBLC-EX-ACTIVE PIC X.
+          05 CBLC-EX-MATCHED PIC X.
+          05 CBLC-EX-TYPE-ID PIC 9(10) COMP-5.
+          05 CBLC-EX-DYNAMIC-TYPE-ID PIC 9(10) COMP-5.
+          05 CBLC-EX-PAYLOAD-SIZE PIC 9(9) COMP-5.
+          05 CBLC-EX-PAYLOAD-OWNER PIC X.
+          05 CBLC-EX-SOURCE-FILE-ID PIC 9(10) COMP-5.
+          05 CBLC-EX-SOURCE-LINE PIC 9(9) COMP-5.
+          05 CBLC-EX-SOURCE-COLUMN PIC 9(9) COMP-5.
+          05 CBLC-EX-RAISING PIC X.
+          05 CBLC-EX-CLEANING PIC X.
+          05 CBLC-EX-SECONDARY-TYPE-ID PIC 9(10) COMP-5.
+          05 CBLC-EX-SECONDARY-SOURCE-LINE PIC 9(9) COMP-5.
+          05 CBLC-EX-SECONDARY-SOURCE-COLUMN PIC 9(9) COMP-5.
+          05 CBLC-EX-INT-PAYLOAD PIC S9(9).
+          05 CBLC-EX-STRING.
+             10 CBLC-EX-STRING-LEN PIC 9(4) COMP.
+             10 CBLC-EX-STRING-BUF PIC X(256).
+       01 F-OPERAND USAGE COMP-2.
+       01 F-SCALE PIC S9(9) COMP-5.
+       01 CBLC-RETURN-F USAGE COMP-2.
+       PROCEDURE DIVISION USING CBLC-EX-CONTEXT
+            BY REFERENCE F-OPERAND BY REFERENCE F-SCALE
+            BY REFERENCE CBLC-RETURN-F.
+       F.
+           IF F-SCALE < 0 OR F-SCALE > 18
+           COMPUTE F-ERROR-CODE = 2
+           IF CBLC-EX-RAISING = 'Y' OR CBLC-EX-CLEANING = 'Y'
+               MOVE 942785999 TO CBLC-EX-SECONDARY-TYPE-ID
+               MOVE 45 TO CBLC-EX-SECONDARY-SOURCE-LINE
+               MOVE 9 TO CBLC-EX-SECONDARY-SOURCE-COLUMN
+               PERFORM CBLC-TERMINATE
            END-IF
-           IF WS-FRACTION > WS-HALF
-               IF WS-SCALED >= 0
-                   COMPUTE WS-SCALED = WS-INTEGER + 1
-               ELSE
-                   COMPUTE WS-SCALED = WS-INTEGER - 1
-               END-IF
+           MOVE 'Y' TO CBLC-EX-RAISING
+           MOVE F-ERROR TO CBLC-EX-PAYLOAD-INVALID-ARGUMENT
+           MOVE 4 TO CBLC-EX-PAYLOAD-SIZE
+           MOVE 942785999 TO CBLC-EX-TYPE-ID
+           MOVE 942785999 TO CBLC-EX-DYNAMIC-TYPE-ID
+           MOVE 45 TO CBLC-EX-SOURCE-LINE
+           MOVE 516652814 TO CBLC-EX-SOURCE-FILE-ID
+           MOVE 9 TO CBLC-EX-SOURCE-COLUMN
+           MOVE 'Y' TO CBLC-EX-PAYLOAD-OWNER
+           MOVE 'Y' TO CBLC-EX-ACTIVE
+           MOVE 'N' TO CBLC-EX-RAISING
+           GOBACK
            ELSE
-               IF WS-FRACTION = WS-HALF
-                   COMPUTE WS-ABS-INTEGER = FUNCTION ABS(WS-INTEGER)
-                   COMPUTE WS-REMAINDER = FUNCTION MOD(WS-ABS-INTEGER, WS-TWO)
-                   IF WS-REMAINDER NOT = 0
-                       IF WS-SCALED >= 0
-                           COMPUTE WS-SCALED = WS-INTEGER + 1
-                       ELSE
-                           COMPUTE WS-SCALED = WS-INTEGER - 1
-                       END-IF
-                   END-IF
-               END-IF
+           COMPUTE F-RESULT = F-OPERAND
+           COMPUTE F-INDEX = 0
+           PERFORM UNTIL NOT (F-INDEX < F-SCALE)
+           COMPUTE F-RESULT = F-RESULT * 10
+           COMPUTE F-INDEX = F-INDEX + 1
+           END-PERFORM
+           COMPUTE F-RESULT = FUNCTION INTEGER-PART(F-RESULT)
+           COMPUTE F-INDEX = 0
+           PERFORM UNTIL NOT (F-INDEX < F-SCALE)
+           COMPUTE F-RESULT = F-RESULT / 10
+           COMPUTE F-INDEX = F-INDEX + 1
+           END-PERFORM
            END-IF.
-           COMPUTE LNK-RESULT = WS-SCALED / WS-SCALE-POWER
-               ON SIZE ERROR
-                   MOVE 2 TO LNK-STATUS
-                   MOVE 0 TO LNK-RESULT
-                   GOBACK
-           END-COMPUTE.
+           MOVE F-RESULT TO CBLC-RETURN-F.
            GOBACK.
+           GOBACK.
+
+       CBLC-TERMINATE.
+           DISPLAY "Fatal CBL-C double exception"
+           DISPLAY "Original exception type: " CBLC-EX-TYPE-ID
+           DISPLAY "Original exception file ID: " CBLC-EX-SOURCE-FILE-ID
+           DISPLAY "Original exception line: " CBLC-EX-SOURCE-LINE
+           DISPLAY "Original exception column: " CBLC-EX-SOURCE-COLUMN
+           DISPLAY "Secondary exception type: " CBLC-EX-SECONDARY-TYPE-ID
+           DISPLAY "Secondary exception line: " CBLC-EX-SECONDARY-SOURCE-LINE
+           DISPLAY "Secondary exception column: " CBLC-EX-SECONDARY-SOURCE-COLUMN
+           STOP RUN.
+
        END PROGRAM CBLC-BANKER-ROUND.
+

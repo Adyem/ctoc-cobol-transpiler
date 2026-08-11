@@ -2,9 +2,16 @@ CBL-C STARTER SHOWCASE
 POLICY SNAPSHOT
 Title chars
 +000000015
-clean base
+String value
+clean base!
 Note chars
-+000000010
++000000011
+Vector size
++000000003
+Vector first
++000000072
+Vector last
++000000094
 BASE
 Memory marker
 R

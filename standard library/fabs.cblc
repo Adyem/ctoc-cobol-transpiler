@@ -1,5 +1,6 @@
-void F(double operand, double result, int status)
+double F(double operand)
 {
-    status = 0;
+    double result;
     result = std::fabs(operand);
+    return result;
 }

@@ -1,5 +1,6 @@
-void F(char *source_char, int source_length, double result, int status)
+double F(char *source_char, int source_length)
 {
+    double result;
     int index;
     int negative;
     int started;
@@ -7,9 +8,9 @@ void F(char *source_char, int source_length, double result, int status)
     int seen_dot;
     int decimal_places;
     int digit;
+    invalid_argument error;
     char current;
     result = 0;
-    status = 0;
     index = 0;
     negative = 0;
     started = 0;
@@ -69,7 +70,8 @@ void F(char *source_char, int source_length, double result, int status)
                 }
                 else
                 {
-                    status = 1;
+                    error.code = 1;
+                    throw error;
                     result = 0;
                     index = source_length;
                 }
@@ -78,7 +80,8 @@ void F(char *source_char, int source_length, double result, int status)
     }
     if (seen_digit == 0)
     {
-        status = 1;
+        error.code = 1;
+        throw error;
     }
     while (decimal_places > 0)
     {
@@ -89,4 +92,5 @@ void F(char *source_char, int source_length, double result, int status)
     {
         result = 0 - result;
     }
+    return result;
 }

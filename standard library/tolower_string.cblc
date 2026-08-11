@@ -1,19 +1,6 @@
-void F(string x, int status)
+void F(string source)
 {
-    int index;
-    char current;
-    status = 0;
-    index = 0;
-    while (index < x.len)
-    {
-        current = x[index];
-        if (current >= 'A')
-        {
-            if (current <= 'Z')
-            {
-                x[index] = current + 32;
-            }
-        }
-        index = index + 1;
-    }
+    String object(source);
+    object.tolower();
+    source = object.value;
 }

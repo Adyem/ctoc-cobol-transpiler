@@ -25,6 +25,19 @@ Migration rules:
 
 All cataloged units are represented here as `.cblc` sources, including the
 character, string, numeric, math, rounding, date, and conversion helpers. The
+`vector<T>` template container is also defined here. It provides the core
+value-oriented operations `size`, `max_size`, `capacity`, `empty`, `reserve`,
+  `shrink_to_fit`, `resize`, `push_back`, `emplace_back`, `insert`, `erase`,
+  `pop_back`, `clear`, `assign`, `at`, `front`, and `back`. Storage is dynamically allocated through CBL-C
+pointer lowering; growth copies existing elements before releasing the old
+block, so it does not rely on a platform-specific realloc extension.
+
+The current element contract is value assignment plus byte-relocatable storage.
+Scalar types such as `int` are supported. Full C++-style iterator/reference
+semantics, allocator customization, and constructor/destructor dispatch for
+non-trivial class or string elements remain planned lifecycle extensions; those
+must be implemented before advertising `vector<string>` or arbitrary RAII
+element support.
 four C++ files remaining under `src/standard_library` are infrastructure only:
 the catalog, usage-state tracking, the source embedder/native lowering bridge,
 and ABI compatibility wrappers. None contains a COBOL template.
@@ -36,3 +49,7 @@ second source implementation. Generated COBOL is syntax-checked as part of the
 standard-library validation path; ABI-width and behavioral parity tests remain
 the required follow-up for helpers whose historical COBOL ABI used wider
 numeric pictures or date-specific intrinsics.
+
+The plan for replacing low-value `status` output parameters with normal return
+values, typed results, or exceptions is in
+[`STATUS_PARAMETER_MIGRATION.md`](STATUS_PARAMETER_MIGRATION.md).

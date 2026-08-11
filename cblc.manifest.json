@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "mode": "cblc-to-cobol",
+  "runtime": "external-standard-library",
+  "template_contract": "CBLC-TEMPLATE-TYPE-SUBSTITUTION@6",
+  "artifacts": [
+    {
+      "kind": "target",
+      "id": "MAIN",
+      "path": "tmp_vector_api_probe.cob",
+      "source_hash": "fnv1a64:8728c48eb22627fb",
+      "module_dependencies": [],
+      "hash": "fnv1a64:82301679e14aa9d6",
+      "dependencies": []
+    }
+  ]
+}

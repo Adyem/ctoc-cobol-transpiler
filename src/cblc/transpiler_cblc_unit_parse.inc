@@ -1,3 +1,30 @@
+static void cblc_resolve_local_function_calls(t_cblc_translation_unit *unit)
+{
+    size_t function_index;
+
+    if (!unit)
+        return ;
+    function_index = 0;
+    while (function_index < unit->function_count)
+    {
+        size_t statement_index;
+
+        statement_index = 0;
+        while (statement_index < unit->functions[function_index].statement_count)
+        {
+            t_cblc_statement *statement;
+
+            statement = &unit->functions[function_index].statements[statement_index];
+            if ((statement->type == CBLC_STATEMENT_CALL
+                    || statement->type == CBLC_STATEMENT_CALL_ASSIGN)
+                && cblc_find_function_in_unit(unit, statement->call_identifier))
+                statement->call_is_external = 0;
+            statement_index += 1;
+        }
+        function_index += 1;
+    }
+}
+
 static int cblc_parse_function(const char **cursor, t_cblc_translation_unit *unit)
 {
     char identifier[TRANSPILE_IDENTIFIER_MAX];
@@ -698,5 +725,6 @@ int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit)
     }
     if (cblc_inject_entry_lifecycle(unit) != FT_SUCCESS)
         return (FT_FAILURE);
+    cblc_resolve_local_function_calls(unit);
     return (FT_SUCCESS);
 }

@@ -221,6 +221,21 @@ int transpiler_standard_library_generate_date_yyyymmdd(char **out_text)
     return (transpiler_standard_library_generate_native_compat("CBLC-DATE-YYYYMMDD", out_text));
 }
 
+int transpiler_standard_library_generate_date_parse_result(char **out_text)
+{
+    return (transpiler_standard_library_generate_native_compat("CBLC-DATE-PARSE-RESULT", out_text));
+}
+
+int transpiler_standard_library_generate_parse_int_result(char **out_text)
+{
+    return (transpiler_standard_library_generate_native_compat("CBLC-PARSE-INT-RESULT", out_text));
+}
+
+int transpiler_standard_library_generate_parse_double_result(char **out_text)
+{
+    return (transpiler_standard_library_generate_native_compat("CBLC-PARSE-DOUBLE-RESULT", out_text));
+}
+
 int transpiler_standard_library_generate_date_duration(char **out_text)
 {
     return (transpiler_standard_library_generate_native_compat("CBLC-DATE-DURATION", out_text));

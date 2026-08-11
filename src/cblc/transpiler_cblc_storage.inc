@@ -386,7 +386,10 @@ static size_t cblc_exception_payload_size(const t_cblc_translation_unit *unit,
             const t_cblc_struct_type *nested_type;
 
             nested_type = cblc_find_struct_type(unit, field->struct_type_name);
-            element_size = cblc_exception_payload_size(unit, nested_type, depth + 1);
+            if (!nested_type && field->is_template_parameter)
+                element_size = sizeof(int);
+            else
+                element_size = cblc_exception_payload_size(unit, nested_type, depth + 1);
         }
         else
             element_size = sizeof(void *);
@@ -533,6 +536,46 @@ static int cblc_translation_unit_ensure_function_instantiation_capacity(
     return (FT_SUCCESS);
 }
 
+static int cblc_register_string_class_method(t_cblc_struct_type *type,
+    const char *name, t_cblc_function_return_kind return_kind,
+    const char *return_type_name, const char *program_name,
+    const t_transpiler_function_parameter_kind *parameter_kinds,
+    const char *const *parameter_type_names, size_t parameter_count)
+{
+    t_cblc_method *method;
+    size_t index;
+
+    if (!type || !name || !program_name || parameter_count > TRANSPILE_FUNCTION_PARAMETER_MAX
+        || (parameter_count > 0 && (!parameter_kinds || !parameter_type_names)))
+        return (FT_FAILURE);
+    if (type->method_count >= type->method_capacity)
+        return (FT_FAILURE);
+    method = &type->methods[type->method_count];
+    std::memset(method, 0, sizeof(*method));
+    ft_strlcpy(method->source_name, name, sizeof(method->source_name));
+    cblc_identifier_to_cobol(name, method->cobol_name, sizeof(method->cobol_name));
+    method->return_kind = return_kind;
+    if (return_type_name)
+        ft_strlcpy(method->return_type_name, return_type_name,
+            sizeof(method->return_type_name));
+    ft_strlcpy(method->implementation_program_name, program_name,
+        sizeof(method->implementation_program_name));
+    method->visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
+    method->has_definition = 0;
+    index = 0;
+    while (index < parameter_count)
+    {
+        method->parameters[index].kind = parameter_kinds[index];
+        if (parameter_type_names[index])
+            ft_strlcpy(method->parameters[index].type_name, parameter_type_names[index],
+                sizeof(method->parameters[index].type_name));
+        index += 1;
+    }
+    method->parameter_count = parameter_count;
+    type->method_count += 1;
+    return (FT_SUCCESS);
+}
+
 static int cblc_register_builtin_string_type(t_cblc_translation_unit *unit)
 {
     t_cblc_struct_type *type;
@@ -573,7 +616,7 @@ static int cblc_register_builtin_string_type(t_cblc_translation_unit *unit)
     constructor->parameter_count = 1;
     constructor->has_definition = 0;
     type->constructor_count += 1;
-    if (cblc_struct_type_ensure_method_capacity(type, 10) != FT_SUCCESS)
+    if (cblc_struct_type_ensure_method_capacity(type, 24) != FT_SUCCESS)
         return (FT_FAILURE);
     method = &type->methods[type->method_count];
     std::memset(method, 0, sizeof(*method));
@@ -679,6 +722,65 @@ static int cblc_register_builtin_string_type(t_cblc_translation_unit *unit)
     method->parameter_count = 1;
     method->has_definition = 0;
     type->method_count += 1;
+    {
+        const t_transpiler_function_parameter_kind string_parameter[] = {
+            TRANSPILE_FUNCTION_PARAMETER_STRING
+        };
+        const t_transpiler_function_parameter_kind string_string_parameters[] = {
+            TRANSPILE_FUNCTION_PARAMETER_STRING, TRANSPILE_FUNCTION_PARAMETER_STRING
+        };
+        const t_transpiler_function_parameter_kind string_int_parameters[] = {
+            TRANSPILE_FUNCTION_PARAMETER_STRING, TRANSPILE_FUNCTION_PARAMETER_INT
+        };
+        const t_transpiler_function_parameter_kind int_parameter[] = {
+            TRANSPILE_FUNCTION_PARAMETER_INT
+        };
+        const char *string_type[] = {"string"};
+        const char *string_string_types[] = {"string", "string"};
+        const char *string_int_types[] = {"string", "int"};
+        const char *int_type[] = {"int"};
+
+        if (cblc_register_string_class_method(type, "atoi",
+                CBLC_FUNCTION_RETURN_INT, "int", "CBLC-ATOI-STRING",
+                NULL, NULL, 0) != FT_SUCCESS
+            || cblc_register_string_class_method(type, "atol",
+                CBLC_FUNCTION_RETURN_INT, "int", "CBLC-ATOL-STRING",
+                NULL, NULL, 0) != FT_SUCCESS
+            || cblc_register_string_class_method(type, "atoll",
+                CBLC_FUNCTION_RETURN_INT, "int", "CBLC-ATOLL-STRING",
+                NULL, NULL, 0) != FT_SUCCESS
+            || cblc_register_string_class_method(type, "strlen",
+                CBLC_FUNCTION_RETURN_INT, "int", "CBLC-STRLEN-STRING",
+                NULL, NULL, 0) != FT_SUCCESS
+            || cblc_register_string_class_method(type, "strnlen",
+                CBLC_FUNCTION_RETURN_INT, "int", "CBLC-STRNLEN-STRING",
+                int_parameter, int_type, 1) != FT_SUCCESS
+            || cblc_register_string_class_method(type, "strcmp",
+                CBLC_FUNCTION_RETURN_INT, "int", "CBLC-STRCMP-STRING",
+                string_parameter, string_type, 1) != FT_SUCCESS
+            || cblc_register_string_class_method(type, "strcpy",
+                CBLC_FUNCTION_RETURN_VOID, NULL, "CBLC-STRCPY-STRING",
+                string_parameter, string_type, 1) != FT_SUCCESS
+            || cblc_register_string_class_method(type, "strncpy",
+                CBLC_FUNCTION_RETURN_VOID, NULL, "CBLC-STRNCPY-STRING",
+                string_int_parameters, string_int_types, 2) != FT_SUCCESS
+            || cblc_register_string_class_method(type, "memcmp",
+                CBLC_FUNCTION_RETURN_INT, "int", "CBLC-MEMCMP-STRING",
+                string_int_parameters, string_int_types, 2) != FT_SUCCESS
+            || cblc_register_string_class_method(type, "strcat",
+                CBLC_FUNCTION_RETURN_VOID, NULL, "CBLC-STRCAT-STRING",
+                string_string_parameters, string_string_types, 2) != FT_SUCCESS
+            || cblc_register_string_class_method(type, "strtod",
+                CBLC_FUNCTION_RETURN_DOUBLE, "double", "CBLC-STRTOD-STRING",
+                NULL, NULL, 0) != FT_SUCCESS
+            || cblc_register_string_class_method(type, "toupper",
+                CBLC_FUNCTION_RETURN_VOID, NULL, "CBLC-TOUPPER-STRING",
+                NULL, NULL, 0) != FT_SUCCESS
+            || cblc_register_string_class_method(type, "tolower",
+                CBLC_FUNCTION_RETURN_VOID, NULL, "CBLC-TOLOWER-STRING",
+                NULL, NULL, 0) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
     unit->struct_type_count += 1;
     return (FT_SUCCESS);
 }
@@ -779,6 +881,8 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
             type->fields[index].is_borrowed = signature->fields[index].is_borrowed;
             type->fields[index].is_template_parameter =
                 signature->fields[index].is_template_parameter;
+            type->fields[index].template_parameter_pointer_depth =
+                signature->fields[index].template_parameter_pointer_depth;
             ft_strlcpy(type->fields[index].template_parameter_name,
                 signature->fields[index].template_parameter_name,
                 sizeof(type->fields[index].template_parameter_name));

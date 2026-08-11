@@ -1,0 +1,620 @@
+class String
+{
+    public:
+    string value;
+
+    String(string source)
+    {
+        value = source;
+    }
+
+    String(String source)
+    {
+        value = source.value;
+    }
+
+    void operator=(String source)
+    {
+        string snapshot;
+        snapshot = source.value;
+        value = snapshot;
+    }
+
+    int len()
+    {
+        return value.len;
+    }
+
+    int empty()
+    {
+        if (value.len == 0)
+        {
+            return 1;
+        }
+        return 0;
+    }
+
+    void clear()
+    {
+        value = "";
+    }
+
+    void append(string source)
+    {
+        value.append(source);
+    }
+
+    int equals(string source)
+    {
+        int index;
+        if (value.len != source.len)
+        {
+            return 0;
+        }
+        index = 0;
+        while (index < value.len)
+        {
+            if (value[index] != source[index])
+            {
+                return 0;
+            }
+            index = index + 1;
+        }
+        return 1;
+    }
+
+    int starts_with(string source)
+    {
+        int index;
+        if (source.len > value.len)
+        {
+            return 0;
+        }
+        index = 0;
+        while (index < source.len)
+        {
+            if (value[index] != source[index])
+            {
+                return 0;
+            }
+            index = index + 1;
+        }
+        return 1;
+    }
+
+    int ends_with(string source)
+    {
+        int index;
+        int offset;
+        if (source.len > value.len)
+        {
+            return 0;
+        }
+        index = 0;
+        offset = value.len - source.len;
+        while (index < source.len)
+        {
+            if (value[offset + index] != source[index])
+            {
+                return 0;
+            }
+            index = index + 1;
+        }
+        return 1;
+    }
+
+    int compare(string source)
+    {
+        int index;
+        int limit;
+        int result;
+        result = 0;
+        index = 0;
+        limit = value.len;
+        if (source.len < limit)
+        {
+            limit = source.len;
+        }
+        while (index < limit)
+        {
+            if (value[index] < source[index])
+            {
+                result = -1;
+                index = limit;
+            }
+            else
+            {
+                if (value[index] > source[index])
+                {
+                    result = 1;
+                    index = limit;
+                }
+                else
+                {
+                    index = index + 1;
+                }
+            }
+        }
+        if (result == 0)
+        {
+            if (value.len < source.len)
+            {
+                result = -1;
+            }
+            else
+            {
+                if (value.len > source.len)
+                {
+                    result = 1;
+                }
+            }
+        }
+        return result;
+    }
+
+    int contains(string source)
+    {
+        int start;
+        int index;
+        int matched;
+        if (source.len == 0)
+        {
+            return 1;
+        }
+        start = 0;
+        while (start <= value.len - source.len)
+        {
+            index = 0;
+            matched = 1;
+            while (index < source.len)
+            {
+                if (value[start + index] != source[index])
+                {
+                    matched = 0;
+                    index = source.len;
+                }
+                else
+                {
+                    index = index + 1;
+                }
+            }
+            if (matched == 1)
+            {
+                return 1;
+            }
+            start = start + 1;
+        }
+        return 0;
+    }
+
+    int atoi()
+    {
+        int result;
+        int index;
+        int negative;
+        int digit;
+        char current;
+        result = 0;
+        index = 0;
+        negative = 0;
+        while (index < value.len)
+        {
+            if (value[index] == ' ')
+            {
+                index = index + 1;
+            }
+            else
+            {
+                index = value.len;
+            }
+        }
+        if (index < value.len && value[index] == '-')
+        {
+            negative = 1;
+            index = index + 1;
+        }
+        else
+        {
+            if (index < value.len && value[index] == '+')
+            {
+                index = index + 1;
+            }
+        }
+        while (index < value.len)
+        {
+            if (value[index] < '0' || value[index] > '9')
+            {
+                index = value.len;
+            }
+            else
+            {
+                current = value[index];
+                digit = std::ord(current) - std::ord('0');
+                result = result * 10 + digit;
+                index = index + 1;
+            }
+        }
+        if (negative == 1)
+        {
+            result = 0 - result;
+        }
+        return result;
+    }
+
+    int atol()
+    {
+        int result;
+        int index;
+        int negative;
+        int digit;
+        char current;
+        result = 0;
+        index = 0;
+        negative = 0;
+        while (index < value.len)
+        {
+            if (value[index] == ' ')
+            {
+                index = index + 1;
+            }
+            else
+            {
+                index = value.len;
+            }
+        }
+        if (index < value.len && value[index] == '-')
+        {
+            negative = 1;
+            index = index + 1;
+        }
+        else
+        {
+            if (index < value.len && value[index] == '+')
+            {
+                index = index + 1;
+            }
+        }
+        while (index < value.len)
+        {
+            if (value[index] < '0' || value[index] > '9')
+            {
+                index = value.len;
+            }
+            else
+            {
+                current = value[index];
+                digit = std::ord(current) - std::ord('0');
+                result = result * 10 + digit;
+                index = index + 1;
+            }
+        }
+        if (negative == 1)
+        {
+            result = 0 - result;
+        }
+        return result;
+    }
+
+    int atoll()
+    {
+        int result;
+        int index;
+        int negative;
+        int digit;
+        char current;
+        result = 0;
+        index = 0;
+        negative = 0;
+        while (index < value.len)
+        {
+            if (value[index] == ' ')
+            {
+                index = index + 1;
+            }
+            else
+            {
+                index = value.len;
+            }
+        }
+        if (index < value.len && value[index] == '-')
+        {
+            negative = 1;
+            index = index + 1;
+        }
+        else
+        {
+            if (index < value.len && value[index] == '+')
+            {
+                index = index + 1;
+            }
+        }
+        while (index < value.len)
+        {
+            if (value[index] < '0' || value[index] > '9')
+            {
+                index = value.len;
+            }
+            else
+            {
+                current = value[index];
+                digit = std::ord(current) - std::ord('0');
+                result = result * 10 + digit;
+                index = index + 1;
+            }
+        }
+        if (negative == 1)
+        {
+            result = 0 - result;
+        }
+        return result;
+    }
+
+    int strlen()
+    {
+        return value.len;
+    }
+
+    int strnlen(int request)
+    {
+        int result;
+        result = value.len;
+        if (request < result)
+        {
+            result = request;
+        }
+        if (result < 0)
+        {
+            result = 0;
+        }
+        return result;
+    }
+
+    int strcmp(string source)
+    {
+        int index;
+        int limit;
+        int result;
+        result = 0;
+        index = 0;
+        limit = value.len;
+        if (source.len < limit)
+        {
+            limit = source.len;
+        }
+        while (index < limit)
+        {
+            if (value[index] < source[index])
+            {
+                result = -1;
+                index = limit;
+            }
+            else
+            {
+                if (value[index] > source[index])
+                {
+                    result = 1;
+                    index = limit;
+                }
+                else
+                {
+                    index = index + 1;
+                }
+            }
+        }
+        if (result == 0)
+        {
+            if (value.len < source.len)
+            {
+                result = -1;
+            }
+            else
+            {
+                if (value.len > source.len)
+                {
+                    result = 1;
+                }
+            }
+        }
+        return result;
+    }
+
+    void strcpy(string source)
+    {
+        value = source;
+    }
+
+    void strncpy(string source, int request)
+    {
+        int index;
+        int copy_limit;
+        copy_limit = request;
+        if (copy_limit < 0)
+        {
+            copy_limit = 0;
+        }
+        if (copy_limit > source.len)
+        {
+            copy_limit = source.len;
+        }
+        value = "";
+        index = 0;
+        while (index < copy_limit)
+        {
+            value[index] = source[index];
+            index = index + 1;
+        }
+    }
+
+    int memcmp(string source, int count)
+    {
+        int index;
+        int limit;
+        int result;
+        result = 0;
+        limit = count;
+        if (limit < 0)
+        {
+            limit = 0;
+        }
+        if (limit > value.len)
+        {
+            limit = value.len;
+        }
+        if (limit > source.len)
+        {
+            limit = source.len;
+        }
+        index = 0;
+        while (index < limit)
+        {
+            if (value[index] < source[index])
+            {
+                result = -1;
+                index = limit;
+            }
+            else
+            {
+                if (value[index] > source[index])
+                {
+                    result = 1;
+                    index = limit;
+                }
+                else
+                {
+                    index = index + 1;
+                }
+            }
+        }
+        return result;
+    }
+
+    void strcat(string left, string right)
+    {
+        value = left;
+        value.append(right);
+    }
+
+    double strtod()
+    {
+        double result;
+        int index;
+        int negative;
+        int seen_digit;
+        int seen_dot;
+        int decimal_places;
+        int digit;
+        int invalid;
+        char current;
+        result = 0;
+        index = 0;
+        negative = 0;
+        seen_digit = 0;
+        seen_dot = 0;
+        decimal_places = 0;
+        invalid = 0;
+        while (index < value.len)
+        {
+            current = value[index];
+            if (current == ' ' && seen_digit == 0)
+            {
+                index = index + 1;
+            }
+            else
+            {
+                index = value.len;
+            }
+        }
+        if (index < value.len && value[index] == '-')
+        {
+            negative = 1;
+            index = index + 1;
+        }
+        else
+        {
+            if (index < value.len && value[index] == '+')
+            {
+                index = index + 1;
+            }
+        }
+        while (index < value.len)
+        {
+            current = value[index];
+            if (current >= '0' && current <= '9')
+            {
+                digit = std::ord(current) - std::ord('0');
+                result = result * 10 + digit;
+                if (seen_dot == 1)
+                {
+                    decimal_places = decimal_places + 1;
+                }
+                seen_digit = 1;
+            }
+            else
+            {
+                if (current == '.' && seen_dot == 0)
+                {
+                    seen_dot = 1;
+                }
+                else
+                {
+                    if (current == ' ')
+                    {
+                        index = value.len;
+                    }
+                    else
+                    {
+                        invalid = 1;
+                        index = value.len;
+                    }
+                }
+            }
+            index = index + 1;
+        }
+        if (invalid == 1 || seen_digit == 0)
+        {
+            result = 0;
+        }
+        while (decimal_places > 0)
+        {
+            result = result / 10;
+            decimal_places = decimal_places - 1;
+        }
+        if (negative == 1)
+        {
+            result = 0 - result;
+        }
+        return result;
+    }
+
+    void toupper()
+    {
+        int index;
+        char current;
+        index = 0;
+        while (index < value.len)
+        {
+            current = value[index];
+            if (current >= 'a' && current <= 'z')
+            {
+                value[index] = current - 32;
+            }
+            index = index + 1;
+        }
+    }
+
+    void tolower()
+    {
+        int index;
+        char current;
+        index = 0;
+        while (index < value.len)
+        {
+            current = value[index];
+            if (current >= 'A' && current <= 'Z')
+            {
+                value[index] = current + 32;
+            }
+            index = index + 1;
+        }
+    }
+};

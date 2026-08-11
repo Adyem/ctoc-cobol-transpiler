@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "mode": "cblc-to-cobol",
+  "runtime": "external-standard-library",
+  "template_contract": "CBLC-TEMPLATE-TYPE-SUBSTITUTION@6",
+  "artifacts": [
+    {
+      "kind": "target",
+      "id": "MAIN",
+      "path": "cobol/hello_make_demo.cob",
+      "source_hash": "fnv1a64:cee500a18d154763",
+      "module_dependencies": [],
+      "hash": "fnv1a64:e42681259830b9a7",
+      "dependencies": []
+    }
+  ]
+}

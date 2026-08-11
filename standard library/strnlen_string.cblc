@@ -1,14 +1,7 @@
 int F(string source, int request)
 {
     int result;
-    result = source.len;
-    if (request < result)
-    {
-        result = request;
-    }
-    if (result < 0)
-    {
-        result = 0;
-    }
+    String object(source);
+    result = object.strnlen(request);
     return result;
 }

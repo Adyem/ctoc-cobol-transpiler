@@ -1,27 +1,8 @@
 REPO_ROOT := $(abspath ../..)
-ifeq ($(OS),Windows_NT)
-EXE_EXT := .exe
-else
-EXE_EXT :=
-endif
-
-TRANSPILER := $(REPO_ROOT)/ctoc_cobol_transpiler$(EXE_EXT)
 COBC ?= cobc
 GOINFRE_LOCAL_PREFIX ?= /goinfre/$(USER)/local
-
-COBC_ON_PATH := $(shell command -v $(COBC) 2>/dev/null)
-GOINFRE_COBC := $(GOINFRE_LOCAL_PREFIX)/bin/cobc
-GOINFRE_COBC_AVAILABLE := $(shell test -x "$(GOINFRE_COBC)" && printf yes)
-
-ifeq ($(COBC_ON_PATH),)
-ifeq ($(GOINFRE_COBC_AVAILABLE),yes)
-COBC := $(GOINFRE_COBC)
-export PATH := $(GOINFRE_LOCAL_PREFIX)/bin:$(PATH)
-export LD_LIBRARY_PATH := $(GOINFRE_LOCAL_PREFIX)/lib:$(GOINFRE_LOCAL_PREFIX)/lib64$(if $(LD_LIBRARY_PATH),:$(LD_LIBRARY_PATH))
-export CPATH := $(GOINFRE_LOCAL_PREFIX)/include$(if $(CPATH),:$(CPATH))
-export LIBRARY_PATH := $(GOINFRE_LOCAL_PREFIX)/lib:$(GOINFRE_LOCAL_PREFIX)/lib64$(if $(LIBRARY_PATH),:$(LIBRARY_PATH))
-endif
-endif
+include ../Makefile.platform
+TRANSPILER := $(REPO_ROOT)/ctoc_cobol_transpiler$(EXE_EXT)
 
 SETUP_SENTINEL := .environment_ready
 PROGRAM_NAME := hello_make_demo
@@ -39,41 +20,35 @@ transpile: $(COB_OUTPUT)
 compile: $(EXECUTABLE)
 
 run: $(EXECUTABLE)
-	./$(EXECUTABLE)
+	$(SAMPLE_RUN)$(EXECUTABLE)
 
 $(EXECUTABLE): $(COB_OUTPUT) | ensure_cobc
 	$(COBC) -x -o $@ $<
 
 $(COB_OUTPUT): $(CBLC_SRC) $(TRANSPILER)
-	mkdir -p $(COB_DIR)
-	$(TRANSPILER) --direction cblc-to-cobol \
+	$(call SAMPLE_MKDIR,$(COB_DIR))
+	"$(TRANSPILER)" --direction cblc-to-cobol \
 		--input $(CBLC_SRC) \
 		--output $@ \
 		--diagnostics silent
-	@if [ ! -f $@ ]; then \
-		printf 'The transpiler did not emit %s. Check the command output above for diagnostics.\n' "$@"; \
-		exit 1; \
-	fi
+	$(call SAMPLE_REQUIRE_FILE,$@)
 
 compiler: $(TRANSPILER)
 
 ensure_environment: $(SETUP_SENTINEL)
 
+$(TRANSPILER):
+	$(MAKE) -C $(REPO_ROOT) all
+
 $(SETUP_SENTINEL):
 	$(MAKE) -C $(REPO_ROOT) all
+ifeq ($(OS),Windows_NT)
+	@$(SAMPLE_COBC_AVAILABLE) || (echo Unable to locate "$(COBC)" on PATH. & exit /b 1)
+else
 	$(MAKE) -C $(REPO_ROOT) install_cobc
-	touch $(SETUP_SENTINEL)
-
-ensure_cobc:
-	@if ! command -v $(COBC) >/dev/null 2>&1; then \
-		printf 'Unable to locate "$(COBC)" on PATH or at "$(GOINFRE_COBC)".\n' >&2; \
-		printf 'Run "make -C $(REPO_ROOT) install_cobc_goinfre" to install it locally.\n' >&2; \
-		exit 1; \
-	fi
-
-$(TRANSPILER): | $(SETUP_SENTINEL)
-	$(MAKE) -C $(REPO_ROOT) all
+endif
+	$(call SAMPLE_TOUCH,$(SETUP_SENTINEL))
 
 clean:
-	rm -f $(COB_OUTPUT) $(EXECUTABLE) $(SETUP_SENTINEL)
-	rmdir $(COB_DIR) 2>/dev/null || true
+	-$(call SAMPLE_REMOVE_FILES,$(COB_OUTPUT) $(EXECUTABLE) $(SETUP_SENTINEL))
+	-$(call SAMPLE_REMOVE_DIR,$(COB_DIR))

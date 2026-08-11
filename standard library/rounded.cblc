@@ -1,11 +1,10 @@
-void F(double operand, double result, int status)
+double F(double operand)
 {
+    double result;
     int parity;
-    status = 0;
     result = std::floor(operand);
     if (operand != result)
     {
-        status = 1;
         parity = result;
         parity = parity / 2;
         if (operand >= 0)
@@ -23,4 +22,5 @@ void F(double operand, double result, int status)
             }
         }
     }
+    return result;
 }

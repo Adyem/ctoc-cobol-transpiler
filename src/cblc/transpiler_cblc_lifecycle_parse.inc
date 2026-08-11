@@ -399,6 +399,8 @@ static int cblc_parse_statement_block(const char **cursor, t_cblc_translation_un
             continue ;
         if (cblc_parse_std_strcpy(cursor, unit, function) == FT_SUCCESS)
             continue ;
+        if (cblc_parse_delete_statement(cursor, unit, function) == FT_SUCCESS)
+            continue ;
         if (cblc_parse_std_free(cursor, unit, function) == FT_SUCCESS)
             continue ;
         if (cblc_parse_method_call(cursor, unit, function) == FT_SUCCESS)
@@ -407,6 +409,9 @@ static int cblc_parse_statement_block(const char **cursor, t_cblc_translation_un
             continue ;
         if (cblc_parse_assignment(cursor, unit, function) == FT_SUCCESS)
             continue ;
+        if (unit->parse_error_message[0] == '\0')
+            std::snprintf(unit->parse_error_message, sizeof(unit->parse_error_message),
+                "unable to parse statement near '%.48s'", *cursor);
         return (FT_FAILURE);
     }
     return (FT_FAILURE);
@@ -452,8 +457,12 @@ static int cblc_capture_lifecycle_body(const char **cursor, t_cblc_translation_u
                 || statement_type == CBLC_STATEMENT_CATCH_BEGIN
                 || statement_type == CBLC_STATEMENT_CATCH_END
                 || statement_type == CBLC_STATEMENT_TRY_END
-                || statement_type == CBLC_STATEMENT_CALL
-                || statement_type == CBLC_STATEMENT_CALL_ASSIGN
+                || ((statement_type == CBLC_STATEMENT_CALL
+                        || statement_type == CBLC_STATEMENT_CALL_ASSIGN)
+                    && std::strncmp(lifecycle_function.statements[statement_index].call_identifier,
+                        "std::free", sizeof(lifecycle_function.statements[statement_index].call_identifier)) != 0
+                    && std::strncmp(lifecycle_function.statements[statement_index].call_identifier,
+                        "CBLC-DELETE", std::strlen("CBLC-DELETE")) != 0)
                 || statement_type == CBLC_STATEMENT_METHOD_CALL
                 || statement_type == CBLC_STATEMENT_METHOD_CALL_ASSIGN
                 || statement_type == CBLC_STATEMENT_FILE_OPEN
@@ -924,7 +933,7 @@ static int cblc_capture_constructor_body(const char **cursor, t_cblc_translation
             status = FT_FAILURE;
             goto cleanup;
         }
-        if (!seen_fields[index])
+        if (!seen_fields[index] && !type->fields[index].is_template_parameter)
         {
             if (field_item->kind == CBLC_DATA_KIND_STRING || field_item->kind == CBLC_DATA_KIND_STRUCT)
             {
@@ -973,7 +982,8 @@ static int cblc_capture_constructor_body(const char **cursor, t_cblc_translation
             }
             statement_index += 1;
         }
-        if ((field_item->kind == CBLC_DATA_KIND_STRING
+        if (!type->fields[index].is_template_parameter
+            && (field_item->kind == CBLC_DATA_KIND_STRING
                 || field_item->kind == CBLC_DATA_KIND_STRUCT)
             && constructor_function->local_destructor_count
                 < CBLC_EXCEPTION_CLEANUP_MAX)
@@ -1101,6 +1111,7 @@ static int cblc_inject_entry_lifecycle(t_cblc_translation_unit *unit)
             parameter_index += 1;
         }
         if (item->is_template_item || item->is_alias || item->is_function_local
+            || item->owner_function_name[0] != '\0'
             || std::strchr(item->source_name, '.') || is_entry_parameter)
         {
             index += 1;
@@ -1375,6 +1386,8 @@ static int cblc_parse_local_scalar_declaration(const char **cursor,
     array_count = 0;
     if (cblc_match_keyword(cursor, "int"))
         kind = CBLC_DATA_KIND_INT;
+    else if (cblc_match_keyword(cursor, "double") || cblc_match_keyword(cursor, "float"))
+        kind = CBLC_DATA_KIND_DOUBLE;
     else if (cblc_match_keyword(cursor, "char"))
     {
         kind = CBLC_DATA_KIND_CHAR;

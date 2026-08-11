@@ -1,13 +1,16 @@
-void F(double operand, double result, int status)
+double F(double operand)
 {
-    status = 0;
+    double result;
+    domain_error error;
     result = 0;
     if (operand <= 0)
     {
-        status = 1;
+        error.code = 1;
+        throw error;
     }
     else
     {
         result = std::log(operand);
     }
+    return result;
 }

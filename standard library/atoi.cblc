@@ -1,5 +1,6 @@
-void F(char *source_char, int source_length, int result, int status)
+int F(char *source_char, int source_length)
 {
+    int result;
     int index;
     int negative;
     int digit;
@@ -7,7 +8,6 @@ void F(char *source_char, int source_length, int result, int status)
     int digit_count;
     char current;
     result = 0;
-    status = 0;
     negative = 0;
     index = 0;
     started = 0;
@@ -46,7 +46,6 @@ void F(char *source_char, int source_length, int result, int status)
         {
             if (source_char[index] < '0')
             {
-                status = 1;
                 result = 0;
                 index = source_length;
             }
@@ -54,7 +53,6 @@ void F(char *source_char, int source_length, int result, int status)
             {
                 if (source_char[index] > '9')
                 {
-                    status = 1;
                     result = 0;
                     index = source_length;
                 }
@@ -65,7 +63,6 @@ void F(char *source_char, int source_length, int result, int status)
                     digit_count = digit_count + 1;
                     if (digit_count > 9)
                     {
-                        status = 1;
                         result = 0;
                         index = source_length;
                     }
@@ -82,4 +79,5 @@ void F(char *source_char, int source_length, int result, int status)
     {
         result = 0 - result;
     }
+    return result;
 }

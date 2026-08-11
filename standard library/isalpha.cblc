@@ -1,5 +1,6 @@
-void F(char current_char, int result)
+int F(char current_char)
 {
+    int result;
     result = 0;
     if (current_char >= 'A' && current_char <= 'Z')
     {
@@ -9,4 +10,5 @@ void F(char current_char, int result)
     {
         result = 1;
     }
+    return result;
 }

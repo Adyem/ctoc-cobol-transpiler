@@ -3,10 +3,12 @@ import "message_showcase_constants.cblc";
 void showcase_text()
 {
     note = "clean base";
+    note.append(suffix);
     display(title);
     title_length = title.len();
     display("Title chars");
     display(title_length);
+    display("String value");
     display(note);
     note_length = note.len();
     display("Note chars");

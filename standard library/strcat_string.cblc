@@ -1,42 +1,6 @@
-void F(string destination, string left, string right, int status)
+void F(string destination, string left, string right)
 {
-    int index;
-    int result_length;
-    status = 0;
-    result_length = destination.len;
-    if (result_length > 255)
-    {
-        result_length = 255;
-        status = 1;
-    }
-    index = 0;
-    while (index < left.len)
-    {
-        if (result_length >= 255)
-        {
-            status = 1;
-            index = left.len;
-        }
-        else
-        {
-            destination[result_length] = left[index];
-            result_length = result_length + 1;
-            index = index + 1;
-        }
-    }
-    index = 0;
-    while (index < right.len)
-    {
-        if (result_length >= 255)
-        {
-            status = 1;
-            index = right.len;
-        }
-        else
-        {
-            destination[result_length] = right[index];
-            result_length = result_length + 1;
-            index = index + 1;
-        }
-    }
+    String object(destination);
+    object.strcat(left, right);
+    destination = object.value;
 }

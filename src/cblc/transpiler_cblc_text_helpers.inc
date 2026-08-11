@@ -220,23 +220,46 @@ static int cblc_cobol_identifier_is_reserved(const char *identifier)
 static void cblc_identifier_to_cobol(const char *identifier, char *buffer, size_t buffer_size)
 {
     size_t index;
+    size_t output_index;
+    static const char operator_assignment[] = "operator=";
+    static const char operator_assignment_cobol[] = "OPERATOR-ASSIGN";
 
     if (!identifier || !buffer || buffer_size == 0)
         return ;
     index = 0;
-    while (identifier[index] != '\0' && index + 1 < buffer_size)
+    output_index = 0;
+    while (identifier[index] != '\0' && output_index + 1 < buffer_size)
     {
         char character;
 
+        if (std::strncmp(identifier + index, operator_assignment,
+                sizeof(operator_assignment) - 1) == 0
+            || std::strncmp(identifier + index, "OPERATOR=",
+                sizeof(operator_assignment) - 1) == 0)
+        {
+            size_t replacement_index;
+
+            replacement_index = 0;
+            while (operator_assignment_cobol[replacement_index] != '\0'
+                && output_index + 1 < buffer_size)
+            {
+                buffer[output_index] = operator_assignment_cobol[replacement_index];
+                output_index += 1;
+                replacement_index += 1;
+            }
+            index += sizeof(operator_assignment) - 1;
+            continue ;
+        }
         character = identifier[index];
         if (character >= 'a' && character <= 'z')
             character = static_cast<char>(character - 'a' + 'A');
         else if (character == '_')
             character = '-';
-        buffer[index] = character;
+        buffer[output_index] = character;
+        output_index += 1;
         index += 1;
     }
-    buffer[index] = '\0';
+    buffer[output_index] = '\0';
     if (cblc_cobol_identifier_is_reserved(buffer))
     {
         char safe_buffer[TRANSPILE_IDENTIFIER_MAX];
