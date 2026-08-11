@@ -264,6 +264,7 @@ TEST_SRC    = imported/libft_test_runner.cpp \
              tests/standard_library/standard_library_tan_tests.cpp \
              tests/standard_library/standard_library_tolower_tests.cpp \
              tests/standard_library/standard_library_toupper_tests.cpp \
+             tests/standard_library/standard_library_vector_tests.cpp \
               tests/runtime_audit_tests.cpp \
               tests/runtime_record_tests.cpp \
              tests/runtime_file_tests.cpp \
