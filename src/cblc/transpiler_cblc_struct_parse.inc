@@ -11,6 +11,8 @@ static void cblc_record_template_instantiation_error(
     size_t definition_offset, size_t use_offset);
 static int cblc_function_return_kind_from_data_kind(t_cblc_data_kind kind,
     t_cblc_function_return_kind *out_kind);
+static int cblc_template_apply_pointer_depth(t_cblc_data_kind base_kind,
+    size_t pointer_depth, t_cblc_data_kind *out_kind);
 static int cblc_sizeof_data_kind(const t_cblc_translation_unit *unit,
     t_cblc_data_kind kind, size_t length, size_t array_count,
     const char *struct_type_name, size_t *out_size);
@@ -562,21 +564,58 @@ static int cblc_parse_method_identifier(const char **cursor, char *identifier,
     if (std::strcmp(identifier, "operator") != 0)
         return (FT_SUCCESS);
     cblc_skip_whitespace(cursor);
+    if (**cursor == '=')
+    {
+        length = std::strlen(identifier);
+        if (length + 1 >= identifier_size)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        identifier[length] = '=';
+        identifier[length + 1] = '\0';
+        *cursor += 1;
+        return (FT_SUCCESS);
+    }
+    if (**cursor == '[')
+    {
+        if ((*cursor)[1] != ']')
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        length = std::strlen(identifier);
+        if (length + 2 >= identifier_size)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        identifier[length] = '[';
+        identifier[length + 1] = ']';
+        identifier[length + 2] = '\0';
+        *cursor += 2;
+        return (FT_SUCCESS);
+    }
+    if (**cursor == '-' && (*cursor)[1] == '>')
+    {
+        length = std::strlen(identifier);
+        if (length + 2 >= identifier_size)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        identifier[length] = '-';
+        identifier[length + 1] = '>';
+        identifier[length + 2] = '\0';
+        *cursor += 2;
+        return (FT_SUCCESS);
+    }
     if (**cursor != '=')
     {
         *cursor = start;
         return (FT_FAILURE);
     }
-    length = std::strlen(identifier);
-    if (length + 1 >= identifier_size)
-    {
-        *cursor = start;
-        return (FT_FAILURE);
-    }
-    identifier[length] = '=';
-    identifier[length + 1] = '\0';
-    *cursor += 1;
-    return (FT_SUCCESS);
+    return (FT_FAILURE);
 }
 
 static t_cblc_constructor *cblc_find_mutable_constructor_for_parameters(
@@ -743,6 +782,7 @@ static int cblc_parse_method_definition(const char **cursor, t_cblc_translation_
     size_t statement_count;
     size_t statement_capacity;
     size_t parameter_scope_base;
+    size_t return_template_parameter_index;
 
     if (!cursor || !*cursor || !unit || !type || !type->is_class)
         return (FT_FAILURE);
@@ -752,6 +792,11 @@ static int cblc_parse_method_definition(const char **cursor, t_cblc_translation_
     if (cblc_parse_function_return_type(cursor, unit, &return_kind,
             return_type_name, sizeof(return_type_name)) != FT_SUCCESS)
         return (FT_FAILURE);
+    return_template_parameter_index = 0;
+    if (return_kind == CBLC_FUNCTION_RETURN_STRUCT_POINTER
+        && cblc_active_template_parameter_index(return_type_name,
+            &return_template_parameter_index) == FT_SUCCESS)
+        return_template_parameter_index = 1;
     cblc_skip_whitespace(cursor);
     if (cblc_parse_method_identifier(cursor, identifier, sizeof(identifier)) != FT_SUCCESS)
     {
@@ -778,6 +823,7 @@ static int cblc_parse_method_definition(const char **cursor, t_cblc_translation_
     }
     std::memset(&method_function, 0, sizeof(method_function));
     method_function.return_kind = return_kind;
+    method_function.template_return_pointer_depth = return_template_parameter_index;
     if (return_kind == CBLC_FUNCTION_RETURN_INT
         || return_kind == CBLC_FUNCTION_RETURN_DOUBLE)
         ft_strlcpy(method_function.return_cobol_name, "CBLC-THIS-RET",
@@ -847,6 +893,7 @@ static int cblc_parse_method_definition(const char **cursor, t_cblc_translation_
         method->return_kind = return_kind;
         ft_strlcpy(method->return_type_name, return_type_name,
             sizeof(method->return_type_name));
+        method->template_return_pointer_depth = method_function.template_return_pointer_depth;
         method->visibility = visibility;
         method->parameter_count = method_function.parameter_count;
         std::memcpy(method->parameters, method_function.parameters, sizeof(method->parameters));
@@ -905,6 +952,7 @@ static int cblc_parse_method_definition(const char **cursor, t_cblc_translation_
     method->return_kind = return_kind;
     ft_strlcpy(method->return_type_name, return_type_name,
         sizeof(method->return_type_name));
+    method->template_return_pointer_depth = method_function.template_return_pointer_depth;
     method->visibility = visibility;
     method->parameter_count = method_function.parameter_count;
     std::memcpy(method->parameters, method_function.parameters, sizeof(method->parameters));
@@ -1828,6 +1876,21 @@ static int cblc_clone_template_method(const t_cblc_method *source,
             return (FT_FAILURE);
         }
         destination->return_kind = argument_return_kind;
+        if (source->template_return_pointer_depth > 0)
+        {
+            t_cblc_data_kind pointer_kind;
+
+            if (cblc_template_apply_pointer_depth(argument_kinds[parameter_index],
+                    source->template_return_pointer_depth, &pointer_kind) != FT_SUCCESS
+                || cblc_function_return_kind_from_data_kind(pointer_kind,
+                    &destination->return_kind) != FT_SUCCESS)
+            {
+                if (destination->statements)
+                    cma_free(destination->statements);
+                destination->statements = NULL;
+                return (FT_FAILURE);
+            }
+        }
         if (argument_return_kind == CBLC_FUNCTION_RETURN_STRUCT
             || argument_return_kind == CBLC_FUNCTION_RETURN_STRUCT_POINTER)
             ft_strlcpy(destination->return_type_name, arguments[parameter_index],
@@ -1905,6 +1968,8 @@ static int cblc_template_apply_pointer_depth(t_cblc_data_kind base_kind,
     else if (base_kind == CBLC_DATA_KIND_INT_POINTER)
         *out_kind = CBLC_DATA_KIND_INT_POINTER_POINTER;
     else if (base_kind == CBLC_DATA_KIND_STRUCT)
+        *out_kind = CBLC_DATA_KIND_STRUCT_POINTER;
+    else if (base_kind == CBLC_DATA_KIND_STRING)
         *out_kind = CBLC_DATA_KIND_STRUCT_POINTER;
     else
         return (FT_FAILURE);

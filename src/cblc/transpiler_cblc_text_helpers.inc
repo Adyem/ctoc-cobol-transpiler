@@ -250,6 +250,40 @@ static void cblc_identifier_to_cobol(const char *identifier, char *buffer, size_
             index += sizeof(operator_assignment) - 1;
             continue ;
         }
+        if (std::strncmp(identifier + index, "operator[]", sizeof("operator[]") - 1) == 0
+            || std::strncmp(identifier + index, "OPERATOR[]", sizeof("OPERATOR[]") - 1) == 0)
+        {
+            static const char operator_index_cobol[] = "OPERATOR-INDEX";
+            size_t replacement_index;
+
+            replacement_index = 0;
+            while (operator_index_cobol[replacement_index] != '\0'
+                && output_index + 1 < buffer_size)
+            {
+                buffer[output_index] = operator_index_cobol[replacement_index];
+                output_index += 1;
+                replacement_index += 1;
+            }
+            index += sizeof("operator[]") - 1;
+            continue ;
+        }
+        if (std::strncmp(identifier + index, "operator->", sizeof("operator->") - 1) == 0
+            || std::strncmp(identifier + index, "OPERATOR->", sizeof("operator->") - 1) == 0)
+        {
+            static const char operator_arrow_cobol[] = "OPERATOR-ARROW";
+            size_t replacement_index;
+
+            replacement_index = 0;
+            while (operator_arrow_cobol[replacement_index] != '\0'
+                && output_index + 1 < buffer_size)
+            {
+                buffer[output_index] = operator_arrow_cobol[replacement_index];
+                output_index += 1;
+                replacement_index += 1;
+            }
+            index += sizeof("operator->") - 1;
+            continue ;
+        }
         character = identifier[index];
         if (character >= 'a' && character <= 'z')
             character = static_cast<char>(character - 'a' + 'A');

@@ -201,6 +201,16 @@ class vector
         return data[count - 1];
     }
 
+    T *operator[](int index)
+    {
+        return data + index;
+    }
+
+    T *operator->()
+    {
+        return data + 0;
+    }
+
     void emplace_back(T value)
     {
         if (count >= reserved)

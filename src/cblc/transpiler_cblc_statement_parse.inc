@@ -2359,9 +2359,14 @@ static int cblc_parse_return(const char **cursor, t_cblc_translation_unit *unit,
                 if (cblc_parse_pointer_address_of_reference(cursor, unit, return_pointer_kind,
                         &item, expression, sizeof(expression)) != FT_SUCCESS)
                 {
-                    if (cblc_parse_data_reference_text(cursor, unit, &item, NULL,
-                            expression, sizeof(expression)) != FT_SUCCESS)
-                        return (FT_FAILURE);
+                    if (cblc_parse_pointer_arithmetic_reference(cursor, unit,
+                            return_pointer_kind, &item, expression,
+                            sizeof(expression)) != FT_SUCCESS)
+                    {
+                        if (cblc_parse_data_reference_text(cursor, unit, &item, NULL,
+                                expression, sizeof(expression)) != FT_SUCCESS)
+                            return (FT_FAILURE);
+                    }
                     if (!item || !cblc_pointer_assignment_is_compatible(return_pointer_kind,
                             item->kind))
                         return (FT_FAILURE);

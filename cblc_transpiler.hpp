@@ -1413,6 +1413,7 @@ typedef struct s_cblc_method
     size_t parameter_count;
     t_cblc_function_return_kind return_kind;
     char return_type_name[TRANSPILE_IDENTIFIER_MAX];
+    size_t template_return_pointer_depth;
     t_cblc_member_visibility visibility;
     t_cblc_statement *statements;
     size_t statement_count;
@@ -1621,6 +1622,7 @@ typedef struct s_cblc_function
     int exception_types_unknown;
     t_cblc_function_return_kind return_kind;
     char return_type_name[TRANSPILE_IDENTIFIER_MAX];
+    size_t template_return_pointer_depth;
     int return_item_index;
     char return_cobol_name[TRANSPILE_IDENTIFIER_MAX];
     char return_source_name[TRANSPILE_IDENTIFIER_MAX];
