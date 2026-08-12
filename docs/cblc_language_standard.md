@@ -1,8 +1,8 @@
 # CBL-C Language Standard and Compiler Behavior
 
 **Status:** authoritative repository specification
-**Version:** 0.6 (bounded template subset and versioned fixed-array function ABIs)
-**Last reviewed:** 2026-08-07
+**Version:** 0.7 (basic reference aliases and reference-qualified signatures)
+**Last reviewed:** 2026-08-12
 
 This document is the normative reference for CBL-C as implemented by this
 repository. It specifies source syntax, static semantics, runtime behavior,
@@ -36,6 +36,9 @@ references:
   interface, while [`ci_pipeline.md`](ci_pipeline.md) documents verification.
 - [`cobol_dialect_requirements.md`](cobol_dialect_requirements.md) documents
   the target COBOL profile.
+- [`reference_lowering_design.md`](reference_lowering_design.md) records the
+  reference implementation design and explicitly separates implemented rules
+  from planned ABI extensions.
 
 When implementation and documentation disagree, the discrepancy is a compiler
 bug or a documentation bug. It must be resolved explicitly; readers must not
@@ -308,6 +311,53 @@ aggregates; classes additionally provide methods and lifecycle behavior.
 Nested fields and supported arrays preserve their declared member path in the
 semantic model and generated group/storage representation.
 
+### 6.4.1 Vector containers
+
+The standard-library `vector<T>` is a CBL-C-native container with familiar
+C++-style operations. It is not required to reproduce the complete C++
+`std::vector` object-lifetime, allocator, iterator, or move-semantics model.
+
+The basic vector storage model is:
+
+- `count` is the number of logically active elements.
+- `reserved` is the number of allocated, constructed capacity slots.
+- Only the first `count` slots are members of the vector's logical sequence.
+- Capacity slots may already contain default-constructed values before they
+  become logically active.
+- Growth copies active elements into a new block before the old block is
+  released.
+- `pop_back`, `erase`, `clear`, and shrinking `resize` reduce logical
+  membership but do not run per-element destructors.
+
+The supported element contract is value assignment plus byte-relocatable
+storage for approved scalar and value-like types. Arbitrary RAII element types,
+custom allocators, iterator objects, move operations, and exact C++
+construction/destruction timing are not part of this version.
+
+The current access contract is intentionally CBL-C-specific:
+
+- `at(index)` returns a mutable `T&` reference and checks `0 <= index < count`.
+- `front()` and `back()` return mutable `T&` references and throw `out_of_range`
+  when the vector is empty.
+- `operator[](index)` exposes a pointer to the active element and checks the
+  same bounds as `at`; it is not a C++ reference return.
+- `operator->()` exposes the first active element for supported method calls
+  and throws `out_of_range` for an empty vector.
+- Reference results preserve element identity: assigning through a supported
+  reference result targets the stored element, while assigning the result to a
+  value performs a copy. The COBOL lowering uses the shared typed address
+  result slot; it does not copy the element merely to represent the reference.
+- Full reference descriptors, invalidation-generation checks, and reference
+  returns from `operator[]` remain future extensions described in
+  [`reference_lowering_design.md`](reference_lowering_design.md).
+
+Negative size-changing requests are treated as zero. Growth beyond the
+representable vector limit raises `length_error`. The representable limit is
+not a promise that the target machine can allocate that many elements;
+allocation failure remains a runtime/target resource failure. Invalid indexing
+and empty access follow these CBL-C rules rather than implicitly inheriting all
+C++ `std::vector` behavior.
+
 ### 6.5 Classes
 
 A class combines member storage with named constructors and methods. It is not
@@ -323,7 +373,49 @@ Member access is checked semantically. A private field or method cannot be used
 from an unauthorized caller merely because the generated target could represent
 the access.
 
-### 6.5.1 Method emission and reuse
+### 6.5.1 References
+
+The basic reference subset uses C++-like syntax for non-null aliases:
+
+```cblc
+int total;
+int& alias = total;
+const int& read_only = total;
+void increment(int& value);
+Point& global_point();
+```
+
+The following rules are normative for this version:
+
+- `T&` and `const T&` are distinct reference qualifications, not pointer
+  kinds. References are non-null, must be initialized, and cannot be reseated.
+- A local reference initializer must name an existing scalar, complete string,
+  record, or class lvalue of a compatible type. Reference-to-reference
+  binding, literals, temporaries, arrays of references, and reference members
+  are unsupported.
+- A mutable reference must not bind to const data. A const reference may read
+  mutable or const data but writes through that alias are rejected.
+- A direct local alias uses the target's COBOL storage; it must not create a
+  second object or copy the target merely to represent the alias.
+- Local same-module reference parameters use the compiler's centralized
+  copy-in/copy-out call lowering. A mutable reference copies the argument into
+  the callee slot before the call and copies the mutated slot back afterward;
+  a const reference is read-only and has no copy-back. This is an interim ABI
+  representation with the same source-level mutation rules as a reference.
+- A reference return may designate global storage or other storage proven to
+  outlive the call. Returning a local automatic object or by-value parameter is
+  rejected with `TRANSPILE_ERROR_SEMANTIC_REFERENCE_BINDING`.
+- Reference metadata is preserved in function, method, template, and imported
+  signature records so reference qualification participates in compatibility.
+
+Native COBOL `BY REFERENCE` linkage groups, a dedicated reference descriptor,
+reference members, and container invalidation generations are planned
+extensions. The supported vector accessors use the existing typed pointer
+result slot; the remaining extensions are described in
+[`reference_lowering_design.md`](reference_lowering_design.md) and are not
+supported by this version.
+
+### 6.5.2 Method emission and reuse
 
 A user-defined method is one implementation, not a macro. The compiler must
 not paste a method's body into every call site. The required lowering model is:

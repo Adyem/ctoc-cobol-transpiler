@@ -161,6 +161,7 @@ int test_run_command_capture_status(const char *command, int *exit_status)
         while ((position = command_text.find(".\\C:", position)) != std::string::npos)
             command_text.erase(position, 2);
     }
+#if defined(_WIN32)
     if (command_text.find("cobc") == std::string::npos
         && command_text.find(" -o ") == std::string::npos)
     {
@@ -185,6 +186,7 @@ int test_run_command_capture_status(const char *command, int *exit_status)
             position += 4;
         }
     }
+#endif
     if (std::system("cc --version > cc_probe.log 2>&1") != 0)
     {
         size_t position = 0;

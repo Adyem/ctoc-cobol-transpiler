@@ -219,6 +219,8 @@ int cblc_import_translation_unit_function_stubs(t_transpiler_context *context,
         cblc_identifier_to_cobol(function->source_name, function->cobol_name,
             sizeof(function->cobol_name));
         function->return_kind = static_cast<t_cblc_function_return_kind>(signature->return_kind);
+        function->return_reference_kind = static_cast<t_cblc_reference_kind>(
+            signature->return_reference_kind);
         ft_strlcpy(function->return_type_name, signature->return_type_name,
             sizeof(function->return_type_name));
         ft_strlcpy(function->return_cobol_name, signature->return_cobol_name,
@@ -250,6 +252,9 @@ int cblc_import_translation_unit_function_stubs(t_transpiler_context *context,
             && parameter_index < TRANSPILE_FUNCTION_PARAMETER_MAX)
         {
             function->parameters[parameter_index].kind = signature->parameter_kinds[parameter_index];
+            function->parameters[parameter_index].reference_kind =
+                static_cast<t_cblc_reference_kind>(
+                    signature->parameter_reference_kinds[parameter_index]);
             function->parameters[parameter_index].array_count =
                 signature->parameter_array_counts[parameter_index];
             function->parameters[parameter_index].length =
@@ -585,6 +590,8 @@ int cblc_resolve_translation_unit_calls(t_transpiler_context *context, const cha
 
                         std::memset(&parameter, 0, sizeof(parameter));
                         parameter.kind = signature->parameter_kinds[index];
+                        parameter.reference_kind = static_cast<t_cblc_reference_kind>(
+                            signature->parameter_reference_kinds[index]);
                         parameter.array_count = signature->parameter_array_counts[index];
                         parameter.length = signature->parameter_lengths[index];
                         if (parameter.kind != TRANSPILE_FUNCTION_PARAMETER_STRUCT
@@ -725,6 +732,8 @@ static int cblc_export_type_methods(t_transpiler_type_signature *signature,
         ft_strlcpy(signature->methods[index].name, type->methods[index].source_name,
             sizeof(signature->methods[index].name));
         signature->methods[index].return_kind = static_cast<int>(type->methods[index].return_kind);
+        signature->methods[index].return_reference_kind = static_cast<int>(
+            type->methods[index].return_reference_kind);
         ft_strlcpy(signature->methods[index].return_type_name,
             type->methods[index].return_type_name,
             sizeof(signature->methods[index].return_type_name));
@@ -736,6 +745,8 @@ static int cblc_export_type_methods(t_transpiler_type_signature *signature,
         {
             signature->methods[index].parameter_kinds[parameter_index] =
                 type->methods[index].parameters[parameter_index].kind;
+            signature->methods[index].parameter_reference_kinds[parameter_index] =
+                static_cast<int>(type->methods[index].parameters[parameter_index].reference_kind);
             signature->methods[index].parameter_array_counts[parameter_index] =
                 type->methods[index].parameters[parameter_index].array_count;
             signature->methods[index].parameter_lengths[parameter_index] =
@@ -1066,6 +1077,8 @@ int cblc_register_translation_unit_exports(t_transpiler_context *context, const 
             if (unit->functions[index].return_kind != CBLC_FUNCTION_RETURN_VOID)
                 signature.return_mode = TRANSPILE_FUNCTION_RETURN_VALUE;
             signature.return_kind = unit->functions[index].return_kind;
+            signature.return_reference_kind = static_cast<int>(
+                unit->functions[index].return_reference_kind);
             ft_strlcpy(signature.return_type_name, unit->functions[index].return_type_name,
                 sizeof(signature.return_type_name));
             ft_strlcpy(signature.return_cobol_name, unit->functions[index].return_cobol_name,
@@ -1129,6 +1142,8 @@ int cblc_register_translation_unit_exports(t_transpiler_context *context, const 
             {
                 signature.parameter_kinds[parameter_index] =
                     unit->functions[index].parameters[parameter_index].kind;
+                signature.parameter_reference_kinds[parameter_index] = static_cast<int>(
+                    unit->functions[index].parameters[parameter_index].reference_kind);
                 signature.parameter_array_counts[parameter_index] =
                     unit->functions[index].parameters[parameter_index].array_count;
                 signature.parameter_lengths[parameter_index] =

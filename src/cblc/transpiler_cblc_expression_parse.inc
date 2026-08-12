@@ -881,6 +881,27 @@ static int cblc_parse_function_call_assignment(const char **cursor,
     return (FT_SUCCESS);
 }
 
+static int cblc_reference_return_matches_value_target(const t_cblc_method *method,
+    const t_cblc_data_item *target_item)
+{
+    if (!method || !target_item || method->return_reference_kind == CBLC_REFERENCE_NONE)
+        return (0);
+    if (method->return_kind == CBLC_FUNCTION_RETURN_INT_POINTER)
+        return (target_item->kind == CBLC_DATA_KIND_INT);
+    if (method->return_kind == CBLC_FUNCTION_RETURN_CHAR_POINTER)
+        return (target_item->kind == CBLC_DATA_KIND_CHAR);
+    if (method->return_kind == CBLC_FUNCTION_RETURN_STRUCT_POINTER)
+    {
+        if (std::strncmp(method->return_type_name, "string",
+                sizeof(method->return_type_name)) == 0)
+            return (target_item->kind == CBLC_DATA_KIND_STRING);
+        return (target_item->kind == CBLC_DATA_KIND_STRUCT
+            && std::strncmp(target_item->struct_type_name, method->return_type_name,
+                sizeof(target_item->struct_type_name)) == 0);
+    }
+    return (0);
+}
+
 static int cblc_parse_method_call_assignment(const char **cursor,
     t_cblc_translation_unit *unit, t_cblc_function *function,
     t_cblc_data_item *target_item)
@@ -911,7 +932,11 @@ static int cblc_parse_method_call_assignment(const char **cursor,
         *cursor = start;
         return (FT_FAILURE);
     }
-    if (method->return_kind == CBLC_FUNCTION_RETURN_INT)
+    if (cblc_reference_return_matches_value_target(method, target_item))
+    {
+        /* A reference result may be copied into a value target. */
+    }
+    else if (method->return_kind == CBLC_FUNCTION_RETURN_INT)
     {
         if (target_item->kind != CBLC_DATA_KIND_INT)
         {

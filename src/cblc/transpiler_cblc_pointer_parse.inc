@@ -74,6 +74,7 @@ static int cblc_parse_pointer_address_of_reference(const char **cursor,
     t_cblc_translation_unit *unit, t_cblc_data_kind target_kind,
     t_cblc_data_item **out_item, char *out_reference, size_t out_reference_size)
 {
+    const char *start;
     char reference[TRANSPILE_STATEMENT_TEXT_MAX];
     t_cblc_data_item *item;
     int is_length_reference;
@@ -81,19 +82,29 @@ static int cblc_parse_pointer_address_of_reference(const char **cursor,
     if (!cursor || !*cursor || !unit || !out_item || !out_reference
         || out_reference_size == 0)
         return (FT_FAILURE);
+    start = *cursor;
     if (**cursor != '&')
         return (FT_FAILURE);
     *cursor += 1;
     if (cblc_parse_data_reference_text(cursor, unit, &item, &is_length_reference,
             reference, sizeof(reference)) != FT_SUCCESS)
+    {
+        *cursor = start;
         return (FT_FAILURE);
+    }
     if (!item || is_length_reference || item->kind == CBLC_DATA_KIND_STRING
         || (item->array_count > 0
             && std::strncmp(reference, item->cobol_name, sizeof(item->cobol_name)) == 0)
         || !cblc_pointer_address_of_is_compatible(target_kind, item->kind))
+    {
+        *cursor = start;
         return (FT_FAILURE);
+    }
     if (std::snprintf(out_reference, out_reference_size, "&%s", reference) < 0)
+    {
+        *cursor = start;
         return (FT_FAILURE);
+    }
     *out_item = item;
     return (FT_SUCCESS);
 }
@@ -102,6 +113,7 @@ static int cblc_parse_pointer_arithmetic_reference(const char **cursor,
     t_cblc_translation_unit *unit, t_cblc_data_kind target_kind,
     t_cblc_data_item **out_item, char *out_reference, size_t out_reference_size)
 {
+    const char *start;
     char source_reference[TRANSPILE_STATEMENT_TEXT_MAX];
     char operand_reference[TRANSPILE_STATEMENT_TEXT_MAX];
     t_cblc_data_item *source_item;
@@ -111,17 +123,27 @@ static int cblc_parse_pointer_arithmetic_reference(const char **cursor,
     if (!cursor || !*cursor || !unit || !out_item || !out_reference
         || out_reference_size == 0)
         return (FT_FAILURE);
+    start = *cursor;
     if (target_kind == CBLC_DATA_KIND_VOID_POINTER)
         return (FT_FAILURE);
     if (cblc_parse_data_reference_text(cursor, unit, &source_item, NULL,
             source_reference, sizeof(source_reference)) != FT_SUCCESS)
+    {
+        *cursor = start;
         return (FT_FAILURE);
+    }
     if (!source_item || source_item->kind != target_kind
         || source_item->kind == CBLC_DATA_KIND_VOID_POINTER)
+    {
+        *cursor = start;
         return (FT_FAILURE);
+    }
     cblc_skip_whitespace(cursor);
     if (**cursor != '+' && **cursor != '-')
+    {
+        *cursor = start;
         return (FT_FAILURE);
+    }
     operator_char = **cursor;
     *cursor += 1;
     cblc_skip_whitespace(cursor);
@@ -133,7 +155,10 @@ static int cblc_parse_pointer_arithmetic_reference(const char **cursor,
         while (**cursor >= '0' && **cursor <= '9')
         {
             if (length + 1 >= sizeof(operand_reference))
+            {
+                *cursor = start;
                 return (FT_FAILURE);
+            }
             operand_reference[length] = **cursor;
             length += 1;
             *cursor += 1;
@@ -144,13 +169,22 @@ static int cblc_parse_pointer_arithmetic_reference(const char **cursor,
     {
         if (cblc_parse_data_reference_text(cursor, unit, &operand_item, NULL,
                 operand_reference, sizeof(operand_reference)) != FT_SUCCESS)
+        {
+            *cursor = start;
             return (FT_FAILURE);
+        }
         if (!operand_item || operand_item->kind != CBLC_DATA_KIND_INT)
+        {
+            *cursor = start;
             return (FT_FAILURE);
+        }
     }
     if (std::snprintf(out_reference, out_reference_size, "%s %c %s", source_reference,
             operator_char, operand_reference) < 0)
+    {
+        *cursor = start;
         return (FT_FAILURE);
+    }
     *out_item = source_item;
     return (FT_SUCCESS);
 }

@@ -93,6 +93,14 @@ static int cblc_argument_matches_parameter(const t_cblc_translation_unit *unit,
     if (!unit || !argument || !parameter)
         return (0);
     item = cblc_find_data_item_for_emit_by_source(unit, argument);
+    if (parameter->reference_kind != CBLC_REFERENCE_NONE)
+    {
+        if (!item)
+            return (0);
+        if (parameter->reference_kind == CBLC_REFERENCE_MUTABLE
+            && item->is_const)
+            return (0);
+    }
     if (parameter->array_count > 0)
     {
         if (!item || item->array_count != parameter->array_count)
@@ -678,8 +686,15 @@ static int cblc_emit_parameter_argument_moves(const t_cblc_translation_unit *uni
         }
         else
         {
-            if (cblc_translate_expression_for_cobol(argument, expression,
-                    sizeof(expression)) != FT_SUCCESS)
+            const t_cblc_data_item *item;
+
+            item = cblc_find_data_item_for_emit_by_source(unit, argument);
+            if (item && item->kind != CBLC_DATA_KIND_STRUCT
+                && item->kind != CBLC_DATA_KIND_STRING
+                && !cblc_data_kind_is_pointer(item->kind))
+                ft_strlcpy(expression, item->cobol_name, sizeof(expression));
+            else if (cblc_translate_expression_for_cobol(argument, expression,
+                        sizeof(expression)) != FT_SUCCESS)
                 return (FT_FAILURE);
             if (std::snprintf(line, sizeof(line), "           COMPUTE %s = %s.",
                     parameters[index].cobol_name, expression) < 0)
@@ -699,6 +714,63 @@ static int cblc_emit_local_call_argument_moves(const t_cblc_translation_unit *un
     if (!unit || !target_function || !statement || !builder)
         return (FT_FAILURE);
     return (cblc_emit_parameter_argument_moves(unit, statement->call_arguments,
-            statement->call_argument_count, target_function->parameters,
-            target_function->parameter_count, builder));
+        statement->call_argument_count, target_function->parameters,
+        target_function->parameter_count, builder));
+}
+
+static int cblc_emit_local_call_reference_copy_backs(const t_cblc_translation_unit *unit,
+    const t_cblc_function *target_function, const t_cblc_statement *statement,
+    t_cobol_text_builder *builder)
+{
+    size_t index;
+
+    if (!unit || !target_function || !statement || !builder)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < target_function->parameter_count)
+    {
+        char argument[TRANSPILE_STATEMENT_TEXT_MAX];
+        const t_cblc_parameter *parameter;
+        const t_cblc_data_item *source_item;
+        const t_cblc_data_item *parameter_item;
+        char argument_name[TRANSPILE_STATEMENT_TEXT_MAX];
+        char line[TRANSPILE_STATEMENT_TEXT_MAX];
+
+        parameter = &target_function->parameters[index];
+        if (parameter->reference_kind != CBLC_REFERENCE_MUTABLE)
+        {
+            index += 1;
+            continue ;
+        }
+        if (cblc_extract_call_argument(statement, index, argument, sizeof(argument)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        source_item = cblc_find_data_item_for_emit_by_source(unit, argument);
+        parameter_item = cblc_find_data_item_for_emit_by_source(unit,
+            parameter->actual_source_name);
+        if (!source_item || !parameter_item)
+            return (FT_FAILURE);
+        ft_strlcpy(argument_name, source_item->cobol_name, sizeof(argument_name));
+        if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_STRING)
+        {
+            if (std::snprintf(line, sizeof(line), "           MOVE %s-BUF TO %s-BUF.",
+                    parameter_item->cobol_name, argument_name) < 0
+                || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
+                || std::snprintf(line, sizeof(line), "           COMPUTE %s-LEN = %s-LEN.",
+                    argument_name, parameter_item->cobol_name) < 0)
+                return (FT_FAILURE);
+        }
+        else if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_STRUCT)
+        {
+            if (std::snprintf(line, sizeof(line), "           MOVE %s TO %s.",
+                    parameter_item->cobol_name, argument_name) < 0)
+                return (FT_FAILURE);
+        }
+        else if (std::snprintf(line, sizeof(line), "           MOVE %s TO %s.",
+                parameter_item->cobol_name, argument_name) < 0)
+            return (FT_FAILURE);
+        if (cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+            return (FT_FAILURE);
+        index += 1;
+    }
+    return (FT_SUCCESS);
 }

@@ -2,7 +2,6 @@ int scores[2];
 int slot;
 int selected_score;
 int copied_score;
-int *score_ref;
 char *marker_buffer;
 char marker;
 void *scratch;
@@ -17,8 +16,7 @@ void showcase_memory()
     display(selected_score);
     scratch = std::malloc(16);
     std::free(scratch);
-    score_ref = &selected_score;
-    copied_score = *score_ref;
+    copied_score = selected_score;
     display("Copied score");
     display(copied_score);
     marker_buffer = std::malloc(4);

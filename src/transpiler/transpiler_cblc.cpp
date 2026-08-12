@@ -58,6 +58,8 @@ static int cblc_parse_local_struct_instance_declaration(const char **cursor,
     t_cblc_translation_unit *unit, t_cblc_function *function);
 static int cblc_parse_local_scalar_declaration(const char **cursor,
     t_cblc_translation_unit *unit, t_cblc_function *function);
+static int cblc_parse_local_reference_declaration(const char **cursor,
+    t_cblc_translation_unit *unit, t_cblc_function *function);
 static int cblc_parse_local_string_declaration(const char **cursor,
     t_cblc_translation_unit *unit, t_cblc_function *function);
 static int cblc_parse_local_pointer_declaration(const char **cursor,
@@ -114,7 +116,7 @@ static void cblc_build_constructor_scope_name(const char *base, const char *sepa
     size_t arity, char *buffer, size_t buffer_size);
 static int cblc_parse_function_return_type(const char **cursor,
     const t_cblc_translation_unit *unit, t_cblc_function_return_kind *out_kind,
-    char *type_name, size_t type_name_size);
+    char *type_name, size_t type_name_size, t_cblc_reference_kind *out_reference_kind);
 static const t_cblc_struct_type *cblc_find_struct_type(const t_cblc_translation_unit *unit,
     const char *identifier);
 static const t_cblc_function *cblc_find_template_function(

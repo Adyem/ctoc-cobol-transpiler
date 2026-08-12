@@ -1,0 +1,5 @@
+void adjust_module_count(int& count, int& delta)
+{
+    count = count + delta;
+    return;
+}

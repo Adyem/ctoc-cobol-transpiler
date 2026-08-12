@@ -329,7 +329,15 @@ static int cblc_emit_reusable_method_results(const t_cblc_translation_unit *unit
             if (cblc_method_result_name(receiver, method, result_name,
                     sizeof(result_name)) != FT_SUCCESS)
                 return (FT_FAILURE);
-            if (method->return_kind == CBLC_FUNCTION_RETURN_INT)
+            if (method->return_reference_kind != CBLC_REFERENCE_NONE)
+            {
+                if (std::snprintf(line, sizeof(line),
+                        "       01 %s USAGE POINTER VALUE NULL.", result_name) < 0)
+                    return (FT_FAILURE);
+                if (cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            else if (method->return_kind == CBLC_FUNCTION_RETURN_INT)
             {
                 if (std::snprintf(line, sizeof(line),
                         "       01 %s PIC S9(9) VALUE 0.", result_name) < 0)

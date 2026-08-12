@@ -31,6 +31,7 @@ static int cblc_parse_function(const char **cursor, t_cblc_translation_unit *uni
     t_cblc_function *function;
     t_cblc_data_item *return_item;
     t_cblc_function_return_kind return_kind;
+    t_cblc_reference_kind return_reference_kind;
     char return_type_name[TRANSPILE_IDENTIFIER_MAX];
     size_t index;
     size_t parameter_scope_base;
@@ -41,7 +42,7 @@ static int cblc_parse_function(const char **cursor, t_cblc_translation_unit *uni
         return (FT_FAILURE);
     cblc_skip_whitespace(cursor);
     if (cblc_parse_function_return_type(cursor, unit, &return_kind,
-            return_type_name, sizeof(return_type_name)) != FT_SUCCESS)
+            return_type_name, sizeof(return_type_name), &return_reference_kind) != FT_SUCCESS)
         return (FT_FAILURE);
     cblc_skip_whitespace(cursor);
     if (cblc_parse_identifier(cursor, identifier, sizeof(identifier)) != FT_SUCCESS)
@@ -59,6 +60,7 @@ static int cblc_parse_function(const char **cursor, t_cblc_translation_unit *uni
     function->parameter_count = 0;
     function->saw_return = 0;
     function->return_kind = return_kind;
+    function->return_reference_kind = return_reference_kind;
     function->return_type_name[0] = '\0';
     function->return_item_index = -1;
     function->return_cobol_name[0] = '\0';
@@ -151,7 +153,7 @@ static int cblc_starts_with_function_declaration(const t_cblc_translation_unit *
         return (0);
     lookahead = cursor;
     if (cblc_parse_function_return_type(&lookahead, unit, &return_kind,
-            type_name, sizeof(type_name)) != FT_SUCCESS)
+            type_name, sizeof(type_name), NULL) != FT_SUCCESS)
         return (0);
     if (return_kind == CBLC_FUNCTION_RETURN_STRUCT && type_name[0] == '\0')
         return (0);

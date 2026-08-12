@@ -32,12 +32,35 @@ value-oriented operations `size`, `max_size`, `capacity`, `empty`, `reserve`,
 pointer lowering; growth copies existing elements before releasing the old
 block, so it does not rely on a platform-specific realloc extension.
 
+The CBL-C vector contract is intentionally similar to, but not identical to,
+`std::vector`:
+
+- `count` is the number of logically active elements.
+- `reserved` is the number of allocated and constructed capacity slots.
+- Only the first `count` slots are members of the vector's logical sequence.
+- Capacity slots may already contain default-constructed values before they
+  become logically active.
+- `push_back`, `emplace_back`, `insert`, `reserve`, `resize`, and `assign`
+  preserve active values by copying them into newly allocated storage when
+  growth is required.
+- `pop_back`, `erase`, `clear`, and shrinking `resize` reduce logical
+  membership but do not run per-element destructors.
+
 The current element contract is value assignment plus byte-relocatable storage.
-Scalar types such as `int` are supported. Full C++-style iterator/reference
-semantics, allocator customization, and constructor/destructor dispatch for
-non-trivial class or string elements remain planned lifecycle extensions; those
-must be implemented before advertising `vector<string>` or arbitrary RAII
-element support.
+Scalar and other explicitly approved value-like types are supported. `at`,
+`front`, and `back` return mutable references to active elements; assigning
+those results to a value copies the element, while reference-based mutation
+preserves element identity. Full C++-style iterator/reference descriptors,
+allocator customization, move semantics, and constructor/destructor dispatch
+for non-trivial elements remain planned extensions.
+
+`at`, `front`, `back`, and pointer-oriented indexing check their active-element
+bounds and throw `out_of_range` when the requested element does not exist.
+`at`, `front`, and `back` return `T&`; `operator->` requires a non-empty vector
+and refers to its first active element.
+Growth overflow raises `length_error`; allocation failure is handled by the
+configured runtime. The current API does not promise exact C++ object-lifetime
+behavior.
 four C++ files remaining under `src/standard_library` are infrastructure only:
 the catalog, usage-state tracking, the source embedder/native lowering bridge,
 and ABI compatibility wrappers. None contains a COBOL template.

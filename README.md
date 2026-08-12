@@ -58,6 +58,11 @@ The authoritative language and compiler-behavior standard is [`docs/cblc_languag
 
 The planned basic template design is documented in [`docs/template_implementation_plan.md`](docs/template_implementation_plan.md); it is not part of the language standard until implemented and verified.
 
+The source-reference semantics and COBOL lowering design are documented in
+[`docs/reference_lowering_design.md`](docs/reference_lowering_design.md).
+The implemented subset is covered by the authoritative language standard;
+the document also marks planned ABI and vector extensions explicitly.
+
 ### COBOL Generation
 
 The forward backend can emit COBOL for the supported CBL-C subset. Implemented generation includes:

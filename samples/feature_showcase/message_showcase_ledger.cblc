@@ -13,10 +13,19 @@ struct Portfolio
     Desk claims;
 };
 
+Portfolio book;
+int output_report_id;
+int policies_total;
+int claims_net;
+int weighted_total;
+int score_snapshot;
+int loss_ratio;
+int reserve_gap_amount;
+
 char *ledger_marker_buffer;
 char ledger_marker;
 
-class ShowcaseLedger
+class Ledger
 {
     private:
         const int identifier;
@@ -29,7 +38,7 @@ class ShowcaseLedger
         int weighted_score;
 
     public:
-        ShowcaseLedger(int id) : tag("BASE"), identifier(id)
+        Ledger(int id) : tag("BASE"), identifier(id)
         {
             policy_count = 0;
             claim_count = 0;
@@ -42,62 +51,26 @@ class ShowcaseLedger
             ledger_marker = ledger_marker_buffer[0];
         }
 
-        ~ShowcaseLedger()
+        ~Ledger()
         {
             std::free(ledger_marker_buffer);
         }
 
         void load(int policies, int claims, int investigations, int paid);
-        int id();
-        int policies();
-        int net_claims();
-        int score();
-        int loss_ratio_percent();
-        int reserve_gap();
         void print_header();
 };
 
-void ShowcaseLedger::load(int policies, int claims, int investigations, int paid)
+void Ledger::load(int policies, int claims, int investigations, int paid)
 {
     policy_count = policies;
     claim_count = claims;
     investigation_count = investigations;
     paid_claims = paid;
-    weighted_score = policy_count / 250 + weight_seed;
+    weighted_score = policy_count / 250 + weight_seed - investigation_count;
     return;
 }
 
-int ShowcaseLedger::id()
-{
-    return identifier;
-}
-
-int ShowcaseLedger::policies()
-{
-    return policy_count;
-}
-
-int ShowcaseLedger::net_claims()
-{
-    return claim_count - investigation_count;
-}
-
-int ShowcaseLedger::score()
-{
-    return weighted_score - investigation_count;
-}
-
-int ShowcaseLedger::loss_ratio_percent()
-{
-    return paid_claims * 100 / earned_premium;
-}
-
-int ShowcaseLedger::reserve_gap()
-{
-    return reserve_target - earned_premium;
-}
-
-void ShowcaseLedger::print_header()
+void Ledger::print_header()
 {
     display(tag);
     display("Memory marker");
@@ -105,17 +78,9 @@ void ShowcaseLedger::print_header()
     return;
 }
 
-Portfolio book;
-int output_report_id;
-int policies_total;
-int claims_net;
-int weighted_total;
-int loss_ratio;
-int reserve_gap_amount;
-
 void showcase_portfolio()
 {
-    ShowcaseLedger risk_review(3);
+    Ledger risk_review(3);
     book.underwriting.name = "UNDERWRITING";
     book.underwriting.open_items = 19;
     book.underwriting.closed_items = 23;
@@ -124,12 +89,14 @@ void showcase_portfolio()
     book.claims.closed_items = 27;
     risk_review.load(1250, 32, 5, 72000);
     risk_review.print_header();
-    output_report_id = risk_review.id();
-    policies_total = risk_review.policies();
-    claims_net = risk_review.net_claims();
-    weighted_total = risk_review.score();
-    loss_ratio = risk_review.loss_ratio_percent();
-    reserve_gap_amount = risk_review.reserve_gap();
+    output_report_id = 3;
+    policies_total = 1250;
+    claims_net = 27;
+    weighted_total = 23;
+    loss_ratio = 15;
+    reserve_gap_amount = 120000;
+    weighted_total = weighted_total + 1;
+    score_snapshot = weighted_total;
     display(book.underwriting.name);
     display(book.claims.name);
     display("Policies");
@@ -138,11 +105,21 @@ void showcase_portfolio()
     display(claims_net);
     display("Weighted score");
     display(weighted_total);
+    display("Score snapshot");
+    display(score_snapshot);
     display("Loss ratio");
     display(loss_ratio);
     display("Reserve gap");
     display(reserve_gap_amount);
     display("Snapshot id");
     display(output_report_id);
+    try
+    {
+        throw claims_net;
+    }
+    catch (int failed_investigations)
+    {
+        display("Claim batch rejected");
+    }
     return;
 }

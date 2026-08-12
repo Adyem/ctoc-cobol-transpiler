@@ -1096,6 +1096,7 @@ static int transpiler_context_type_method_signatures_compatible(
     if (std::strncmp(left->name, right->name, sizeof(left->name)) != 0
         || left->parameter_count != right->parameter_count
         || left->return_kind != right->return_kind
+        || left->return_reference_kind != right->return_reference_kind
         || left->visibility != right->visibility
         || std::strncmp(left->return_type_name, right->return_type_name,
             sizeof(left->return_type_name)) != 0)
@@ -1104,6 +1105,8 @@ static int transpiler_context_type_method_signatures_compatible(
     while (index < left->parameter_count)
     {
         if (left->parameter_kinds[index] != right->parameter_kinds[index]
+            || left->parameter_reference_kinds[index]
+                != right->parameter_reference_kinds[index]
             || left->parameter_array_counts[index] != right->parameter_array_counts[index]
             || left->parameter_lengths[index] != right->parameter_lengths[index]
             || std::strncmp(left->parameter_type_names[index],
@@ -2984,6 +2987,7 @@ int transpiler_context_register_function_signature_record(t_transpiler_context *
         return (FT_FAILURE);
     registered = const_cast<t_transpiler_function_signature *>(registered_const);
     registered->return_kind = record->return_kind;
+    registered->return_reference_kind = record->return_reference_kind;
     registered->may_throw = record->may_throw;
     registered->exception_abi_version = record->exception_abi_version;
     registered->exception_policy_fingerprint = record->exception_policy_fingerprint;
@@ -3021,8 +3025,9 @@ int transpiler_context_register_function_signature_record(t_transpiler_context *
         ft_strlcpy(registered->parameter_type_names[index],
             record->parameter_type_names[index],
             sizeof(registered->parameter_type_names[index]));
-            registered->parameter_array_counts[index] = record->parameter_array_counts[index];
-            registered->parameter_lengths[index] = record->parameter_lengths[index];
+        registered->parameter_array_counts[index] = record->parameter_array_counts[index];
+        registered->parameter_lengths[index] = record->parameter_lengths[index];
+        registered->parameter_reference_kinds[index] = record->parameter_reference_kinds[index];
         index += 1;
     }
     if (record->statement_count > 0 && record->statements)

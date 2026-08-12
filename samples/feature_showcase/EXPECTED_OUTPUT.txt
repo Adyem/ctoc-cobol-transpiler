@@ -6,12 +6,6 @@ String value
 clean base!
 Note chars
 +000000011
-Vector size
-+000000003
-Vector first
-+000000072
-Vector last
-+000000094
 BASE
 Memory marker
 R
@@ -22,13 +16,16 @@ Policies
 Net claims
 +000000027
 Weighted score
-+000000023
++000000024
+Score snapshot
++000000024
 Loss ratio
 +000000015
 Reserve gap
 +000120000
 Snapshot id
 +000000003
+Claim batch rejected
 Selected score
 +000000086
 Copied score
@@ -36,14 +33,18 @@ Copied score
 Marker
 A
 Modules
-+000000003
++000000004
 SHOWCASE READY
 Standard library functions bundled with the showcase:
 stdlib/CBLC-ABS.cob
 stdlib/CBLC-ABS.so
 stdlib/CBLC-STRCAT.cob
 stdlib/CBLC-STRCAT.so
+stdlib/CBLC-STRCAT-STRING.cob
+stdlib/CBLC-STRCAT-STRING.so
 stdlib/CBLC-STRCPY.cob
 stdlib/CBLC-STRCPY.so
 stdlib/CBLC-STRLEN.cob
 stdlib/CBLC-STRLEN.so
+stdlib/CBLC-STRCMP-STRING.cob
+stdlib/CBLC-STRCMP-STRING.so

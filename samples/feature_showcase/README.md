@@ -1,12 +1,17 @@
 # CBL-C Feature Showcase
 
 This sample builds one executable, `message_showcase`, from a set of imported
-CBL-C translation units. It is meant to be a compact, readable starting point
-for the language rather than a long business demo. The sample still exercises
-the core features that lower cleanly into COBOL: imports, a shared constants
-module, structs, a class with `private` / `public` members, constructor and
-destructor lifecycle code, out-of-class method bodies, builtin `string` values
-and methods, arrays, and basic pointer access.
+CBL-C translation units. It models a small insurance policy snapshot: text is
+prepared, a ledger object calculates the report, claim batches are validated,
+scores are adjusted, and the final report is displayed. The source
+is intentionally ordinary application code; the language features are used as
+part of that workflow rather than presented as disconnected demonstrations.
+
+The workflow exercises imports, shared constants, structs, a class with
+`private` / `public` members, constructor and destructor lifecycle code,
+out-of-class methods, builtin `string` values and methods, arrays, pointers,
+mutable and read-only references, reference-backed module-count updates, typed
+exception handling for claim validation, and nested scopes.
 
 ## Layout
 
@@ -19,12 +24,14 @@ and methods, arrays, and basic pointer access.
 - `message_showcase_constants.cblc` — shared string literals and constant
   values used by the text and ledger examples.
 - `message_showcase_text.cblc` — a small `string` example with readable output.
-- `message_showcase_ledger.cblc` — the expanded class example. It combines
+- `message_showcase_ledger.cblc` — the policy snapshot workflow. It combines
   constructor initialization, destructor cleanup, out-of-class methods, structs,
-  strings, and a small malloc/free-backed scoring buffer.
+  strings, exception-based claim validation, and a small malloc/free-backed
+  scoring buffer.
 - `message_showcase_memory.cblc` — a short array and pointer example.
-- `message_showcase_main.cblc` — the entrypoint also demonstrates the native
-  `vector<int>` class with reservation, insertion, and value access methods.
+- `message_showcase_refs.cblc` — a separate reference-parameter helper used by
+  the entrypoint so both arguments are passed by reference.
+- `message_showcase_main.cblc` — the entrypoint coordinates the workflow.
 - `EXPECTED_OUTPUT.txt` — the transcript used by `make verify`.
 - `stdlib/` — populated by the `standard-library` CLI direction.
 - `cobol/message_showcase*.cob` — generated COBOL output.

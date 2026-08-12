@@ -2325,6 +2325,79 @@ static int cblc_parse_return(const char **cursor, t_cblc_translation_unit *unit,
                 return (FT_FAILURE);
         }
     }
+    else if (function->return_reference_kind != CBLC_REFERENCE_NONE)
+    {
+        t_cblc_data_kind expected_kind;
+        t_cblc_data_item *referent_item;
+        int referent_is_function_local;
+        int referent_is_indexed_pointer;
+
+        if (function->return_kind == CBLC_FUNCTION_RETURN_INT_POINTER)
+            expected_kind = CBLC_DATA_KIND_INT;
+        else if (function->return_kind == CBLC_FUNCTION_RETURN_CHAR_POINTER)
+            expected_kind = CBLC_DATA_KIND_CHAR;
+        else
+            expected_kind = std::strncmp(function->return_type_name, "string",
+                sizeof(function->return_type_name)) == 0
+                ? CBLC_DATA_KIND_STRING : CBLC_DATA_KIND_STRUCT;
+        if (cblc_parse_data_reference_text(cursor, unit, &referent_item, NULL,
+                expression, sizeof(expression)) != FT_SUCCESS || !referent_item)
+            return (FT_FAILURE);
+        referent_is_indexed_pointer =
+            (expected_kind == CBLC_DATA_KIND_INT
+                && referent_item->kind == CBLC_DATA_KIND_INT_POINTER)
+            || (expected_kind == CBLC_DATA_KIND_CHAR
+                && referent_item->kind == CBLC_DATA_KIND_CHAR_POINTER)
+            || (expected_kind == CBLC_DATA_KIND_STRUCT
+                && referent_item->kind == CBLC_DATA_KIND_STRUCT_POINTER);
+        if (referent_item->kind != expected_kind && !referent_is_indexed_pointer)
+            return (FT_FAILURE);
+        if (expected_kind == CBLC_DATA_KIND_STRUCT
+            && std::strncmp(referent_item->struct_type_name, function->return_type_name,
+                sizeof(referent_item->struct_type_name)) != 0)
+            return (FT_FAILURE);
+        referent_is_function_local = referent_item->is_function_local;
+        if (!referent_is_function_local && referent_item->is_alias)
+        {
+            size_t data_index;
+
+            data_index = 0;
+            while (data_index < unit->data_count)
+            {
+                if (unit->data_items[data_index].is_function_local
+                    && std::strncmp(unit->data_items[data_index].cobol_name,
+                        referent_item->cobol_name,
+                        sizeof(referent_item->cobol_name)) == 0)
+                {
+                    referent_is_function_local = 1;
+                    break;
+                }
+                if (unit->data_items[data_index].reference_kind == CBLC_REFERENCE_NONE
+                    && std::strncmp(unit->data_items[data_index].owner_function_name,
+                        function->source_name,
+                        sizeof(function->source_name)) == 0
+                    && std::strncmp(unit->data_items[data_index].cobol_name,
+                        referent_item->cobol_name,
+                        sizeof(referent_item->cobol_name)) == 0)
+                {
+                    referent_is_function_local = 1;
+                    break;
+                }
+                data_index += 1;
+            }
+        }
+        if (referent_is_function_local
+            || (referent_item->reference_kind != CBLC_REFERENCE_NONE
+                && referent_item->reference_target_index < unit->data_count
+                && unit->data_items[referent_item->reference_target_index].is_function_local))
+        {
+            unit->parse_error_code = TRANSPILE_ERROR_SEMANTIC_REFERENCE_BINDING;
+            std::snprintf(unit->parse_error_message, sizeof(unit->parse_error_message),
+                "reference return from '%s' would outlive its local target",
+                function->source_name);
+            return (FT_FAILURE);
+        }
+    }
     else if (function->return_kind == CBLC_FUNCTION_RETURN_VOID_POINTER
         || function->return_kind == CBLC_FUNCTION_RETURN_CHAR_POINTER
         || function->return_kind == CBLC_FUNCTION_RETURN_INT_POINTER

@@ -411,6 +411,7 @@ static int cblc_type_ref_equal(const t_cblc_type_ref *left,
     size_t index;
 
     if (!left || !right || left->kind != right->kind
+        || left->reference_kind != right->reference_kind
         || left->builtin_kind != right->builtin_kind
         || std::strcmp(left->name, right->name) != 0
         || left->parameter_index != right->parameter_index
@@ -913,6 +914,8 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
                     std::strlen(type->methods[index].cobol_name + 10) + 1);
             type->methods[index].return_kind = static_cast<t_cblc_function_return_kind>(
                 signature->methods[index].return_kind);
+            type->methods[index].return_reference_kind = static_cast<t_cblc_reference_kind>(
+                signature->methods[index].return_reference_kind);
             ft_strlcpy(type->methods[index].return_type_name,
                 signature->methods[index].return_type_name,
                 sizeof(type->methods[index].return_type_name));
@@ -926,7 +929,10 @@ static int cblc_register_imported_type_stub(t_cblc_translation_unit *unit,
             {
                 type->methods[index].parameters[parameter_index].kind =
                     signature->methods[index].parameter_kinds[parameter_index];
-                    type->methods[index].parameters[parameter_index].array_count =
+                type->methods[index].parameters[parameter_index].reference_kind =
+                    static_cast<t_cblc_reference_kind>(
+                        signature->methods[index].parameter_reference_kinds[parameter_index]);
+                type->methods[index].parameters[parameter_index].array_count =
                     signature->methods[index].parameter_array_counts[parameter_index];
                 type->methods[index].parameters[parameter_index].length =
                     signature->methods[index].parameter_lengths[parameter_index];

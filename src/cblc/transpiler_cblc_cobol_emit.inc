@@ -1488,6 +1488,84 @@ static int cblc_normalize_method_string_subscripts(const t_cblc_translation_unit
     return (FT_SUCCESS);
 }
 
+static int cblc_emit_method_reference_result(const t_cblc_translation_unit *unit,
+    const t_cblc_method *method, const char *source, const char *assign_target,
+    t_cobol_text_builder *builder)
+{
+    const t_cblc_data_item *target_item;
+    t_cblc_data_item result_item;
+    t_cblc_statement return_statement;
+    char prepared_source[TRANSPILE_STATEMENT_TEXT_MAX];
+    char translated_source[TRANSPILE_STATEMENT_TEXT_MAX];
+    char line[TRANSPILE_STATEMENT_TEXT_MAX];
+
+    if (!unit || !method || !source || !assign_target || assign_target[0] == '\0' || !builder)
+        return (FT_FAILURE);
+    target_item = cblc_find_data_item_by_cobol(unit, assign_target);
+    if (!target_item)
+        target_item = cblc_find_data_item_for_emit_by_source(unit, assign_target);
+    if (!target_item)
+    {
+        std::memset(&result_item, 0, sizeof(result_item));
+        if (method->return_kind == CBLC_FUNCTION_RETURN_INT_POINTER)
+            result_item.kind = CBLC_DATA_KIND_INT_POINTER;
+        else if (method->return_kind == CBLC_FUNCTION_RETURN_CHAR_POINTER)
+            result_item.kind = CBLC_DATA_KIND_CHAR_POINTER;
+        else if (method->return_kind == CBLC_FUNCTION_RETURN_STRUCT_POINTER)
+            result_item.kind = CBLC_DATA_KIND_STRUCT_POINTER;
+        else
+            return (FT_FAILURE);
+        ft_strlcpy(result_item.cobol_name, assign_target, sizeof(result_item.cobol_name));
+        ft_strlcpy(result_item.struct_type_name, method->return_type_name,
+            sizeof(result_item.struct_type_name));
+        target_item = &result_item;
+    }
+    if (!target_item)
+        return (FT_FAILURE);
+    std::memset(&return_statement, 0, sizeof(return_statement));
+    return_statement.type = CBLC_STATEMENT_RETURN;
+    ft_strlcpy(return_statement.target, assign_target, sizeof(return_statement.target));
+    ft_strlcpy(return_statement.source, source, sizeof(return_statement.source));
+    if (cblc_data_kind_is_pointer(target_item->kind))
+    {
+        if (cblc_emit_pointer_assignment_statement(unit, &return_statement, builder,
+                line, sizeof(line)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        return (cobol_text_builder_append_line(builder, line));
+    }
+    if (cblc_emit_prepare_pointer_element(unit, source, builder, prepared_source,
+            sizeof(prepared_source)) == FT_SUCCESS)
+    {
+        if (target_item->kind == CBLC_DATA_KIND_INT
+            || target_item->kind == CBLC_DATA_KIND_DOUBLE)
+        {
+            if (std::snprintf(line, sizeof(line), "           COMPUTE %s = %s.",
+                    assign_target, prepared_source) < 0)
+                return (FT_FAILURE);
+        }
+        else if (std::snprintf(line, sizeof(line), "           MOVE %s TO %s.",
+                prepared_source, assign_target) < 0)
+            return (FT_FAILURE);
+    }
+    else
+    {
+        if (cblc_translate_expression_for_cobol(source, translated_source,
+                sizeof(translated_source)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (target_item->kind == CBLC_DATA_KIND_INT
+            || target_item->kind == CBLC_DATA_KIND_DOUBLE)
+        {
+            if (std::snprintf(line, sizeof(line), "           COMPUTE %s = %s.",
+                    assign_target, translated_source) < 0)
+                return (FT_FAILURE);
+        }
+        else if (std::snprintf(line, sizeof(line), "           MOVE %s TO %s.",
+                translated_source, assign_target) < 0)
+            return (FT_FAILURE);
+    }
+    return (cobol_text_builder_append_line(builder, line));
+}
+
 static int cblc_emit_method_body(const t_cblc_translation_unit *unit, const t_cblc_data_item *receiver,
     const t_cblc_method *method, const char *assign_target, t_cobol_text_builder *builder)
 {
@@ -1518,14 +1596,18 @@ static int cblc_emit_method_body(const t_cblc_translation_unit *unit, const t_cb
                 substituted.source, sizeof(substituted.source)) != FT_SUCCESS
             || cblc_restore_method_parameter_sources(method, body_statement->call_arguments,
                 substituted.call_arguments, sizeof(substituted.call_arguments)) != FT_SUCCESS)
+        {
             return (FT_FAILURE);
+        }
         if (cblc_rewrite_method_parameter_references(method, substituted.target,
                 rewritten_target, sizeof(rewritten_target)) != FT_SUCCESS
             || cblc_rewrite_method_parameter_references(method, substituted.source,
                 rewritten_source, sizeof(rewritten_source)) != FT_SUCCESS
             || cblc_rewrite_method_parameter_references(method, substituted.call_arguments,
                 rewritten_call_arguments, sizeof(rewritten_call_arguments)) != FT_SUCCESS)
+        {
             return (FT_FAILURE);
+        }
         ft_strlcpy(substituted.target, rewritten_target, sizeof(substituted.target));
         ft_strlcpy(substituted.source, rewritten_source, sizeof(substituted.source));
         ft_strlcpy(substituted.call_arguments, rewritten_call_arguments,
@@ -1538,9 +1620,7 @@ static int cblc_emit_method_body(const t_cblc_translation_unit *unit, const t_cb
                 || cblc_rewrite_method_field_references(unit, receiver, method,
                     substituted.call_arguments, rewritten_call_arguments,
                     sizeof(rewritten_call_arguments)) != FT_SUCCESS))
-        {
             return (FT_FAILURE);
-        }
         ft_strlcpy(substituted.target, rewritten_target, sizeof(substituted.target));
         ft_strlcpy(substituted.source, rewritten_source, sizeof(substituted.source));
         ft_strlcpy(substituted.call_arguments, rewritten_call_arguments,
@@ -1557,7 +1637,9 @@ static int cblc_emit_method_body(const t_cblc_translation_unit *unit, const t_cb
         }
         if (cblc_replace_this_prefix(rewritten_call_arguments, receiver->cobol_name,
                 substituted.call_arguments, sizeof(substituted.call_arguments)) != FT_SUCCESS)
+        {
             return (FT_FAILURE);
+        }
         if (!method->is_copy_assignment
             && (cblc_rewrite_method_field_references(unit, receiver, method,
                     substituted.target, rewritten_target, sizeof(rewritten_target)) != FT_SUCCESS
@@ -1566,7 +1648,9 @@ static int cblc_emit_method_body(const t_cblc_translation_unit *unit, const t_cb
                 || cblc_rewrite_method_field_references(unit, receiver, method,
                     substituted.call_arguments, rewritten_call_arguments,
                     sizeof(rewritten_call_arguments)) != FT_SUCCESS))
+        {
             return (FT_FAILURE);
+        }
         if (!method->is_copy_assignment)
         {
             ft_strlcpy(substituted.target, rewritten_target, sizeof(substituted.target));
@@ -1580,7 +1664,9 @@ static int cblc_emit_method_body(const t_cblc_translation_unit *unit, const t_cb
                 rewritten_source, sizeof(rewritten_source)) != FT_SUCCESS
             || cblc_rewrite_method_parameter_references(method, substituted.call_arguments,
                 rewritten_call_arguments, sizeof(rewritten_call_arguments)) != FT_SUCCESS)
+        {
             return (FT_FAILURE);
+        }
         ft_strlcpy(substituted.target, rewritten_target, sizeof(substituted.target));
         ft_strlcpy(substituted.source, rewritten_source, sizeof(substituted.source));
         ft_strlcpy(substituted.call_arguments, rewritten_call_arguments,
@@ -1598,6 +1684,35 @@ static int cblc_emit_method_body(const t_cblc_translation_unit *unit, const t_cb
         ft_strlcpy(substituted.source, mapped_source, sizeof(substituted.source));
         ft_strlcpy(substituted.call_arguments, mapped_call_arguments,
             sizeof(substituted.call_arguments));
+        if (substituted.type == CBLC_STATEMENT_CALL
+            || substituted.type == CBLC_STATEMENT_CALL_ASSIGN)
+        {
+            const t_cblc_struct_type *receiver_type;
+            const t_cblc_method *implicit_method;
+
+            receiver_type = cblc_find_receiver_type(unit, receiver);
+            implicit_method = receiver_type
+                ? cblc_find_method_on_type(receiver_type, substituted.call_identifier) : NULL;
+            if (implicit_method
+                && ((substituted.type == CBLC_STATEMENT_CALL
+                        && implicit_method->return_kind == CBLC_FUNCTION_RETURN_VOID)
+                    || (substituted.type == CBLC_STATEMENT_CALL_ASSIGN
+                        && implicit_method->return_kind != CBLC_FUNCTION_RETURN_VOID)))
+            {
+                if (substituted.type == CBLC_STATEMENT_CALL)
+                {
+                    substituted.type = CBLC_STATEMENT_METHOD_CALL;
+                    ft_strlcpy(substituted.target, receiver->cobol_name,
+                        sizeof(substituted.target));
+                }
+                else
+                {
+                    substituted.type = CBLC_STATEMENT_METHOD_CALL_ASSIGN;
+                    ft_strlcpy(substituted.source, receiver->cobol_name,
+                        sizeof(substituted.source));
+                }
+            }
+        }
         if (cblc_normalize_method_string_subscripts(unit, receiver, substituted.target,
                 rewritten_target, sizeof(rewritten_target)) != FT_SUCCESS
             || cblc_normalize_method_string_subscripts(unit, receiver, substituted.source,
@@ -1670,7 +1785,13 @@ static int cblc_emit_method_body(const t_cblc_translation_unit *unit, const t_cb
         }
         if (substituted.type == CBLC_STATEMENT_RETURN)
         {
-            if (method->return_kind == CBLC_FUNCTION_RETURN_INT
+            if (method->return_reference_kind != CBLC_REFERENCE_NONE)
+            {
+                if (cblc_emit_method_reference_result(unit, method, substituted.source,
+                        assign_target, builder) != FT_SUCCESS)
+                    return (FT_FAILURE);
+            }
+            else if (method->return_kind == CBLC_FUNCTION_RETURN_INT
             || method->return_kind == CBLC_FUNCTION_RETURN_DOUBLE)
             {
                 char return_source[TRANSPILE_STATEMENT_TEXT_MAX];
@@ -1725,7 +1846,8 @@ static int cblc_method_is_reusable(const t_cblc_method *method)
 {
     if (!method || !method->has_definition
         || method->is_copy_assignment
-        || (method->return_kind != CBLC_FUNCTION_RETURN_VOID
+        || (method->return_reference_kind == CBLC_REFERENCE_NONE
+            && method->return_kind != CBLC_FUNCTION_RETURN_VOID
             && method->return_kind != CBLC_FUNCTION_RETURN_INT
             && method->return_kind != CBLC_FUNCTION_RETURN_DOUBLE
             && method->return_kind != CBLC_FUNCTION_RETURN_STRUCT))
@@ -2824,6 +2946,13 @@ static int cblc_emit_method_statement(const t_cblc_translation_unit *unit,
             || cblc_method_result_name(receiver, method, result_name,
                 sizeof(result_name)) != FT_SUCCESS)
             return (FT_FAILURE);
+        if (method->return_reference_kind != CBLC_REFERENCE_NONE)
+        {
+            if (cblc_emit_method_reference_result(unit, method, result_name, assign_target,
+                    builder) != FT_SUCCESS)
+                return (FT_FAILURE);
+            return (FT_SUCCESS);
+        }
         if (method->return_kind == CBLC_FUNCTION_RETURN_INT
             || method->return_kind == CBLC_FUNCTION_RETURN_DOUBLE)
         {
@@ -5325,6 +5454,9 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
                         return (FT_FAILURE);
                     skip_append = 1;
                 }
+                if (cblc_emit_local_call_reference_copy_backs(unit, target_function,
+                        statement, builder) != FT_SUCCESS)
+                    return (FT_FAILURE);
                 }
             }
         }
@@ -5907,6 +6039,40 @@ static int cblc_emit_method_exception_body(const t_cblc_translation_unit *unit,
         {
             cma_free(exception_function.statements);
             return (FT_FAILURE);
+        }
+        if (exception_function.statements[index].type == CBLC_STATEMENT_CALL
+            || exception_function.statements[index].type == CBLC_STATEMENT_CALL_ASSIGN)
+        {
+            const t_cblc_struct_type *receiver_type;
+            const t_cblc_method *called_method;
+
+            receiver_type = cblc_find_receiver_type(unit, receiver);
+            called_method = receiver_type
+                ? cblc_find_method_on_type(receiver_type,
+                    exception_function.statements[index].call_identifier) : NULL;
+            if (called_method
+                && ((exception_function.statements[index].type == CBLC_STATEMENT_CALL
+                        && called_method->return_kind == CBLC_FUNCTION_RETURN_VOID)
+                    || (exception_function.statements[index].type
+                            == CBLC_STATEMENT_CALL_ASSIGN
+                        && called_method->return_kind != CBLC_FUNCTION_RETURN_VOID)))
+            {
+                if (exception_function.statements[index].type == CBLC_STATEMENT_CALL)
+                {
+                    exception_function.statements[index].type = CBLC_STATEMENT_METHOD_CALL;
+                    ft_strlcpy(exception_function.statements[index].target,
+                        receiver->cobol_name,
+                        sizeof(exception_function.statements[index].target));
+                }
+                else
+                {
+                    exception_function.statements[index].type =
+                        CBLC_STATEMENT_METHOD_CALL_ASSIGN;
+                    ft_strlcpy(exception_function.statements[index].source,
+                        receiver->cobol_name,
+                        sizeof(exception_function.statements[index].source));
+                }
+            }
         }
         if (exception_function.statements[index].type == CBLC_STATEMENT_RETURN
             && method->return_kind != CBLC_FUNCTION_RETURN_VOID

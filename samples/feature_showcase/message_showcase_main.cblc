@@ -1,39 +1,27 @@
 import "message_showcase_text.cblc";
 import "message_showcase_ledger.cblc";
 import "message_showcase_memory.cblc";
+import "message_showcase_refs.cblc";
 
 int module_count;
-vector<int> score_history;
-int vector_size;
-int vector_first;
-int vector_last;
-
-void showcase_vector()
-{
-    score_history.reserve(4);
-    score_history.push_back(72);
-    score_history.emplace_back(86);
-    score_history.insert(1, 94);
-    vector_size = score_history.size();
-    vector_first = score_history.front();
-    vector_last = score_history.back();
-    display("Vector size");
-    display(vector_size);
-    display("Vector first");
-    display(vector_first);
-    display("Vector last");
-    display(vector_last);
-    return;
-}
+int module_delta;
 
 void main()
 {
     module_count = 3;
+    module_delta = 1;
     display("CBL-C STARTER SHOWCASE");
     showcase_text();
-    showcase_vector();
-    showcase_portfolio();
+    try
+    {
+        showcase_portfolio();
+    }
+    catch (int portfolio_failure)
+    {
+        display("Portfolio exception handled");
+    }
     showcase_memory();
+    adjust_module_count(module_count, module_delta);
     display("Modules");
     display(module_count);
     display("SHOWCASE READY");

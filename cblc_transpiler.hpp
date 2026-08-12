@@ -322,8 +322,10 @@ typedef struct s_transpiler_function_signature
     char parameter_actual_source_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
     char parameter_cobol_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
     char parameter_type_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    int parameter_reference_kinds[TRANSPILE_FUNCTION_PARAMETER_MAX];
     size_t parameter_count;
     int return_kind;
+    int return_reference_kind;
     char return_type_name[TRANSPILE_IDENTIFIER_MAX];
     char return_cobol_name[TRANSPILE_IDENTIFIER_MAX];
     char return_source_name[TRANSPILE_IDENTIFIER_MAX];
@@ -368,6 +370,7 @@ typedef struct s_transpiler_type_method_signature
 {
     char name[TRANSPILE_IDENTIFIER_MAX];
     t_transpiler_function_parameter_kind parameter_kinds[TRANSPILE_FUNCTION_PARAMETER_MAX];
+    int parameter_reference_kinds[TRANSPILE_FUNCTION_PARAMETER_MAX];
     size_t parameter_array_counts[TRANSPILE_FUNCTION_PARAMETER_MAX];
     size_t parameter_lengths[TRANSPILE_FUNCTION_PARAMETER_MAX];
     char parameter_source_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
@@ -376,6 +379,7 @@ typedef struct s_transpiler_type_method_signature
     char parameter_type_names[TRANSPILE_FUNCTION_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
     size_t parameter_count;
     int return_kind;
+    int return_reference_kind;
     char return_type_name[TRANSPILE_IDENTIFIER_MAX];
     t_transpiler_symbol_visibility visibility;
     t_cblc_statement *statements;
@@ -1235,6 +1239,9 @@ void transpiler_pipeline_reset(t_transpiler_pipeline *pipeline);
 #define TRANSPILE_ERROR_SEMANTIC_FLOATING_TRUNCATION 2012
 #define TRANSPILE_ERROR_SEMANTIC_DECIMAL_SCALE_MISMATCH 2013
 #define TRANSPILE_ERROR_SEMANTIC_SCOPE_VIOLATION 2014
+#define TRANSPILE_ERROR_SEMANTIC_REFERENCE_UNINITIALIZED 2015
+#define TRANSPILE_ERROR_SEMANTIC_REFERENCE_BINDING 2016
+#define TRANSPILE_ERROR_SEMANTIC_REFERENCE_CONSTNESS 2017
 
 #define TRANSPILE_WARNING_SEMANTIC_FLOAT_TO_DOUBLE 3001
 #define TRANSPILE_WARNING_SEMANTIC_DOUBLE_TO_FLOAT 3002
@@ -1276,6 +1283,13 @@ typedef enum e_cblc_data_kind
     CBLC_DATA_KIND_INT_POINTER_POINTER
 }   t_cblc_data_kind;
 
+typedef enum e_cblc_reference_kind
+{
+    CBLC_REFERENCE_NONE = 0,
+    CBLC_REFERENCE_MUTABLE,
+    CBLC_REFERENCE_CONST
+}   t_cblc_reference_kind;
+
 typedef enum e_cblc_type_ref_kind
 {
     CBLC_TYPE_REF_BUILTIN = 0,
@@ -1289,6 +1303,7 @@ typedef enum e_cblc_type_ref_kind
 typedef struct s_cblc_type_ref
 {
     t_cblc_type_ref_kind kind;
+    t_cblc_reference_kind reference_kind;
     t_cblc_data_kind builtin_kind;
     char name[TRANSPILE_IDENTIFIER_MAX];
     size_t parameter_index;
@@ -1360,6 +1375,8 @@ typedef struct s_cblc_data_item
     int is_imported;
     int is_template_item;
     int is_shadowed;
+    t_cblc_reference_kind reference_kind;
+    size_t reference_target_index;
     int has_initializer;
     size_t initializer_length;
     char initializer_text[TRANSPILE_STATEMENT_TEXT_MAX];
@@ -1401,6 +1418,7 @@ typedef struct s_cblc_parameter
     char cobol_name[TRANSPILE_IDENTIFIER_MAX];
     char type_name[TRANSPILE_IDENTIFIER_MAX];
     t_transpiler_function_parameter_kind kind;
+    t_cblc_reference_kind reference_kind;
     size_t length;
     size_t array_count;
 }   t_cblc_parameter;
@@ -1412,6 +1430,7 @@ typedef struct s_cblc_method
     t_cblc_parameter parameters[TRANSPILE_FUNCTION_PARAMETER_MAX];
     size_t parameter_count;
     t_cblc_function_return_kind return_kind;
+    t_cblc_reference_kind return_reference_kind;
     char return_type_name[TRANSPILE_IDENTIFIER_MAX];
     size_t template_return_pointer_depth;
     t_cblc_member_visibility visibility;
@@ -1621,6 +1640,7 @@ typedef struct s_cblc_function
     size_t exception_type_ids[CBLC_EXCEPTION_THROW_SET_MAX];
     int exception_types_unknown;
     t_cblc_function_return_kind return_kind;
+    t_cblc_reference_kind return_reference_kind;
     char return_type_name[TRANSPILE_IDENTIFIER_MAX];
     size_t template_return_pointer_depth;
     int return_item_index;

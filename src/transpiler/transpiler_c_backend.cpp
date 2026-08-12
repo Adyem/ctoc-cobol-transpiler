@@ -248,6 +248,25 @@ static const t_cblc_data_item *c_backend_find_data_item_by_cobol(const t_cblc_tr
     return (alias_match);
 }
 
+static const t_cblc_data_item *c_backend_find_member_item_by_cobol(
+    const t_cblc_translation_unit *unit, const char *cobol_name)
+{
+    size_t index;
+
+    if (!unit || !cobol_name)
+        return (NULL);
+    index = 0;
+    while (index < unit->data_count)
+    {
+        if (std::strncmp(unit->data_items[index].cobol_name, cobol_name,
+                sizeof(unit->data_items[index].cobol_name)) == 0
+            && std::strstr(unit->data_items[index].source_name, "->") != NULL)
+            return (&unit->data_items[index]);
+        index += 1;
+    }
+    return (NULL);
+}
+
 static const t_cblc_data_item *c_backend_find_data_item(const t_cblc_translation_unit *unit,
     const char *source_name)
 {
@@ -616,6 +635,16 @@ static int c_backend_map_identifier_to_c(const t_cblc_translation_unit *unit, co
         if (std::snprintf(buffer, buffer_size, "%c%s", token[0], mapped) < 0)
             return (FT_FAILURE);
         return (FT_SUCCESS);
+    }
+    if (std::strstr(token, "->") != NULL)
+    {
+        item = c_backend_find_member_item_by_cobol(unit, token);
+        if (item)
+        {
+            if (std::snprintf(buffer, buffer_size, "%s", item->source_name) < 0)
+                return (FT_FAILURE);
+            return (FT_SUCCESS);
+        }
     }
     if (c_backend_parse_expression_indexed_token(token, base, sizeof(base), suffix, sizeof(suffix),
             index_expression, sizeof(index_expression)) == FT_SUCCESS)
@@ -1605,6 +1634,20 @@ static int c_backend_emit_display(const t_cblc_translation_unit *unit, const t_c
     {
         char value_ref[TRANSPILE_STATEMENT_TEXT_MAX];
 
+        if (std::strstr(statement->source, "->") != NULL)
+        {
+            const t_cblc_data_item *item;
+            char mapped_ref[TRANSPILE_STATEMENT_TEXT_MAX];
+
+            item = c_backend_find_member_item_by_cobol(unit, statement->source);
+            if (!item || item->kind != CBLC_DATA_KIND_INT
+                || std::snprintf(mapped_ref, sizeof(mapped_ref), "%s", item->source_name) < 0)
+                return (FT_FAILURE);
+            if (c_backend_buffer_append_format_line(buffer,
+                    "    cblc_display_int(%s);", mapped_ref) != FT_SUCCESS)
+                return (FT_FAILURE);
+            return (FT_SUCCESS);
+        }
         if (statement->source[0] == '*')
         {
             const t_cblc_data_item *item;

@@ -107,6 +107,38 @@ class vector
         }
     }
 
+    void ensure_capacity_for_one()
+    {
+        int requested;
+
+        if (count < reserved)
+        {
+            return;
+        }
+        if (reserved >= 2147483647)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        if (reserved < 1)
+        {
+            requested = 1;
+        }
+        else
+        {
+            if (reserved > 1073741823)
+            {
+                requested = 2147483647;
+            }
+            else
+            {
+                requested = reserved * 2;
+            }
+        }
+        reserve(requested);
+    }
+
     void shrink_to_fit()
     {
         if (count < reserved)
@@ -139,34 +171,7 @@ class vector
     {
         if (count >= reserved)
         {
-            if (reserved < 1)
-            {
-                relocation = new T[1];
-                relocation_index = 0;
-                while (relocation_index < count)
-                {
-                    relocation[relocation_index] = data[relocation_index];
-                    relocation_index = relocation_index + 1;
-                }
-                delete[] data;
-                data = relocation;
-                relocation = NULL;
-                reserved = 1;
-            }
-            else
-            {
-                relocation = new T[reserved * 2];
-                relocation_index = 0;
-                while (relocation_index < count)
-                {
-                    relocation[relocation_index] = data[relocation_index];
-                    relocation_index = relocation_index + 1;
-                }
-                delete[] data;
-                data = relocation;
-                relocation = NULL;
-                reserved = reserved * 2;
-            }
+            ensure_capacity_for_one();
         }
         data[count] = value;
         count = count + 1;
@@ -180,34 +185,33 @@ class vector
         }
     }
 
-    T at(int index)
+    T& at(int index)
     {
-        if (index < 0 || index >= count)
-        {
-            out_of_range error;
-            error.code = 1;
-            throw error;
-        }
+        check_index(index);
         return data[index];
     }
 
-    T front()
+    T& front()
     {
+        check_index(0);
         return data[0];
     }
 
-    T back()
+    T& back()
     {
+        check_index(count - 1);
         return data[count - 1];
     }
 
     T *operator[](int index)
     {
+        check_index(index);
         return data + index;
     }
 
     T *operator->()
     {
+        check_index(0);
         return data + 0;
     }
 
@@ -215,34 +219,7 @@ class vector
     {
         if (count >= reserved)
         {
-            if (reserved < 1)
-            {
-                relocation = new T[1];
-                relocation_index = 0;
-                while (relocation_index < count)
-                {
-                    relocation[relocation_index] = data[relocation_index];
-                    relocation_index = relocation_index + 1;
-                }
-                delete[] data;
-                data = relocation;
-                relocation = NULL;
-                reserved = 1;
-            }
-            else
-            {
-                relocation = new T[reserved * 2];
-                relocation_index = 0;
-                while (relocation_index < count)
-                {
-                    relocation[relocation_index] = data[relocation_index];
-                    relocation_index = relocation_index + 1;
-                }
-                delete[] data;
-                data = relocation;
-                relocation = NULL;
-                reserved = reserved * 2;
-            }
+            ensure_capacity_for_one();
         }
         data[count] = value;
         count = count + 1;
@@ -262,34 +239,7 @@ class vector
         }
         if (count >= reserved)
         {
-            if (reserved < 1)
-            {
-                relocation = new T[1];
-                relocation_index = 0;
-                while (relocation_index < count)
-                {
-                    relocation[relocation_index] = data[relocation_index];
-                    relocation_index = relocation_index + 1;
-                }
-                delete[] data;
-                data = relocation;
-                relocation = NULL;
-                reserved = 1;
-            }
-            else
-            {
-                relocation = new T[reserved * 2];
-                relocation_index = 0;
-                while (relocation_index < count)
-                {
-                    relocation[relocation_index] = data[relocation_index];
-                    relocation_index = relocation_index + 1;
-                }
-                delete[] data;
-                data = relocation;
-                relocation = NULL;
-                reserved = reserved * 2;
-            }
+            ensure_capacity_for_one();
         }
         shift = count;
         while (shift > index)
@@ -331,13 +281,7 @@ class vector
         }
         if (requested > reserved)
         {
-            if (data != NULL)
-            {
-                delete[] data;
-            }
-            data = new T[requested];
-            relocation = NULL;
-            reserved = requested;
+            reserve(requested);
         }
         count = 0;
         while (count < requested)
@@ -355,18 +299,19 @@ class vector
         }
         if (requested > reserved)
         {
-            relocation = new T[requested];
-            relocation_index = 0;
-            while (relocation_index < count)
-            {
-                relocation[relocation_index] = data[relocation_index];
-                relocation_index = relocation_index + 1;
-            }
-            delete[] data;
-            data = relocation;
-            relocation = NULL;
-            reserved = requested;
+            reserve(requested);
         }
         count = requested;
+    }
+
+    private:
+    void check_index(int index)
+    {
+        if (index < 0 || index >= count)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
     }
 };

@@ -3207,6 +3207,484 @@ FT_TEST(test_cblc_scope_resolution_rejects_cross_function_local_reference)
     return (status);
 }
 
+FT_TEST(test_cblc_local_reference_aliases_existing_storage)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    size_t index;
+    int found_reference;
+    int status;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    int& alias = total;\n"
+        "    alias = 4;\n"
+        "    return;\n"
+        "}\n";
+    generated_cobol = NULL;
+    found_reference = 0;
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "mutable local reference should parse") != FT_SUCCESS)
+        goto cleanup;
+    index = 0;
+    while (index < unit.data_count)
+    {
+        const t_cblc_data_item *item;
+
+        item = &unit.data_items[index];
+        if (std::strncmp(item->source_name, "alias", sizeof(item->source_name)) == 0)
+        {
+            if (item->reference_kind != CBLC_REFERENCE_MUTABLE || !item->is_alias
+                || std::strncmp(item->cobol_name, "TOTAL", sizeof(item->cobol_name)) != 0
+                || item->reference_target_index >= unit.data_count)
+            {
+                std::printf("Assertion failed: local reference should alias the target storage\n");
+                goto cleanup;
+            }
+            found_reference = 1;
+        }
+        index += 1;
+    }
+    if (!found_reference
+        || test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "local reference should generate COBOL") != FT_SUCCESS
+        || !generated_cobol
+        || !ft_strnstr(generated_cobol, "COMPUTE TOTAL = 4.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: reference assignment should lower directly to target storage\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_local_const_reference_rejects_mutation)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    const int& alias = total;\n"
+        "    alias = 4;\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_FAILURE)
+        status = FT_SUCCESS;
+    else
+        std::printf("Assertion failed: const reference should reject writes through the alias\n");
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_const_record_reference_rejects_member_mutation)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "struct Point { int value; };\n"
+        "Point point;\n"
+        "void main()\n"
+        "{\n"
+        "    const Point& alias = point;\n"
+        "    alias.value = 4;\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_FAILURE)
+        status = FT_SUCCESS;
+    else
+        std::printf("Assertion failed: const record references should reject member writes\n");
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_reference_requires_initializer)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    int& alias;\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_FAILURE
+        && unit.parse_error_code == TRANSPILE_ERROR_SEMANTIC_REFERENCE_UNINITIALIZED)
+        status = FT_SUCCESS;
+    else
+        std::printf("Assertion failed: uninitialized reference should have a dedicated diagnostic\n");
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_local_references_support_strings_and_records)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    size_t index;
+    int found_record_reference;
+    int found_string_reference;
+    int status;
+
+    source = "struct Point { int value; };\n"
+        "Point point;\n"
+        "string text(8);\n"
+        "void main()\n"
+        "{\n"
+        "    Point& point_ref = point;\n"
+        "    string& text_ref = text;\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    found_record_reference = 0;
+    found_string_reference = 0;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "record and string references should parse") != FT_SUCCESS)
+        goto cleanup;
+    index = 0;
+    while (index < unit.data_count)
+    {
+        const t_cblc_data_item *item;
+
+        item = &unit.data_items[index];
+        if (std::strncmp(item->source_name, "point_ref", sizeof(item->source_name)) == 0
+            && item->reference_kind == CBLC_REFERENCE_MUTABLE
+            && item->kind == CBLC_DATA_KIND_STRUCT
+            && std::strncmp(item->struct_type_name, "Point",
+                sizeof(item->struct_type_name)) == 0)
+            found_record_reference = 1;
+        if (std::strncmp(item->source_name, "text_ref", sizeof(item->source_name)) == 0
+            && item->reference_kind == CBLC_REFERENCE_MUTABLE
+            && item->kind == CBLC_DATA_KIND_STRING)
+            found_string_reference = 1;
+        index += 1;
+    }
+    if (!found_record_reference || !found_string_reference)
+    {
+        std::printf("Assertion failed: references should preserve record and string base types\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_const_reference_parameter_preserves_constness)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "void inspect(const int& value)\n"
+        "{\n"
+        "    return;\n"
+        "}\n"
+        "int total;\n"
+        "void main() { return; }\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "const reference parameter should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (unit.function_count < 1
+        || unit.functions[0].parameter_count != 1
+        || unit.functions[0].parameters[0].reference_kind != CBLC_REFERENCE_CONST)
+    {
+        std::printf("Assertion failed: const reference parameter should preserve constness\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_scalar_reference_return_preserves_global_identity)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "int total;\n"
+        "int& get_total()\n"
+        "{\n"
+        "    return total;\n"
+        "}\n"
+        "void main() { return; }\n";
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "scalar reference return should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (unit.function_count < 1
+        || unit.functions[0].return_reference_kind != CBLC_REFERENCE_MUTABLE
+        || unit.functions[0].return_kind != CBLC_FUNCTION_RETURN_INT_POINTER)
+    {
+        std::printf("Assertion failed: scalar reference return should retain pointer result metadata\n");
+        goto cleanup;
+    }
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "scalar reference return should generate COBOL") != FT_SUCCESS
+        || !generated_cobol
+        || !ft_strnstr(generated_cobol,
+            "SET CBLC-RETURN-GET-TOTAL TO ADDRESS OF TOTAL",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: scalar reference return should preserve global identity\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_string_reference_return_preserves_global_identity)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "string text(8);\n"
+        "string& get_text()\n"
+        "{\n"
+        "    return text;\n"
+        "}\n"
+        "void main() { return; }\n";
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "string reference return should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (unit.function_count < 1
+        || unit.functions[0].return_reference_kind != CBLC_REFERENCE_MUTABLE
+        || unit.functions[0].return_kind != CBLC_FUNCTION_RETURN_STRUCT_POINTER
+        || std::strncmp(unit.functions[0].return_type_name, "string",
+            sizeof(unit.functions[0].return_type_name)) != 0)
+    {
+        std::printf("Assertion failed: string reference return should preserve its type and identity\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_reference_binding_rejects_literal)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "void main()\n"
+        "{\n"
+        "    int& alias = 1;\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_FAILURE)
+        status = FT_SUCCESS;
+    else
+        std::printf("Assertion failed: references should reject literal binding\n");
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_reference_parameter_copies_mutations_back_to_caller)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "void increment(int& value)\n"
+        "{\n"
+        "    value = value + 1;\n"
+        "    return;\n"
+        "}\n"
+        "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    increment(total);\n"
+        "    return;\n"
+        "}\n";
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "reference parameter should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (unit.function_count < 1
+        || unit.functions[0].parameter_count != 1
+        || unit.functions[0].parameters[0].reference_kind != CBLC_REFERENCE_MUTABLE)
+    {
+        std::printf("Assertion failed: function parameter should retain mutable reference qualification\n");
+        goto cleanup;
+    }
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "reference parameter should generate COBOL") != FT_SUCCESS
+        || !generated_cobol
+        || !ft_strnstr(generated_cobol, "MOVE INCREMENT-VALUE TO TOTAL.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: local reference calls should copy mutations back to the caller\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_reference_parameter_requires_mutable_lvalue)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "void increment(int& value)\n"
+        "{\n"
+        "    value = value + 1;\n"
+        "    return;\n"
+        "}\n"
+        "void main()\n"
+        "{\n"
+        "    increment(1);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_FAILURE)
+        status = FT_SUCCESS;
+    else
+        std::printf("Assertion failed: mutable reference parameters should require an lvalue\n");
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_reference_return_rejects_by_value_parameter)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "int& bad_reference(int value)\n"
+        "{\n"
+        "    return value;\n"
+        "}\n"
+        "void main() { return; }\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_FAILURE
+        && unit.parse_error_code == TRANSPILE_ERROR_SEMANTIC_REFERENCE_BINDING)
+        status = FT_SUCCESS;
+    else
+        std::printf("Assertion failed: reference returns should reject by-value parameters\n");
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_reference_return_preserves_global_identity)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "struct Point { int value; };\n"
+        "Point point;\n"
+        "Point& get_point()\n"
+        "{\n"
+        "    return point;\n"
+        "}\n"
+        "void main()\n"
+        "{\n"
+        "    return;\n"
+        "}\n";
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "reference return should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (unit.function_count < 1
+        || unit.functions[0].return_reference_kind != CBLC_REFERENCE_MUTABLE
+        || unit.functions[0].return_kind != CBLC_FUNCTION_RETURN_STRUCT_POINTER)
+    {
+        std::printf("Assertion failed: class reference return should retain reference identity metadata\n");
+        goto cleanup;
+    }
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "reference return should generate COBOL") != FT_SUCCESS
+        || !generated_cobol
+        || !ft_strnstr(generated_cobol, "SET CBLC-RETURN-GET-POINT TO ADDRESS OF POINT",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: reference return should lower to a typed address result\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_reference_return_rejects_local_target)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "struct Point { int value; };\n"
+        "Point& bad_point()\n"
+        "{\n"
+        "    Point local;\n"
+        "    return local;\n"
+        "}\n"
+        "void main() { return; }\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_FAILURE
+        && unit.parse_error_code == TRANSPILE_ERROR_SEMANTIC_REFERENCE_BINDING)
+        status = FT_SUCCESS;
+    else
+        std::printf("Assertion failed: reference return should reject a local target\n");
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_generate_c_emits_struct_returning_function_and_call_assignment)
 {
     const char *source;
@@ -7580,6 +8058,34 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_scope_metadata_marks_shadowed_bindings},
         {"cblc_scope_resolution_rejects_cross_function_local_reference",
             test_cblc_scope_resolution_rejects_cross_function_local_reference},
+        {"cblc_local_reference_aliases_existing_storage",
+            test_cblc_local_reference_aliases_existing_storage},
+        {"cblc_local_const_reference_rejects_mutation",
+            test_cblc_local_const_reference_rejects_mutation},
+        {"cblc_const_record_reference_rejects_member_mutation",
+            test_cblc_const_record_reference_rejects_member_mutation},
+        {"cblc_reference_requires_initializer",
+            test_cblc_reference_requires_initializer},
+        {"cblc_local_references_support_strings_and_records",
+            test_cblc_local_references_support_strings_and_records},
+        {"cblc_const_reference_parameter_preserves_constness",
+            test_cblc_const_reference_parameter_preserves_constness},
+        {"cblc_scalar_reference_return_preserves_global_identity",
+            test_cblc_scalar_reference_return_preserves_global_identity},
+        {"cblc_string_reference_return_preserves_global_identity",
+            test_cblc_string_reference_return_preserves_global_identity},
+        {"cblc_reference_binding_rejects_literal",
+            test_cblc_reference_binding_rejects_literal},
+        {"cblc_reference_parameter_copies_mutations_back_to_caller",
+            test_cblc_reference_parameter_copies_mutations_back_to_caller},
+        {"cblc_reference_parameter_requires_mutable_lvalue",
+            test_cblc_reference_parameter_requires_mutable_lvalue},
+        {"cblc_reference_return_rejects_by_value_parameter",
+            test_cblc_reference_return_rejects_by_value_parameter},
+        {"cblc_reference_return_preserves_global_identity",
+            test_cblc_reference_return_preserves_global_identity},
+        {"cblc_reference_return_rejects_local_target",
+            test_cblc_reference_return_rejects_local_target},
         {"cblc_parse_translation_unit_records_class_lifecycle_metadata",
             test_cblc_parse_translation_unit_records_class_lifecycle_metadata},
         {"cblc_parse_translation_unit_records_parameterized_class_lifecycle_and_methods",

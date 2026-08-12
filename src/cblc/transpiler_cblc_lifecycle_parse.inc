@@ -387,6 +387,8 @@ static int cblc_parse_statement_block(const char **cursor, t_cblc_translation_un
             continue ;
         if (cblc_parse_file_statement(cursor, unit, function) == FT_SUCCESS)
             continue ;
+        if (cblc_parse_local_reference_declaration(cursor, unit, function) == FT_SUCCESS)
+            continue ;
         if (cblc_parse_local_string_declaration(cursor, unit, function) == FT_SUCCESS)
             continue ;
         if (cblc_parse_local_scalar_declaration(cursor, unit, function) == FT_SUCCESS)
@@ -1456,6 +1458,191 @@ static int cblc_parse_local_scalar_declaration(const char **cursor,
         *cursor = start;
         return (FT_FAILURE);
     }
+    return (FT_SUCCESS);
+}
+
+static int cblc_parse_local_reference_declaration(const char **cursor,
+    t_cblc_translation_unit *unit, t_cblc_function *function)
+{
+    const char *start;
+    char type_identifier[TRANSPILE_IDENTIFIER_MAX];
+    char reference_identifier[TRANSPILE_IDENTIFIER_MAX];
+    char target_reference[TRANSPILE_STATEMENT_TEXT_MAX];
+    char target_cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    char declared_type_name[TRANSPILE_IDENTIFIER_MAX];
+    t_cblc_data_kind kind;
+    t_cblc_reference_kind reference_kind;
+    t_cblc_data_item *target_item;
+    int is_const;
+    size_t target_index;
+
+    if (!cursor || !*cursor || !unit || !function)
+        return (FT_FAILURE);
+    start = *cursor;
+    declared_type_name[0] = '\0';
+    is_const = cblc_match_keyword(cursor, "const");
+    if (cblc_match_keyword(cursor, "int"))
+        kind = CBLC_DATA_KIND_INT;
+    else if (cblc_match_keyword(cursor, "double") || cblc_match_keyword(cursor, "float"))
+        kind = CBLC_DATA_KIND_DOUBLE;
+    else if (cblc_match_keyword(cursor, "char"))
+        kind = CBLC_DATA_KIND_CHAR;
+    else if (cblc_match_keyword(cursor, "string"))
+    {
+        kind = CBLC_DATA_KIND_STRING;
+        cblc_skip_whitespace(cursor);
+        if (**cursor == '(')
+        {
+            size_t capacity;
+
+            *cursor += 1;
+            capacity = 0;
+            while (**cursor >= '0' && **cursor <= '9')
+            {
+                capacity = capacity * 10 + static_cast<size_t>(**cursor - '0');
+                *cursor += 1;
+            }
+            cblc_skip_whitespace(cursor);
+            if (capacity == 0 || **cursor != ')'
+                || std::snprintf(declared_type_name, sizeof(declared_type_name),
+                    "%zu", capacity) < 0)
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+            *cursor += 1;
+        }
+    }
+    else
+    {
+        if (cblc_parse_identifier(cursor, type_identifier, sizeof(type_identifier)) != FT_SUCCESS
+            || !cblc_find_struct_type(unit, type_identifier))
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        kind = CBLC_DATA_KIND_STRUCT;
+        ft_strlcpy(declared_type_name, type_identifier, sizeof(declared_type_name));
+    }
+    cblc_skip_whitespace(cursor);
+    if (**cursor != '&')
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    *cursor += 1;
+    cblc_skip_whitespace(cursor);
+    if (cblc_parse_identifier(cursor, reference_identifier,
+            sizeof(reference_identifier)) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    cblc_skip_whitespace(cursor);
+    if (**cursor != '=')
+    {
+        *cursor = start;
+        unit->parse_error_code = TRANSPILE_ERROR_SEMANTIC_REFERENCE_UNINITIALIZED;
+        std::snprintf(unit->parse_error_message, sizeof(unit->parse_error_message),
+            "reference '%s' must be initialized", reference_identifier);
+        return (FT_FAILURE);
+    }
+    *cursor += 1;
+    cblc_skip_whitespace(cursor);
+    target_item = NULL;
+    target_reference[0] = '\0';
+    if (cblc_parse_data_reference_text(cursor, unit, &target_item, NULL,
+            target_reference, sizeof(target_reference)) != FT_SUCCESS
+        || !target_item)
+    {
+        *cursor = start;
+        if (unit->parse_error_code == 0)
+        {
+            unit->parse_error_code = TRANSPILE_ERROR_SEMANTIC_REFERENCE_BINDING;
+            std::snprintf(unit->parse_error_message, sizeof(unit->parse_error_message),
+                "reference '%s' has an invalid target", reference_identifier);
+        }
+        return (FT_FAILURE);
+    }
+    cblc_skip_whitespace(cursor);
+    if (**cursor != ';')
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    if (target_item->reference_kind != CBLC_REFERENCE_NONE)
+    {
+        *cursor = start;
+        unit->parse_error_code = TRANSPILE_ERROR_SEMANTIC_REFERENCE_BINDING;
+        std::snprintf(unit->parse_error_message, sizeof(unit->parse_error_message),
+            "reference '%s' cannot bind to another reference", reference_identifier);
+        return (FT_FAILURE);
+    }
+    if (target_item->kind != kind
+        || (kind == CBLC_DATA_KIND_STRUCT
+            && std::strncmp(target_item->struct_type_name, declared_type_name,
+                sizeof(target_item->struct_type_name)) != 0))
+    {
+        *cursor = start;
+        unit->parse_error_code = TRANSPILE_ERROR_SEMANTIC_REFERENCE_BINDING;
+        std::snprintf(unit->parse_error_message, sizeof(unit->parse_error_message),
+            "reference '%s' is incompatible with its target", reference_identifier);
+        return (FT_FAILURE);
+    }
+    if (!is_const && target_item->is_const)
+    {
+        *cursor = start;
+        unit->parse_error_code = TRANSPILE_ERROR_SEMANTIC_REFERENCE_CONSTNESS;
+        std::snprintf(unit->parse_error_message, sizeof(unit->parse_error_message),
+            "mutable reference '%s' cannot bind to const data", reference_identifier);
+        return (FT_FAILURE);
+    }
+    reference_kind = is_const ? CBLC_REFERENCE_CONST : CBLC_REFERENCE_MUTABLE;
+    target_index = static_cast<size_t>(target_item - unit->data_items);
+    ft_strlcpy(target_cobol_name, target_item->cobol_name, sizeof(target_cobol_name));
+    if (cblc_add_named_data_item(unit, reference_identifier, target_cobol_name,
+            kind, target_item->length, target_item->array_count,
+            kind == CBLC_DATA_KIND_STRUCT ? declared_type_name : NULL,
+            NULL, 0, 1, is_const || target_item->is_const) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    unit->data_items[unit->data_count - 1].reference_kind = reference_kind;
+    unit->data_items[unit->data_count - 1].reference_target_index = target_index;
+    if (kind == CBLC_DATA_KIND_STRUCT)
+    {
+        const t_cblc_struct_type *type;
+
+        type = cblc_find_struct_type(unit, declared_type_name);
+        if (!type || cblc_add_local_struct_alias_items(unit, type,
+                reference_identifier, target_cobol_name) != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        if (reference_kind == CBLC_REFERENCE_CONST)
+        {
+            char field_prefix[TRANSPILE_IDENTIFIER_MAX];
+            size_t field_index;
+
+            if (std::snprintf(field_prefix, sizeof(field_prefix), "%s.",
+                    reference_identifier) < 0)
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+            field_index = 0;
+            while (field_index < unit->data_count)
+            {
+                if (std::strncmp(unit->data_items[field_index].source_name, field_prefix,
+                        std::strlen(field_prefix)) == 0)
+                    unit->data_items[field_index].is_const = 1;
+                field_index += 1;
+            }
+        }
+    }
+    *cursor += 1;
     return (FT_SUCCESS);
 }
 

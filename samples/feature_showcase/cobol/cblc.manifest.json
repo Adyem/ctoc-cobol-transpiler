@@ -23,8 +23,8 @@
     {
       "kind": "target",
       "id": "MESSAGE-SHOWCASE-CONSTANTS",
-      "path": "C:/Users/Adyem/Documents/Game_development/cbl-c_transiler/samples/feature_showcase/cobol/message_showcase_constants.cob",
-      "source_hash": "fnv1a64:564c648fdb9e8187",
+      "path": "/home/bvangene/ctoc-transpiler/samples/feature_showcase/cobol/message_showcase_constants.cob",
+      "source_hash": "fnv1a64:1822ea2f6a6b592c",
       "module_dependencies": [],
       "hash": "fnv1a64:3f71df4d90b37b4e",
       "dependencies": ["CBLC-STRCMP", "CBLC-STRCMP-STRING"]
@@ -32,37 +32,46 @@
     {
       "kind": "target",
       "id": "SHOWCASE-PORTFOLIO",
-      "path": "C:/Users/Adyem/Documents/Game_development/cbl-c_transiler/samples/feature_showcase/cobol/message_showcase_ledger.cob",
-      "source_hash": "fnv1a64:a2007923796474cc",
-      "module_dependencies": [{"module":"message_showcase_constants","source_hash":"fnv1a64:564c648fdb9e8187"}],
-      "hash": "fnv1a64:66e386a9c94f1187",
+      "path": "/home/bvangene/ctoc-transpiler/samples/feature_showcase/cobol/message_showcase_ledger.cob",
+      "source_hash": "fnv1a64:773c684b328c4065",
+      "module_dependencies": [{"module":"message_showcase_constants","source_hash":"fnv1a64:1822ea2f6a6b592c"}],
+      "hash": "fnv1a64:10b7f93bda2ca14a",
       "dependencies": ["CBLC-STRCMP", "CBLC-STRCMP-STRING"]
     },
     {
       "kind": "target",
       "id": "SHOWCASE-MEMORY",
-      "path": "C:/Users/Adyem/Documents/Game_development/cbl-c_transiler/samples/feature_showcase/cobol/message_showcase_memory.cob",
-      "source_hash": "fnv1a64:7041fcb779070375",
+      "path": "/home/bvangene/ctoc-transpiler/samples/feature_showcase/cobol/message_showcase_memory.cob",
+      "source_hash": "fnv1a64:ca7a7afc24fabb27",
       "module_dependencies": [],
-      "hash": "fnv1a64:9909d0722911f5bf",
+      "hash": "fnv1a64:4859b2feb4200b4a",
+      "dependencies": []
+    },
+    {
+      "kind": "target",
+      "id": "ADJUST-MODULE-COUNT",
+      "path": "/home/bvangene/ctoc-transpiler/samples/feature_showcase/cobol/message_showcase_refs.cob",
+      "source_hash": "fnv1a64:85f00bd6d00e0c25",
+      "module_dependencies": [],
+      "hash": "fnv1a64:f937d13cfa776afa",
       "dependencies": []
     },
     {
       "kind": "target",
       "id": "SHOWCASE-TEXT",
-      "path": "C:/Users/Adyem/Documents/Game_development/cbl-c_transiler/samples/feature_showcase/cobol/message_showcase_text.cob",
-      "source_hash": "fnv1a64:b100cdf7ae9353d1",
-      "module_dependencies": [{"module":"message_showcase_constants","source_hash":"fnv1a64:564c648fdb9e8187"}],
+      "path": "/home/bvangene/ctoc-transpiler/samples/feature_showcase/cobol/message_showcase_text.cob",
+      "source_hash": "fnv1a64:f70aacced0569308",
+      "module_dependencies": [{"module":"message_showcase_constants","source_hash":"fnv1a64:1822ea2f6a6b592c"}],
       "hash": "fnv1a64:79493172f43600e3",
       "dependencies": ["CBLC-STRCMP", "CBLC-STRCMP-STRING"]
     },
     {
       "kind": "target",
       "id": "MAIN",
-      "path": "C:/Users/Adyem/Documents/Game_development/cbl-c_transiler/samples/feature_showcase/cobol/message_showcase_main.cob",
-      "source_hash": "fnv1a64:b3d372eb863b2f28",
-      "module_dependencies": [{"module":"message_showcase_text","source_hash":"fnv1a64:b100cdf7ae9353d1"},{"module":"message_showcase_ledger","source_hash":"fnv1a64:a2007923796474cc"},{"module":"message_showcase_memory","source_hash":"fnv1a64:7041fcb779070375"}],
-      "hash": "fnv1a64:ee2b1556284bfe73",
+      "path": "/home/bvangene/ctoc-transpiler/samples/feature_showcase/cobol/message_showcase_main.cob",
+      "source_hash": "fnv1a64:0e761085bfb8d6b0",
+      "module_dependencies": [{"module":"message_showcase_text","source_hash":"fnv1a64:f70aacced0569308"},{"module":"message_showcase_ledger","source_hash":"fnv1a64:773c684b328c4065"},{"module":"message_showcase_memory","source_hash":"fnv1a64:ca7a7afc24fabb27"},{"module":"message_showcase_refs","source_hash":"fnv1a64:85f00bd6d00e0c25"}],
+      "hash": "fnv1a64:cebcbb6167709517",
       "dependencies": []
     }
   ]

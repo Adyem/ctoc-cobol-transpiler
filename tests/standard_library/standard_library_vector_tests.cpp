@@ -246,6 +246,17 @@ FT_TEST(test_standard_library_vector_translates_full_lifecycle)
         std::printf("Assertion failed: vector translation should emit ownership and bounds paths\n");
         goto cleanup;
     }
+    if (vector_cobol_contains(cobol_path,
+            "CBLC-RESULT-SCORE-HISTORY-CBLC-TPL-VECTOR-INT-AT") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "CBLC-RESULT-SCORE-HISTORY-CBLC-TPL-VECTOR-INT-FRONT") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "CBLC-RESULT-SCORE-HISTORY-CBLC-TPL-VECTOR-INT-BACK") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path, "USAGE POINTER") != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: vector reference accessors should use pointer result slots\n");
+        goto cleanup;
+    }
     status = FT_SUCCESS;
 cleanup:
     test_remove_directory(directory);

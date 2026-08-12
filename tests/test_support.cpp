@@ -5,6 +5,12 @@
 #include <cstdio>
 #include <fstream>
 #include <filesystem>
+#if defined(_WIN32)
+# include <fcntl.h>
+# include <sys/stat.h>
+#else
+# include <fcntl.h>
+#endif
 #include <string>
 #if defined(_WIN32)
 # include <io.h>
@@ -85,6 +91,8 @@ static int test_restore_fd(int saved_fd, int target_fd)
 #else
     status = dup2(saved_fd, target_fd);
     close(saved_fd);
+    if (status >= 0)
+        status = 0;
 #endif
     return (status);
 }
@@ -123,6 +131,10 @@ static void test_forward_translation_probe(void)
 
 static int test_capture_stream_begin(t_test_output_capture *capture, int fd)
 {
+    int capture_fd;
+    int redirect_status;
+    FILE *stream;
+
     if (!capture)
         return (FT_FAILURE);
     capture->target = fd;
@@ -132,9 +144,37 @@ static int test_capture_stream_begin(t_test_output_capture *capture, int fd)
     capture->active = 1;
     std::snprintf(capture->path, sizeof(capture->path),
         "ctoc_test_capture_%s.tmp", fd == 1 ? "stdout" : "stderr");
-    if (!std::freopen(capture->path, "w", fd == 1 ? stdout : stderr))
+    stream = fd == 1 ? stdout : stderr;
+    std::fflush(stream);
+#if defined(_WIN32)
+    capture_fd = _open(capture->path, _O_WRONLY | _O_CREAT | _O_TRUNC | _O_BINARY,
+        _S_IREAD | _S_IWRITE);
+#else
+    capture_fd = open(capture->path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+#endif
+    if (capture_fd < 0)
     {
         capture->active = 0;
+#if defined(_WIN32)
+        _close(capture->saved_fd);
+#else
+        close(capture->saved_fd);
+#endif
+        return (FT_FAILURE);
+    }
+#if defined(_WIN32)
+    redirect_status = _dup2(capture_fd, fd);
+    _close(capture_fd);
+    if (redirect_status != 0)
+        capture->active = 0;
+#else
+    redirect_status = dup2(capture_fd, fd);
+    close(capture_fd);
+    if (redirect_status < 0)
+        capture->active = 0;
+#endif
+    if (!capture->active)
+    {
 #if defined(_WIN32)
         _close(capture->saved_fd);
 #else
@@ -165,6 +205,7 @@ static int test_capture_stream_end(t_test_output_capture *capture, int fd, char 
     }
     if (test_restore_fd(capture->saved_fd, fd) != 0)
         return (FT_FAILURE);
+    std::clearerr(fd == 1 ? stdout : stderr);
     std::remove(capture->path);
     capture->active = 0;
     return (FT_SUCCESS);
@@ -871,6 +912,7 @@ static int test_execute_command(const char *command, int expect_success)
         while ((position = command_text.find(".\\C:", position)) != std::string::npos)
             command_text.erase(position, 2);
     }
+#if defined(_WIN32)
     if (command_text.find("cobc") == std::string::npos
         && command_text.find(" -o ") == std::string::npos)
     {
@@ -895,6 +937,7 @@ static int test_execute_command(const char *command, int expect_success)
             position += 4;
         }
     }
+#endif
     if (std::system("cc --version > cc_probe.log 2>&1") != 0)
     {
         size_t position = 0;
