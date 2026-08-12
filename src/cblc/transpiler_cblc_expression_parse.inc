@@ -82,6 +82,11 @@ static int cblc_sizeof_data_kind(const t_cblc_translation_unit *unit, t_cblc_dat
 
         if (!unit || !struct_type_name || struct_type_name[0] == '\0')
             return (FT_FAILURE);
+        if (std::strcmp(struct_type_name, "string") == 0)
+        {
+            base_size = length == 0 ? 5 : length + 4;
+            goto size_complete;
+        }
         type = cblc_find_struct_type(unit, struct_type_name);
         if (!type)
         {
@@ -97,6 +102,7 @@ static int cblc_sizeof_data_kind(const t_cblc_translation_unit *unit, t_cblc_dat
     }
     else
         return (FT_FAILURE);
+size_complete:
     if (array_count > 0)
         base_size *= array_count;
     *out_size = base_size;

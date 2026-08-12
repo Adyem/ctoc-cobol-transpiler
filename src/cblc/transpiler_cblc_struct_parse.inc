@@ -1891,7 +1891,8 @@ static int cblc_clone_template_method(const t_cblc_method *source,
                 return (FT_FAILURE);
             }
         }
-        if (argument_return_kind == CBLC_FUNCTION_RETURN_STRUCT
+        if (source->template_return_pointer_depth > 0
+            || argument_return_kind == CBLC_FUNCTION_RETURN_STRUCT
             || argument_return_kind == CBLC_FUNCTION_RETURN_STRUCT_POINTER)
             ft_strlcpy(destination->return_type_name, arguments[parameter_index],
                 sizeof(destination->return_type_name));

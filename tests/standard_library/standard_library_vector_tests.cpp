@@ -172,21 +172,15 @@ static const char *g_vector_runtime_source =
 
 static const char *g_vector_string_source =
     "vector<string> names;\n"
-    "vector<string> copied(names);\n"
-    "vector<string> assigned;\n"
+    "int value;\n"
+    "int slot;\n"
     "\n"
     "void main()\n"
     "{\n"
-    "    names.push_back(\"alpha\");\n"
-    "    names.emplace_back(\"beta\");\n"
-    "    names.insert(1, \"middle\");\n"
-    "    assigned = names;\n"
-    "    assigned = assigned;\n"
-    "    names.erase(0);\n"
-    "    names.resize(4);\n"
-    "    names.assign(2, \"reset\");\n"
-    "    names.clear();\n"
-    "    names.shrink_to_fit();\n"
+    "    slot = 0;\n"
+    "    value = names[slot]->len();\n"
+    "    names[slot]->clear();\n"
+    "    value = names->len();\n"
     "    return;\n"
     "}\n";
 
@@ -258,27 +252,23 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_standard_library_vector_string_reports_nontrivial_element_gap)
+FT_TEST(test_standard_library_vector_string_indexed_string_methods)
 {
     char directory[256];
     char source_path[256];
     char cobol_path[256];
-    char log_path[256];
     char command[1024];
-    char output[4096];
     int command_length;
     int status;
 
     directory[0] = '\0';
     source_path[0] = '\0';
     cobol_path[0] = '\0';
-    log_path[0] = '\0';
     status = FT_FAILURE;
     if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_join_path(directory, "vector_string.cblc", source_path, sizeof(source_path)) != FT_SUCCESS
-        || test_join_path(directory, "vector_string.cob", cobol_path, sizeof(cobol_path)) != FT_SUCCESS
-        || test_join_path(directory, "vector_string.log", log_path, sizeof(log_path)) != FT_SUCCESS)
+        || test_join_path(directory, "vector_string.cob", cobol_path, sizeof(cobol_path)) != FT_SUCCESS)
     {
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -286,18 +276,22 @@ FT_TEST(test_standard_library_vector_string_reports_nontrivial_element_gap)
     if (test_write_text_file(source_path, g_vector_string_source) != FT_SUCCESS)
         goto cleanup;
     command_length = std::snprintf(command, sizeof(command),
-        "./ctoc_cobol_transpiler --diagnostics silent --direction cblc-to-cobol --input %s --output %s > %s 2>&1",
-        source_path, cobol_path, log_path);
+        "./ctoc_cobol_transpiler --diagnostics silent --direction cblc-to-cobol --input %s --output %s",
+        source_path, cobol_path);
     if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command)
-        || test_run_command_expect_failure(command) != FT_SUCCESS)
+        || test_run_command(command) != FT_SUCCESS)
     {
-        std::printf("Assertion failed: vector<string> should remain rejected until element lifecycle support exists\n");
+        std::printf("Assertion failed: vector<string> indexed string methods should transpile\n");
         goto cleanup;
     }
-    if (test_read_text_file(log_path, output, sizeof(output)) != FT_SUCCESS
-        || std::strstr(output, "unknown or unsupported template argument") == NULL)
+    if (vector_cobol_contains(cobol_path, "01 CBLC-SPTR-NAMES-CBLC-USER-DATA BASED.") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path, "05 CBLC-SPTR-NAMES-CBLC-USER-DATA-LEN") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path, "05 CBLC-SPTR-NAMES-CBLC-USER-DATA-BUF") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path, "COMPUTE CBLC-USER-VALUE = CBLC-SPTR-NAMES-CBLC-USER-DATA-LEN") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path, "MOVE SPACES TO CBLC-SPTR-NAMES-CBLC-USER-DATA-BUF") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path, "COMPUTE CBLC-PTR-OFFSET = SLOT * 5") != FT_SUCCESS)
     {
-        std::printf("Assertion failed: vector<string> should report the unsupported non-trivial element diagnostic\n");
+        std::printf("Assertion failed: indexed string methods should use the element record view\n");
         goto cleanup;
     }
     status = FT_SUCCESS;

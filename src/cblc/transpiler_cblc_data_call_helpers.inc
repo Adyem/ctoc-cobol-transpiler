@@ -567,6 +567,7 @@ static int cblc_add_temp_alias_item(t_cblc_translation_unit *unit, const char *s
     item->array_count = array_count;
     item->kind = kind;
     item->is_const = is_const;
+    item->is_alias = 1;
     item->is_active = 1;
     item->scope_id = unit->active_scope_id;
     item->scope_depth = unit->scopes && unit->active_scope_id < unit->scope_count
@@ -639,6 +640,14 @@ static const t_cblc_struct_type *cblc_find_receiver_type(const t_cblc_translatio
             return (g_cblc_member_access_type);
         return (cblc_find_struct_type(unit, item->struct_type_name));
     }
+    if (item->kind == CBLC_DATA_KIND_STRUCT_POINTER)
+    {
+        if (g_cblc_member_access_type
+            && std::strncmp(item->struct_type_name, g_cblc_member_access_type->source_name,
+                sizeof(item->struct_type_name)) == 0)
+            return (g_cblc_member_access_type);
+        return (cblc_find_struct_type(unit, item->struct_type_name));
+    }
     return (NULL);
 }
 
@@ -660,14 +669,204 @@ static int cblc_parse_method_receiver(const char **cursor, t_cblc_translation_un
         *cursor = start;
         return (FT_FAILURE);
     }
+    cblc_skip_whitespace(cursor);
+    if (**cursor == '[')
+    {
+        const char *index_start;
+        char index_expression[TRANSPILE_STATEMENT_TEXT_MAX];
+        char member_identifier[TRANSPILE_IDENTIFIER_MAX];
+        char indexed_source_name[TRANSPILE_STATEMENT_TEXT_MAX];
+        char indexed_cobol_name[TRANSPILE_STATEMENT_TEXT_MAX];
+        const t_cblc_struct_type *receiver_type;
+        const t_cblc_struct_type *element_type;
+        const t_cblc_method *operator_method;
+        const t_cblc_method *method;
+        const t_cblc_struct_field *data_field;
+        t_cblc_data_item *indexed_item;
+        const char *probe;
+        size_t index_value;
+        size_t element_length;
+
+        index_start = *cursor;
+        index_expression[0] = '\0';
+        if (cblc_parse_array_literal_index(cursor, &index_value) == FT_SUCCESS)
+        {
+            if (std::snprintf(index_expression, sizeof(index_expression), "%zu", index_value)
+                < 0)
+                return (FT_FAILURE);
+        }
+        else
+        {
+            *cursor = index_start;
+            if (**cursor != '[')
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+            *cursor += 1;
+            cblc_skip_whitespace(cursor);
+            if (cblc_parse_array_variable_index(cursor, unit, index_expression,
+                    sizeof(index_expression)) != FT_SUCCESS)
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+            cblc_skip_whitespace(cursor);
+            if (**cursor != ']')
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+            *cursor += 1;
+        }
+        receiver_type = cblc_find_receiver_type(unit, item);
+        operator_method = cblc_find_method_on_type(receiver_type, "operator[]");
+        if (!operator_method
+            || operator_method->parameter_count != 1
+            || operator_method->parameters[0].kind != TRANSPILE_FUNCTION_PARAMETER_INT
+            || operator_method->return_kind != CBLC_FUNCTION_RETURN_STRUCT_POINTER
+            || operator_method->return_type_name[0] == '\0')
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        cblc_skip_whitespace(cursor);
+        if ((*cursor)[0] != '-' || (*cursor)[1] != '>')
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        *cursor += 2;
+        if (cblc_parse_identifier(cursor, member_identifier, sizeof(member_identifier))
+            != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        probe = *cursor;
+        cblc_skip_whitespace(&probe);
+        if (*probe != '(')
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        element_type = cblc_find_struct_type(unit, operator_method->return_type_name);
+        method = cblc_find_method_on_type(element_type, member_identifier);
+        if (!element_type || !method
+            || !cblc_member_visibility_is_allowed(element_type, method->visibility))
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        if (std::snprintf(indexed_source_name, sizeof(indexed_source_name), "%s[%s]",
+                item->source_name, index_expression) < 0
+            || std::snprintf(indexed_cobol_name, sizeof(indexed_cobol_name), "%s[%s]",
+                item->cobol_name, index_expression) < 0)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        element_length = 1;
+        data_field = cblc_find_field_on_type(receiver_type, "data");
+        if (data_field && data_field->length > 0)
+            element_length = data_field->length;
+        indexed_item = cblc_find_data_item(unit, indexed_source_name);
+        if (!indexed_item
+            && cblc_add_temp_alias_item(unit, indexed_source_name, indexed_cobol_name,
+                CBLC_DATA_KIND_STRUCT_POINTER, element_length, 0,
+                operator_method->return_type_name, 0) != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        indexed_item = cblc_find_data_item(unit, indexed_source_name);
+        if (!indexed_item)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        ft_strlcpy(method_name, member_identifier, method_name_size);
+        *out_receiver = indexed_item;
+        return (FT_SUCCESS);
+    }
     if ((*cursor)[0] == '-' && (*cursor)[1] == '>')
     {
         char member_identifier[TRANSPILE_IDENTIFIER_MAX];
         const t_cblc_struct_type *receiver_type;
         const t_cblc_method *method;
+        const t_cblc_method *operator_method;
         const char *after_member;
         const char *probe;
 
+        receiver_type = cblc_find_receiver_type(unit, item);
+        operator_method = cblc_find_method_on_type(receiver_type, "operator->");
+        if (item->kind == CBLC_DATA_KIND_STRUCT
+            && operator_method
+            && operator_method->parameter_count == 0
+            && operator_method->return_kind == CBLC_FUNCTION_RETURN_STRUCT_POINTER
+            && operator_method->return_type_name[0] != '\0')
+        {
+            const t_cblc_struct_type *element_type;
+            const t_cblc_struct_field *data_field;
+            char indexed_source_name[TRANSPILE_STATEMENT_TEXT_MAX];
+            char indexed_cobol_name[TRANSPILE_STATEMENT_TEXT_MAX];
+            t_cblc_data_item *indexed_item;
+            size_t element_length;
+
+            *cursor += 2;
+            if (cblc_parse_identifier(cursor, member_identifier,
+                    sizeof(member_identifier)) != FT_SUCCESS)
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+            after_member = *cursor;
+            probe = after_member;
+            cblc_skip_whitespace(&probe);
+            if (*probe != '(')
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+            element_type = cblc_find_struct_type(unit, operator_method->return_type_name);
+            method = cblc_find_method_on_type(element_type, member_identifier);
+            if (!element_type || !method
+                || !cblc_member_visibility_is_allowed(element_type, method->visibility))
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+            if (std::snprintf(indexed_source_name, sizeof(indexed_source_name), "%s[0]",
+                    item->source_name) < 0
+                || std::snprintf(indexed_cobol_name, sizeof(indexed_cobol_name), "%s[0]",
+                    item->cobol_name) < 0)
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+            element_length = 1;
+            data_field = cblc_find_field_on_type(receiver_type, "data");
+            if (data_field && data_field->length > 0)
+                element_length = data_field->length;
+            indexed_item = cblc_find_data_item(unit, indexed_source_name);
+            if (!indexed_item
+                && cblc_add_temp_alias_item(unit, indexed_source_name, indexed_cobol_name,
+                    CBLC_DATA_KIND_STRUCT_POINTER, element_length, 0,
+                    operator_method->return_type_name, 0) != FT_SUCCESS)
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+            indexed_item = cblc_find_data_item(unit, indexed_source_name);
+            if (!indexed_item)
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+            ft_strlcpy(method_name, member_identifier, method_name_size);
+            *out_receiver = indexed_item;
+            return (FT_SUCCESS);
+        }
         if (item->kind != CBLC_DATA_KIND_STRUCT_POINTER)
         {
             *cursor = start;
@@ -680,7 +879,6 @@ static int cblc_parse_method_receiver(const char **cursor, t_cblc_translation_un
             return (FT_FAILURE);
         }
         after_member = *cursor;
-        receiver_type = cblc_find_receiver_type(unit, item);
         method = cblc_find_method_on_type(receiver_type, member_identifier);
         if (!receiver_type || !method
             || !cblc_member_visibility_is_allowed(receiver_type, method->visibility))

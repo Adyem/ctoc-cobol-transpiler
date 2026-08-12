@@ -114,7 +114,6 @@ void imported_test_fail(const char *expression, const char *file, int line)
 int imported_test_run_registered(void)
 {
     FILE *log_file;
-    FILE *result_file;
     t_imported_test_case *tests;
     int *test_count;
     int total_tests;
@@ -127,7 +126,6 @@ int imported_test_run_registered(void)
     log_file = std::fopen("imported_test_failures.log", "w");
     if (log_file)
         std::fclose(log_file);
-    result_file = std::fopen("automated_tests.log", "w");
     signal(SIGSEGV, imported_test_signal_handler);
     signal(SIGABRT, imported_test_signal_handler);
     imported_test_sort();
@@ -170,8 +168,6 @@ int imported_test_run_registered(void)
                 std::printf("\r\033[K");
             std::printf("%s %d %s\n", imported_test_success_label(),
                 index + 1, tests[index].description);
-            if (result_file)
-                std::fprintf(result_file, "PASS %d %s\n", index + 1, tests[index].description);
             std::fflush(stdout);
             passed += 1;
         }
@@ -181,18 +177,11 @@ int imported_test_run_registered(void)
                 std::printf("\r\033[K");
             std::printf("%s %d %s\n", imported_test_failure_label(),
                 index + 1, tests[index].description);
-            if (result_file)
-                std::fprintf(result_file, "FAIL %d %s\n", index + 1, tests[index].description);
             std::fflush(stdout);
         }
         index += 1;
     }
     std::printf("%d/%d tests passed\n", passed, selected);
-    if (result_file)
-    {
-        std::fprintf(result_file, "%d/%d tests passed\n", passed, selected);
-        std::fclose(result_file);
-    }
     std::fflush(stdout);
     if (passed != selected)
         return (1);

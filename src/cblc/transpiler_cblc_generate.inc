@@ -1414,6 +1414,19 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
                 if (cblc_build_struct_pointer_based_name(unit->data_items[index].cobol_name,
                         based_name, sizeof(based_name)) != FT_SUCCESS)
                     goto cleanup;
+                if (std::strcmp(unit->data_items[index].struct_type_name, "string") == 0)
+                {
+                    t_cblc_data_item string_pointer_item;
+
+                    string_pointer_item = unit->data_items[index];
+                    ft_strlcpy(string_pointer_item.cobol_name, based_name,
+                        sizeof(string_pointer_item.cobol_name));
+                    if (cblc_emit_string_pointer_fields(&string_pointer_item, &builder)
+                        != FT_SUCCESS)
+                        goto cleanup;
+                    index += 1;
+                    continue ;
+                }
                 type = cblc_find_struct_type(unit, unit->data_items[index].struct_type_name);
                 if (!type)
                 {
