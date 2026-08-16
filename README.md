@@ -2,7 +2,7 @@
 
 `ctoc_cobol_transpiler` is a source-to-source compiler for moving from a small C-style language, **CBL-C**, to COBOL. The project is aimed at COBOL modernization, regression testing, and experiments where business logic should be easier to author while still producing COBOL that can be compiled with GnuCOBOL.
 
-The tool currently supports four CLI directions:
+The tool currently supports three CLI directions:
 
 - `cblc-to-cobol`: generate COBOL from CBL-C.
 - `cobol-to-cblc`: recover CBL-C from the supported COBOL dialect.
@@ -13,7 +13,7 @@ The tool currently supports four CLI directions:
 Build the transpiler and test binary:
 
 ```sh
-make initialize
+git submodule update --init
 make all
 make tests
 ```
@@ -50,18 +50,26 @@ CBL-C is intentionally C-like, but its data model maps onto COBOL storage and ca
 - Multi-file CBL-C builds with repeated `--input` / `--output` pairs and `import "file.cblc"` support.
 - `struct` and `record`-style storage, nested fields, arrays, and generated COBOL group items.
 - `class` declarations with public/private members, constructors, methods, copy-constructor style flows, `const` member enforcement, receiver-specialized COBOL method paragraphs, and C++-style out-of-class method definitions.
+- Bounded compile-time type templates for supported structs, classes, functions, methods, pointers, and fixed arrays, with deterministic monomorphization and imported template metadata.
+- Basic non-null scalar, string, record, and class references, including const references, reference parameters, and supported reference returns.
+- Native `vector<T>` support for approved scalar and value-like element types, including growth, indexing, `at`, `front`, `back`, insertion, erasure, resizing, and lifecycle operations.
 - Pointer support for `void *`, `char *`, `int *`, struct pointers, pointer indexing, pointer arithmetic, address-of, dereference, casts, `std::malloc`, `std::realloc`, and `std::free`.
 - Built-in `string` behavior including constructor-style initialization, assignment, append, clear, length, capacity, empty, equality, compare, contains, starts-with, and ends-with operations.
-- `display`, `return`, `if` / `else`, `while`, function calls, method calls, and selected file-style syntax used by the reverse pipeline.
+- `display`, `return`, `if` / `else`, `while`, function calls, method calls, bounded `try` / `catch` / `throw` exception handling, and selected file-style syntax used by the reverse pipeline.
 
 The authoritative language and compiler-behavior standard is [`docs/cblc_language_standard.md`](docs/cblc_language_standard.md). The samples in [`samples/cblc`](samples/cblc) and [`samples/feature_showcase`](samples/feature_showcase) show larger examples.
 
-The planned basic template design is documented in [`docs/template_implementation_plan.md`](docs/template_implementation_plan.md); it is not part of the language standard until implemented and verified.
+The bounded template subset and its current restrictions are specified in the language standard. The broader design and future extensions are documented in [`docs/template_implementation_plan.md`](docs/template_implementation_plan.md).
 
-The source-reference semantics and COBOL lowering design are documented in
+The implemented source-reference subset and its COBOL lowering design are documented in
 [`docs/reference_lowering_design.md`](docs/reference_lowering_design.md).
-The implemented subset is covered by the authoritative language standard;
-the document also marks planned ABI and vector extensions explicitly.
+The standard also marks the remaining reference-descriptor, invalidation, and
+other ABI extensions that are not yet complete.
+
+Exception handling currently supports bounded value throws, typed and catch-all
+handlers, rethrows, propagation through throwing calls, and cleanup-aware COBOL
+lowering. See [`docs/exception_handling_implementation_plan.md`](docs/exception_handling_implementation_plan.md)
+for the supported subset and restrictions.
 
 ### COBOL Generation
 
@@ -193,6 +201,15 @@ make fuzz
 
 Some COBOL execution tests require `cobc` from GnuCOBOL. The test harness auto-detects it where possible; see [`docs/development_environment.md`](docs/development_environment.md) and [`docs/platform_bootstrap.md`](docs/platform_bootstrap.md) for setup details.
 
+On systems without `cobc`, install a local GnuCOBOL toolchain under `/goinfre` and run the COBOL-backed suite with:
+
+```sh
+make install_cobc_goinfre
+make tests_with_cobc
+```
+
+Forward translation tests are enabled automatically when `cobc` is detected. Set `CTOC_ENABLE_FORWARD_TRANSLATION=0` to skip them, or set it to `1` to force-enable them.
+
 ## Current Limitations
 
 The project is active and does not yet cover all COBOL or all C/C++ syntax. Notable gaps include:
@@ -201,6 +218,7 @@ The project is active and does not yet cover all COBOL or all C/C++ syntax. Nota
 - Legacy COBOL constructs such as `ALTER`, `ENTRY`, broad `INSPECT` support, and `RENAMES`.
 - Full packed-decimal and advanced numeric picture coverage beyond the implemented heuristics.
 - All possible COBOL table, report-writer, screen-section, and environment-division variants.
+- Full C++ template, reference, vector, and exception semantics; the documented CBL-C subsets remain bounded and target-specific.
 - General-purpose C++ compatibility; CBL-C only implements the C/C++-like surface needed by the transpiler.
 
 For the normative language rules, use [`docs/cblc_language_standard.md`](docs/cblc_language_standard.md). For implementation progress and open work, use [`compiler_feature_tracker.md`](compiler_feature_tracker.md).
