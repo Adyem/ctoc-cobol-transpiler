@@ -3773,7 +3773,7 @@ FT_TEST(test_cblc_generate_cobol_emits_parameter_slot_assignments_for_local_call
         std::printf("Assertion failed: generated COBOL should emit parameter storage item\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "COMPUTE ADD-ONE-VALUE = total.", std::strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "COMPUTE ADD-ONE-VALUE = TOTAL.", std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should assign argument into parameter storage before PERFORM\n");
         goto cleanup;
