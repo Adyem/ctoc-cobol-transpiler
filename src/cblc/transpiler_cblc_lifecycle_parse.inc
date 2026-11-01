@@ -164,6 +164,307 @@ static int cblc_build_unique_local_storage_names(
     const char *local_identifier, char *actual_source_name,
     size_t actual_source_size, char *actual_cobol_name,
     size_t actual_cobol_size);
+static int cblc_parse_method_call_assignment(const char **cursor,
+    t_cblc_translation_unit *unit, t_cblc_function *function,
+    t_cblc_data_item *target_item);
+
+static int cblc_condition_method_chain_end(const char *condition,
+    size_t start, size_t *out_end, size_t *out_call_count,
+    int *out_has_arguments)
+{
+    size_t cursor;
+    size_t call_count;
+    int has_arguments;
+
+    if (!condition || !out_end || !out_call_count || !out_has_arguments
+        || !cblc_is_identifier_char(condition[start]))
+        return (FT_FAILURE);
+    cursor = start;
+    while (cblc_is_identifier_char(condition[cursor]))
+        cursor += 1;
+    call_count = 0;
+    has_arguments = 0;
+    while (1)
+    {
+        size_t open_index;
+        size_t depth;
+        int quote;
+
+        while (condition[cursor] == ' ' || condition[cursor] == '\t')
+            cursor += 1;
+        if (condition[cursor] == '-')
+        {
+            if (condition[cursor + 1] != '>')
+                break ;
+            cursor += 2;
+        }
+        else if (condition[cursor] == '.')
+            cursor += 1;
+        else
+            break ;
+        while (condition[cursor] == ' ' || condition[cursor] == '\t')
+            cursor += 1;
+        if (!cblc_is_identifier_char(condition[cursor]))
+            return (FT_FAILURE);
+        while (cblc_is_identifier_char(condition[cursor]))
+            cursor += 1;
+        while (condition[cursor] == ' ' || condition[cursor] == '\t')
+            cursor += 1;
+        if (condition[cursor] != '(')
+            return (FT_FAILURE);
+        open_index = cursor++;
+        depth = 1;
+        quote = 0;
+        while (condition[cursor] != '\0' && depth != 0)
+        {
+            if (quote != 0)
+            {
+                if (condition[cursor] == quote
+                    && (cursor == 0 || condition[cursor - 1] != '\\'))
+                    quote = 0;
+            }
+            else if (condition[cursor] == '\'' || condition[cursor] == '"')
+                quote = condition[cursor];
+            else if (condition[cursor] == '(')
+                depth += 1;
+            else if (condition[cursor] == ')')
+                depth -= 1;
+            cursor += 1;
+        }
+        if (depth != 0 || quote != 0)
+            return (FT_FAILURE);
+        if (cursor - open_index > 2)
+            has_arguments = 1;
+        call_count += 1;
+        while (condition[cursor] == ' ' || condition[cursor] == '\t')
+            cursor += 1;
+        if (condition[cursor] == '-' && condition[cursor + 1] == '>')
+            continue ;
+        *out_end = cursor;
+        *out_call_count = call_count;
+        *out_has_arguments = has_arguments;
+        return (FT_SUCCESS);
+    }
+    return (FT_FAILURE);
+}
+
+static int cblc_condition_find_method_occurrence(const char *expression,
+    size_t expression_length, const char *method_name,
+    const size_t *used_offsets, size_t used_count, size_t *out_offset)
+{
+    const char *search;
+    const char *candidate;
+    size_t best_offset;
+    size_t best_depth;
+    int found;
+
+    if (!expression || !method_name || method_name[0] == '\0'
+        || !out_offset)
+        return (FT_FAILURE);
+    search = expression;
+    best_offset = 0;
+    best_depth = 0;
+    found = 0;
+    while ((candidate = std::strstr(search, method_name)) != NULL
+        && static_cast<size_t>(candidate - expression) < expression_length)
+    {
+        size_t candidate_offset;
+        size_t after_name;
+        size_t before_name;
+        size_t nesting;
+        size_t scan_index;
+        int quote;
+        int is_used;
+
+        candidate_offset = static_cast<size_t>(candidate - expression);
+        after_name = candidate_offset + std::strlen(method_name);
+        before_name = candidate_offset;
+        while (expression[after_name] == ' ' || expression[after_name] == '\t')
+            after_name += 1;
+        while (before_name > 0
+            && (expression[before_name - 1] == ' '
+                || expression[before_name - 1] == '\t'))
+            before_name -= 1;
+        if ((candidate_offset > 0
+                && cblc_is_identifier_char(expression[candidate_offset - 1]))
+            || cblc_is_identifier_char(expression[after_name])
+            || expression[after_name] != '('
+            || before_name == 0
+            || (expression[before_name - 1] != '.'
+                && expression[before_name - 1] != '>'))
+        {
+            search = candidate + 1;
+            continue ;
+        }
+        is_used = 0;
+        for (size_t used_index = 0; used_index < used_count; ++used_index)
+            if (used_offsets[used_index] == candidate_offset)
+                is_used = 1;
+        if (is_used)
+        {
+            search = candidate + 1;
+            continue ;
+        }
+        nesting = 0;
+        quote = 0;
+        scan_index = 0;
+        while (scan_index < candidate_offset)
+        {
+            if (quote != 0)
+            {
+                if (expression[scan_index] == quote
+                    && (scan_index == 0
+                        || expression[scan_index - 1] != '\\'))
+                    quote = 0;
+            }
+            else if (expression[scan_index] == '\''
+                || expression[scan_index] == '"')
+                quote = expression[scan_index];
+            else if (expression[scan_index] == '(')
+                nesting += 1;
+            else if (expression[scan_index] == ')' && nesting > 0)
+                nesting -= 1;
+            scan_index += 1;
+        }
+        if (!found || nesting > best_depth
+            || (nesting == best_depth && candidate_offset < best_offset))
+        {
+            best_offset = candidate_offset;
+            best_depth = nesting;
+            found = 1;
+        }
+        search = candidate + 1;
+    }
+    if (!found)
+        return (FT_FAILURE);
+    *out_offset = best_offset;
+    return (FT_SUCCESS);
+}
+
+/* Route argument-taking and chained condition calls through the normal method
+ * assignment parser so overload resolution, pointer borrowing, and argument
+ * temporary destruction stay consistent with ordinary expressions. */
+static int cblc_lower_condition_method_chain(t_cblc_translation_unit *unit,
+    t_cblc_function *function, const char *source_condition,
+    const char *condition, size_t start, size_t end, char *rewritten,
+    size_t rewritten_size, size_t *output_length)
+{
+    char expression[TRANSPILE_STATEMENT_TEXT_MAX];
+    char local_base[TRANSPILE_IDENTIFIER_MAX];
+    char local_source[TRANSPILE_IDENTIFIER_MAX];
+    char local_cobol[TRANSPILE_IDENTIFIER_MAX];
+    const t_cblc_data_kind result_kinds[3] = {
+        CBLC_DATA_KIND_INT, CBLC_DATA_KIND_DOUBLE, CBLC_DATA_KIND_CHAR
+    };
+    t_cblc_data_item *target_item;
+    const char *expression_cursor;
+    size_t original_data_count;
+    size_t original_statement_count;
+    size_t original_destructor_count;
+    size_t first_statement;
+    size_t expression_length;
+    size_t source_offset;
+    size_t used_method_offsets[TRANSPILE_STATEMENT_TEXT_MAX];
+    size_t used_method_count;
+    size_t candidate_index;
+    int parse_result;
+
+    if (!unit || !function || !source_condition || !condition || start >= end
+        || !rewritten || !rewritten_size || !output_length)
+        return (-1);
+    expression_length = end - start;
+    if (expression_length + 2 > sizeof(expression))
+        return (0);
+    std::memcpy(expression, condition + start, expression_length);
+    expression[expression_length] = ';';
+    expression[expression_length + 1] = '\0';
+    original_data_count = unit->data_count;
+    original_statement_count = function->statement_count;
+    original_destructor_count = function->local_destructor_count;
+    candidate_index = 0;
+    parse_result = FT_FAILURE;
+    while (candidate_index < sizeof(result_kinds) / sizeof(result_kinds[0]))
+    {
+        unit->data_count = original_data_count;
+        function->statement_count = original_statement_count;
+        function->local_destructor_count = original_destructor_count;
+        if (std::snprintf(local_base, sizeof(local_base),
+                "CBLC_CONDITION_CHAIN_%zu", function->statement_count) < 0
+            || cblc_build_unique_local_storage_names(unit, function, local_base,
+                local_source, sizeof(local_source), local_cobol,
+                sizeof(local_cobol)) != FT_SUCCESS
+            || cblc_add_named_data_item(unit, local_source, local_cobol,
+                result_kinds[candidate_index], 0, 0, NULL,
+                function->source_name, 1, 0, 0) != FT_SUCCESS)
+        {
+            unit->data_count = original_data_count;
+            function->statement_count = original_statement_count;
+            function->local_destructor_count = original_destructor_count;
+            return (-1);
+        }
+        target_item = cblc_find_data_item(unit, local_source);
+        expression_cursor = expression;
+        first_statement = function->statement_count;
+        parse_result = target_item
+            ? cblc_parse_method_call_assignment(&expression_cursor, unit,
+                function, target_item) : FT_FAILURE;
+        if (parse_result == FT_SUCCESS && expression_cursor != expression)
+            break ;
+        candidate_index += 1;
+    }
+    if (candidate_index >= sizeof(result_kinds) / sizeof(result_kinds[0]))
+    {
+        unit->data_count = original_data_count;
+        function->statement_count = original_statement_count;
+        function->local_destructor_count = original_destructor_count;
+        return (0);
+    }
+    if (*output_length + std::strlen(local_source) >= rewritten_size)
+    {
+        unit->data_count = original_data_count;
+        function->statement_count = original_statement_count;
+        function->local_destructor_count = original_destructor_count;
+        return (-1);
+    }
+    source_offset = cblc_source_offset(unit, source_condition + start);
+    used_method_count = 0;
+    for (size_t statement_index = first_statement;
+        statement_index < function->statement_count; ++statement_index)
+    {
+        t_cblc_statement *statement = &function->statements[statement_index];
+        size_t method_offset;
+
+        if (statement->type != CBLC_STATEMENT_METHOD_CALL_ASSIGN)
+            continue ;
+        if (used_method_count >= sizeof(used_method_offsets)
+                / sizeof(used_method_offsets[0])
+            || cblc_condition_find_method_occurrence(condition + start,
+                expression_length, statement->call_identifier,
+                used_method_offsets, used_method_count,
+                &method_offset) != FT_SUCCESS)
+        {
+            unit->data_count = original_data_count;
+            function->statement_count = original_statement_count;
+            function->local_destructor_count = original_destructor_count;
+            return (-1);
+        }
+        used_method_offsets[used_method_count++] = method_offset;
+        statement->source_offset = source_offset + method_offset;
+        statement->source_length = std::strlen(statement->call_identifier);
+        cblc_exception_source_position(unit,
+            source_condition + start + method_offset,
+            &statement->exception_source_line,
+            &statement->exception_source_column);
+        cblc_exception_source_position(unit,
+            source_condition + start + method_offset,
+            &statement->source_line, &statement->source_column);
+    }
+    std::memcpy(rewritten + *output_length, local_source,
+        std::strlen(local_source));
+    *output_length += std::strlen(local_source);
+    rewritten[*output_length] = '\0';
+    return (1);
+}
 
 static int cblc_lower_scalar_method_calls_in_if_condition(
     t_cblc_translation_unit *unit, t_cblc_function *function,
@@ -220,6 +521,8 @@ static int cblc_lower_scalar_method_calls_in_if_condition(
         size_t method_start;
         size_t method_end;
         size_t call_end;
+        size_t chain_call_count;
+        int chain_has_arguments;
 
         if (quote != 0)
         {
@@ -255,6 +558,23 @@ static int cblc_lower_scalar_method_calls_in_if_condition(
         while (cblc_is_identifier_char(condition[input_index]))
             input_index += 1;
         receiver_end = input_index;
+        if (cblc_condition_method_chain_end(condition, token_start,
+                &call_end, &chain_call_count, &chain_has_arguments)
+            == FT_SUCCESS && (chain_call_count > 1 || chain_has_arguments))
+        {
+            int chain_result;
+
+            chain_result = cblc_lower_condition_method_chain(unit, function,
+                source_condition, condition, token_start, call_end, rewritten,
+                sizeof(rewritten), &output_length);
+            if (chain_result < 0)
+                goto fail;
+            if (chain_result > 0)
+            {
+                input_index = call_end;
+                continue ;
+            }
+        }
         while (condition[input_index] == ' ' || condition[input_index] == '\t')
             input_index += 1;
         if (condition[input_index] == '-')

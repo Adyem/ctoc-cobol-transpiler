@@ -1637,6 +1637,319 @@ FT_TEST(test_standard_library_vector_size_call_in_if_is_materialized_before_bran
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_standard_library_vector_string_chain_in_condition_uses_borrowed_element)
+{
+    const char *errors_source;
+    const char *string_source;
+    const char *vector_source;
+    const char *program_source;
+    std::string combined_source;
+    t_cblc_translation_unit unit;
+    const t_cblc_function *main_function;
+    const t_cblc_statement *at_calls[9];
+    const t_cblc_statement *len_calls[3];
+    const t_cblc_statement *size_calls[1];
+    const t_cblc_statement *if_statements[4];
+    char *generated_cobol;
+    char diagnostic[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    int diagnostic_code;
+    size_t at_count;
+    size_t len_count;
+    size_t size_count;
+    size_t if_count;
+    int chain_calls_valid;
+
+    errors_source = transpiler_standard_library_get_native_source("CBLC-ERRORS");
+    string_source = transpiler_standard_library_get_native_source("CBLC-STRING");
+    vector_source = transpiler_standard_library_get_native_source("CBLC-VECTOR");
+    program_source = "void main() {\n"
+        "    vector<string> items;\n"
+        "    vector<vector<vector<vector<vector<string>>>>> five;\n"
+        "    string value(\"hello\");\n"
+        "    items.push_back(value);\n"
+        "    if (items.at(0)->len() > 0) { }\n"
+        "    if (five.at(0)->at(0)->at(0)->at(0)->at(0)->len() > 0) { }\n"
+        "    if (items.at(0)->at(0) == 'h') { }\n"
+        "    if (items.at(items.size())->len() > 0) { }\n"
+        "}\n";
+    if (!errors_source || !string_source || !vector_source)
+        return (FT_FAILURE);
+    combined_source = std::string(errors_source) + "\n" + string_source + "\n"
+        + vector_source + "\n" + program_source;
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    diagnostic[0] = '\0';
+    diagnostic_code = 0;
+    if (cblc_parse_translation_unit(combined_source.c_str(), &unit) != FT_SUCCESS)
+    {
+        std::printf("vector<string> condition-chain parse diagnostic: %s\n",
+            unit.parse_error_message);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    main_function = NULL;
+    for (size_t function_index = 0; function_index < unit.function_count;
+        ++function_index)
+    {
+        if (std::strcmp(unit.functions[function_index].source_name, "main") == 0)
+        {
+            main_function = &unit.functions[function_index];
+            break ;
+        }
+    }
+    at_count = 0;
+    len_count = 0;
+    size_count = 0;
+    if_count = 0;
+    chain_calls_valid = 1;
+    if (main_function)
+    {
+        for (size_t statement_index = 0;
+            statement_index < main_function->statement_count; ++statement_index)
+        {
+            const t_cblc_statement *statement =
+                &main_function->statements[statement_index];
+
+            if (statement->type == CBLC_STATEMENT_METHOD_CALL_ASSIGN
+                && std::strcmp(statement->call_identifier, "at") == 0)
+            {
+                if (at_count >= sizeof(at_calls) / sizeof(at_calls[0]))
+                    chain_calls_valid = 0;
+                else
+                    at_calls[at_count++] = statement;
+            }
+            else if (statement->type == CBLC_STATEMENT_METHOD_CALL_ASSIGN
+                && std::strcmp(statement->call_identifier, "len") == 0)
+            {
+                if (len_count >= sizeof(len_calls) / sizeof(len_calls[0]))
+                    chain_calls_valid = 0;
+                else
+                    len_calls[len_count++] = statement;
+            }
+            else if (statement->type == CBLC_STATEMENT_METHOD_CALL_ASSIGN
+                && std::strcmp(statement->call_identifier, "size") == 0)
+            {
+                if (size_count >= sizeof(size_calls) / sizeof(size_calls[0]))
+                    chain_calls_valid = 0;
+                else
+                    size_calls[size_count++] = statement;
+            }
+            else if (statement->type == CBLC_STATEMENT_IF_BEGIN
+                && std::strstr(statement->source, "CONDITION-CHAIN"))
+            {
+                if (if_count >= sizeof(if_statements) / sizeof(if_statements[0]))
+                    chain_calls_valid = 0;
+                else
+                    if_statements[if_count++] = statement;
+            }
+        }
+    }
+    if (!main_function || at_count != 9 || len_count != 3
+        || size_count != 1 || if_count != 4)
+        chain_calls_valid = 0;
+    for (size_t call_index = 0; chain_calls_valid && call_index < at_count;
+        ++call_index)
+    {
+        const t_cblc_data_item *borrowed_item;
+
+        borrowed_item = NULL;
+        for (size_t data_index = 0; data_index < unit.data_count; ++data_index)
+        {
+            if (std::strcmp(unit.data_items[data_index].cobol_name,
+                    at_calls[call_index]->target) == 0)
+            {
+                borrowed_item = &unit.data_items[data_index];
+                break ;
+            }
+        }
+        if (!borrowed_item
+            || (call_index == 7
+                ? borrowed_item->kind != CBLC_DATA_KIND_CHAR
+                : (borrowed_item->kind != CBLC_DATA_KIND_STRUCT_POINTER
+                    || borrowed_item->struct_type_name[0] == '\0'))
+            || at_calls[call_index]->call_argument_count != 1
+            || (call_index > 0
+                && at_calls[call_index]->source_offset
+                    <= at_calls[call_index - 1]->source_offset))
+            chain_calls_valid = 0;
+    }
+    for (size_t chain_index = 0; chain_calls_valid && chain_index < len_count;
+        ++chain_index)
+    {
+        size_t last_at_index;
+
+        last_at_index = chain_index == 0 ? 0
+            : (chain_index == 1 ? 5 : 8);
+        {
+            size_t if_index;
+
+            if_index = chain_index == 2 ? 3 : chain_index;
+            if (!std::strstr(len_calls[chain_index]->target, "CONDITION-CHAIN")
+                || len_calls[chain_index]->source_offset
+                    <= at_calls[last_at_index]->source_offset
+                || !std::strstr(if_statements[if_index]->source,
+                    len_calls[chain_index]->target)
+                || std::strstr(if_statements[if_index]->source,
+                    "items.at(0)->len()"))
+                chain_calls_valid = 0;
+        }
+    }
+    if (chain_calls_valid
+        && (size_calls[0]->source_offset <= at_calls[8]->source_offset
+            || size_calls[0]->source_offset >= len_calls[2]->source_offset))
+        chain_calls_valid = 0;
+    if (!chain_calls_valid)
+    {
+        std::printf("Assertion failed: one- and five-level vector<string> chains, a char-returning chained method, and a method-valued index must preserve borrowed pointers, evaluation/source order, and condition materialization (at=%zu len=%zu size=%zu if=%zu)\n",
+            at_count, len_count, size_count, if_count);
+        if (main_function)
+        {
+            for (size_t statement_index = 0;
+                statement_index < main_function->statement_count; ++statement_index)
+            {
+                const t_cblc_statement *statement =
+                    &main_function->statements[statement_index];
+
+                std::printf("condition chain IR[%zu]: type=%d target=%s source=%s method=%s args=%s\n",
+                    statement_index, statement->type, statement->target,
+                    statement->source, statement->call_identifier,
+                    statement->call_arguments);
+            }
+        }
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &diagnostic_code, diagnostic, sizeof(diagnostic)) != FT_SUCCESS
+        || !generated_cobol
+        || transpiler_validate_generated_cobol_with_diagnostic(generated_cobol,
+            diagnostic, sizeof(diagnostic)) != FT_SUCCESS)
+    {
+        std::printf("vector<string> condition-chain COBOL validation failed (%d): %s\n",
+            diagnostic_code, diagnostic);
+        if (generated_cobol)
+            cma_free(generated_cobol);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_vector_short_circuit_guards_string_chain)
+{
+    const char *errors_source;
+    const char *string_source;
+    const char *vector_source;
+    std::string combined_source;
+    t_cblc_translation_unit unit;
+    const t_cblc_function *main_function;
+    size_t size_call_index;
+    size_t guard_index;
+    size_t at_call_index;
+    size_t len_call_index;
+    size_t guard_else_index;
+    char *generated_cobol;
+    char diagnostic[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    int diagnostic_code;
+
+    errors_source = transpiler_standard_library_get_native_source("CBLC-ERRORS");
+    string_source = transpiler_standard_library_get_native_source("CBLC-STRING");
+    vector_source = transpiler_standard_library_get_native_source("CBLC-VECTOR");
+    if (!errors_source || !string_source || !vector_source)
+        return (FT_FAILURE);
+    combined_source = std::string(errors_source) + "\n" + string_source + "\n"
+        + vector_source + "\n"
+        + "void main() {\n"
+        + "    vector<string> items;\n"
+        + "    if (items.size() > 0 && items.at(0)->len() > 0) { }\n"
+        + "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    diagnostic[0] = '\0';
+    diagnostic_code = 0;
+    if (cblc_parse_translation_unit(combined_source.c_str(), &unit) != FT_SUCCESS)
+    {
+        std::printf("short-circuit vector<string> chain parse diagnostic: %s\n",
+            unit.parse_error_message);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    main_function = NULL;
+    for (size_t function_index = 0; function_index < unit.function_count;
+        ++function_index)
+    {
+        if (std::strcmp(unit.functions[function_index].source_name, "main") == 0)
+        {
+            main_function = &unit.functions[function_index];
+            break ;
+        }
+    }
+    size_call_index = static_cast<size_t>(-1);
+    guard_index = static_cast<size_t>(-1);
+    at_call_index = static_cast<size_t>(-1);
+    len_call_index = static_cast<size_t>(-1);
+    guard_else_index = static_cast<size_t>(-1);
+    if (main_function)
+    {
+        for (size_t statement_index = 0;
+            statement_index < main_function->statement_count; ++statement_index)
+        {
+            const t_cblc_statement *statement =
+                &main_function->statements[statement_index];
+
+            if (statement->type == CBLC_STATEMENT_METHOD_CALL_ASSIGN
+                && std::strcmp(statement->call_identifier, "size") == 0)
+                size_call_index = statement_index;
+            else if (statement->type == CBLC_STATEMENT_IF_BEGIN
+                && std::strstr(statement->source, "BOOLEAN_OPERAND"))
+                guard_index = statement_index;
+            else if (statement->type == CBLC_STATEMENT_METHOD_CALL_ASSIGN
+                && std::strcmp(statement->call_identifier, "at") == 0)
+                at_call_index = statement_index;
+            else if (statement->type == CBLC_STATEMENT_METHOD_CALL_ASSIGN
+                && std::strcmp(statement->call_identifier, "len") == 0)
+                len_call_index = statement_index;
+            else if (statement->type == CBLC_STATEMENT_IF_ELSE
+                && guard_index != static_cast<size_t>(-1)
+                && statement_index > guard_index)
+                guard_else_index = statement_index;
+        }
+    }
+    if (!main_function || size_call_index == static_cast<size_t>(-1)
+        || guard_index == static_cast<size_t>(-1)
+        || at_call_index == static_cast<size_t>(-1)
+        || len_call_index == static_cast<size_t>(-1)
+        || guard_else_index == static_cast<size_t>(-1)
+        || !(size_call_index < guard_index && guard_index < at_call_index
+            && at_call_index < len_call_index
+            && len_call_index < guard_else_index))
+    {
+        std::printf("Assertion failed: vector<string> checked access and its chained method must remain inside the RHS short-circuit branch (size=%zu guard=%zu at=%zu len=%zu else=%zu)\n",
+            size_call_index, guard_index, at_call_index, len_call_index,
+            guard_else_index);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &diagnostic_code, diagnostic, sizeof(diagnostic)) != FT_SUCCESS
+        || !generated_cobol
+        || transpiler_validate_generated_cobol_with_diagnostic(generated_cobol,
+            diagnostic, sizeof(diagnostic)) != FT_SUCCESS)
+    {
+        std::printf("short-circuit vector<string> chain COBOL validation failed (%d): %s\n",
+            diagnostic_code, diagnostic);
+        if (generated_cobol)
+            cma_free(generated_cobol);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_standard_library_vector_logical_conditions_guard_rhs_method_calls)
 {
     const char *program_source;
