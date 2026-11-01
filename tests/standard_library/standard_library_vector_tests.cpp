@@ -502,6 +502,29 @@ static const char *g_vector_runtime_source =
     "    }\n"
     "}\n"
     "\n"
+    "void exercise_value_resize_lifecycle()\n"
+    "{\n"
+    "    tracked_constructions = 0;\n"
+    "    tracked_destructions = 0;\n"
+    "    {\n"
+    "        Tracked fill;\n"
+    "        vector<Tracked> values;\n"
+    "        values.reserve(4);\n"
+    "        values.emplace_back();\n"
+    "        values.emplace_back();\n"
+    "        values.emplace_back();\n"
+    "        values.resize(1, fill);\n"
+    "        if (values.size() == 1)\n"
+    "        {\n"
+    "            display(\"VALUE RESIZE DESTROYS TAIL\");\n"
+    "        }\n"
+    "    }\n"
+    "    if (tracked_constructions == tracked_destructions)\n"
+    "    {\n"
+    "        display(\"VALUE RESIZE LIFETIME BALANCED\");\n"
+    "    }\n"
+    "}\n"
+    "\n"
     "void exercise_scope()\n"
     "{\n"
     "    vector<int> scoped;\n"
@@ -859,6 +882,7 @@ static const char *g_vector_runtime_source =
     "    exercise_tracked_vector();\n"
     "    exercise_reserved_lifecycle();\n"
     "    exercise_count_construction();\n"
+    "    exercise_value_resize_lifecycle();\n"
     "\n"
     "    exercise_scope();\n"
     "    display(\"VECTOR COMPLETE\");\n"
@@ -1501,6 +1525,110 @@ FT_TEST(test_standard_library_vector_resize_growth_builds_tail_before_relocation
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_standard_library_vector_resize_value_destroys_before_shrinking_live_range)
+{
+    const char *vector_source;
+    const char *resize_method;
+    const char *shrink_branch;
+    const char *shrink_loop;
+    const char *destroy_element;
+    const char *shrink_count;
+
+    vector_source = transpiler_standard_library_get_native_source("CBLC-VECTOR");
+    resize_method = vector_source
+        ? std::strstr(vector_source, "void resize(int requested, T value)") : NULL;
+    shrink_branch = resize_method
+        ? std::strstr(resize_method, "if (requested < count)") : NULL;
+    shrink_loop = shrink_branch
+        ? std::strstr(shrink_branch, "while (count > requested)") : NULL;
+    destroy_element = shrink_loop
+        ? std::strstr(shrink_loop, "cblc_destroy_at(elements[count - 1]);") : NULL;
+    shrink_count = destroy_element
+        ? std::strstr(destroy_element, "count = count - 1;") : NULL;
+
+    if (!vector_source || !resize_method || !shrink_branch || !shrink_loop
+        || !destroy_element || !shrink_count
+        || !(shrink_loop < destroy_element && destroy_element < shrink_count)
+        || std::strstr(shrink_loop, "cblc_destroy_at(elements[count]);"))
+    {
+        std::printf("Assertion failed: value-resize must destroy the last live element before reducing the vector live range\n");
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_vector_size_call_in_if_is_materialized_before_branch)
+{
+    const char *errors_source;
+    const char *string_source;
+    const char *vector_source;
+    std::string combined_source;
+    t_cblc_translation_unit unit;
+    const t_cblc_function *target_function;
+    const t_cblc_statement *size_call;
+    const t_cblc_statement *if_statement;
+
+    errors_source = transpiler_standard_library_get_native_source("CBLC-ERRORS");
+    string_source = transpiler_standard_library_get_native_source("CBLC-STRING");
+    vector_source = transpiler_standard_library_get_native_source("CBLC-VECTOR");
+    if (!errors_source || !string_source || !vector_source)
+        return (FT_FAILURE);
+    combined_source = std::string(errors_source) + "\n" + string_source + "\n"
+        + vector_source + "\n" + g_vector_runtime_source;
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(combined_source.c_str(), &unit) != FT_SUCCESS)
+    {
+        std::printf("condition method-call parse diagnostic: %s\n",
+            unit.parse_error_message);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    target_function = NULL;
+    for (size_t function_index = 0; function_index < unit.function_count;
+        ++function_index)
+    {
+        if (std::strcmp(unit.functions[function_index].source_name,
+                "exercise_value_resize_lifecycle") == 0)
+        {
+            target_function = &unit.functions[function_index];
+            break ;
+        }
+    }
+    size_call = NULL;
+    if_statement = NULL;
+    if (target_function)
+    {
+        for (size_t statement_index = 0;
+            statement_index < target_function->statement_count; ++statement_index)
+        {
+            const t_cblc_statement *statement =
+                &target_function->statements[statement_index];
+
+            if (!size_call
+                && statement->type == CBLC_STATEMENT_METHOD_CALL_ASSIGN
+                && std::strcmp(statement->call_identifier, "size") == 0)
+                size_call = statement;
+            if (size_call && statement->type == CBLC_STATEMENT_IF_BEGIN
+                && statement_index > static_cast<size_t>(size_call
+                    - target_function->statements))
+            {
+                if_statement = statement;
+                break ;
+            }
+        }
+    }
+    if (!size_call || !if_statement
+        || !std::strstr(if_statement->source, size_call->target)
+        || std::strstr(if_statement->source, ".size()"))
+    {
+        std::printf("Assertion failed: scalar method calls in an if condition must be emitted once before the branch and replaced by their typed result temporary\n");
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    cblc_translation_unit_dispose(&unit);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_standard_library_vector_translates_full_lifecycle)
 {
     char directory[256];
@@ -1770,6 +1898,8 @@ FT_TEST(test_standard_library_vector_translates_full_lifecycle)
     VECTOR_EXPECT_MARKER("COUNT CONSTRUCTION CLEANUP", "count-constructed class elements are destroyed exactly once");
     VECTOR_EXPECT_MARKER("COUNT VALUE CONSTRUCTION", "count/value construction copies class values into live slots");
     VECTOR_EXPECT_MARKER("COUNT VALUE CLEANUP", "count/value elements and their seed are each destroyed exactly once");
+    VECTOR_EXPECT_MARKER("VALUE RESIZE DESTROYS TAIL", "value-resize destroys removed class elements and publishes the reduced size");
+    VECTOR_EXPECT_MARKER("VALUE RESIZE LIFETIME BALANCED", "value-resize leaves no live-element leaks or double destruction at scope exit");
     VECTOR_EXPECT_VALUE(2, "local vector is usable during its scope");
     VECTOR_EXPECT_VALUE(41, "local vector front");
     VECTOR_EXPECT_VALUE(42, "local vector back");
@@ -1884,7 +2014,11 @@ FT_TEST(test_standard_library_vector_string_runtime_fixture_generates)
         || vector_cobol_contains(cobol_path,
             "DISPLAY \"CLEAR DESTROYS REMAINDER\"") != FT_SUCCESS
         || vector_cobol_contains(cobol_path,
-            "DISPLAY \"SCOPE DOES NOT DOUBLE DESTROY\"") != FT_SUCCESS)
+            "DISPLAY \"SCOPE DOES NOT DOUBLE DESTROY\"") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "DISPLAY \"VALUE RESIZE DESTROYS TAIL\"") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "DISPLAY \"VALUE RESIZE LIFETIME BALANCED\"") != FT_SUCCESS)
     {
         std::printf("Generated vector COBOL must retain exact live-element lifecycle assertions\n");
         goto cleanup;

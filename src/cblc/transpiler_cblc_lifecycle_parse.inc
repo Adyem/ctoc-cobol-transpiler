@@ -159,8 +159,245 @@ static void cblc_exception_source_position(const t_cblc_translation_unit *unit,
 static void cblc_capture_statement_source_spans(
     const t_cblc_translation_unit *unit, t_cblc_function *function,
     size_t first_statement, const char *start, const char *end);
+static int cblc_build_unique_local_storage_names(
+    const t_cblc_translation_unit *unit, const t_cblc_function *function,
+    const char *local_identifier, char *actual_source_name,
+    size_t actual_source_size, char *actual_cobol_name,
+    size_t actual_cobol_size);
+
+static int cblc_lower_scalar_method_calls_in_if_condition(
+    t_cblc_translation_unit *unit, t_cblc_function *function,
+    const char *source_condition, char *condition, size_t condition_size)
+{
+    char rewritten[TRANSPILE_STATEMENT_TEXT_MAX];
+    size_t original_data_count;
+    size_t original_statement_count;
+    size_t input_index;
+    size_t output_length;
+    int quote;
+    int has_short_circuit;
+
+    if (!unit || !function || !source_condition || !condition
+        || condition_size == 0)
+        return (FT_FAILURE);
+    /* Calls in short-circuit operands must be lowered into control-flow
+     * branches, not eagerly hoisted ahead of the condition. Leave those for
+     * the CFG expression-lowering pass. */
+    has_short_circuit = 0;
+    quote = 0;
+    input_index = 0;
+    while (condition[input_index] != '\0')
+    {
+        if (quote != 0)
+        {
+            if (condition[input_index] == quote
+                && (input_index == 0 || condition[input_index - 1] != '\\'))
+                quote = 0;
+        }
+        else if (condition[input_index] == '\'' || condition[input_index] == '"')
+            quote = condition[input_index];
+        else if ((condition[input_index] == '&'
+                && condition[input_index + 1] == '&')
+            || (condition[input_index] == '|'
+                && condition[input_index + 1] == '|'))
+        {
+            has_short_circuit = 1;
+            break ;
+        }
+        input_index += 1;
+    }
+    if (has_short_circuit)
+        return (FT_SUCCESS);
+    original_data_count = unit->data_count;
+    original_statement_count = function->statement_count;
+    rewritten[0] = '\0';
+    input_index = 0;
+    output_length = 0;
+    quote = 0;
+    while (condition[input_index] != '\0')
+    {
+        size_t token_start;
+        size_t receiver_end;
+        size_t method_start;
+        size_t method_end;
+        size_t call_end;
+
+        if (quote != 0)
+        {
+            char literal_character = condition[input_index++];
+
+            if (output_length + 1 >= sizeof(rewritten))
+                goto fail;
+            rewritten[output_length++] = literal_character;
+            rewritten[output_length] = '\0';
+            if (literal_character == quote
+                && (input_index < 2 || condition[input_index - 2] != '\\'))
+                quote = 0;
+            continue ;
+        }
+        if (condition[input_index] == '\'' || condition[input_index] == '"')
+        {
+            quote = condition[input_index];
+            if (output_length + 1 >= sizeof(rewritten))
+                goto fail;
+            rewritten[output_length++] = condition[input_index++];
+            rewritten[output_length] = '\0';
+            continue ;
+        }
+        if (!cblc_is_identifier_char(condition[input_index]))
+        {
+            if (output_length + 1 >= sizeof(rewritten))
+                goto fail;
+            rewritten[output_length++] = condition[input_index++];
+            rewritten[output_length] = '\0';
+            continue ;
+        }
+        token_start = input_index;
+        while (cblc_is_identifier_char(condition[input_index]))
+            input_index += 1;
+        receiver_end = input_index;
+        while (condition[input_index] == ' ' || condition[input_index] == '\t')
+            input_index += 1;
+        if (condition[input_index] == '-')
+        {
+            input_index += 1;
+            if (condition[input_index] != '>')
+            {
+                input_index = receiver_end;
+                goto copy_identifier;
+            }
+            input_index += 1;
+        }
+        else if (condition[input_index] == '.')
+            input_index += 1;
+        else
+        {
+            input_index = receiver_end;
+            goto copy_identifier;
+        }
+        while (condition[input_index] == ' ' || condition[input_index] == '\t')
+            input_index += 1;
+        if (!cblc_is_identifier_char(condition[input_index]))
+        {
+            input_index = receiver_end;
+            goto copy_identifier;
+        }
+        method_start = input_index;
+        while (cblc_is_identifier_char(condition[input_index]))
+            input_index += 1;
+        method_end = input_index;
+        while (condition[input_index] == ' ' || condition[input_index] == '\t')
+            input_index += 1;
+        if (condition[input_index] != '(')
+        {
+            input_index = receiver_end;
+            goto copy_identifier;
+        }
+        input_index += 1;
+        while (condition[input_index] == ' ' || condition[input_index] == '\t')
+            input_index += 1;
+        if (condition[input_index] != ')')
+        {
+            input_index = receiver_end;
+            goto copy_identifier;
+        }
+        call_end = input_index + 1;
+        {
+            char receiver_name[TRANSPILE_IDENTIFIER_MAX];
+            char method_name[TRANSPILE_IDENTIFIER_MAX];
+            char local_base[TRANSPILE_IDENTIFIER_MAX];
+            char local_source[TRANSPILE_IDENTIFIER_MAX];
+            char local_cobol[TRANSPILE_IDENTIFIER_MAX];
+            t_cblc_data_item *receiver_item;
+            const t_cblc_struct_type *receiver_type;
+            const t_cblc_method *method;
+            t_cblc_data_kind result_kind;
+            t_cblc_statement *statement;
+
+            if (receiver_end - token_start >= sizeof(receiver_name)
+                || method_end - method_start >= sizeof(method_name))
+                goto fail;
+            std::memcpy(receiver_name, condition + token_start,
+                receiver_end - token_start);
+            receiver_name[receiver_end - token_start] = '\0';
+            std::memcpy(method_name, condition + method_start,
+                method_end - method_start);
+            method_name[method_end - method_start] = '\0';
+            receiver_item = cblc_find_data_item(unit, receiver_name);
+            receiver_item = cblc_resolve_implicit_member_item(unit,
+                receiver_name, receiver_item);
+            receiver_type = receiver_item
+                ? cblc_find_receiver_type(unit, receiver_item) : NULL;
+            method = receiver_type
+                ? cblc_find_method_on_type(receiver_type, method_name) : NULL;
+            if (!method || method->parameter_count != 0
+                || (method->return_kind != CBLC_FUNCTION_RETURN_INT
+                    && method->return_kind != CBLC_FUNCTION_RETURN_DOUBLE
+                    && method->return_kind != CBLC_FUNCTION_RETURN_CHAR))
+            {
+                input_index = receiver_end;
+                goto copy_identifier;
+            }
+            result_kind = method->return_kind == CBLC_FUNCTION_RETURN_INT
+                ? CBLC_DATA_KIND_INT
+                : (method->return_kind == CBLC_FUNCTION_RETURN_DOUBLE
+                    ? CBLC_DATA_KIND_DOUBLE : CBLC_DATA_KIND_CHAR);
+            if (std::snprintf(local_base, sizeof(local_base),
+                    "CBLC_CONDITION_VALUE_%zu", function->statement_count) < 0
+                || cblc_build_unique_local_storage_names(unit, function,
+                    local_base, local_source, sizeof(local_source), local_cobol,
+                    sizeof(local_cobol)) != FT_SUCCESS
+                || cblc_add_named_data_item(unit, local_source, local_cobol,
+                    result_kind, 0, 0, NULL, function->source_name, 1, 0, 0)
+                    != FT_SUCCESS
+                || cblc_append_statement(function,
+                    CBLC_STATEMENT_METHOD_CALL_ASSIGN, local_cobol,
+                    receiver_item->cobol_name, 0) != FT_SUCCESS)
+                goto fail;
+            statement = &function->statements[function->statement_count - 1];
+            statement->source_offset = cblc_source_offset(unit,
+                source_condition + method_start);
+            statement->source_length = method_end - method_start;
+            cblc_exception_source_position(unit,
+                source_condition + method_start,
+                &statement->exception_source_line,
+                &statement->exception_source_column);
+            cblc_exception_source_position(unit,
+                source_condition + method_start,
+                &statement->source_line, &statement->source_column);
+            ft_strlcpy(statement->call_identifier, method_name,
+                sizeof(statement->call_identifier));
+            statement->call_argument_count = 0;
+            if (output_length + std::strlen(local_source)
+                    >= sizeof(rewritten))
+                goto fail;
+            std::memcpy(rewritten + output_length, local_source,
+                std::strlen(local_source));
+            output_length += std::strlen(local_source);
+            rewritten[output_length] = '\0';
+            input_index = call_end;
+            continue ;
+        }
+copy_identifier:
+        if (output_length + receiver_end - token_start >= sizeof(rewritten))
+            goto fail;
+        std::memcpy(rewritten + output_length, condition + token_start,
+            receiver_end - token_start);
+        output_length += receiver_end - token_start;
+        rewritten[output_length] = '\0';
+    }
+    if (output_length + 1 > condition_size)
+        goto fail;
+    ft_strlcpy(condition, rewritten, condition_size);
+    return (FT_SUCCESS);
+fail:
+    unit->data_count = original_data_count;
+    function->statement_count = original_statement_count;
+    return (FT_FAILURE);
+}
 
 static int cblc_parse_condition(const char **cursor, t_cblc_translation_unit *unit,
+    t_cblc_function *function, int lower_scalar_method_calls,
     char *condition, size_t condition_size)
 {
     const char *condition_start;
@@ -209,6 +446,10 @@ static int cblc_parse_condition(const char **cursor, t_cblc_translation_unit *un
         return (FT_FAILURE);
     std::memcpy(raw_condition, condition_start, condition_length);
     raw_condition[condition_length] = '\0';
+    if (lower_scalar_method_calls
+        && cblc_lower_scalar_method_calls_in_if_condition(unit, function,
+            condition_start, raw_condition, sizeof(raw_condition)) != FT_SUCCESS)
+        return (FT_FAILURE);
     normalized_length = 0;
     condition_index = 0;
     while (raw_condition[condition_index] != '\0')
@@ -298,7 +539,8 @@ static int cblc_parse_generic_while(const char **cursor, t_cblc_translation_unit
     start = *cursor;
     if (!cblc_match_keyword(cursor, "while"))
         return (FT_FAILURE);
-    if (cblc_parse_condition(cursor, unit, condition, sizeof(condition)) != FT_SUCCESS)
+    if (cblc_parse_condition(cursor, unit, NULL, 0, condition,
+            sizeof(condition)) != FT_SUCCESS)
         goto fail;
     cblc_skip_whitespace(cursor);
     if (**cursor != '{')
@@ -329,7 +571,8 @@ static int cblc_parse_generic_if(const char **cursor, t_cblc_translation_unit *u
         return (FT_FAILURE);
     start = *cursor;
     if (!cblc_match_keyword(cursor, "if")
-        || cblc_parse_condition(cursor, unit, condition, sizeof(condition)) != FT_SUCCESS)
+        || cblc_parse_condition(cursor, unit, function, 1, condition,
+            sizeof(condition)) != FT_SUCCESS)
         goto fail;
     cblc_skip_whitespace(cursor);
     if (**cursor != '{'

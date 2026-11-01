@@ -1258,8 +1258,7 @@ class string
             throw error;
         }
         result_length = stored_length + source_length;
-        result.data = new char[result_length + 1];
-        result.storage_capacity = result_length + 1;
+        result.reserve_storage(result_length + 1);
         index = 0;
         while (index < stored_length)
         {

@@ -1180,6 +1180,34 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_standard_library_string_operator_plus_reuses_owned_result_storage)
+{
+    const char *string_source;
+    const char *operator_plus;
+    const char *next_method;
+    const char *reserve_result;
+    const char *allocate_result;
+
+    string_source = transpiler_standard_library_get_native_source("CBLC-STRING");
+    operator_plus = string_source
+        ? std::strstr(string_source, "string operator+(string source)") : NULL;
+    next_method = operator_plus
+        ? std::strstr(operator_plus, "void assign(string source)") : NULL;
+    reserve_result = operator_plus
+        ? std::strstr(operator_plus, "result.reserve_storage(result_length + 1);") : NULL;
+    allocate_result = operator_plus
+        ? std::strstr(operator_plus, "result.data = new char[") : NULL;
+
+    if (!string_source || !operator_plus || !next_method || !reserve_result
+        || reserve_result >= next_method
+        || (allocate_result && allocate_result < next_method))
+    {
+        std::printf("Assertion failed: string operator+ must reuse the default-constructed result buffer instead of overwriting and leaking its owned allocation\n");
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_standard_library_string_to_c_string_returns_owned_copy)
 {
     const char *source;
