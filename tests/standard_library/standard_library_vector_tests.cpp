@@ -1950,6 +1950,123 @@ FT_TEST(test_standard_library_vector_short_circuit_guards_string_chain)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_standard_library_vector_subscript_string_chain_in_condition_borrows_element)
+{
+    const char *errors_source;
+    const char *string_source;
+    const char *vector_source;
+    std::string combined_source;
+    t_cblc_translation_unit unit;
+    const t_cblc_function *main_function;
+    const t_cblc_statement *len_call;
+    const t_cblc_statement *if_statement;
+    const t_cblc_data_item *receiver_item;
+    char *generated_cobol;
+    char diagnostic[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    int diagnostic_code;
+
+    errors_source = transpiler_standard_library_get_native_source("CBLC-ERRORS");
+    string_source = transpiler_standard_library_get_native_source("CBLC-STRING");
+    vector_source = transpiler_standard_library_get_native_source("CBLC-VECTOR");
+    if (!errors_source || !string_source || !vector_source)
+        return (FT_FAILURE);
+    combined_source = std::string(errors_source) + "\n" + string_source + "\n"
+        + vector_source + "\n"
+        + "void main() {\n"
+        + "    vector<string> items;\n"
+        + "    int index;\n"
+        + "    if (items[index]->len() > 0) { }\n"
+        + "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    diagnostic[0] = '\0';
+    diagnostic_code = 0;
+    if (cblc_parse_translation_unit(combined_source.c_str(), &unit) != FT_SUCCESS)
+    {
+        std::printf("subscript vector<string> condition parse diagnostic: %s\n",
+            unit.parse_error_message);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    main_function = NULL;
+    for (size_t function_index = 0; function_index < unit.function_count;
+        ++function_index)
+    {
+        if (std::strcmp(unit.functions[function_index].source_name, "main") == 0)
+        {
+            main_function = &unit.functions[function_index];
+            break ;
+        }
+    }
+    len_call = NULL;
+    if_statement = NULL;
+    if (main_function)
+    {
+        for (size_t statement_index = 0;
+            statement_index < main_function->statement_count; ++statement_index)
+        {
+            const t_cblc_statement *statement =
+                &main_function->statements[statement_index];
+
+            if (statement->type == CBLC_STATEMENT_METHOD_CALL_ASSIGN
+                && std::strcmp(statement->call_identifier, "len") == 0)
+                len_call = statement;
+            else if (statement->type == CBLC_STATEMENT_IF_BEGIN
+                && std::strstr(statement->source, "CONDITION-CHAIN"))
+                if_statement = statement;
+        }
+    }
+    receiver_item = NULL;
+    if (len_call)
+    {
+        for (size_t data_index = 0; data_index < unit.data_count; ++data_index)
+        {
+            if (std::strcmp(unit.data_items[data_index].cobol_name,
+                    len_call->source) == 0)
+            {
+                receiver_item = &unit.data_items[data_index];
+                break ;
+            }
+        }
+    }
+    if (!main_function || !len_call || !if_statement || !receiver_item
+        || receiver_item->kind != CBLC_DATA_KIND_STRUCT_POINTER
+        || std::strcmp(receiver_item->struct_type_name, "string") != 0
+        || !std::strchr(receiver_item->source_name, '[')
+        || !std::strstr(if_statement->source, len_call->target))
+    {
+        std::printf("Assertion failed: vector<string>::operator[](index)->len() in a condition must lower to a scalar result over the indexed borrow, not copy the element\n");
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &diagnostic_code, diagnostic, sizeof(diagnostic)) != FT_SUCCESS
+        || !generated_cobol
+        || std::strstr(generated_cobol, "CBLC-SPTR-MAIN-ITEMS[")
+        || transpiler_validate_generated_cobol_with_diagnostic(generated_cobol,
+            diagnostic, sizeof(diagnostic)) != FT_SUCCESS)
+    {
+        std::printf("subscript vector<string> condition COBOL validation failed (%d): %s\n",
+            diagnostic_code, diagnostic);
+        if (generated_cobol)
+        {
+            const char *bad_based_name = std::strstr(generated_cobol,
+                "CBLC-SPTR-MAIN-ITEMS[");
+
+            if (bad_based_name)
+                std::printf("Invalid indexed BASED declaration: %.96s\n",
+                    bad_based_name);
+        }
+        if (generated_cobol)
+            cma_free(generated_cobol);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_standard_library_vector_logical_conditions_guard_rhs_method_calls)
 {
     const char *program_source;

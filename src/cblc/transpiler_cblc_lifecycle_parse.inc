@@ -186,6 +186,38 @@ static int cblc_condition_method_chain_end(const char *condition,
     has_arguments = 0;
     while (1)
     {
+        size_t bracket_depth;
+        int quote;
+
+        while (condition[cursor] == ' ' || condition[cursor] == '\t')
+            cursor += 1;
+        if (condition[cursor] != '[')
+            break ;
+        has_arguments = 1;
+        bracket_depth = 1;
+        quote = 0;
+        cursor += 1;
+        while (condition[cursor] != '\0' && bracket_depth != 0)
+        {
+            if (quote != 0)
+            {
+                if (condition[cursor] == quote
+                    && (cursor == 0 || condition[cursor - 1] != '\\'))
+                    quote = 0;
+            }
+            else if (condition[cursor] == '\'' || condition[cursor] == '"')
+                quote = condition[cursor];
+            else if (condition[cursor] == '[')
+                bracket_depth += 1;
+            else if (condition[cursor] == ']')
+                bracket_depth -= 1;
+            cursor += 1;
+        }
+        if (bracket_depth != 0 || quote != 0)
+            return (FT_FAILURE);
+    }
+    while (1)
+    {
         size_t open_index;
         size_t depth;
         int quote;

@@ -2972,6 +2972,8 @@ int cblc_generate_cobol_with_diagnostic(
         {
             if (unit->data_items[index].kind == CBLC_DATA_KIND_STRUCT_POINTER
                 && !unit->data_items[index].is_template_item
+                && !unit->data_items[index].is_alias
+                && !std::strchr(unit->data_items[index].cobol_name, '[')
                 && !cblc_struct_pointer_layout_seen(&emitted_pointer_layouts,
                     &unit->data_items[index]))
             {
