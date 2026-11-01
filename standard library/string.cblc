@@ -2377,21 +2377,58 @@ class string
     double parse_double()
     {
         double result;
+        double fraction_value;
+        double fractional_place;
+        double previous_fractional_place;
+        double tail_fractional_value;
+        double maximum_magnitude;
+        double maximum_coefficient;
         int index;
         int end;
         int negative;
         int seen_digit;
         int seen_dot;
-        int decimal_places;
+        int nonzero_digit;
+        int scale_index;
         int digit;
         char current;
         result = 0;
+        fraction_value = 0;
+        fractional_place = 1;
+        fractional_place = fractional_place / 10;
+        previous_fractional_place = 0;
+        tail_fractional_value = 0;
+        maximum_magnitude = 1;
+        maximum_coefficient = 1;
+        maximum_coefficient = maximum_coefficient * 10 + 7;
+        maximum_coefficient = maximum_coefficient * 10 + 9;
+        maximum_coefficient = maximum_coefficient * 10 + 7;
+        maximum_coefficient = maximum_coefficient * 10 + 6;
+        maximum_coefficient = maximum_coefficient * 10 + 9;
+        maximum_coefficient = maximum_coefficient * 10 + 3;
+        maximum_coefficient = maximum_coefficient * 10 + 1;
+        maximum_coefficient = maximum_coefficient * 10 + 3;
+        maximum_coefficient = maximum_coefficient * 10 + 4;
+        maximum_coefficient = maximum_coefficient * 10 + 8;
+        maximum_coefficient = maximum_coefficient * 10 + 6;
+        maximum_coefficient = maximum_coefficient * 10 + 2;
+        maximum_coefficient = maximum_coefficient * 10 + 3;
+        maximum_coefficient = maximum_coefficient * 10 + 1;
+        maximum_coefficient = maximum_coefficient * 10 + 5;
+        maximum_coefficient = maximum_coefficient * 10 + 7;
+        scale_index = 0;
+        while (scale_index < 292)
+        {
+            maximum_magnitude = maximum_magnitude * 10;
+            scale_index = scale_index + 1;
+        }
+        maximum_magnitude = maximum_magnitude * maximum_coefficient;
         index = 0;
         end = stored_length;
         negative = 0;
         seen_digit = 0;
         seen_dot = 0;
-        decimal_places = 0;
+        nonzero_digit = 0;
         while (index < end
             && is_ascii_whitespace_byte(std::ord(data[index]) - 1) == 1)
         {
@@ -2426,10 +2463,47 @@ class string
             digit = std::ord(current) - std::ord('0');
             if (digit >= 0 && digit <= 9)
             {
-                result = result * 10 + digit;
-                if (seen_dot == 1)
+                if (digit > 0)
                 {
-                    decimal_places = decimal_places + 1;
+                    nonzero_digit = 1;
+                }
+                if (seen_dot == 0)
+                {
+                    if (result > (maximum_magnitude - digit) / 10)
+                    {
+                        range_error error;
+                        error.code = 1;
+                        throw error;
+                    }
+                    result = result * 10 + digit;
+                    if (result > maximum_magnitude)
+                    {
+                        range_error error;
+                        error.code = 1;
+                        throw error;
+                    }
+                }
+                else
+                {
+                    if (fractional_place > 0)
+                    {
+                        fraction_value = fraction_value
+                            + digit * fractional_place;
+                        previous_fractional_place = fractional_place;
+                        fractional_place = fractional_place / 10;
+                    }
+                    else
+                    {
+                        if (previous_fractional_place > 0)
+                        {
+                            tail_fractional_value = previous_fractional_place
+                                * digit;
+                            tail_fractional_value = tail_fractional_value / 10;
+                            fraction_value = fraction_value
+                                + tail_fractional_value;
+                            previous_fractional_place = 0;
+                        }
+                    }
                 }
                 seen_digit = 1;
             }
@@ -2454,10 +2528,27 @@ class string
             error.code = 1;
             throw error;
         }
-        while (decimal_places > 0)
+        if (fraction_value > 0)
         {
-            result = result / 10;
-            decimal_places = decimal_places - 1;
+            if (result > maximum_magnitude - fraction_value)
+            {
+                range_error error;
+                error.code = 1;
+                throw error;
+            }
+            result = result + fraction_value;
+        }
+        if (result > maximum_magnitude)
+        {
+            range_error error;
+            error.code = 1;
+            throw error;
+        }
+        if (result == 0 && nonzero_digit == 1)
+        {
+            range_error error;
+            error.code = 2;
+            throw error;
         }
         if (negative == 1)
         {

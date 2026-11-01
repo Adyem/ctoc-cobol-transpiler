@@ -436,6 +436,100 @@ FT_TEST(test_cblc_string_parse_int_boundaries_and_errors_executes)
         "STRING PARSE INT CONTRACT OK\n"));
 }
 
+static const char *g_string_parse_double_range_source =
+    "void main()\n"
+    "{\n"
+    "    string finite_integer(\"1\");\n"
+    "    string finite_fraction(\"1.\");\n"
+    "    string overflow(\"9\");\n"
+    "    double parsed;\n"
+    "    int index;\n"
+    "    int range_caught;\n"
+    "    int finite_caught;\n"
+    "    index = 0;\n"
+    "    while (index < 308) {\n"
+    "        finite_integer.push_back('0');\n"
+    "        index = index + 1;\n"
+    "    }\n"
+    "    index = 0;\n"
+    "    while (index < 400) {\n"
+    "        finite_fraction.push_back('9');\n"
+    "        overflow.push_back('9');\n"
+    "        index = index + 1;\n"
+    "    }\n"
+    "    range_caught = 0;\n"
+    "    finite_caught = 0;\n"
+    "    try { parsed = finite_integer.parse_double(); }\n"
+    "    catch (const range_error& error) { finite_caught = finite_caught + 1; }\n"
+    "    try { parsed = finite_fraction.parse_double(); }\n"
+    "    catch (const range_error& error) { finite_caught = finite_caught + 1; }\n"
+    "    try { parsed = overflow.parse_double(); }\n"
+    "    catch (const range_error& error) { range_caught = error.code; }\n"
+    "    if (finite_caught == 0 && range_caught == 1) {\n"
+    "        display(\"STRING PARSE DOUBLE RANGE OK\");\n"
+    "    } else {\n"
+    "        display(\"STRING PARSE DOUBLE RANGE BAD\");\n"
+    "    }\n"
+    "    return;\n"
+    "}\n";
+
+FT_TEST(test_cblc_string_parse_double_range_generates)
+{
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int diagnostic_code;
+    char diagnostic[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    int status;
+
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    diagnostic_code = 0;
+    diagnostic[0] = '\0';
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(g_string_parse_double_range_source,
+            &unit) != FT_SUCCESS)
+    {
+        std::printf("string parse_double range parse diagnostic: %s\n",
+            unit.parse_error_message);
+        goto cleanup;
+    }
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &diagnostic_code, diagnostic, sizeof(diagnostic)) != FT_SUCCESS)
+    {
+        std::printf("string parse_double range generation diagnostic (%d): %s\n",
+            diagnostic_code, diagnostic);
+        goto cleanup;
+    }
+    if (!generated_cobol
+        || !std::strstr(generated_cobol,
+            "CBLC-METHOD-MAIN-FINITE-INTEGER-PARSE-DOUBLE")
+        || !std::strstr(generated_cobol,
+            "CBLC-METHOD-MAIN-FINITE-FRACTION-PARSE-DOUBLE")
+        || !std::strstr(generated_cobol,
+            "CBLC-METHOD-MAIN-OVERFLOW-PARSE-DOUBLE")
+        || !std::strstr(generated_cobol, "CBLC-EX-RAISING"))
+    {
+        std::printf("Assertion failed: parse_double must emit typed range checks for finite and overflowing decimal inputs\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_string_parse_double_range_executes)
+{
+    if (!test_cobc_available())
+        return (test_require_cobc_dependency(__func__));
+    return (run_inline_cblc_to_cobol_execution_test(
+        g_string_parse_double_range_source,
+        "string_parse_double_range_generated",
+        "STRING PARSE DOUBLE RANGE OK\n"));
+}
+
 static const char *g_string_substr_utf8_contract_source =
     "void main()\n"
     "{\n"
