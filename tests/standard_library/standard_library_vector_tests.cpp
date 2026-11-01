@@ -518,6 +518,14 @@ static const char *g_vector_runtime_source =
     "        {\n"
     "            display(\"VALUE RESIZE DESTROYS TAIL\");\n"
     "        }\n"
+    "        while (values.size() > 0 && values.capacity() > 0)\n"
+    "        {\n"
+    "            values.pop_back();\n"
+    "        }\n"
+    "        if (values.empty())\n"
+    "        {\n"
+    "            display(\"VALUE RESIZE WHILE RECHECKS\");\n"
+    "        }\n"
     "    }\n"
     "    if (tracked_constructions == tracked_destructions)\n"
     "    {\n"
@@ -1629,6 +1637,352 @@ FT_TEST(test_standard_library_vector_size_call_in_if_is_materialized_before_bran
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_standard_library_vector_logical_conditions_guard_rhs_method_calls)
+{
+    const char *program_source;
+    std::string combined_source;
+    t_cblc_translation_unit unit;
+    const t_cblc_function *main_function;
+    size_t logical_and_guard;
+    size_t logical_or_guard;
+    size_t and_else_index;
+    size_t and_right_call_index;
+    size_t or_else_index;
+    size_t or_right_call_index;
+    size_t left_call_count;
+    size_t right_call_count;
+    size_t previous_call_source_offset;
+    size_t index;
+    int call_source_order_valid;
+    char *generated_cobol;
+    char diagnostic[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    int diagnostic_code;
+
+    program_source = "class ConditionProbe {\n"
+        "public:\n"
+        "    int calls;\n"
+        "    int left() { calls = calls + 1; return 0; }\n"
+        "    int right() { calls = calls + 1; return 1; }\n"
+        "};\n"
+        "void main() {\n"
+        "    ConditionProbe probe;\n"
+        "    if ((probe.left() != 0) && (probe.right() != 0)) { }\n"
+        "    if ((probe.left() != 0) || (probe.right() != 0)) { }\n"
+        "    if (probe.left() == 0 || (probe.right() != 0 && probe.left() != 0)) { }\n"
+        "}\n";
+    combined_source = std::string(program_source);
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    diagnostic[0] = '\0';
+    diagnostic_code = 0;
+    if (cblc_parse_translation_unit(combined_source.c_str(), &unit) != FT_SUCCESS)
+    {
+        std::printf("short-circuit method-call parse diagnostic: %s\n",
+            unit.parse_error_message);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    main_function = NULL;
+    for (index = 0; index < unit.function_count; ++index)
+    {
+        if (std::strcmp(unit.functions[index].source_name, "main") == 0)
+        {
+            main_function = &unit.functions[index];
+            break ;
+        }
+    }
+    logical_and_guard = static_cast<size_t>(-1);
+    logical_or_guard = static_cast<size_t>(-1);
+    and_else_index = static_cast<size_t>(-1);
+    and_right_call_index = static_cast<size_t>(-1);
+    or_else_index = static_cast<size_t>(-1);
+    or_right_call_index = static_cast<size_t>(-1);
+    left_call_count = 0;
+    right_call_count = 0;
+    previous_call_source_offset = static_cast<size_t>(-1);
+    call_source_order_valid = 1;
+    if (main_function)
+    {
+        for (index = 0; index < main_function->statement_count; ++index)
+        {
+            const t_cblc_statement *statement = &main_function->statements[index];
+
+            if (statement->type == CBLC_STATEMENT_IF_BEGIN
+                && std::strstr(statement->source, "BOOLEAN_OPERAND"))
+            {
+                if (logical_and_guard == static_cast<size_t>(-1))
+                    logical_and_guard = index;
+                else if (logical_or_guard == static_cast<size_t>(-1))
+                    logical_or_guard = index;
+            }
+            else if (statement->type == CBLC_STATEMENT_IF_ELSE)
+            {
+                if (logical_and_guard != static_cast<size_t>(-1)
+                    && and_else_index == static_cast<size_t>(-1)
+                    && index > logical_and_guard)
+                    and_else_index = index;
+                else if (logical_or_guard != static_cast<size_t>(-1)
+                    && or_else_index == static_cast<size_t>(-1)
+                    && index > logical_or_guard)
+                    or_else_index = index;
+            }
+            else if (statement->type == CBLC_STATEMENT_METHOD_CALL_ASSIGN
+                && std::strcmp(statement->call_identifier, "left") == 0)
+            {
+                if (previous_call_source_offset != static_cast<size_t>(-1)
+                    && statement->source_offset <= previous_call_source_offset)
+                    call_source_order_valid = 0;
+                previous_call_source_offset = statement->source_offset;
+                left_call_count += 1;
+            }
+            else if (statement->type == CBLC_STATEMENT_METHOD_CALL_ASSIGN
+                && std::strcmp(statement->call_identifier, "right") == 0)
+            {
+                if (previous_call_source_offset != static_cast<size_t>(-1)
+                    && statement->source_offset <= previous_call_source_offset)
+                    call_source_order_valid = 0;
+                previous_call_source_offset = statement->source_offset;
+                right_call_count += 1;
+                if (and_right_call_index == static_cast<size_t>(-1))
+                    and_right_call_index = index;
+                else if (or_right_call_index == static_cast<size_t>(-1))
+                    or_right_call_index = index;
+            }
+        }
+    }
+    if (!main_function || left_call_count != 4 || right_call_count != 3
+        || !call_source_order_valid
+        || logical_and_guard == static_cast<size_t>(-1)
+        || logical_or_guard == static_cast<size_t>(-1)
+        || and_right_call_index <= logical_and_guard
+        || and_else_index <= and_right_call_index
+        || or_else_index == static_cast<size_t>(-1)
+        || or_else_index >= or_right_call_index)
+    {
+        std::printf("Assertion failed: logical RHS calls must remain inside their short-circuit control-flow branches (left=%zu right=%zu &&-guard=%zu &&-rhs=%zu &&-else=%zu ||-guard=%zu ||-else=%zu ||-rhs=%zu)\n",
+            left_call_count, right_call_count, logical_and_guard,
+            and_right_call_index, and_else_index, logical_or_guard,
+            or_else_index, or_right_call_index);
+        if (main_function)
+        {
+            for (index = 0; index < main_function->statement_count; ++index)
+            {
+                const t_cblc_statement *statement =
+                    &main_function->statements[index];
+
+                std::printf("short-circuit IR[%zu]: type=%d target=%s source=%s method=%s\n",
+                    index, statement->type, statement->target, statement->source,
+                    statement->call_identifier);
+            }
+        }
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &diagnostic_code, diagnostic, sizeof(diagnostic)) != FT_SUCCESS
+        || !generated_cobol
+        || transpiler_validate_generated_cobol_with_diagnostic(generated_cobol,
+            diagnostic, sizeof(diagnostic)) != FT_SUCCESS)
+    {
+        std::printf("short-circuit method-call COBOL validation failed (%d): %s\n",
+            diagnostic_code, diagnostic);
+        if (generated_cobol)
+            cma_free(generated_cobol);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_standard_library_vector_size_call_in_while_is_recomputed_each_iteration)
+{
+    const char *errors_source;
+    const char *vector_source;
+    const char *program_source;
+    std::string combined_source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    char cobol_diagnostic[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    int diagnostic_code;
+    const t_cblc_function *target_function;
+    size_t active_initialization_index;
+    size_t while_begin_index;
+    size_t size_call_index;
+    size_t short_circuit_guard_index;
+    size_t capacity_call_index;
+    size_t condition_index;
+    size_t result_condition_index;
+    size_t loop_else_index;
+    size_t active_exit_index;
+    size_t condition_end_index;
+    size_t while_end_index;
+    size_t function_index;
+
+    errors_source = transpiler_standard_library_get_native_source("CBLC-ERRORS");
+    vector_source = transpiler_standard_library_get_native_source("CBLC-VECTOR");
+    program_source = "void main() {\n"
+        "    vector<int> items;\n"
+        "    items.push_back(1);\n"
+        "    while (items.size() > 0 && items.capacity() > 0) {\n"
+        "        items.pop_back();\n"
+        "    }\n"
+        "}\n";
+    if (!errors_source || !vector_source)
+        return (FT_FAILURE);
+    combined_source = std::string(errors_source) + "\n" + vector_source + "\n"
+        + program_source;
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    cobol_diagnostic[0] = '\0';
+    diagnostic_code = 0;
+    if (cblc_parse_translation_unit(combined_source.c_str(), &unit) != FT_SUCCESS)
+    {
+        std::printf("while condition method-call parse diagnostic: %s\n",
+            unit.parse_error_message);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    target_function = NULL;
+    function_index = 0;
+    while (function_index < unit.function_count)
+    {
+        if (std::strcmp(unit.functions[function_index].source_name,
+                "main") == 0)
+        {
+            target_function = &unit.functions[function_index];
+            break ;
+        }
+        function_index += 1;
+    }
+    active_initialization_index = static_cast<size_t>(-1);
+    while_begin_index = static_cast<size_t>(-1);
+    size_call_index = static_cast<size_t>(-1);
+    short_circuit_guard_index = static_cast<size_t>(-1);
+    capacity_call_index = static_cast<size_t>(-1);
+    condition_index = static_cast<size_t>(-1);
+    result_condition_index = static_cast<size_t>(-1);
+    loop_else_index = static_cast<size_t>(-1);
+    active_exit_index = static_cast<size_t>(-1);
+    condition_end_index = static_cast<size_t>(-1);
+    while_end_index = static_cast<size_t>(-1);
+    if (target_function)
+    {
+        size_t statement_index;
+
+        statement_index = 0;
+        while (statement_index < target_function->statement_count)
+        {
+            const t_cblc_statement *statement =
+                &target_function->statements[statement_index];
+
+            if (statement->type == CBLC_STATEMENT_ASSIGNMENT
+                && std::strcmp(statement->source, "0") == 0
+                && std::strstr(statement->target, "WHILE-ACTIVE"))
+                active_initialization_index = statement_index;
+            else if (statement->type == CBLC_STATEMENT_WHILE_BEGIN
+                && std::strstr(statement->source, "WHILE_ACTIVE"))
+                while_begin_index = statement_index;
+            else if (statement->type == CBLC_STATEMENT_METHOD_CALL_ASSIGN
+                && std::strcmp(statement->call_identifier, "size") == 0)
+                size_call_index = statement_index;
+            else if (statement->type == CBLC_STATEMENT_METHOD_CALL_ASSIGN
+                && std::strcmp(statement->call_identifier, "capacity") == 0)
+                capacity_call_index = statement_index;
+            else if (statement->type == CBLC_STATEMENT_IF_BEGIN
+                && std::strstr(statement->source, "BOOLEAN_OPERAND"))
+                short_circuit_guard_index = statement_index;
+            else if (statement->type == CBLC_STATEMENT_IF_BEGIN
+                && std::strstr(statement->source, "BOOLEAN-RESULT"))
+                result_condition_index = statement_index;
+            else if (statement->type == CBLC_STATEMENT_IF_BEGIN
+                && size_call_index != static_cast<size_t>(-1)
+                && condition_index == static_cast<size_t>(-1)
+                && std::strstr(statement->source, "WHILE-ACTIVE") == NULL)
+                condition_index = statement_index;
+            else if (statement->type == CBLC_STATEMENT_IF_ELSE)
+                loop_else_index = statement_index;
+            else if (statement->type == CBLC_STATEMENT_ASSIGNMENT
+                && std::strcmp(statement->source, "1") == 0
+                && std::strstr(statement->target, "WHILE-ACTIVE"))
+                active_exit_index = statement_index;
+            else if (statement->type == CBLC_STATEMENT_IF_END)
+                condition_end_index = statement_index;
+            else if (statement->type == CBLC_STATEMENT_WHILE_END)
+                while_end_index = statement_index;
+            statement_index += 1;
+        }
+    }
+    if (!target_function
+        || active_initialization_index == static_cast<size_t>(-1)
+        || while_begin_index == static_cast<size_t>(-1)
+        || size_call_index == static_cast<size_t>(-1)
+        || short_circuit_guard_index == static_cast<size_t>(-1)
+        || capacity_call_index == static_cast<size_t>(-1)
+        || condition_index == static_cast<size_t>(-1)
+        || result_condition_index == static_cast<size_t>(-1)
+        || loop_else_index == static_cast<size_t>(-1)
+        || active_exit_index == static_cast<size_t>(-1)
+        || condition_end_index == static_cast<size_t>(-1)
+        || while_end_index == static_cast<size_t>(-1)
+        || !(active_initialization_index < while_begin_index
+            && while_begin_index < size_call_index
+            && size_call_index < condition_index
+            && short_circuit_guard_index < capacity_call_index
+            && capacity_call_index < result_condition_index
+            && condition_index < loop_else_index
+            && loop_else_index < active_exit_index
+            && active_exit_index < condition_end_index
+            && condition_end_index < while_end_index)
+        || !std::strstr(target_function->statements[condition_index].source,
+            "CONDITION_VALUE")
+        || std::strstr(target_function->statements[condition_index].source,
+            ".size()"))
+    {
+        std::printf("Assertion failed: while conditions must reevaluate operands per iteration, keep short-circuit RHS calls inside their guard, and exit after a false result (indices %zu %zu %zu %zu %zu %zu %zu %zu %zu %zu %zu)\n",
+            active_initialization_index, while_begin_index, size_call_index,
+            condition_index, short_circuit_guard_index, capacity_call_index,
+            result_condition_index, loop_else_index, active_exit_index,
+            condition_end_index, while_end_index);
+        if (target_function)
+        {
+            size_t statement_index;
+
+            statement_index = 0;
+            while (statement_index < target_function->statement_count)
+            {
+                const t_cblc_statement *statement =
+                    &target_function->statements[statement_index];
+
+                std::printf("while IR[%zu]: type=%d target=%s source=%s method=%s\n",
+                    statement_index, statement->type, statement->target,
+                    statement->source, statement->call_identifier);
+                statement_index += 1;
+            }
+        }
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &diagnostic_code, cobol_diagnostic,
+            sizeof(cobol_diagnostic)) != FT_SUCCESS
+        || !generated_cobol
+        || transpiler_validate_generated_cobol_with_diagnostic(generated_cobol,
+            cobol_diagnostic, sizeof(cobol_diagnostic)) != FT_SUCCESS)
+    {
+        std::printf("while method-call COBOL validation failed (%d): %s\n",
+            diagnostic_code, cobol_diagnostic);
+        if (generated_cobol)
+            cma_free(generated_cobol);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_standard_library_vector_translates_full_lifecycle)
 {
     char directory[256];
@@ -1899,6 +2253,7 @@ FT_TEST(test_standard_library_vector_translates_full_lifecycle)
     VECTOR_EXPECT_MARKER("COUNT VALUE CONSTRUCTION", "count/value construction copies class values into live slots");
     VECTOR_EXPECT_MARKER("COUNT VALUE CLEANUP", "count/value elements and their seed are each destroyed exactly once");
     VECTOR_EXPECT_MARKER("VALUE RESIZE DESTROYS TAIL", "value-resize destroys removed class elements and publishes the reduced size");
+    VECTOR_EXPECT_MARKER("VALUE RESIZE WHILE RECHECKS", "scalar condition methods are reevaluated on each loop iteration until the vector is empty");
     VECTOR_EXPECT_MARKER("VALUE RESIZE LIFETIME BALANCED", "value-resize leaves no live-element leaks or double destruction at scope exit");
     VECTOR_EXPECT_VALUE(2, "local vector is usable during its scope");
     VECTOR_EXPECT_VALUE(41, "local vector front");
@@ -2017,6 +2372,8 @@ FT_TEST(test_standard_library_vector_string_runtime_fixture_generates)
             "DISPLAY \"SCOPE DOES NOT DOUBLE DESTROY\"") != FT_SUCCESS
         || vector_cobol_contains(cobol_path,
             "DISPLAY \"VALUE RESIZE DESTROYS TAIL\"") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "DISPLAY \"VALUE RESIZE WHILE RECHECKS\"") != FT_SUCCESS
         || vector_cobol_contains(cobol_path,
             "DISPLAY \"VALUE RESIZE LIFETIME BALANCED\"") != FT_SUCCESS)
     {

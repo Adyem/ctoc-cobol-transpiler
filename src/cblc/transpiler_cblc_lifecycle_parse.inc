@@ -180,9 +180,8 @@ static int cblc_lower_scalar_method_calls_in_if_condition(
     if (!unit || !function || !source_condition || !condition
         || condition_size == 0)
         return (FT_FAILURE);
-    /* Calls in short-circuit operands must be lowered into control-flow
-     * branches, not eagerly hoisted ahead of the condition. Leave those for
-     * the CFG expression-lowering pass. */
+    /* This helper handles one leaf operand. Keep the guard as a safety net:
+     * any logical tree reaching it must stay intact rather than being hoisted. */
     has_short_circuit = 0;
     quote = 0;
     input_index = 0;
@@ -396,6 +395,349 @@ fail:
     return (FT_FAILURE);
 }
 
+static int cblc_condition_strip_outer_parentheses(const char *condition,
+    size_t *start, size_t *length)
+{
+    int changed;
+
+    if (!condition || !start || !length)
+        return (FT_FAILURE);
+    changed = 1;
+    while (changed)
+    {
+        size_t index;
+        size_t depth;
+        char quote;
+
+        changed = 0;
+        while (*length > 0 && (condition[*start] == ' '
+                || condition[*start] == '\t' || condition[*start] == '\n'
+                || condition[*start] == '\r'))
+        {
+            *start += 1;
+            *length -= 1;
+            changed = 1;
+        }
+        while (*length > 0 && (condition[*start + *length - 1] == ' '
+                || condition[*start + *length - 1] == '\t'
+                || condition[*start + *length - 1] == '\n'
+                || condition[*start + *length - 1] == '\r'))
+        {
+            *length -= 1;
+            changed = 1;
+        }
+        if (*length < 2 || condition[*start] != '('
+            || condition[*start + *length - 1] != ')')
+            continue ;
+        depth = 0;
+        quote = '\0';
+        index = *start;
+        while (index < *start + *length)
+        {
+            char current;
+
+            current = condition[index];
+            if (quote != '\0')
+            {
+                if (current == quote && (index == *start
+                        || condition[index - 1] != '\\'))
+                    quote = '\0';
+            }
+            else if (current == '\'' || current == '"')
+                quote = current;
+            else if (current == '(')
+                depth += 1;
+            else if (current == ')')
+            {
+                if (depth == 0)
+                    return (FT_FAILURE);
+                depth -= 1;
+                if (depth == 0 && index != *start + *length - 1)
+                    break ;
+            }
+            index += 1;
+        }
+        if (index == *start + *length && depth == 0 && quote == '\0')
+        {
+            *start += 1;
+            *length -= 2;
+            while (*length > 0 && (condition[*start] == ' '
+                    || condition[*start] == '\t' || condition[*start] == '\n'
+                    || condition[*start] == '\r'))
+            {
+                *start += 1;
+                *length -= 1;
+            }
+            while (*length > 0 && (condition[*start + *length - 1] == ' '
+                    || condition[*start + *length - 1] == '\t'
+                    || condition[*start + *length - 1] == '\n'
+                    || condition[*start + *length - 1] == '\r'))
+                *length -= 1;
+            changed = 1;
+        }
+    }
+    return (FT_SUCCESS);
+}
+
+static int cblc_condition_find_logical_operator(const char *condition,
+    size_t start, size_t length, const char *logical_operator,
+    size_t *operator_position)
+{
+    size_t index;
+    size_t depth;
+    size_t operator_length;
+    char quote;
+
+    if (!condition || !logical_operator || !operator_position)
+        return (FT_FAILURE);
+    operator_length = std::strlen(logical_operator);
+    depth = 0;
+    quote = '\0';
+    index = start;
+    while (index < start + length)
+    {
+        char current;
+
+        current = condition[index];
+        if (quote != '\0')
+        {
+            if (current == quote && (index == start
+                    || condition[index - 1] != '\\'))
+                quote = '\0';
+        }
+        else if (current == '\'' || current == '"')
+            quote = current;
+        else if (current == '(')
+            depth += 1;
+        else if (current == ')')
+        {
+            if (depth == 0)
+                return (FT_FAILURE);
+            depth -= 1;
+        }
+        else if (depth == 0 && index + operator_length <= start + length
+            && std::memcmp(condition + index, logical_operator,
+                operator_length) == 0)
+        {
+            *operator_position = index;
+            return (FT_SUCCESS);
+        }
+        index += 1;
+    }
+    if (depth != 0 || quote != '\0')
+        return (FT_FAILURE);
+    *operator_position = static_cast<size_t>(-1);
+    return (FT_SUCCESS);
+}
+
+static int cblc_add_condition_integer(t_cblc_translation_unit *unit,
+    t_cblc_function *function, const char *stem, char *source_name,
+    size_t source_size, char *cobol_name, size_t cobol_size)
+{
+    char local_base[TRANSPILE_IDENTIFIER_MAX];
+
+    if (!unit || !function || !stem || !source_name || source_size == 0
+        || !cobol_name || cobol_size == 0
+        || std::snprintf(local_base, sizeof(local_base), "%s_%zu", stem,
+            function->statement_count) < 0
+        || cblc_build_unique_local_storage_names(unit, function, local_base,
+            source_name, source_size, cobol_name, cobol_size) != FT_SUCCESS
+        || cblc_add_named_data_item(unit, source_name, cobol_name,
+            CBLC_DATA_KIND_INT, 0, 0, NULL, function->source_name,
+            1, 0, 0) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int cblc_append_condition_assignment(t_cblc_function *function,
+    const char *target, const char *literal)
+{
+    return (cblc_append_statement(function, CBLC_STATEMENT_ASSIGNMENT,
+        target, literal, 1));
+}
+
+/* Emit each logical tree as left-first branches. Every path assigns a 0/1
+ * result, and a right operand exists only inside the branch that evaluates it. */
+static int cblc_lower_boolean_expression(t_cblc_translation_unit *unit,
+    t_cblc_function *function, const char *source_condition,
+    const char *source_origin,
+    size_t expression_start, size_t expression_length,
+    const char *result_source, const char *result_cobol, size_t recursion_depth)
+{
+    char left_source[TRANSPILE_IDENTIFIER_MAX];
+    char left_cobol[TRANSPILE_IDENTIFIER_MAX];
+    size_t operator_position;
+    size_t expression_end;
+    size_t left_start;
+    size_t left_length;
+    size_t right_start;
+    size_t right_length;
+    const char *logical_operator;
+    int is_or;
+
+    if (!unit || !function || !source_condition || !source_origin || !result_source
+        || !result_cobol || recursion_depth > 64 || expression_length == 0)
+        return (FT_FAILURE);
+    if (cblc_condition_strip_outer_parentheses(source_condition,
+            &expression_start, &expression_length) != FT_SUCCESS)
+        return (FT_FAILURE);
+    expression_end = expression_start + expression_length;
+    operator_position = static_cast<size_t>(-1);
+    if (cblc_condition_find_logical_operator(source_condition, expression_start,
+            expression_length, "||", &operator_position) != FT_SUCCESS)
+        return (FT_FAILURE);
+    logical_operator = "||";
+    is_or = 1;
+    if (operator_position == static_cast<size_t>(-1))
+    {
+        if (cblc_condition_find_logical_operator(source_condition,
+                expression_start, expression_length, "&&",
+                &operator_position) != FT_SUCCESS)
+            return (FT_FAILURE);
+        logical_operator = "&&";
+        is_or = 0;
+    }
+    if (operator_position == static_cast<size_t>(-1))
+    {
+        char leaf[TRANSPILE_STATEMENT_TEXT_MAX];
+        size_t leaf_start;
+        size_t leaf_length;
+
+        leaf_start = expression_start;
+        leaf_length = expression_length;
+        while (leaf_length > 0 && (source_condition[leaf_start] == ' '
+                || source_condition[leaf_start] == '\t'
+                || source_condition[leaf_start] == '\n'
+                || source_condition[leaf_start] == '\r'))
+        {
+            leaf_start += 1;
+            leaf_length -= 1;
+        }
+        while (leaf_length > 0 && (source_condition[leaf_start + leaf_length - 1] == ' '
+                || source_condition[leaf_start + leaf_length - 1] == '\t'
+                || source_condition[leaf_start + leaf_length - 1] == '\n'
+                || source_condition[leaf_start + leaf_length - 1] == '\r'))
+            leaf_length -= 1;
+        if (leaf_length == 0 || leaf_length >= sizeof(leaf))
+            return (FT_FAILURE);
+        std::memcpy(leaf, source_condition + leaf_start, leaf_length);
+        leaf[leaf_length] = '\0';
+        if (cblc_lower_scalar_method_calls_in_if_condition(unit, function,
+                source_origin + leaf_start, leaf, sizeof(leaf)) != FT_SUCCESS
+            || cblc_append_statement(function, CBLC_STATEMENT_IF_BEGIN, NULL,
+                leaf, 0) != FT_SUCCESS
+            || cblc_append_condition_assignment(function, result_cobol, "1")
+                != FT_SUCCESS
+            || cblc_append_statement(function, CBLC_STATEMENT_IF_ELSE,
+                NULL, NULL, 0) != FT_SUCCESS
+            || cblc_append_condition_assignment(function, result_cobol, "0")
+                != FT_SUCCESS
+            || cblc_append_statement(function, CBLC_STATEMENT_IF_END,
+                NULL, NULL, 0) != FT_SUCCESS)
+            return (FT_FAILURE);
+        return (FT_SUCCESS);
+    }
+    if (operator_position <= expression_start
+        || operator_position + std::strlen(logical_operator) >= expression_end)
+        return (FT_FAILURE);
+    left_start = expression_start;
+    left_length = operator_position - expression_start;
+    right_start = operator_position + std::strlen(logical_operator);
+    right_length = expression_end - right_start;
+    if (cblc_add_condition_integer(unit, function, "CBLC_BOOLEAN_OPERAND",
+            left_source, sizeof(left_source), left_cobol,
+            sizeof(left_cobol)) != FT_SUCCESS
+        || cblc_lower_boolean_expression(unit, function, source_condition,
+            source_origin, left_start, left_length, left_source, left_cobol,
+            recursion_depth + 1) != FT_SUCCESS)
+        return (FT_FAILURE);
+    {
+        char branch_condition[TRANSPILE_STATEMENT_TEXT_MAX];
+
+        if (std::snprintf(branch_condition, sizeof(branch_condition),
+                "%s == 1", left_source) < 0
+            || cblc_append_statement(function, CBLC_STATEMENT_IF_BEGIN, NULL,
+                branch_condition, 0) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    if (is_or)
+    {
+        if (cblc_append_condition_assignment(function, result_cobol, "1")
+                != FT_SUCCESS
+            || cblc_append_statement(function, CBLC_STATEMENT_IF_ELSE,
+                NULL, NULL, 0) != FT_SUCCESS
+            || cblc_lower_boolean_expression(unit, function, source_condition,
+                source_origin, right_start, right_length, result_source, result_cobol,
+                recursion_depth + 1) != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    else if (cblc_lower_boolean_expression(unit, function, source_condition,
+                source_origin, right_start, right_length, result_source, result_cobol,
+                recursion_depth + 1) != FT_SUCCESS
+        || cblc_append_statement(function, CBLC_STATEMENT_IF_ELSE,
+            NULL, NULL, 0) != FT_SUCCESS
+        || cblc_append_condition_assignment(function, result_cobol, "0")
+            != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (cblc_append_statement(function, CBLC_STATEMENT_IF_END,
+        NULL, NULL, 0));
+}
+
+static int cblc_lower_short_circuit_condition(t_cblc_translation_unit *unit,
+    t_cblc_function *function, const char *source_condition,
+    char *condition, size_t condition_size, int *was_lowered)
+{
+    size_t operator_position;
+    char result_source[TRANSPILE_IDENTIFIER_MAX];
+    char result_cobol[TRANSPILE_IDENTIFIER_MAX];
+    char rewritten[TRANSPILE_STATEMENT_TEXT_MAX];
+    size_t original_data_count;
+    size_t original_statement_count;
+    size_t expression_start;
+    size_t condition_length;
+
+    if (!unit || !function || !source_condition || !condition
+        || condition_size == 0 || !was_lowered)
+        return (FT_FAILURE);
+    *was_lowered = 0;
+    condition_length = std::strlen(condition);
+    expression_start = 0;
+    if (cblc_condition_strip_outer_parentheses(condition, &expression_start,
+            &condition_length) != FT_SUCCESS)
+        return (FT_FAILURE);
+    operator_position = static_cast<size_t>(-1);
+    if (cblc_condition_find_logical_operator(condition, expression_start,
+            condition_length,
+            "||", &operator_position) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (operator_position == static_cast<size_t>(-1)
+        && cblc_condition_find_logical_operator(condition, expression_start,
+            condition_length,
+            "&&", &operator_position) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (operator_position == static_cast<size_t>(-1))
+        return (FT_SUCCESS);
+    original_data_count = unit->data_count;
+    original_statement_count = function->statement_count;
+    if (cblc_add_condition_integer(unit, function, "CBLC_BOOLEAN_RESULT",
+            result_source, sizeof(result_source), result_cobol,
+            sizeof(result_cobol)) != FT_SUCCESS
+        || cblc_lower_boolean_expression(unit, function, condition,
+            source_condition, expression_start, condition_length,
+            result_source, result_cobol, 0) != FT_SUCCESS
+        || std::snprintf(rewritten, sizeof(rewritten), "%s == 1",
+            result_source) < 0
+        || std::strlen(rewritten) >= condition_size)
+    {
+        unit->data_count = original_data_count;
+        function->statement_count = original_statement_count;
+        return (FT_FAILURE);
+    }
+    ft_strlcpy(condition, rewritten, condition_size);
+    *was_lowered = 1;
+    return (FT_SUCCESS);
+}
+
 static int cblc_parse_condition(const char **cursor, t_cblc_translation_unit *unit,
     t_cblc_function *function, int lower_scalar_method_calls,
     char *condition, size_t condition_size)
@@ -407,6 +749,7 @@ static int cblc_parse_condition(const char **cursor, t_cblc_translation_unit *un
     char raw_condition[TRANSPILE_STATEMENT_TEXT_MAX];
     size_t normalized_length;
     size_t condition_index;
+    int logical_condition_lowered;
 
     if (!cursor || !*cursor || !unit || !condition || condition_size == 0)
         return (FT_FAILURE);
@@ -446,9 +789,15 @@ static int cblc_parse_condition(const char **cursor, t_cblc_translation_unit *un
         return (FT_FAILURE);
     std::memcpy(raw_condition, condition_start, condition_length);
     raw_condition[condition_length] = '\0';
+    logical_condition_lowered = 0;
     if (lower_scalar_method_calls
-        && cblc_lower_scalar_method_calls_in_if_condition(unit, function,
-            condition_start, raw_condition, sizeof(raw_condition)) != FT_SUCCESS)
+        && (cblc_lower_short_circuit_condition(unit, function,
+                condition_start, raw_condition, sizeof(raw_condition),
+                &logical_condition_lowered) != FT_SUCCESS
+            || (!logical_condition_lowered
+                && cblc_lower_scalar_method_calls_in_if_condition(unit,
+                    function, condition_start, raw_condition,
+                    sizeof(raw_condition)) != FT_SUCCESS)))
         return (FT_FAILURE);
     normalized_length = 0;
     condition_index = 0;
@@ -533,18 +882,105 @@ static int cblc_parse_generic_while(const char **cursor, t_cblc_translation_unit
 {
     const char *start;
     char condition[TRANSPILE_STATEMENT_TEXT_MAX];
+    char active_source[TRANSPILE_IDENTIFIER_MAX];
+    char active_cobol[TRANSPILE_IDENTIFIER_MAX];
+    size_t original_statement_count;
+    size_t original_data_count;
+    size_t original_scope_count;
+    size_t original_scope_id;
+    size_t original_local_destructor_count;
+    size_t original_exception_type_count;
+    size_t original_exception_region_depth;
+    size_t original_next_exception_region_id;
+    size_t original_active_catch_region_id;
+    size_t original_active_catch_cleanup_base;
+    size_t lowered_call_count;
+    t_cblc_statement active_assignment;
+    t_cblc_statement while_begin;
+    int original_saw_return;
+    int original_may_throw;
+    int original_exception_types_unknown;
+    int original_exception_in_catch;
 
     if (!cursor || !*cursor || !unit || !function)
         return (FT_FAILURE);
     start = *cursor;
+    original_statement_count = function->statement_count;
+    original_data_count = unit->data_count;
+    original_scope_count = unit->scope_count;
+    original_scope_id = unit->active_scope_id;
+    original_local_destructor_count = function->local_destructor_count;
+    original_exception_type_count = function->exception_type_count;
+    original_exception_region_depth = function->exception_region_depth;
+    original_next_exception_region_id = function->next_exception_region_id;
+    original_active_catch_region_id = function->active_catch_region_id;
+    original_active_catch_cleanup_base = function->active_catch_cleanup_base;
+    original_saw_return = function->saw_return;
+    original_may_throw = function->may_throw;
+    original_exception_types_unknown = function->exception_types_unknown;
+    original_exception_in_catch = function->exception_in_catch;
     if (!cblc_match_keyword(cursor, "while"))
         return (FT_FAILURE);
-    if (cblc_parse_condition(cursor, unit, NULL, 0, condition,
+    if (cblc_parse_condition(cursor, unit, function, 1, condition,
             sizeof(condition)) != FT_SUCCESS)
         goto fail;
+    lowered_call_count = function->statement_count - original_statement_count;
     cblc_skip_whitespace(cursor);
     if (**cursor != '{')
         goto fail;
+    if (lowered_call_count > 0)
+    {
+        char active_base[TRANSPILE_IDENTIFIER_MAX];
+        char while_condition[TRANSPILE_STATEMENT_TEXT_MAX];
+        size_t while_begin_index;
+        size_t condition_index;
+
+        if (std::snprintf(active_base, sizeof(active_base),
+                "CBLC_WHILE_ACTIVE_%zu", original_statement_count) < 0
+            || cblc_build_unique_local_storage_names(unit, function,
+                active_base, active_source, sizeof(active_source), active_cobol,
+                sizeof(active_cobol)) != FT_SUCCESS
+            || cblc_add_named_data_item(unit, active_source, active_cobol,
+                CBLC_DATA_KIND_INT, 0, 0, NULL, function->source_name,
+                1, 0, 0) != FT_SUCCESS
+            || std::snprintf(while_condition, sizeof(while_condition),
+                "%s == 0", active_source) < 0)
+            goto fail;
+        if (cblc_append_statement(function, CBLC_STATEMENT_ASSIGNMENT,
+                active_cobol, "0", 1) != FT_SUCCESS
+            || cblc_append_statement(function, CBLC_STATEMENT_WHILE_BEGIN,
+                NULL, while_condition, 0) != FT_SUCCESS)
+            goto fail;
+        active_assignment = function->statements[function->statement_count - 2];
+        while_begin = function->statements[function->statement_count - 1];
+        std::memmove(&function->statements[original_statement_count + 2],
+            &function->statements[original_statement_count],
+            lowered_call_count * sizeof(function->statements[0]));
+        function->statements[original_statement_count] = active_assignment;
+        function->statements[original_statement_count + 1] = while_begin;
+        while_begin_index = original_statement_count + 1;
+        cblc_exception_source_position(unit, start,
+            &function->statements[while_begin_index].exception_source_line,
+            &function->statements[while_begin_index].exception_source_column);
+        if (cblc_append_statement(function, CBLC_STATEMENT_IF_BEGIN, NULL,
+                condition, 0) != FT_SUCCESS)
+            goto fail;
+        condition_index = function->statement_count - 1;
+        cblc_exception_source_position(unit, start,
+            &function->statements[condition_index].exception_source_line,
+            &function->statements[condition_index].exception_source_column);
+        if (cblc_parse_statement_block(cursor, unit, function, 1) != FT_SUCCESS
+            || cblc_append_statement(function, CBLC_STATEMENT_IF_ELSE,
+                NULL, NULL, 0) != FT_SUCCESS
+            || cblc_append_statement(function, CBLC_STATEMENT_ASSIGNMENT,
+                active_cobol, "1", 1) != FT_SUCCESS
+            || cblc_append_statement(function, CBLC_STATEMENT_IF_END,
+                NULL, NULL, 0) != FT_SUCCESS
+            || cblc_append_statement(function, CBLC_STATEMENT_WHILE_END,
+                NULL, NULL, 0) != FT_SUCCESS)
+            goto fail;
+        return (FT_SUCCESS);
+    }
     if (cblc_append_statement(function, CBLC_STATEMENT_WHILE_BEGIN,
             NULL, condition, 0) != FT_SUCCESS)
         goto fail;
@@ -557,6 +993,20 @@ static int cblc_parse_generic_while(const char **cursor, t_cblc_translation_unit
         goto fail;
     return (FT_SUCCESS);
 fail:
+    function->statement_count = original_statement_count;
+    function->local_destructor_count = original_local_destructor_count;
+    function->exception_type_count = original_exception_type_count;
+    function->exception_region_depth = original_exception_region_depth;
+    function->next_exception_region_id = original_next_exception_region_id;
+    function->active_catch_region_id = original_active_catch_region_id;
+    function->active_catch_cleanup_base = original_active_catch_cleanup_base;
+    function->saw_return = original_saw_return;
+    function->may_throw = original_may_throw;
+    function->exception_types_unknown = original_exception_types_unknown;
+    function->exception_in_catch = original_exception_in_catch;
+    unit->data_count = original_data_count;
+    unit->scope_count = original_scope_count;
+    unit->active_scope_id = original_scope_id;
     *cursor = start;
     return (FT_FAILURE);
 }
