@@ -34,6 +34,7 @@ def generate(source_dir: Path, output: Path) -> None:
         "struct s_embedded_standard_library_source",
         "{",
         "    const char *program_name;",
+        "    const char *source_path;",
         "    const char *source;",
         "};",
         "",
@@ -45,7 +46,11 @@ def generate(source_dir: Path, output: Path) -> None:
         chunks.extend(c_string_lines(source_path.read_text(encoding="utf-8")))
         chunks.append("    \"\";")
         chunks.append("")
-        entries.append(f'    {{"{program_name(source_path)}", {symbol}}}')
+        source_identity = Path(source_dir.name, source_path.name).as_posix()
+        entries.append(
+            f"    {{{json.dumps(program_name(source_path))}, "
+            f"{json.dumps(source_identity)}, {symbol}}}"
+        )
     chunks.extend(
         [
             "static const s_embedded_standard_library_source",

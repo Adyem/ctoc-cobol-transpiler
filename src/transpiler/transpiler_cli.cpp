@@ -63,6 +63,31 @@ static void transpiler_cli_warning_settings_enable_all(t_transpiler_warning_sett
     settings->unused = 1;
 }
 
+static int transpiler_cli_parse_size_value(const char *text, size_t *out_value)
+{
+    size_t value;
+    size_t index;
+
+    if (!text || !out_value || text[0] == '\0')
+        return (FT_FAILURE);
+    value = 0;
+    index = 0;
+    while (text[index] != '\0')
+    {
+        size_t digit;
+
+        if (text[index] < '0' || text[index] > '9')
+            return (FT_FAILURE);
+        digit = static_cast<size_t>(text[index] - '0');
+        if (value > (static_cast<size_t>(-1) - digit) / 10)
+            return (FT_FAILURE);
+        value = value * 10 + digit;
+        index += 1;
+    }
+    *out_value = value;
+    return (FT_SUCCESS);
+}
+
 static int transpiler_cli_options_append_input(t_transpiler_cli_options *options, const char *path)
 {
     if (!options || !path)
@@ -351,6 +376,13 @@ int transpiler_cli_options_init(t_transpiler_cli_options *options)
     options->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
     options->warnings_as_errors = 0;
     transpiler_cli_warning_settings_enable_all(&options->warning_settings);
+    options->max_source_bytes = TRANSPILE_DEFAULT_MAX_SOURCE_BYTES;
+    options->max_lifetime_edge_transfers =
+        TRANSPILE_DEFAULT_MAX_LIFETIME_EDGE_TRANSFERS;
+    options->max_template_instantiations =
+        TRANSPILE_DEFAULT_MAX_TEMPLATE_INSTANTIATIONS;
+    options->max_template_instantiation_depth =
+        CBLC_TEMPLATE_DEFAULT_MAX_DEPTH;
     options->show_help = 0;
     options->emit_standard_library = 0;
     options->emit_all_standard_library = 0;
@@ -385,6 +417,13 @@ void transpiler_cli_options_dispose(t_transpiler_cli_options *options)
     options->diagnostic_level = TRANSPILE_DIAGNOSTIC_NORMAL;
     options->warnings_as_errors = 0;
     transpiler_cli_warning_settings_enable_all(&options->warning_settings);
+    options->max_source_bytes = TRANSPILE_DEFAULT_MAX_SOURCE_BYTES;
+    options->max_lifetime_edge_transfers =
+        TRANSPILE_DEFAULT_MAX_LIFETIME_EDGE_TRANSFERS;
+    options->max_template_instantiations =
+        TRANSPILE_DEFAULT_MAX_TEMPLATE_INSTANTIATIONS;
+    options->max_template_instantiation_depth =
+        CBLC_TEMPLATE_DEFAULT_MAX_DEPTH;
     options->show_help = 0;
     options->emit_standard_library = 0;
     options->emit_all_standard_library = 0;
@@ -463,6 +502,74 @@ static int transpiler_cli_parse_long_option(t_transpiler_cli_options *options, c
         && std::strlen(argument) == 27)
     {
         options->emit_all_standard_library = 1;
+        return (FT_SUCCESS);
+    }
+    if (std::strcmp(argument, "--max-lifetime-edge-transfers") == 0)
+    {
+        *index += 1;
+        if (*index >= argc)
+        {
+            std::printf("Missing value for --max-lifetime-edge-transfers option.\n");
+            return (FT_FAILURE);
+        }
+        if (transpiler_cli_parse_size_value(argv[*index],
+                &options->max_lifetime_edge_transfers) != FT_SUCCESS)
+        {
+            std::printf("Invalid value for --max-lifetime-edge-transfers option: '%s'. Expected a non-negative decimal integer within size_t range.\n",
+                argv[*index]);
+            return (FT_FAILURE);
+        }
+        return (FT_SUCCESS);
+    }
+    if (std::strcmp(argument, "--max-source-bytes") == 0)
+    {
+        *index += 1;
+        if (*index >= argc)
+        {
+            std::printf("Missing value for --max-source-bytes option.\n");
+            return (FT_FAILURE);
+        }
+        if (transpiler_cli_parse_size_value(argv[*index],
+                &options->max_source_bytes) != FT_SUCCESS)
+        {
+            std::printf("Invalid value for --max-source-bytes option: '%s'. Expected a non-negative decimal integer within size_t range.\n",
+                argv[*index]);
+            return (FT_FAILURE);
+        }
+        return (FT_SUCCESS);
+    }
+    if (std::strcmp(argument, "--max-template-instantiations") == 0)
+    {
+        *index += 1;
+        if (*index >= argc)
+        {
+            std::printf("Missing value for --max-template-instantiations option.\n");
+            return (FT_FAILURE);
+        }
+        if (transpiler_cli_parse_size_value(argv[*index],
+                &options->max_template_instantiations) != FT_SUCCESS)
+        {
+            std::printf("Invalid value for --max-template-instantiations option: '%s'. Expected a non-negative decimal integer within size_t range.\n",
+                argv[*index]);
+            return (FT_FAILURE);
+        }
+        return (FT_SUCCESS);
+    }
+    if (std::strcmp(argument, "--max-template-depth") == 0)
+    {
+        *index += 1;
+        if (*index >= argc)
+        {
+            std::printf("Missing value for --max-template-depth option.\n");
+            return (FT_FAILURE);
+        }
+        if (transpiler_cli_parse_size_value(argv[*index],
+                &options->max_template_instantiation_depth) != FT_SUCCESS)
+        {
+            std::printf("Invalid value for --max-template-depth option: '%s'. Expected a non-negative decimal integer within size_t range.\n",
+                argv[*index]);
+            return (FT_FAILURE);
+        }
         return (FT_SUCCESS);
     }
     if (std::strncmp(argument, "--format", 9) == 0 && std::strlen(argument) == 8)
@@ -626,6 +733,11 @@ int transpiler_cli_apply(const t_transpiler_cli_options *options, t_transpiler_c
     transpiler_context_set_diagnostic_level(context, options->diagnostic_level);
     transpiler_context_set_warnings_as_errors(context, options->warnings_as_errors);
     transpiler_context_set_warning_settings(context, &options->warning_settings);
+    context->max_lifetime_edge_transfers = options->max_lifetime_edge_transfers;
+    context->max_source_bytes = options->max_source_bytes;
+    context->max_template_instantiations = options->max_template_instantiations;
+    context->max_template_instantiation_depth =
+        options->max_template_instantiation_depth;
     return (FT_SUCCESS);
 }
 
@@ -645,6 +757,10 @@ void transpiler_cli_print_usage(void)
     std::printf("                 --dump-copybook-graph <auto|directory> to emit copybook dependency graphs.\n");
     std::printf("                 --dump-semantic-ir <auto|directory> to record pre/post-normalization semantic IR.\n");
     std::printf("                 --warnings-as-errors to treat warnings as build errors.\n");
+    std::printf("                 --max-lifetime-edge-transfers <count> to bound CFG lifetime analysis.\n");
+    std::printf("                 --max-source-bytes <count> to bound aggregate input source bytes (0 disables the cap).\n");
+    std::printf("                 --max-template-instantiations <count> to bound monomorphization work.\n");
+    std::printf("                 --max-template-depth <count> to bound nested template work (0 disables the depth cap).\n");
     std::printf("                 -Werror to escalate warnings.\n");
     std::printf("                 -Wconversion / -Wno-conversion to toggle conversion warnings.\n");
     std::printf("                 -Woverflow / -Wno-overflow to toggle overflow warnings.\n");

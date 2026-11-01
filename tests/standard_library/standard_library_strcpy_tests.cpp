@@ -64,67 +64,6 @@ FT_TEST(test_standard_library_strcpy_generates_expected_text)
     return (FT_SUCCESS);
 }
 
-FT_TEST(test_standard_library_strcpy_string_generates_expected_text)
-{
-    char *program_text;
-    const char *expected_text;
-    int status;
-
-    program_text = NULL;
-    expected_text =
-        "       IDENTIFICATION DIVISION.\n"
-        "       PROGRAM-ID. CBLC-STRCPY-STRING.\n"
-        "       DATA DIVISION.\n"
-        "       WORKING-STORAGE SECTION.\n"
-        "       01 IDX PIC 9(9) VALUE 000000000.\n"
-        "       01 SOURCE-LIMIT PIC 9(9) VALUE 000000000.\n"
-        "       01 COPY-LIMIT PIC 9(9) VALUE 000000000.\n"
-        "       LINKAGE SECTION.\n"
-        "       01 LNK-DESTINATION.\n"
-        "          05 LNK-DESTINATION-LEN PIC 9(4) COMP.\n"
-        "          05 LNK-DESTINATION-BUF PIC X(255).\n"
-        "       01 LNK-SOURCE.\n"
-        "          05 LNK-SOURCE-LEN PIC 9(4) COMP.\n"
-        "          05 LNK-SOURCE-BUF PIC X(255).\n"
-        "       01 LNK-STATUS PIC 9(9).\n"
-        "       PROCEDURE DIVISION USING BY REFERENCE LNK-DESTINATION\n"
-        "           BY REFERENCE LNK-SOURCE BY REFERENCE LNK-STATUS.\n"
-        "       MAIN.\n"
-        "           MOVE 0 TO LNK-STATUS.\n"
-        "           MOVE LNK-SOURCE-LEN TO SOURCE-LIMIT.\n"
-        "           IF SOURCE-LIMIT > 255\n"
-        "               MOVE 255 TO SOURCE-LIMIT\n"
-        "               MOVE 1 TO LNK-STATUS\n"
-        "           END-IF.\n"
-        "           MOVE SOURCE-LIMIT TO COPY-LIMIT.\n"
-        "           MOVE 0 TO LNK-DESTINATION-LEN.\n"
-        "           MOVE 0 TO IDX.\n"
-        "           PERFORM VARYING IDX FROM 1 BY 1 UNTIL IDX > 255\n"
-        "               MOVE SPACE TO LNK-DESTINATION-BUF(IDX:1)\n"
-        "           END-PERFORM.\n"
-        "           MOVE 0 TO IDX.\n"
-        "           PERFORM VARYING IDX FROM 1 BY 1 UNTIL IDX > COPY-LIMIT\n"
-        "               MOVE LNK-SOURCE-BUF(IDX:1) TO LNK-DESTINATION-BUF(IDX:1)\n"
-        "           END-PERFORM.\n"
-        "           MOVE COPY-LIMIT TO LNK-DESTINATION-LEN.\n"
-        "           GOBACK.\n"
-        "       END PROGRAM CBLC-STRCPY-STRING.\n";
-    if (test_expect_success(transpiler_standard_library_generate_strcpy_string(&program_text),
-            "strcpy string generator should succeed") != FT_SUCCESS)
-    {
-        if (program_text)
-            cma_free(program_text);
-        return (FT_FAILURE);
-    }
-    status = test_expect_cstring_equal(program_text, expected_text,
-        "strcpy string generator should emit expected COBOL subprogram");
-    if (program_text)
-        cma_free(program_text);
-    if (status != FT_SUCCESS)
-        return (FT_FAILURE);
-    return (FT_SUCCESS);
-}
-
 FT_TEST(test_standard_library_strcpy_executes_without_truncation)
 {
     const char *library_path;

@@ -1,5 +1,40 @@
 #include "test_suites.hpp"
 
+FT_TEST(test_cblc_class_pointer_method_parameter_preserves_pointee_type)
+{
+    t_cblc_translation_unit unit;
+    const char *source;
+    char *generated_cobol;
+    int status;
+
+    source = "class Owner {\n"
+        "    public:\n"
+        "    int value;\n"
+        "    void set_through_pointer(Owner *source) {\n"
+        "        source->value = 42;\n"
+        "        return;\n"
+        "    }\n"
+        "};\n"
+        "void main() {\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "class pointer method parameter should retain its pointee type") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "class pointer member write should generate COBOL") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_register_translation_unit_exports_records_entrypoint_and_helpers)
 {
     t_transpiler_context context;
@@ -128,8 +163,8 @@ FT_TEST(test_cblc_register_translation_unit_exports_and_imports_public_data)
 
     provider_source = "const int reserve_target = 600000;\n"
         "const int earned_premium = 480000;\n"
-        "string title(\"POLICY SNAPSHOT\");\n"
-        "string note(16);\n"
+        "char title[16];\n"
+        "char note[16];\n"
         "int title_length;\n"
         "int note_length;\n";
     consumer_source = "import \"provider_mod\";\n"

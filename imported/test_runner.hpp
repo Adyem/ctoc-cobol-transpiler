@@ -9,6 +9,8 @@ typedef int (*t_imported_test_func)(void);
 #define TEST_MODULE "Libft"
 #endif
 
+#define IMPORTED_TEST_SKIPPED 2
+
 int imported_test_register(t_imported_test_func func, const char *description, const char *module);
 void imported_test_fail(const char *expression, const char *file, int line);
 int imported_test_run_registered(void);

@@ -1,68 +1,321 @@
 template <typename T>
 class vector
 {
-    public:
-    T *data;
-    T *relocation;
+    private:
+    T *elements;
     int count;
     int reserved;
-    int relocation_index;
+
+    void destroy_current_elements()
+    {
+        int destroy_index;
+
+        destroy_index = count;
+        while (destroy_index > 0)
+        {
+            destroy_index = destroy_index - 1;
+            cblc_destroy_at(elements[destroy_index]);
+        }
+    }
+
+    void reallocate(int requested)
+    {
+        T *relocation;
+        int relocation_index;
+        int maximum_size;
+
+        maximum_size = max_size();
+        if (requested > maximum_size)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        if (requested > reserved)
+        {
+            relocation = new T[requested];
+            relocation_index = 0;
+            try
+            {
+                while (relocation_index < count)
+                {
+                    cblc_relocate_at(relocation[relocation_index],
+                        elements[relocation_index]);
+                    relocation_index = relocation_index + 1;
+                }
+            }
+            catch (...)
+            {
+                while (relocation_index > 0)
+                {
+                    relocation_index = relocation_index - 1;
+                    cblc_destroy_at(relocation[relocation_index]);
+                }
+                delete[] relocation;
+                relocation_index = 0;
+                throw;
+            }
+            destroy_current_elements();
+            delete[] elements;
+            elements = relocation;
+            reserved = requested;
+            relocation_index = 0;
+        }
+    }
+
+    public:
 
     vector()
     {
-        data = NULL;
-        relocation = NULL;
+        elements = NULL;
         count = 0;
         reserved = 0;
-        relocation_index = 0;
+    }
+
+    vector(int requested)
+    {
+        int maximum_size;
+
+        elements = NULL;
+        count = 0;
+        reserved = 0;
+        maximum_size = max_size();
+        if (requested < 0)
+        {
+            invalid_argument error;
+            error.code = 1;
+            throw error;
+        }
+        if (requested > maximum_size)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        if (requested == 0)
+        {
+            return;
+        }
+        elements = new T[requested];
+        reserved = requested;
+        try
+        {
+            while (count < requested)
+            {
+                cblc_construct_at(elements[count]);
+                count = count + 1;
+            }
+        }
+        catch (...)
+        {
+            destroy_current_elements();
+            delete[] elements;
+            elements = NULL;
+            count = 0;
+            reserved = 0;
+            throw;
+        }
+    }
+
+    vector(int requested, T value)
+    {
+        int maximum_size;
+
+        elements = NULL;
+        count = 0;
+        reserved = 0;
+        maximum_size = max_size();
+        if (requested < 0)
+        {
+            invalid_argument error;
+            error.code = 1;
+            throw error;
+        }
+        if (requested > maximum_size)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        if (requested == 0)
+        {
+            return;
+        }
+        elements = new T[requested];
+        reserved = requested;
+        try
+        {
+            while (count < requested)
+            {
+                cblc_construct_at(elements[count], value);
+                count = count + 1;
+            }
+        }
+        catch (...)
+        {
+            destroy_current_elements();
+            delete[] elements;
+            elements = NULL;
+            count = 0;
+            reserved = 0;
+            throw;
+        }
     }
 
     vector(vector source)
     {
-        data = NULL;
-        relocation = NULL;
+        int relocation_index;
+
+        elements = NULL;
         count = source.count;
         reserved = source.reserved;
         relocation_index = 0;
-        if (reserved > 0)
+        try
         {
-            data = new T[reserved];
-            while (relocation_index < count)
+            if (reserved > 0)
             {
-                data[relocation_index] = source.data[relocation_index];
-                relocation_index = relocation_index + 1;
+                elements = new T[reserved];
+                while (relocation_index < count)
+                {
+                    cblc_construct_at(elements[relocation_index], source.elements[relocation_index]);
+                    relocation_index = relocation_index + 1;
+                }
             }
+        }
+        catch (...)
+        {
+            while (relocation_index > 0)
+            {
+                relocation_index = relocation_index - 1;
+                cblc_destroy_at(elements[relocation_index]);
+            }
+            delete[] elements;
+            elements = NULL;
+            count = 0;
+            reserved = 0;
+            relocation_index = 0;
+            throw;
+        }
+        relocation_index = 0;
+    }
+
+    vector(vector *source)
+    {
+        elements = NULL;
+        count = 0;
+        reserved = 0;
+        if (source != NULL)
+        {
+            elements = source->elements;
+            count = source->count;
+            reserved = source->reserved;
+            source->elements = NULL;
+            source->count = 0;
+            source->reserved = 0;
         }
     }
 
     void operator=(vector source)
     {
+        T *relocation;
+        int relocation_index;
+
         relocation = NULL;
         relocation_index = 0;
-        if (source.reserved > 0)
+        try
         {
-            relocation = new T[source.reserved];
-            while (relocation_index < source.count)
+            if (source.reserved > 0)
             {
-                relocation[relocation_index] = source.data[relocation_index];
-                relocation_index = relocation_index + 1;
+                relocation = new T[source.reserved];
+                while (relocation_index < source.count)
+                {
+                    cblc_construct_at(relocation[relocation_index], source.elements[relocation_index]);
+                    relocation_index = relocation_index + 1;
+                }
             }
         }
-        if (data != NULL)
+        catch (...)
         {
-            delete[] data;
+            while (relocation_index > 0)
+            {
+                relocation_index = relocation_index - 1;
+                cblc_destroy_at(relocation[relocation_index]);
+            }
+            delete[] relocation;
+            relocation = NULL;
+            relocation_index = 0;
+            throw;
         }
-        data = NULL;
+        if (elements != NULL)
+        {
+            destroy_current_elements();
+            delete[] elements;
+        }
+        elements = NULL;
         count = source.count;
         reserved = source.reserved;
-        data = relocation;
+        elements = relocation;
         relocation = NULL;
         relocation_index = 0;
     }
 
     ~vector()
     {
-        delete[] data;
+        destroy_current_elements();
+        delete[] elements;
+    }
+
+    void swap(vector *other)
+    {
+        T *temporary_data;
+        int temporary_count;
+        int temporary_reserved;
+
+        if (other == NULL)
+        {
+            return;
+        }
+        temporary_data = elements;
+        elements = other->elements;
+        other->elements = temporary_data;
+        temporary_count = count;
+        count = other->count;
+        other->count = temporary_count;
+        temporary_reserved = reserved;
+        reserved = other->reserved;
+        other->reserved = temporary_reserved;
+    }
+
+    void move_assign(vector *source)
+    {
+        if (source == NULL || source->elements == elements)
+        {
+            return;
+        }
+        destroy_current_elements();
+        delete[] elements;
+        elements = source->elements;
+        count = source->count;
+        reserved = source->reserved;
+        source->elements = NULL;
+        source->count = 0;
+        source->reserved = 0;
+    }
+
+    void move_from(vector *source)
+    {
+        if (source == NULL || source->elements == elements)
+        {
+            return;
+        }
+        destroy_current_elements();
+        delete[] elements;
+        elements = source->elements;
+        count = source->count;
+        reserved = source->reserved;
+        source->elements = NULL;
+        source->count = 0;
+        source->reserved = 0;
     }
 
     int size()
@@ -77,7 +330,14 @@ class vector
 
     int max_size()
     {
-        return 2147483647;
+        int element_size;
+
+        element_size = sizeof(T);
+        if (element_size <= 0)
+        {
+            return 999999999;
+        }
+        return 999999999 / element_size;
     }
 
     int empty()
@@ -91,30 +351,26 @@ class vector
 
     void reserve(int requested)
     {
-        if (requested > reserved && requested > 0)
+        if (requested < 0)
         {
-            relocation = new T[requested];
-            relocation_index = 0;
-            while (relocation_index < count)
-            {
-                relocation[relocation_index] = data[relocation_index];
-                relocation_index = relocation_index + 1;
-            }
-            delete[] data;
-            data = relocation;
-            relocation = NULL;
-            reserved = requested;
+            invalid_argument error;
+            error.code = 1;
+            throw error;
         }
+        reallocate(requested);
     }
 
     void shrink_to_fit()
     {
+        T *relocation;
+        int relocation_index;
+
         if (count < reserved)
         {
             if (count == 0)
             {
-                delete[] data;
-                data = NULL;
+                delete[] elements;
+                elements = NULL;
                 relocation = NULL;
                 reserved = 0;
             }
@@ -122,13 +378,29 @@ class vector
             {
                 relocation = new T[count];
                 relocation_index = 0;
-                while (relocation_index < count)
+                try
                 {
-                    relocation[relocation_index] = data[relocation_index];
-                    relocation_index = relocation_index + 1;
+                    while (relocation_index < count)
+                    {
+                        cblc_relocate_at(relocation[relocation_index],
+                            elements[relocation_index]);
+                        relocation_index = relocation_index + 1;
+                    }
                 }
-                delete[] data;
-                data = relocation;
+                catch (...)
+                {
+                    while (relocation_index > 0)
+                    {
+                        relocation_index = relocation_index - 1;
+                        cblc_destroy_at(relocation[relocation_index]);
+                    }
+                    delete[] relocation;
+                    relocation_index = 0;
+                    throw;
+                }
+                destroy_current_elements();
+                delete[] elements;
+                elements = relocation;
                 relocation = NULL;
                 reserved = count;
             }
@@ -137,50 +409,90 @@ class vector
 
     void push_back(T value)
     {
+        T *relocation;
+        int requested_capacity;
+        int relocation_index;
+        int appended_constructed;
+        int maximum_size;
+
+        maximum_size = max_size();
         if (count >= reserved)
         {
-            if (reserved < 1)
+            if (count >= maximum_size)
             {
-                relocation = new T[1];
-                relocation_index = 0;
+                length_error error;
+                error.code = 1;
+                throw error;
+            }
+            requested_capacity = 1;
+            if (reserved > 0)
+            {
+                if (reserved > maximum_size / 2)
+                {
+                    requested_capacity = maximum_size;
+                }
+                else
+                {
+                    requested_capacity = reserved * 2;
+                }
+            }
+            relocation = NULL;
+            relocation_index = 0;
+            appended_constructed = 0;
+            try
+            {
+                relocation = new T[requested_capacity];
+                cblc_construct_at(relocation[count], value);
+                appended_constructed = 1;
                 while (relocation_index < count)
                 {
-                    relocation[relocation_index] = data[relocation_index];
+                    cblc_relocate_at(relocation[relocation_index],
+                        elements[relocation_index]);
                     relocation_index = relocation_index + 1;
                 }
-                delete[] data;
-                data = relocation;
-                relocation = NULL;
-                reserved = 1;
             }
-            else
+            catch (...)
             {
-                relocation = new T[reserved * 2];
-                relocation_index = 0;
-                while (relocation_index < count)
+                while (relocation_index > 0)
                 {
-                    relocation[relocation_index] = data[relocation_index];
-                    relocation_index = relocation_index + 1;
+                    relocation_index = relocation_index - 1;
+                    cblc_destroy_at(relocation[relocation_index]);
                 }
-                delete[] data;
-                data = relocation;
+                if (appended_constructed == 1)
+                {
+                    cblc_destroy_at(relocation[count]);
+                }
+                delete[] relocation;
                 relocation = NULL;
-                reserved = reserved * 2;
+                throw;
             }
+            destroy_current_elements();
+            delete[] elements;
+            elements = relocation;
+            relocation = NULL;
+            count = count + 1;
+            reserved = requested_capacity;
         }
-        data[count] = value;
-        count = count + 1;
+        else
+        {
+            cblc_construct_at(elements[count], value);
+            count = count + 1;
+        }
     }
 
     void pop_back()
     {
-        if (count > 0)
+        if (count <= 0)
         {
-            count = count - 1;
+            out_of_range error;
+            error.code = 1;
+            throw error;
         }
+        cblc_destroy_at(elements[count - 1]);
+        count = count - 1;
     }
 
-    T at(int index)
+    T *at(int index)
     {
         if (index < 0 || index >= count)
         {
@@ -188,185 +500,637 @@ class vector
             error.code = 1;
             throw error;
         }
-        return data[index];
+        return elements[index];
     }
 
-    T front()
+    T at_value(int index)
     {
-        return data[0];
+        if (index < 0 || index >= count)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        return elements[index];
     }
 
-    T back()
+    T *front()
     {
-        return data[count - 1];
+        if (count <= 0)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        return elements[0];
+    }
+
+    T front_value()
+    {
+        if (count <= 0)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        return elements[0];
+    }
+
+    T *back()
+    {
+        if (count <= 0)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        return elements[count - 1];
+    }
+
+    T back_value()
+    {
+        if (count <= 0)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        return elements[count - 1];
     }
 
     T *operator[](int index)
     {
-        return data + index;
+        if (index < 0 || index >= count)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        return elements[index];
     }
 
     T *operator->()
     {
-        return data + 0;
+        if (count <= 0)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        return elements[0];
     }
 
     void emplace_back(T value)
     {
+        T *relocation;
+        int requested_capacity;
+        int relocation_index;
+        int appended_constructed;
+        int maximum_size;
+
+        maximum_size = max_size();
         if (count >= reserved)
         {
-            if (reserved < 1)
+            if (count >= maximum_size)
             {
-                relocation = new T[1];
-                relocation_index = 0;
+                length_error error;
+                error.code = 1;
+                throw error;
+            }
+            requested_capacity = 1;
+            if (reserved > 0)
+            {
+                if (reserved > maximum_size / 2)
+                {
+                    requested_capacity = maximum_size;
+                }
+                else
+                {
+                    requested_capacity = reserved * 2;
+                }
+            }
+            relocation = NULL;
+            relocation_index = 0;
+            appended_constructed = 0;
+            try
+            {
+                relocation = new T[requested_capacity];
+                cblc_construct_at(relocation[count], value);
+                appended_constructed = 1;
                 while (relocation_index < count)
                 {
-                    relocation[relocation_index] = data[relocation_index];
+                    cblc_relocate_at(relocation[relocation_index],
+                        elements[relocation_index]);
                     relocation_index = relocation_index + 1;
                 }
-                delete[] data;
-                data = relocation;
-                relocation = NULL;
-                reserved = 1;
             }
-            else
+            catch (...)
             {
-                relocation = new T[reserved * 2];
-                relocation_index = 0;
-                while (relocation_index < count)
+                while (relocation_index > 0)
                 {
-                    relocation[relocation_index] = data[relocation_index];
-                    relocation_index = relocation_index + 1;
+                    relocation_index = relocation_index - 1;
+                    cblc_destroy_at(relocation[relocation_index]);
                 }
-                delete[] data;
-                data = relocation;
+                if (appended_constructed == 1)
+                {
+                    cblc_destroy_at(relocation[count]);
+                }
+                delete[] relocation;
                 relocation = NULL;
-                reserved = reserved * 2;
+                throw;
             }
+            destroy_current_elements();
+            delete[] elements;
+            elements = relocation;
+            relocation = NULL;
+            count = count + 1;
+            reserved = requested_capacity;
         }
-        data[count] = value;
-        count = count + 1;
+        else
+        {
+            cblc_construct_at(elements[count], value);
+            count = count + 1;
+        }
+    }
+
+    void emplace_back()
+    {
+        T *relocation;
+        int requested_capacity;
+        int relocation_index;
+        int appended_constructed;
+        int maximum_size;
+
+        maximum_size = max_size();
+        if (count >= reserved)
+        {
+            if (count >= maximum_size)
+            {
+                length_error error;
+                error.code = 1;
+                throw error;
+            }
+            requested_capacity = 1;
+            if (reserved > 0)
+            {
+                if (reserved > maximum_size / 2)
+                {
+                    requested_capacity = maximum_size;
+                }
+                else
+                {
+                    requested_capacity = reserved * 2;
+                }
+            }
+            relocation = NULL;
+            relocation_index = 0;
+            appended_constructed = 0;
+            try
+            {
+                relocation = new T[requested_capacity];
+                cblc_construct_at(relocation[count]);
+                appended_constructed = 1;
+                while (relocation_index < count)
+                {
+                    cblc_relocate_at(relocation[relocation_index],
+                        elements[relocation_index]);
+                    relocation_index = relocation_index + 1;
+                }
+            }
+            catch (...)
+            {
+                while (relocation_index > 0)
+                {
+                    relocation_index = relocation_index - 1;
+                    cblc_destroy_at(relocation[relocation_index]);
+                }
+                if (appended_constructed == 1)
+                {
+                    cblc_destroy_at(relocation[count]);
+                }
+                delete[] relocation;
+                relocation = NULL;
+                throw;
+            }
+            destroy_current_elements();
+            delete[] elements;
+            elements = relocation;
+            relocation = NULL;
+            count = count + 1;
+            reserved = requested_capacity;
+        }
+        else
+        {
+            cblc_construct_at(elements[count]);
+            count = count + 1;
+        }
     }
 
     void insert(int index, T value)
     {
-        int shift;
+        T *relocation;
+        int requested_capacity;
+        int prefix_count;
+        int suffix_count;
+        int inserted_constructed;
+        int maximum_size;
 
-        if (index < 0)
+        maximum_size = max_size();
+        if (index < 0 || index > count)
         {
-            index = 0;
+            out_of_range error;
+            error.code = 1;
+            throw error;
         }
-        if (index > count)
+        if (count >= maximum_size)
         {
-            index = count;
+            length_error error;
+            error.code = 1;
+            throw error;
         }
-        if (count >= reserved)
+        requested_capacity = reserved;
+        if (requested_capacity <= count)
         {
-            if (reserved < 1)
+            requested_capacity = 1;
+            if (reserved > 0)
             {
-                relocation = new T[1];
-                relocation_index = 0;
-                while (relocation_index < count)
+                if (reserved > maximum_size / 2)
                 {
-                    relocation[relocation_index] = data[relocation_index];
-                    relocation_index = relocation_index + 1;
+                    requested_capacity = maximum_size;
                 }
-                delete[] data;
-                data = relocation;
-                relocation = NULL;
-                reserved = 1;
-            }
-            else
-            {
-                relocation = new T[reserved * 2];
-                relocation_index = 0;
-                while (relocation_index < count)
+                else
                 {
-                    relocation[relocation_index] = data[relocation_index];
-                    relocation_index = relocation_index + 1;
+                    requested_capacity = reserved * 2;
                 }
-                delete[] data;
-                data = relocation;
-                relocation = NULL;
-                reserved = reserved * 2;
             }
         }
-        shift = count;
-        while (shift > index)
+        relocation = NULL;
+        prefix_count = 0;
+        suffix_count = 0;
+        inserted_constructed = 0;
+        try
         {
-            data[shift] = data[shift - 1];
-            shift = shift - 1;
+            relocation = new T[requested_capacity];
+            cblc_construct_at(relocation[index], value);
+            inserted_constructed = 1;
+            while (prefix_count < index)
+            {
+                cblc_relocate_at(relocation[prefix_count],
+                    elements[prefix_count]);
+                prefix_count = prefix_count + 1;
+            }
+            while (suffix_count < count - index)
+            {
+                cblc_relocate_at(relocation[index + suffix_count + 1],
+                    elements[index + suffix_count]);
+                suffix_count = suffix_count + 1;
+            }
         }
-        data[index] = value;
+        catch (...)
+        {
+            while (suffix_count > 0)
+            {
+                suffix_count = suffix_count - 1;
+                cblc_destroy_at(relocation[index + suffix_count + 1]);
+            }
+            while (prefix_count > 0)
+            {
+                prefix_count = prefix_count - 1;
+                cblc_destroy_at(relocation[prefix_count]);
+            }
+            if (inserted_constructed == 1)
+            {
+                cblc_destroy_at(relocation[index]);
+            }
+            delete[] relocation;
+            relocation = NULL;
+            prefix_count = 0;
+            suffix_count = 0;
+            inserted_constructed = 0;
+            throw;
+        }
+        destroy_current_elements();
+        delete[] elements;
+        elements = relocation;
+        relocation = NULL;
         count = count + 1;
+        reserved = requested_capacity;
     }
 
     void erase(int index)
     {
-        int shift;
+        T *relocation;
+        int source_index;
+        int relocation_index;
 
-        if (index >= 0 && index < count)
+        if (index < 0 || index >= count)
         {
-            shift = index;
-            while (shift < count - 1)
-            {
-                data[shift] = data[shift + 1];
-                shift = shift + 1;
-            }
-            count = count - 1;
+            out_of_range error;
+            error.code = 1;
+            throw error;
         }
+        relocation = NULL;
+        relocation_index = 0;
+        try
+        {
+            relocation = new T[reserved];
+            source_index = 0;
+            while (source_index < count)
+            {
+                if (source_index != index)
+                {
+                    cblc_relocate_at(relocation[relocation_index],
+                        elements[source_index]);
+                    relocation_index = relocation_index + 1;
+                }
+                source_index = source_index + 1;
+            }
+        }
+        catch (...)
+        {
+            while (relocation_index > 0)
+            {
+                relocation_index = relocation_index - 1;
+                cblc_destroy_at(relocation[relocation_index]);
+            }
+            delete[] relocation;
+            relocation = NULL;
+            relocation_index = 0;
+            throw;
+        }
+        destroy_current_elements();
+        delete[] elements;
+        elements = relocation;
+        relocation = NULL;
+        count = count - 1;
+        relocation_index = 0;
     }
 
 
     void clear()
     {
+        destroy_current_elements();
         count = 0;
     }
 
     void assign(int requested, T value)
     {
+        T *relocation;
+        int replacement_capacity;
+        int relocation_index;
+        int maximum_size;
+
+        maximum_size = max_size();
         if (requested < 0)
         {
-            requested = 0;
+            invalid_argument error;
+            error.code = 1;
+            throw error;
         }
-        if (requested > reserved)
+        if (requested > maximum_size)
         {
-            if (data != NULL)
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        replacement_capacity = reserved;
+        if (requested > replacement_capacity)
+        {
+            replacement_capacity = requested;
+        }
+        relocation = NULL;
+        relocation_index = 0;
+        try
+        {
+            if (replacement_capacity > 0)
             {
-                delete[] data;
+                relocation = new T[replacement_capacity];
             }
-            data = new T[requested];
-            relocation = NULL;
-            reserved = requested;
+            while (relocation_index < requested)
+            {
+                cblc_construct_at(relocation[relocation_index], value);
+                relocation_index = relocation_index + 1;
+            }
         }
-        count = 0;
-        while (count < requested)
+        catch (...)
         {
-            data[count] = value;
-            count = count + 1;
+            while (relocation_index > 0)
+            {
+                relocation_index = relocation_index - 1;
+                cblc_destroy_at(relocation[relocation_index]);
+            }
+            delete[] relocation;
+            relocation = NULL;
+            throw;
         }
+        destroy_current_elements();
+        delete[] elements;
+        elements = relocation;
+        relocation = NULL;
+        count = requested;
+        reserved = replacement_capacity;
+        relocation_index = 0;
     }
 
     void resize(int requested)
     {
+        T *relocation;
+        int replacement_capacity;
+        int relocation_index;
+        int appended_index;
+        int maximum_size;
+
+        maximum_size = max_size();
         if (requested < 0)
         {
-            requested = 0;
+            invalid_argument error;
+            error.code = 1;
+            throw error;
         }
-        if (requested > reserved)
+        if (requested > maximum_size)
         {
-            relocation = new T[requested];
-            relocation_index = 0;
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        if (requested > count)
+        {
+            if (requested <= reserved)
+            {
+                relocation_index = count;
+                try
+                {
+                    while (relocation_index < requested)
+                    {
+                        cblc_construct_at(elements[relocation_index]);
+                        relocation_index = relocation_index + 1;
+                    }
+                }
+                catch (...)
+                {
+                    while (relocation_index > count)
+                    {
+                        relocation_index = relocation_index - 1;
+                        cblc_destroy_at(elements[relocation_index]);
+                    }
+                    relocation_index = 0;
+                    throw;
+                }
+                count = requested;
+                relocation_index = 0;
+            }
+            else
+            {
+                replacement_capacity = requested;
+                relocation = NULL;
+                relocation_index = 0;
+                appended_index = count;
+                try
+                {
+                    relocation = new T[replacement_capacity];
+                    while (appended_index < requested)
+                    {
+                        cblc_construct_at(relocation[appended_index]);
+                        appended_index = appended_index + 1;
+                    }
+                    while (relocation_index < count)
+                    {
+                        cblc_relocate_at(relocation[relocation_index],
+                            elements[relocation_index]);
+                        relocation_index = relocation_index + 1;
+                    }
+                }
+                catch (...)
+                {
+                    while (relocation_index > 0)
+                    {
+                        relocation_index = relocation_index - 1;
+                        cblc_destroy_at(relocation[relocation_index]);
+                    }
+                    while (appended_index > count)
+                    {
+                        appended_index = appended_index - 1;
+                        cblc_destroy_at(relocation[appended_index]);
+                    }
+                    delete[] relocation;
+                    relocation = NULL;
+                    relocation_index = 0;
+                    throw;
+                }
+                destroy_current_elements();
+                delete[] elements;
+                elements = relocation;
+                relocation = NULL;
+                count = requested;
+                reserved = replacement_capacity;
+                relocation_index = 0;
+            }
+        }
+        else
+        {
+            while (count > requested)
+            {
+                cblc_destroy_at(elements[count - 1]);
+                count = count - 1;
+            }
+        }
+    }
+
+    void resize(int requested, T value)
+    {
+        T *relocation;
+        int replacement_capacity;
+        int relocation_index;
+        int appended_index;
+        int maximum_size;
+
+        maximum_size = max_size();
+        if (requested < 0)
+        {
+            invalid_argument error;
+            error.code = 1;
+            throw error;
+        }
+        if (requested > maximum_size)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        if (requested < count)
+        {
+            while (count > requested)
+            {
+                count = count - 1;
+                cblc_destroy_at(elements[count]);
+            }
+            return;
+        }
+        if (requested == count)
+        {
+            return;
+        }
+        if (requested <= reserved)
+        {
+            relocation_index = count;
+            try
+            {
+                while (relocation_index < requested)
+                {
+                    cblc_construct_at(elements[relocation_index], value);
+                    relocation_index = relocation_index + 1;
+                }
+            }
+            catch (...)
+            {
+                while (relocation_index > count)
+                {
+                    relocation_index = relocation_index - 1;
+                    cblc_destroy_at(elements[relocation_index]);
+                }
+                throw;
+            }
+            count = requested;
+            return;
+        }
+        replacement_capacity = requested;
+        relocation = NULL;
+        relocation_index = 0;
+        appended_index = count;
+        try
+        {
+            relocation = new T[replacement_capacity];
+            while (appended_index < requested)
+            {
+                cblc_construct_at(relocation[appended_index], value);
+                appended_index = appended_index + 1;
+            }
             while (relocation_index < count)
             {
-                relocation[relocation_index] = data[relocation_index];
+                cblc_relocate_at(relocation[relocation_index],
+                    elements[relocation_index]);
                 relocation_index = relocation_index + 1;
             }
-            delete[] data;
-            data = relocation;
-            relocation = NULL;
-            reserved = requested;
         }
+        catch (...)
+        {
+            while (relocation_index > 0)
+            {
+                relocation_index = relocation_index - 1;
+                cblc_destroy_at(relocation[relocation_index]);
+            }
+            while (appended_index > count)
+            {
+                appended_index = appended_index - 1;
+                cblc_destroy_at(relocation[appended_index]);
+            }
+            delete[] relocation;
+            throw;
+        }
+        destroy_current_elements();
+        delete[] elements;
+        elements = relocation;
         count = requested;
+        reserved = replacement_capacity;
     }
 };

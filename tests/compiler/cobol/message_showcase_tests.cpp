@@ -279,7 +279,7 @@ FT_TEST(test_message_showcase_sample_make_pipeline)
     }
     if (!test_cobc_available())
     {
-        status = FT_SUCCESS;
+        status = test_require_cobc_dependency(__func__);
         goto cleanup;
     }
     test_remove_file("samples/feature_showcase/message_output.txt");

@@ -272,32 +272,78 @@ portable way to avoid bounds validation. Future bounds-checking features must
 define their cost, failure result, and interaction with pointer arithmetic
 without changing existing pointer ABI rules.
 
-### 6.3 Built-in `string`
+### 6.3 The standard-library `string` class
 
-`string` is a managed, fixed-capacity value object, not a null-terminated C
-pointer. A capacity is supplied using the supported constructor syntax:
+The 1.0 source-language name `string` denotes the standard-library owning
+class, with ordinary class construction, methods, copy/move operations, and
+destruction. There is no competing compiler built-in type also spelled
+`string`. In particular, declarations such as `string greeting(32);` must be
+resolved as class construction, not intercepted by a primitive declaration
+parser. The class is the public abstraction for text and must keep its storage
+private.
 
-```cblc
-string greeting(32);
-string message(64) = "hello";
-```
+Raw character storage remains available independently through `char`,
+`char[]`, and supported character-pointer forms. These are low-level storage
+and interop facilities; they are not implicitly promoted to the owning
+`string` class and do not inherit its UTF-8, capacity, or value-semantics
+contract. Conversion between raw character storage and `string` must use
+explicit constructors or methods with documented length and validation rules.
 
-The object stores logical length and backing capacity. Assignments and mutating
-operations must not silently exceed capacity. The semantic pass reports a
-truncation/capacity diagnostic when it can determine that the operation cannot
-fit. Runtime helpers report the documented status for dynamic failures.
+The competing compiler-created string type and its special source declaration,
+member, and parameter interpretations have been removed. A source occurrence
+of `string` now resolves through the canonical standard-library class before
+template analysis. `string value;` and `string value(32);` are class instances
+(the latter selects the ordinary integer-capacity constructor); they are never
+fixed character buffers. Raw `char[]` and character-pointer forms remain
+separate low-level facilities. Raw character-buffer parameters use the
+`TRANSPILE_FUNCTION_PARAMETER_CHAR_BUFFER` ABI kind; it does not identify the
+`string` class.
 
-Supported operations include construction, assignment, append, clear, length,
-capacity, empty, equality, comparison, contains, starts-with, and ends-with in
-the spellings recognized by the parser and runtime. A string array uses the
-explicit array-plus-capacity form supported by the declaration parser.
+This removes the competing source type, but does not claim that class lifecycle
+lowering, literal conversion, or every old buffer ABI path is complete. The
+remaining migration gates are:
 
-The object is copied according to value semantics in supported assignments and
-copy-constructor-style flows. It must not be treated as a raw pointer or
-manually mutated through undocumented backing storage. The standard-library
-operation table is the authoritative list of supported string members; a name
-appearing in editor completion or a backend helper is not automatically a
-source-language operation.
+1. Former capacity-bearing type spellings such as `string(C)[N]` are rejected;
+   use explicit raw `char[N]` storage for buffer ABIs. Arrays of owning class
+   objects remain unavailable until lifecycle-aware lowering is implemented.
+2. Give literals and raw character inputs explicit, length-aware class
+   construction/conversion paths. Fixed `char[]` is not dynamic owning text;
+   bounds and ownership remain explicit.
+3. Use the owning class or explicit raw-buffer contracts for native `.cblc`
+   APIs. Any retained compatibility adapter may cover only a separately
+   documented raw-buffer ABI; it must not restore the former fixed-buffer
+   owning-string representation or a string-specific source alias.
+4. Complete ordinary class construction, copying, destruction, nested-field,
+   template, and emitted COBOL lifecycle dispatch for `string`.
+
+The concrete compiler inventory is `transpiler_cblc_declarations.inc` and
+`transpiler_cblc_unit_parse.inc` (top-level declarations), `transpiler_cblc_lifecycle_parse.inc`
+(locals), `transpiler_cblc_struct_parse.inc` (members, parameters, and type
+matching), `transpiler_cblc_storage.inc` (raw character-buffer storage), plus
+`transpiler_cblc_call_match_helpers.inc`, `transpiler_cblc_lifecycle_emit.inc`,
+`transpiler_cblc_cobol_emit.inc`, `transpiler_cblc_data_call_helpers.inc`,
+and `transpiler_cblc_references.inc` (ABI matching and lowering). The audit
+must also cover `transpiler_cblc_expression_parse.inc` (string-literal
+construction and `new` expression lowering),
+`transpiler_cblc_pointer_parse.inc` (raw character-pointer declarations and
+operations), and `transpiler_cblc_generate.inc` (storage/layout emission).
+`CBLC_DATA_KIND_CHAR_BUFFER` and length/buffer COBOL storage now denote raw
+character buffers only. Any legacy helper ABI retained for those buffers must
+be isolated and versioned rather than inferred from the spelling `string`.
+`delete` lowering and class destruction must be checked together so owned
+character storage is released exactly once.
+The native-helper generator no longer injects the string class into helper
+units selected by a `-STRING` suffix. Source programs that use `string` resolve
+the canonical class during CBL-C translation-unit analysis; raw character
+helpers use explicit character-buffer signatures. The former compiler-created
+`string` type and its compatibility aliases are removed; no source-level
+spelling or ABI path may restore that competing meaning.
+
+The owning class contract (UTF-8 validity, byte length, code-point operations,
+capacity behavior, mutation guarantees, parsing errors, and complete lifecycle
+semantics) is specified by the standard-library design and its operation
+matrix. An intrinsic/backend helper or editor completion entry is not by
+itself a supported source-language method.
 
 ### 6.4 Records and structs
 
@@ -424,28 +470,22 @@ COBOL identifier. The generated COBOL program must contain only concrete
 paragraphs, groups, and calls, with no unresolved `T` or `typename`.
 
 The current template feature is partial. Fixed-array arguments are supported in
-function parameter positions for integer, explicitly-capacitated string, and
-trivially-copyable concrete struct element arrays. Integer arrays use an
+function parameter positions for integer and trivially-copyable concrete
+struct element arrays. Owning `string` arrays are not yet supported; they need
+type-directed element construction and destruction. Raw character arrays use
+explicit `char[N]` storage and do not acquire owning-string semantics. Integer arrays use an
 exact-shape, by-value-copy ABI: the
 caller must pass a named `int[N]` item and the callee receives an independent
-`OCCURS N TIMES` item. String arrays use the form `string(C)[N]`; both `C` and
-`N` are part of type identity, the caller must pass a named array with exactly
-the same capacity and count, and each element's length and active buffer are
-copied into callee-owned storage. No array-to-pointer decay, implicit bounds
-conversion, dynamic-pointer transfer, or truncation is permitted. Trivially
+`OCCURS N TIMES` item. No array-to-pointer decay, implicit bounds conversion,
+dynamic-pointer transfer, or truncation is permitted. Trivially
 copyable struct arrays use exact concrete struct identity and per-element group
-copies of scalar fields, including fixed character buffers. Mutable string
-fields are deep-copied per element: the callee receives independent `PTR`,
-`CAP`, `LEN`, and buffer storage, and the generated lifecycle releases every
-callee allocation. Structs containing pointer fields are accepted in this
+copies of scalar fields, including fixed character buffers. Structs containing
+pointer fields are accepted in this
 array ABI only when the field is explicitly declared `borrowed`; those fields
 are copied shallowly and the callee does not free or otherwise own the pointee.
 Owning pointer fields remain rejected. Indexed expressions, literals, mismatched
 capacities/bounds, and unsupported return/storage shapes remain rejected until
-their ABI is specified. Within a struct array, a
-`const string(C)` field is represented as a fixed character buffer and copied
-by value. A null mutable source element produces a null destination element;
-non-null elements preserve the source capacity and active length.
+their ABI is specified.
 Struct arrays may provide constructor arguments using `Type[N](arguments)`.
 The selected constructor is applied independently to every element in index
 order after the element's storage is initialized. Constructor parameters use
@@ -457,11 +497,7 @@ Adding any new template form requires updating this section, the feature
 registry, diagnostics, formatter/tooling behavior, and both direct and
 GnuCOBOL-backed tests.
 
-The string-array ABI is versioned separately from the integer ABI. Its
-capacity-bearing type identity prevents a smaller callee buffer from silently
-truncating a source element. Dynamic source pointers remain owned by the
-caller; the callee allocates and cleans up its own element storage. The
-enabled struct-array subset carries concrete struct identity and element count
+The enabled struct-array subset carries concrete struct identity and element count
 and copies each complete element group. The current layout fingerprint crosses
 the module metadata boundary so imported struct identities cannot silently
 drift. Borrowed pointer values must remain valid for the complete callee use;
@@ -502,33 +538,15 @@ model or C's permission to perform arbitrary unchecked casts.
 const item, const string, or protected member are semantic errors. This applies
 to direct assignment and supported indirect/member access paths.
 
-### 6.8 Built-in operations are intrinsics, not copied method bodies
+### 6.8 Compiler intrinsics and class methods
 
-Built-in `string` operations and other compiler-known methods must be represented
-as intrinsic operations in the semantic/lowering layer. Each intrinsic maps to
-one shared runtime/target helper contract, for example:
-
-```text
-string.append       → CBLC string-append helper
-string.length       → CBLC string-length helper
-string.starts_with  → CBLC string-prefix helper
-```
-
-The mapping is resolved once during semantic analysis. The CBL-C-to-COBOL
-backend emits a call to the generated standard-library subprogram or one shared
-generated paragraph. The COBOL backend must not reproduce the complete
-append/length/prefix algorithm separately at every source call site.
-
-The source of truth for the currently registered string intrinsic names,
-argument counts, mutability, and COBOL target associations is
-`src/transpiler/transpiler_cblc_intrinsics.cpp`. A registry entry is not a
-claim that a COBOL program exists: the COBOL target association remains unset
-until its calling convention and generated artifact are implemented and tested.
-
-If an operation needs target-specific preparation—such as obtaining a dynamic
-string buffer view—that preparation belongs in a reusable lowering helper or a
-single target helper contract. It must not become an independent copy of the
-operation's semantics in each caller.
+Compiler-known operations may use intrinsic lowering when the language
+specification explicitly defines them. The owning `string` API is not a
+compiler intrinsic: member lookup, type checking, ownership, and lifecycle
+follow the canonical standard-library class declaration. Any optimization must
+preserve those class semantics. Raw `char[]` and character-pointer operations
+remain separate low-level interfaces and do not constitute another string
+type.
 
 ## 7. Declarations and scope
 
@@ -752,7 +770,7 @@ with parameters. Parameter storage and non-void result slots are explicit
 working-storage ABI elements. Constructors/destructors, pointer receivers, and
 other return kinds still require shared lifecycle/receiver ABI work in the
 remaining gaps; supported constructor and destructor bodies are already emitted
-as receiver-specialized paragraphs. Built-in string operations with parameters
+as receiver-specialized paragraphs. Standard-library string-class operations with parameters
 use the same model: each receiver has reusable argument groups, result/status
 slots, and one paragraph per registered operation. This rule is especially
 important for string capacity checks, allocation, copying, comparison, and
@@ -870,7 +888,7 @@ The initial feature registry is:
 | Feature ID | Capability | Status | Primary sections |
 | --- | --- | --- | --- |
 | `CBLC-MOD-IMPORT` | Multi-file imports and public signatures | current/partial | 4, 14.3 |
-| `CBLC-TYPE-STRING` | Fixed-capacity built-in string values | current/partial | 6.3, 6.8, 12 |
+| `CBLC-TYPE-STRING` | Owning standard-library `string` class; no competing compiler-created string representation | specified; class lifecycle and full runtime coverage remain incomplete | 6.3, 6.8, 12 |
 | `CBLC-TYPE-CLASS` | Classes, methods, constructors, and lifecycle | current/partial | 6.5, 8, 14 |
 | `CBLC-TEMPLATE-TYPE-SUBSTITUTION` | Bounded type templates and monomorphization | partial | 6.5.2, 8, 14 |
 | `CBLC-MEM-POINTER` | Supported pointer kinds and allocator calls | current/partial | 6.6, 12 |
@@ -984,25 +1002,22 @@ are met.
 
 ### 19.1 Remaining implementation TODOs
 
-The following work items are the next release-gated tasks for completing the
-remaining intrinsic and runtime artifact contracts:
+The following work items are the next release-gated tasks for completing
+standard-library class method and runtime artifact contracts:
 
-- [ ] **Parameterized COBOL intrinsic ABI (`CBLC-TODO-INTRINSIC-ABI`).** The
-  reusable receiver-specialized ABI is implemented for the current one-argument
-  string registry (`append`, `equals`, `starts_with`, `ends_with`, `compare`,
-  and `contains`): argument groups, result/status slots, literal/variable
-  argument moves, collision-safe paragraph names, dynamic growth, and fixed
-  capacity handling are emitted once per operation. Complete the release gate
-  by adding executable COBOL coverage for every operation, aliasing and repeated
-  calls, truncation/status behavior, and future multi-argument signatures.
-  Update the intrinsic registry and this ABI section together whenever an
-  operation is added.
+- [ ] **Class method COBOL ABI.** Complete executable COBOL coverage for each
+  supported `string` method, including aliasing, repeated calls, allocation
+  failure, and lifecycle cleanup. Method calls must use the canonical class
+  signature and lifecycle dispatch; no compiler-created string representation
+  or removed legacy string-intrinsic registry may participate. Raw
+  character-buffer interop is separately typed and cannot stand in for class
+  method resolution.
 
 | Area | Current status | Required hardening |
 | --- | --- | --- |
 | exact grammar | **partial** | Keep accepted syntax examples and parser tests synchronized with this document. |
 | method reuse | **partial** | COBOL supports receiver-specialized paragraphs for supported methods and custom constructors/destructors. Extend parameterized destructor ABI and other result kinds. |
-| built-in string intrinsics | **partial** | The operation registry, canonical parser operands, registry-driven arity validation, and reusable COBOL paragraphs for zero- and one-argument string operations are centralized; executable COBOL validation and broader ABI coverage remain release gates. |
+| string class operations | **partial** | The `string` class methods are declared in the native standard-library source. Generated COBOL validation and complete class lifecycle/ABI coverage remain release gates; raw character-buffer helpers are a separate interop surface. |
 | runtime dependency closure | **partial** | COBOL output emits the transitive standard-library closure; broader artifact-level dependency validation remains. |
 | forward file-control generation | **partial** | The sequential declaration/open/read/write/close subset and restricted read loop are defined; add indexed/relative organizations, report-writer clauses, and broader file-control validation incrementally. |
 | reverse translation | **partial** | Keep reverse-recoverable syntax separate from forward language conformance. |

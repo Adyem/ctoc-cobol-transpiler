@@ -2,6 +2,7 @@
 
 int test_parser_parses_minimal_program(void);
 int test_parser_parses_control_flow_statements(void);
+int test_parser_parses_go_to_statement_and_target(void);
 int test_parser_accepts_boolean_character_literals(void);
 int test_parser_accepts_assignment_statement(void);
 int test_parser_accepts_modulo_expression(void);
@@ -33,6 +34,7 @@ const t_test_case *get_parser_tests(size_t *count)
     static const t_test_case tests[] = {
         {"parser_parses_minimal_program", test_parser_parses_minimal_program},
         {"parser_parses_control_flow_statements", test_parser_parses_control_flow_statements},
+        {"parser_parses_go_to_statement_and_target", test_parser_parses_go_to_statement_and_target},
         {"parser_accepts_boolean_character_literals", test_parser_accepts_boolean_character_literals},
         {"parser_accepts_assignment_statement", test_parser_accepts_assignment_statement},
         {"parser_accepts_modulo_expression", test_parser_accepts_modulo_expression},

@@ -48,6 +48,14 @@ static int cblc_binding_shadows_visible_item(const t_cblc_translation_unit *unit
 
     if (!unit || !source_name)
         return (0);
+    /* A root-scope binding has no visible ancestor binding to shadow. Template
+     * specialization materialization adds many uniquely named storage items
+     * at this scope; scanning every previously added item here made deep
+     * vector<T> expansion quadratic in the total generated storage count. */
+    if (unit->active_scope_id >= unit->scope_count
+        || unit->scopes[unit->active_scope_id].parent_id
+            == static_cast<size_t>(-1))
+        return (0);
     index = unit->data_count;
     while (index > 0)
     {
@@ -106,78 +114,6 @@ static const t_cblc_data_item *cblc_find_data_item_const(
     return (NULL);
 }
 
-static int cblc_parse_string_constructor_clause(const char **cursor,
-    t_cblc_translation_unit *unit, size_t *out_length, char *out_arguments,
-    size_t out_arguments_size, size_t *out_argument_count)
-{
-    const t_cblc_data_item *actual_item;
-    const t_cblc_data_item *item;
-    const char *start;
-    const char *literal_cursor;
-    t_cblc_statement statement;
-    char argument[TRANSPILE_STATEMENT_TEXT_MAX];
-    char literal_buffer[TRANSPILE_STATEMENT_TEXT_MAX];
-
-    if (!cursor || !*cursor || !unit || !out_length || !out_arguments
-        || out_arguments_size == 0 || !out_argument_count)
-        return (FT_FAILURE);
-    start = *cursor;
-    if (**cursor != '(')
-        return (FT_FAILURE);
-    *cursor += 1;
-    if (cblc_parse_call_argument_list(cursor, unit, out_arguments, out_arguments_size,
-            out_argument_count) != FT_SUCCESS)
-    {
-        *cursor = start;
-        return (FT_FAILURE);
-    }
-    if (**cursor != ')')
-    {
-        *cursor = start;
-        return (FT_FAILURE);
-    }
-    *cursor += 1;
-    if (*out_argument_count != 1)
-    {
-        *cursor = start;
-        return (FT_FAILURE);
-    }
-    std::memset(&statement, 0, sizeof(statement));
-    ft_strlcpy(statement.call_arguments, out_arguments, sizeof(statement.call_arguments));
-    statement.call_argument_count = *out_argument_count;
-    if (cblc_extract_call_argument(&statement, 0, argument, sizeof(argument)) != FT_SUCCESS)
-    {
-        *cursor = start;
-        return (FT_FAILURE);
-    }
-    if (argument[0] == '"')
-    {
-        literal_cursor = argument;
-        if (cblc_parse_string_literal(&literal_cursor, literal_buffer, sizeof(literal_buffer))
-            != FT_SUCCESS || *literal_cursor != '\0')
-        {
-            *cursor = start;
-            return (FT_FAILURE);
-        }
-        *out_length = std::strlen(literal_buffer);
-        if (*out_length == 0)
-            *out_length = 1;
-        return (FT_SUCCESS);
-    }
-    item = cblc_find_data_item_const(unit, argument);
-    if (!item || item->kind != CBLC_DATA_KIND_STRING || item->array_count > 0)
-    {
-        *cursor = start;
-        return (FT_FAILURE);
-    }
-    actual_item = cblc_find_data_item_by_cobol(unit, item->cobol_name);
-    if (actual_item && !actual_item->is_alias)
-        ft_strlcpy(out_arguments, actual_item->source_name, out_arguments_size);
-    *out_length = item->length;
-    if (*out_length == 0)
-        *out_length = 1;
-    return (FT_SUCCESS);
-}
 
 #include "src/cblc/transpiler_cblc_references.inc"
 #include "src/cblc/transpiler_cblc_struct_parse.inc"
@@ -275,7 +211,9 @@ static int cblc_parse_call_argument_list(const char **cursor,
                 {
                     array_item = cblc_find_data_item(unit, array_identifier);
                     cblc_skip_whitespace(cursor);
-                    if (array_item && array_item->array_count > 0
+                    if (array_item
+                        && ((array_item->array_count > 0)
+                            || array_item->kind == CBLC_DATA_KIND_STRUCT)
                         && (**cursor == ')' || **cursor == ','))
                     {
                         ft_strlcpy(expression, array_identifier, sizeof(expression));
@@ -402,6 +340,10 @@ static int cblc_append_statement(t_cblc_function *function, t_cblc_statement_typ
     }
     statement = &function->statements[function->statement_count];
     statement->type = type;
+    statement->source_offset = static_cast<size_t>(-1);
+    statement->source_length = 0;
+    statement->source_line = function->active_source_line;
+    statement->source_column = function->active_source_column;
     statement->is_literal = is_literal;
     statement->target[0] = '\0';
     statement->source[0] = '\0';
@@ -419,7 +361,7 @@ static int cblc_append_statement(t_cblc_function *function, t_cblc_statement_typ
     statement->exception_to_outer_region = 0;
     statement->exception_payload_is_struct = 0;
     statement->exception_payload_requires_copy = 0;
-    statement->exception_payload_is_string = 0;
+    statement->exception_payload_is_message = 0;
     statement->exception_payload_struct_type[0] = '\0';
     statement->exception_payload_cobol_name[0] = '\0';
     statement->exception_source_line = 0;
@@ -483,6 +425,10 @@ static int cblc_append_existing_statement(t_cblc_function *function,
             statement->source, statement->is_literal) != FT_SUCCESS)
         return (FT_FAILURE);
     appended = &function->statements[function->statement_count - 1];
+    appended->source_offset = statement->source_offset;
+    appended->source_length = statement->source_length;
+    appended->source_line = statement->source_line;
+    appended->source_column = statement->source_column;
     ft_strlcpy(appended->call_identifier, statement->call_identifier,
         sizeof(appended->call_identifier));
     appended->call_is_external = statement->call_is_external;
@@ -500,7 +446,7 @@ static int cblc_append_existing_statement(t_cblc_function *function,
     appended->exception_to_outer_region = statement->exception_to_outer_region;
     appended->exception_payload_is_struct = statement->exception_payload_is_struct;
     appended->exception_payload_requires_copy = statement->exception_payload_requires_copy;
-    appended->exception_payload_is_string = statement->exception_payload_is_string;
+    appended->exception_payload_is_message = statement->exception_payload_is_message;
     ft_strlcpy(appended->exception_payload_struct_type,
         statement->exception_payload_struct_type,
         sizeof(appended->exception_payload_struct_type));
@@ -557,8 +503,8 @@ static int cblc_add_temp_alias_item(t_cblc_translation_unit *unit, const char *s
     std::memset(item, 0, sizeof(*item));
     ft_strlcpy(item->source_name, source_name, sizeof(item->source_name));
     ft_strlcpy(item->cobol_name, cobol_name, sizeof(item->cobol_name));
-    if (kind == CBLC_DATA_KIND_STRING)
-        ft_strlcpy(item->declared_type_name, "string", sizeof(item->declared_type_name));
+    if (kind == CBLC_DATA_KIND_CHAR_BUFFER)
+        ft_strlcpy(item->declared_type_name, "char[]", sizeof(item->declared_type_name));
     else if (struct_type_name)
         ft_strlcpy(item->declared_type_name, struct_type_name, sizeof(item->declared_type_name));
     if (struct_type_name)
@@ -568,6 +514,7 @@ static int cblc_add_temp_alias_item(t_cblc_translation_unit *unit, const char *s
     item->kind = kind;
     item->is_const = is_const;
     item->is_alias = 1;
+    item->is_borrowed = 1;
     item->is_active = 1;
     item->scope_id = unit->active_scope_id;
     item->scope_depth = unit->scopes && unit->active_scope_id < unit->scope_count
@@ -595,8 +542,8 @@ static int cblc_add_named_data_item(t_cblc_translation_unit *unit, const char *s
     std::memset(item, 0, sizeof(*item));
     ft_strlcpy(item->source_name, source_name, sizeof(item->source_name));
     ft_strlcpy(item->cobol_name, cobol_name, sizeof(item->cobol_name));
-    if (kind == CBLC_DATA_KIND_STRING)
-        ft_strlcpy(item->declared_type_name, "string", sizeof(item->declared_type_name));
+    if (kind == CBLC_DATA_KIND_CHAR_BUFFER)
+        ft_strlcpy(item->declared_type_name, "char[]", sizeof(item->declared_type_name));
     else if (struct_type_name)
         ft_strlcpy(item->declared_type_name, struct_type_name, sizeof(item->declared_type_name));
     if (struct_type_name)
@@ -624,6 +571,14 @@ static const t_cblc_struct_type *cblc_find_receiver_type(const t_cblc_translatio
 {
     if (!unit || !item)
         return (NULL);
+    if (item->kind == CBLC_DATA_KIND_STRUCT_POINTER)
+    {
+        if (g_cblc_member_access_type
+            && std::strncmp(item->struct_type_name, g_cblc_member_access_type->source_name,
+                sizeof(item->struct_type_name)) == 0)
+            return (g_cblc_member_access_type);
+        return (cblc_find_struct_type(unit, item->struct_type_name));
+    }
     if (item->declared_type_name[0] != '\0')
     {
         if (g_cblc_member_access_type
@@ -633,14 +588,6 @@ static const t_cblc_struct_type *cblc_find_receiver_type(const t_cblc_translatio
         return (cblc_find_struct_type(unit, item->declared_type_name));
     }
     if (item->kind == CBLC_DATA_KIND_STRUCT)
-    {
-        if (g_cblc_member_access_type
-            && std::strncmp(item->struct_type_name, g_cblc_member_access_type->source_name,
-                sizeof(item->struct_type_name)) == 0)
-            return (g_cblc_member_access_type);
-        return (cblc_find_struct_type(unit, item->struct_type_name));
-    }
-    if (item->kind == CBLC_DATA_KIND_STRUCT_POINTER)
     {
         if (g_cblc_member_access_type
             && std::strncmp(item->struct_type_name, g_cblc_member_access_type->source_name,
@@ -932,7 +879,7 @@ static int cblc_parse_method_receiver(const char **cursor, t_cblc_translation_un
                 return (FT_SUCCESS);
             }
         }
-        if (item->kind == CBLC_DATA_KIND_STRING
+        if (item->kind == CBLC_DATA_KIND_CHAR_BUFFER
             && std::strncmp(member_identifier, "len", sizeof(member_identifier)) == 0)
         {
             *cursor = start;

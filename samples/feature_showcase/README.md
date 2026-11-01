@@ -5,8 +5,10 @@ CBL-C translation units. It is meant to be a compact, readable starting point
 for the language rather than a long business demo. The sample still exercises
 the core features that lower cleanly into COBOL: imports, a shared constants
 module, structs, a class with `private` / `public` members, constructor and
-destructor lifecycle code, out-of-class method bodies, builtin `string` values
-and methods, arrays, and basic pointer access.
+destructor lifecycle code, out-of-class method bodies, raw `char[]` buffers,
+arrays, and basic pointer access. Owning text values use
+the standard-library `string` class; fixed interop buffers are explicitly
+`char[]`.
 
 ## Layout
 
@@ -21,7 +23,7 @@ and methods, arrays, and basic pointer access.
 - `message_showcase_text.cblc` — a small `string` example with readable output.
 - `message_showcase_ledger.cblc` — the expanded class example. It combines
   constructor initialization, destructor cleanup, out-of-class methods, structs,
-  strings, and a small malloc/free-backed scoring buffer.
+  fixed character buffers, and a small malloc/free-backed scoring buffer.
 - `message_showcase_memory.cblc` — a short array and pointer example.
 - `message_showcase_main.cblc` — the entrypoint also demonstrates the native
   `vector<int>` class with reservation, insertion, and value access methods.

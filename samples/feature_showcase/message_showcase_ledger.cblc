@@ -2,7 +2,7 @@ import "message_showcase_constants.cblc";
 
 struct Desk
 {
-    string name(16);
+    char name[16];
     int open_items;
     int closed_items;
 };
@@ -20,7 +20,7 @@ class ShowcaseLedger
 {
     private:
         const int identifier;
-        string tag(16);
+        char tag[16];
         int policy_count;
         int claim_count;
         int investigation_count;
@@ -29,8 +29,9 @@ class ShowcaseLedger
         int weighted_score;
 
     public:
-        ShowcaseLedger(int id) : tag("BASE"), identifier(id)
+        ShowcaseLedger(int id) : identifier(id)
         {
+            tag = "BASE";
             policy_count = 0;
             claim_count = 0;
             investigation_count = 0;

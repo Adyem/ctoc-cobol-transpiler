@@ -100,32 +100,23 @@ int imported_test_register(t_imported_test_func func, const char *description, c
 
 void imported_test_fail(const char *expression, const char *file, int line)
 {
-    FILE *log_file;
-
-    log_file = std::fopen("imported_test_failures.log", "a");
-    if (log_file)
-    {
-        std::fprintf(log_file, "%s:%d: %s\n", file, line, expression);
-        std::fclose(log_file);
-    }
+    std::fprintf(stderr, "%s:%d: %s\n", file, line, expression);
     return ;
 }
 
 int imported_test_run_registered(void)
 {
-    FILE *log_file;
     t_imported_test_case *tests;
     int *test_count;
     int total_tests;
     int output_is_terminal;
     int index;
     int passed;
+    int skipped;
+    int failed;
     int selected;
     const char *filter;
 
-    log_file = std::fopen("imported_test_failures.log", "w");
-    if (log_file)
-        std::fclose(log_file);
     signal(SIGSEGV, imported_test_signal_handler);
     signal(SIGABRT, imported_test_signal_handler);
     imported_test_sort();
@@ -149,6 +140,8 @@ int imported_test_run_registered(void)
     output_is_terminal = 0;
     index = 0;
     passed = 0;
+    skipped = 0;
+    failed = 0;
     while (index < total_tests)
     {
         if (filter && filter[0] != '\0'
@@ -162,28 +155,44 @@ int imported_test_run_registered(void)
         else
             std::printf("Running test %d \"%s\"\n", index + 1, tests[index].description);
         std::fflush(stdout);
-        if (tests[index].func())
         {
-            if (output_is_terminal)
-                std::printf("\r\033[K");
-            std::printf("%s %d %s\n", imported_test_success_label(),
-                index + 1, tests[index].description);
-            std::fflush(stdout);
-            passed += 1;
-        }
-        else
-        {
-            if (output_is_terminal)
-                std::printf("\r\033[K");
-            std::printf("%s %d %s\n", imported_test_failure_label(),
-                index + 1, tests[index].description);
-            std::fflush(stdout);
+            int test_status;
+
+            test_status = tests[index].func();
+            if (test_status == IMPORTED_TEST_SKIPPED)
+            {
+                if (output_is_terminal)
+                    std::printf("\r\033[K");
+                std::printf("\033[33mSkipped\033[0m %d %s\n",
+                    index + 1, tests[index].description);
+                std::fflush(stdout);
+                skipped += 1;
+            }
+            else if (test_status != 0)
+            {
+                if (output_is_terminal)
+                    std::printf("\r\033[K");
+                std::printf("%s %d %s\n", imported_test_success_label(),
+                    index + 1, tests[index].description);
+                std::fflush(stdout);
+                passed += 1;
+            }
+            else
+            {
+                if (output_is_terminal)
+                    std::printf("\r\033[K");
+                std::printf("%s %d %s\n", imported_test_failure_label(),
+                    index + 1, tests[index].description);
+                std::fflush(stdout);
+                failed += 1;
+            }
         }
         index += 1;
     }
-    std::printf("%d/%d tests passed\n", passed, selected);
+    std::printf("Test summary: %d passed, %d skipped, %d failed (%d selected)\n",
+        passed, skipped, failed, selected);
     std::fflush(stdout);
-    if (passed != selected)
+    if (failed > 0)
         return (1);
     return (0);
 }

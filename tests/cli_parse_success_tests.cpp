@@ -405,6 +405,457 @@ FT_TEST(test_cli_dump_semantic_ir_option)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_cli_lifetime_edge_transfer_limit)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cblc-to-cobol",
+        "--input",
+        "input.cblc",
+        "--output",
+        "output.cob",
+        "--max-lifetime-edge-transfers",
+        "0"
+    };
+    t_transpiler_cli_options options;
+    t_transpiler_context context;
+
+    if (test_expect_success(transpiler_cli_parse(&options, 9, argv),
+            "CLI should accept a zero lifetime edge-transfer limit") != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_size_t_equal(options.max_lifetime_edge_transfers, 0,
+            "CLI should preserve an explicit zero lifetime edge-transfer limit")
+        != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (transpiler_cli_apply(&options, &context) != FT_SUCCESS
+        || test_expect_size_t_equal(context.max_lifetime_edge_transfers, 0,
+            "CLI apply should copy the lifetime edge-transfer limit into the invocation context")
+            != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    transpiler_cli_options_dispose(&options);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cli_template_resource_limits)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cblc-to-cobol",
+        "--input",
+        "input.cblc",
+        "--output",
+        "output.cob",
+        "--max-template-instantiations",
+        "7",
+        "--max-template-depth",
+        "3",
+        "--max-source-bytes",
+        "4096"
+    };
+    t_transpiler_cli_options options;
+    t_transpiler_context context;
+
+    if (test_expect_success(transpiler_cli_parse(&options, 13, argv),
+            "CLI should accept per-invocation template resource limits")
+        != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (test_expect_size_t_equal(options.max_template_instantiations, 7,
+            "CLI should preserve the template-instantiation work limit")
+        != FT_SUCCESS
+        || test_expect_size_t_equal(options.max_template_instantiation_depth, 3,
+            "CLI should preserve the template nesting-depth limit")
+            != FT_SUCCESS
+        || test_expect_size_t_equal(options.max_source_bytes, 4096,
+            "CLI should preserve the aggregate source-byte limit")
+            != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (transpiler_context_init(&context) != FT_SUCCESS)
+    {
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    if (transpiler_cli_apply(&options, &context) != FT_SUCCESS
+        || test_expect_size_t_equal(context.max_template_instantiations, 7,
+            "CLI apply should copy the template-instantiation limit") != FT_SUCCESS
+        || test_expect_size_t_equal(context.max_template_instantiation_depth, 3,
+            "CLI apply should copy the template nesting-depth limit") != FT_SUCCESS
+        || test_expect_size_t_equal(context.max_source_bytes, 4096,
+            "CLI apply should copy the aggregate source-byte limit") != FT_SUCCESS)
+    {
+        transpiler_context_dispose(&context);
+        transpiler_cli_options_dispose(&options);
+        return (FT_FAILURE);
+    }
+    transpiler_context_dispose(&context);
+    transpiler_cli_options_dispose(&options);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cli_lifetime_edge_transfer_limit_reaches_translation_unit)
+{
+    char directory[256];
+    char source_path[256];
+    char output_path[256];
+    char diagnostic_path[256];
+    char command[1024];
+    char diagnostic_text[1024];
+    int command_length;
+    int source_path_length;
+    int output_path_length;
+    int diagnostic_path_length;
+
+    directory[0] = '\0';
+    source_path[0] = '\0';
+    output_path[0] = '\0';
+    diagnostic_path[0] = '\0';
+    if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    source_path_length = std::snprintf(source_path, sizeof(source_path),
+        "%s/lifetime_budget.cblc", directory);
+    output_path_length = std::snprintf(output_path, sizeof(output_path),
+        "%s/lifetime_budget.cob", directory);
+    diagnostic_path_length = std::snprintf(diagnostic_path,
+        sizeof(diagnostic_path), "%s/lifetime_budget.diagnostics", directory);
+    if (source_path_length < 0
+        || static_cast<size_t>(source_path_length) >= sizeof(source_path)
+        || output_path_length < 0
+        || static_cast<size_t>(output_path_length) >= sizeof(output_path)
+        || diagnostic_path_length < 0
+        || static_cast<size_t>(diagnostic_path_length) >= sizeof(diagnostic_path)
+        || test_write_text_file(source_path,
+            "void main() { int value; value = 1; return; }\n") != FT_SUCCESS)
+    {
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    command_length = std::snprintf(command, sizeof(command),
+        "./ctoc_cobol_transpiler --diagnostics silent --direction cblc-to-cobol --input \"%s\" --output \"%s\"",
+        source_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command)
+        || test_run_command(command) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: ordinary CLI translation should accept the lifetime-budget fixture\n");
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    test_remove_file(output_path);
+    command_length = std::snprintf(command, sizeof(command),
+        "./ctoc_cobol_transpiler --diagnostics silent --direction cblc-to-cobol --input \"%s\" --output \"%s\" --max-lifetime-edge-transfers 0 > \"%s\" 2>&1",
+        source_path, output_path, diagnostic_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command)
+        || test_run_command_expect_failure(command) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: CLI zero lifetime budget should fail during translation\n");
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_read_text_file(diagnostic_path, diagnostic_text,
+            sizeof(diagnostic_text)) != FT_SUCCESS
+        || !std::strstr(diagnostic_text, "configured_limit=0")
+        || !std::strstr(diagnostic_text, "observed=1"))
+    {
+        std::printf("Assertion failed: CLI diagnostic should retain the configured and observed lifetime-analysis limits\n");
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_read_text_file(output_path, diagnostic_text,
+            sizeof(diagnostic_text)) == FT_SUCCESS)
+    {
+        std::printf("Assertion failed: failed lifetime analysis must not publish a COBOL output\n");
+        test_remove_file(output_path);
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    test_remove_directory(directory);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cli_template_limits_reach_monomorphization)
+{
+    char directory[256];
+    char source_path[256];
+    char output_path[256];
+    char diagnostic_path[256];
+    char command[1024];
+    char diagnostic_text[1024];
+    int source_path_length;
+    int output_path_length;
+    int diagnostic_path_length;
+    int command_length;
+
+    directory[0] = '\0';
+    source_path[0] = '\0';
+    output_path[0] = '\0';
+    diagnostic_path[0] = '\0';
+    if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    source_path_length = std::snprintf(source_path, sizeof(source_path),
+        "%s/template_limits.cblc", directory);
+    output_path_length = std::snprintf(output_path, sizeof(output_path),
+        "%s/template_limits.cob", directory);
+    diagnostic_path_length = std::snprintf(diagnostic_path,
+        sizeof(diagnostic_path), "%s/template_limits.diagnostics", directory);
+    if (source_path_length < 0
+        || static_cast<size_t>(source_path_length) >= sizeof(source_path)
+        || output_path_length < 0
+        || static_cast<size_t>(output_path_length) >= sizeof(output_path)
+        || diagnostic_path_length < 0
+        || static_cast<size_t>(diagnostic_path_length) >= sizeof(diagnostic_path)
+        || test_write_text_file(source_path,
+            "template <typename T> struct box { T value; };\n"
+            "box<int> first; box<char> second;\n"
+            "void main() { return; }\n") != FT_SUCCESS)
+    {
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    command_length = std::snprintf(command, sizeof(command),
+        "./ctoc_cobol_transpiler --diagnostics silent --direction cblc-to-cobol --input \"%s\" --output \"%s\"",
+        source_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command)
+        || test_run_command(command) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: default template policy should accept two concrete specializations\n");
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    test_remove_file(output_path);
+    command_length = std::snprintf(command, sizeof(command),
+        "./ctoc_cobol_transpiler --diagnostics silent --direction cblc-to-cobol --input \"%s\" --output \"%s\" --max-template-instantiations 1 > \"%s\" 2>&1",
+        source_path, output_path, diagnostic_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command)
+        || test_run_command_expect_failure(command) != FT_SUCCESS
+        || test_read_text_file(diagnostic_path, diagnostic_text,
+            sizeof(diagnostic_text)) != FT_SUCCESS
+        || !std::strstr(diagnostic_text, "template instantiation limit exceeded"))
+    {
+        std::printf("Assertion failed: invocation template-instantiation limit should stop monomorphization with a stable diagnostic\n");
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_write_text_file(source_path,
+            "template <typename T> struct box { T value; };\n"
+            "box<box<int>> nested;\n"
+            "void main() { return; }\n") != FT_SUCCESS)
+    {
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    test_remove_file(output_path);
+    command_length = std::snprintf(command, sizeof(command),
+        "./ctoc_cobol_transpiler --diagnostics silent --direction cblc-to-cobol --input \"%s\" --output \"%s\" --max-template-depth 1 > \"%s\" 2>&1",
+        source_path, output_path, diagnostic_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command)
+        || test_run_command_expect_failure(command) != FT_SUCCESS
+        || test_read_text_file(diagnostic_path, diagnostic_text,
+            sizeof(diagnostic_text)) != FT_SUCCESS
+        || !std::strstr(diagnostic_text, "template type nesting limit exceeded"))
+    {
+        std::printf("Assertion failed: invocation template-depth limit should stop nested type parsing with a stable diagnostic\n");
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    test_remove_directory(directory);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cli_source_byte_limit_stops_before_translation)
+{
+    char directory[256];
+    char source_path[256];
+    char output_path[256];
+    char diagnostic_path[256];
+    char command[1024];
+    char diagnostic_text[1024];
+    const char *source_text;
+    int source_path_length;
+    int output_path_length;
+    int diagnostic_path_length;
+    int command_length;
+    size_t source_length;
+    directory[0] = '\0';
+    source_path[0] = '\0';
+    output_path[0] = '\0';
+    diagnostic_path[0] = '\0';
+    source_text = "void main() { return; }\n";
+    source_length = std::strlen(source_text);
+    if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    source_path_length = std::snprintf(source_path, sizeof(source_path),
+        "%s/source_budget.cblc", directory);
+    output_path_length = std::snprintf(output_path, sizeof(output_path),
+        "%s/source_budget.cob", directory);
+    diagnostic_path_length = std::snprintf(diagnostic_path,
+        sizeof(diagnostic_path), "%s/source_budget.diagnostics", directory);
+    if (source_path_length < 0
+        || static_cast<size_t>(source_path_length) >= sizeof(source_path)
+        || output_path_length < 0
+        || static_cast<size_t>(output_path_length) >= sizeof(output_path)
+        || diagnostic_path_length < 0
+        || static_cast<size_t>(diagnostic_path_length) >= sizeof(diagnostic_path)
+        || test_write_text_file(source_path, source_text) != FT_SUCCESS)
+    {
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    test_remove_file(output_path);
+    command_length = std::snprintf(command, sizeof(command),
+        "./ctoc_cobol_transpiler --diagnostics silent --direction cblc-to-cobol --input \"%s\" --output \"%s\" --max-source-bytes %zu",
+        source_path, output_path, source_length);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command)
+        || test_run_command(command) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: source-byte budget should allow input exactly at the configured limit\n");
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    test_remove_file(output_path);
+    command_length = std::snprintf(command, sizeof(command),
+        "./ctoc_cobol_transpiler --diagnostics silent --direction cblc-to-cobol --input \"%s\" --output \"%s\" --max-source-bytes 8 > \"%s\" 2>&1",
+        source_path, output_path, diagnostic_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command)
+        || test_run_command_expect_failure(command) != FT_SUCCESS
+        || test_read_text_file(diagnostic_path, diagnostic_text,
+            sizeof(diagnostic_text)) != FT_SUCCESS
+        || !std::strstr(diagnostic_text, "resource_limit_exceeded phase=source_read")
+        || !std::strstr(diagnostic_text, "dimension=source_bytes configured_limit=8")
+        || !std::strstr(diagnostic_text, "observed=")
+        || test_read_text_file(output_path, diagnostic_text,
+            sizeof(diagnostic_text)) == FT_SUCCESS)
+    {
+        std::printf("Assertion failed: source-byte exhaustion should emit a structured diagnostic and no COBOL output\n");
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    command_length = std::snprintf(command, sizeof(command),
+        "./ctoc_cobol_transpiler --diagnostics silent --direction cblc-to-cobol --input \"%s\" --output \"%s\" --max-source-bytes 0",
+        source_path, output_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command)
+        || test_run_command(command) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: zero source-byte limit should disable the configured cap\n");
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    test_remove_directory(directory);
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cli_source_byte_limit_is_aggregate_across_inputs)
+{
+    char directory[256];
+    char first_source_path[256];
+    char second_source_path[256];
+    char first_output_path[256];
+    char second_output_path[256];
+    char diagnostic_path[256];
+    char command[1536];
+    char diagnostic_text[1024];
+    char expected_limit[64];
+    char expected_observed[64];
+    const char *first_source;
+    const char *second_source;
+    size_t first_length;
+    size_t second_length;
+    size_t configured_limit;
+    size_t observed_count;
+    int first_source_path_length;
+    int second_source_path_length;
+    int first_output_path_length;
+    int second_output_path_length;
+    int diagnostic_path_length;
+    int command_length;
+
+    directory[0] = '\0';
+    first_source_path[0] = '\0';
+    second_source_path[0] = '\0';
+    first_output_path[0] = '\0';
+    second_output_path[0] = '\0';
+    diagnostic_path[0] = '\0';
+    first_source = "void main() { return; }\n";
+    second_source = "void helper() { return; }\n";
+    first_length = std::strlen(first_source);
+    second_length = std::strlen(second_source);
+    configured_limit = first_length + second_length - 1;
+    observed_count = first_length + second_length;
+    if (std::snprintf(expected_limit, sizeof(expected_limit),
+            "dimension=source_bytes configured_limit=%zu", configured_limit) < 0
+        || std::snprintf(expected_observed, sizeof(expected_observed),
+            "observed=%zu", observed_count) < 0)
+        return (FT_FAILURE);
+    if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
+        return (FT_FAILURE);
+    first_source_path_length = std::snprintf(first_source_path,
+        sizeof(first_source_path), "%s/first.cblc", directory);
+    second_source_path_length = std::snprintf(second_source_path,
+        sizeof(second_source_path), "%s/second.cblc", directory);
+    first_output_path_length = std::snprintf(first_output_path,
+        sizeof(first_output_path), "%s/first.cob", directory);
+    second_output_path_length = std::snprintf(second_output_path,
+        sizeof(second_output_path), "%s/second.cob", directory);
+    diagnostic_path_length = std::snprintf(diagnostic_path,
+        sizeof(diagnostic_path), "%s/aggregate.diagnostics", directory);
+    if (first_source_path_length < 0
+        || static_cast<size_t>(first_source_path_length) >= sizeof(first_source_path)
+        || second_source_path_length < 0
+        || static_cast<size_t>(second_source_path_length) >= sizeof(second_source_path)
+        || first_output_path_length < 0
+        || static_cast<size_t>(first_output_path_length) >= sizeof(first_output_path)
+        || second_output_path_length < 0
+        || static_cast<size_t>(second_output_path_length) >= sizeof(second_output_path)
+        || diagnostic_path_length < 0
+        || static_cast<size_t>(diagnostic_path_length) >= sizeof(diagnostic_path)
+        || test_write_text_file(first_source_path, first_source) != FT_SUCCESS
+        || test_write_text_file(second_source_path, second_source) != FT_SUCCESS)
+    {
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    command_length = std::snprintf(command, sizeof(command),
+        "./ctoc_cobol_transpiler --diagnostics silent --direction cblc-to-cobol --input \"%s\" --input \"%s\" --output \"%s\" --output \"%s\" --max-source-bytes %zu > \"%s\" 2>&1",
+        first_source_path, second_source_path, first_output_path,
+        second_output_path, configured_limit, diagnostic_path);
+    if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(command)
+        || test_run_command_expect_failure(command) != FT_SUCCESS
+        || test_read_text_file(diagnostic_path, diagnostic_text,
+            sizeof(diagnostic_text)) != FT_SUCCESS
+        || !std::strstr(diagnostic_text, expected_limit)
+        || !std::strstr(diagnostic_text, expected_observed)
+        || !std::strstr(diagnostic_text, second_source_path))
+    {
+        std::printf("Assertion failed: aggregate source-byte limit should reject the canonical input prefix that exceeds the invocation budget\n");
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    if (test_read_text_file(first_output_path, diagnostic_text,
+            sizeof(diagnostic_text)) == FT_SUCCESS)
+    {
+        std::printf("Assertion failed: aggregate source-byte exhaustion must not publish a partial module output\n");
+        test_remove_directory(directory);
+        return (FT_FAILURE);
+    }
+    test_remove_directory(directory);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_cli_standard_library_direction)
 {
     const char *argv[] = {
@@ -782,7 +1233,17 @@ const t_test_case *get_cli_parse_success_tests(size_t *count)
         {"cli_supports_multiple_inputs", test_cli_supports_multiple_inputs},
         {"cli_apply_propagates_multi_file_context", test_cli_apply_propagates_multi_file_context},
         {"cli_dump_copybook_graph_option", test_cli_dump_copybook_graph_option},
-        {"cli_dump_semantic_ir_option", test_cli_dump_semantic_ir_option}
+        {"cli_dump_semantic_ir_option", test_cli_dump_semantic_ir_option},
+        {"cli_lifetime_edge_transfer_limit", test_cli_lifetime_edge_transfer_limit},
+        {"cli_template_resource_limits", test_cli_template_resource_limits},
+        {"cli_lifetime_edge_transfer_limit_reaches_translation_unit",
+            test_cli_lifetime_edge_transfer_limit_reaches_translation_unit},
+        {"cli_template_limits_reach_monomorphization",
+            test_cli_template_limits_reach_monomorphization},
+        {"cli_source_byte_limit_stops_before_translation",
+            test_cli_source_byte_limit_stops_before_translation},
+        {"cli_source_byte_limit_is_aggregate_across_inputs",
+            test_cli_source_byte_limit_is_aggregate_across_inputs}
     };
 
     if (count)

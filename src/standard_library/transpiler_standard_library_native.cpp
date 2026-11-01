@@ -21,12 +21,27 @@ const char *transpiler_standard_library_get_native_source(const char *program_na
     return (NULL);
 }
 
+const char *transpiler_standard_library_get_native_source_path(const char *program_name)
+{
+    size_t index;
+
+    if (!program_name)
+        return (NULL);
+    index = 0;
+    while (index < g_embedded_standard_library_source_count)
+    {
+        if (std::strcmp(program_name, g_embedded_standard_library_sources[index].program_name) == 0)
+            return (g_embedded_standard_library_sources[index].source_path);
+        index += 1;
+    }
+    return (NULL);
+}
+
 int transpiler_standard_library_generate_native(const char *program_name, char **out_text)
 {
     t_cblc_translation_unit unit;
     const char *source;
     const char *error_source;
-    const char *string_class_source;
     char *combined_source;
     size_t combined_length;
     int status;
@@ -41,30 +56,14 @@ int transpiler_standard_library_generate_native(const char *program_name, char *
     error_source = transpiler_standard_library_get_native_source("CBLC-ERRORS");
     if (!error_source)
         return (FT_FAILURE);
-    string_class_source = NULL;
-    if (std::strcmp(program_name, "CBLC-STRING") != 0
-        && std::strcmp(program_name, "CBLC-ERRORS") != 0
-        && std::strstr(program_name, "-STRING") != NULL)
-    {
-        string_class_source = transpiler_standard_library_get_native_source("CBLC-STRING");
-        if (!string_class_source)
-            return (FT_FAILURE);
-    }
     if (std::strcmp(program_name, "CBLC-ERRORS") != 0)
     {
         combined_length = std::strlen(error_source) + std::strlen(source) + 2;
-        if (string_class_source)
-            combined_length += std::strlen(string_class_source) + 1;
         combined_source = static_cast<char *>(cma_calloc(combined_length, sizeof(char)));
         if (!combined_source)
             return (FT_FAILURE);
         ft_strlcpy(combined_source, error_source, combined_length);
         ft_strlcat(combined_source, "\n", combined_length);
-        if (string_class_source)
-        {
-            ft_strlcat(combined_source, string_class_source, combined_length);
-            ft_strlcat(combined_source, "\n", combined_length);
-        }
         ft_strlcat(combined_source, source, combined_length);
         source = combined_source;
     }

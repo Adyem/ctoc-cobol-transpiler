@@ -81,16 +81,29 @@ static void transpiler_parallel_execute_job(t_transpiler_parallel_result *result
     const t_cblc_translation_unit *unit, const char *source_path)
 {
     char *generated_text;
+    int diagnostic_code;
+    char diagnostic_message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
     std::lock_guard<std::mutex> guard(g_transpiler_parallel_generation_mutex);
 
     if (!result || !unit)
         return ;
     generated_text = NULL;
+    diagnostic_code = 0;
+    diagnostic_message[0] = '\0';
     result->status = FT_FAILURE;
     result->error_message[0] = '\0';
-    if (cblc_generate_cobol(unit, &generated_text) != FT_SUCCESS)
+    if (cblc_generate_cobol_with_diagnostic(unit, &generated_text,
+            &diagnostic_code, diagnostic_message,
+            sizeof(diagnostic_message)) != FT_SUCCESS)
     {
-        if (source_path && std::snprintf(result->error_message,
+        if (diagnostic_message[0] != '\0' && source_path)
+            std::snprintf(result->error_message,
+                sizeof(result->error_message), "%s: %s", source_path,
+                diagnostic_message);
+        else if (diagnostic_message[0] != '\0')
+            ft_strlcpy(result->error_message, diagnostic_message,
+                sizeof(result->error_message));
+        else if (source_path && std::snprintf(result->error_message,
                 sizeof(result->error_message),
                 "Failed to generate COBOL for '%s'", source_path) < 0)
             result->error_message[0] = '\0';

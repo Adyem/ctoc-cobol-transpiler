@@ -361,6 +361,142 @@ FT_TEST(test_cli_rejects_missing_diagnostics_value)
         "CLI should report missing diagnostics value"));
 }
 
+FT_TEST(test_cli_rejects_invalid_lifetime_edge_transfer_limit)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cblc-to-cobol",
+        "--input",
+        "first.cblc",
+        "--output",
+        "first.cob",
+        "--max-lifetime-edge-transfers",
+        "-1"
+    };
+    size_t argc;
+
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Invalid value for --max-lifetime-edge-transfers option: '-1'. Expected a non-negative decimal integer within size_t range.\n",
+        "CLI should reject a negative lifetime edge-transfer limit"));
+}
+
+FT_TEST(test_cli_rejects_overflowed_lifetime_edge_transfer_limit)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cblc-to-cobol",
+        "--input",
+        "first.cblc",
+        "--output",
+        "first.cob",
+        "--max-lifetime-edge-transfers",
+        "18446744073709551616"
+    };
+    size_t argc;
+
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Invalid value for --max-lifetime-edge-transfers option: '18446744073709551616'. Expected a non-negative decimal integer within size_t range.\n",
+        "CLI should reject an overflowing lifetime edge-transfer limit"));
+}
+
+FT_TEST(test_cli_rejects_missing_lifetime_edge_transfer_limit)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cblc-to-cobol",
+        "--input",
+        "first.cblc",
+        "--output",
+        "first.cob",
+        "--max-lifetime-edge-transfers"
+    };
+    size_t argc;
+
+    argc = sizeof(argv) / sizeof(argv[0]);
+    return (expect_cli_parse_failure(argv, argc,
+        "Missing value for --max-lifetime-edge-transfers option.\n",
+        "CLI should report a missing lifetime edge-transfer limit"));
+}
+
+FT_TEST(test_cli_rejects_invalid_template_instantiation_limit)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cblc-to-cobol",
+        "--input",
+        "first.cblc",
+        "--output",
+        "first.cob",
+        "--max-template-instantiations",
+        "many"
+    };
+
+    return (expect_cli_parse_failure(argv, sizeof(argv) / sizeof(argv[0]),
+        "Invalid value for --max-template-instantiations option: 'many'. Expected a non-negative decimal integer within size_t range.\n",
+        "CLI should reject a malformed template-instantiation limit"));
+}
+
+FT_TEST(test_cli_rejects_missing_template_depth_limit)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cblc-to-cobol",
+        "--input",
+        "first.cblc",
+        "--output",
+        "first.cob",
+        "--max-template-depth"
+    };
+
+    return (expect_cli_parse_failure(argv, sizeof(argv) / sizeof(argv[0]),
+        "Missing value for --max-template-depth option.\n",
+        "CLI should report a missing template-depth limit"));
+}
+
+FT_TEST(test_cli_rejects_invalid_source_byte_limit)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cblc-to-cobol",
+        "--input",
+        "first.cblc",
+        "--output",
+        "first.cob",
+        "--max-source-bytes",
+        "many"
+    };
+
+    return (expect_cli_parse_failure(argv, sizeof(argv) / sizeof(argv[0]),
+        "Invalid value for --max-source-bytes option: 'many'. Expected a non-negative decimal integer within size_t range.\n",
+        "CLI should reject a malformed source-byte limit"));
+}
+
+FT_TEST(test_cli_rejects_missing_source_byte_limit)
+{
+    const char *argv[] = {
+        "ctoc_cobol_transpiler",
+        "--direction",
+        "cblc-to-cobol",
+        "--input",
+        "first.cblc",
+        "--output",
+        "first.cob",
+        "--max-source-bytes"
+    };
+
+    return (expect_cli_parse_failure(argv, sizeof(argv) / sizeof(argv[0]),
+        "Missing value for --max-source-bytes option.\n",
+        "CLI should report a missing source-byte limit"));
+}
+
 const t_test_case *get_cli_parse_failure_tests(size_t *count)
 {
     static const t_test_case tests[] = {
@@ -380,7 +516,21 @@ const t_test_case *get_cli_parse_failure_tests(size_t *count)
         {"cli_rejects_missing_output_directory_value", test_cli_rejects_missing_output_directory_value},
         {"cli_rejects_missing_format_value", test_cli_rejects_missing_format_value},
         {"cli_rejects_missing_layout_value", test_cli_rejects_missing_layout_value},
-        {"cli_rejects_missing_diagnostics_value", test_cli_rejects_missing_diagnostics_value}
+        {"cli_rejects_missing_diagnostics_value", test_cli_rejects_missing_diagnostics_value},
+        {"cli_rejects_invalid_lifetime_edge_transfer_limit",
+            test_cli_rejects_invalid_lifetime_edge_transfer_limit},
+        {"cli_rejects_overflowed_lifetime_edge_transfer_limit",
+            test_cli_rejects_overflowed_lifetime_edge_transfer_limit},
+        {"cli_rejects_missing_lifetime_edge_transfer_limit",
+            test_cli_rejects_missing_lifetime_edge_transfer_limit},
+        {"cli_rejects_invalid_template_instantiation_limit",
+            test_cli_rejects_invalid_template_instantiation_limit},
+        {"cli_rejects_missing_template_depth_limit",
+            test_cli_rejects_missing_template_depth_limit},
+        {"cli_rejects_invalid_source_byte_limit",
+            test_cli_rejects_invalid_source_byte_limit},
+        {"cli_rejects_missing_source_byte_limit",
+            test_cli_rejects_missing_source_byte_limit}
     };
 
     if (count)

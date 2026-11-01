@@ -1,7 +1,0 @@
-int F(string first, string second, int count)
-{
-    int result;
-    String object(first);
-    result = object.memcmp(second, count);
-    return result;
-}

@@ -14,7 +14,7 @@ EXECUTABLES := $(MAIN_PROGRAM)$(EXE_EXT)
 
 STD_DIR := stdlib
 STD_SENTINEL := $(STD_DIR)/.standard_library_built
-STD_HELPERS := CBLC-ABS CBLC-STRCAT CBLC-STRCPY CBLC-STRLEN
+STD_HELPERS := CBLC-ABS
 STD_SOURCES := $(addprefix $(STD_DIR)/,$(addsuffix .cob,$(STD_HELPERS)))
 STD_MODULES := $(addprefix $(STD_DIR)/,$(addsuffix $(MODULE_EXT),$(STD_HELPERS)))
 STD_CATALOG := $(foreach helper,$(STD_HELPERS),$(STD_DIR)/$(helper).cob $(STD_DIR)/$(helper)$(MODULE_EXT))

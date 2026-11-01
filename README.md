@@ -43,7 +43,7 @@ The CLI creates missing output directories automatically. See [`docs/getting_sta
 
 CBL-C is intentionally C-like, but its data model maps onto COBOL storage and calling conventions. Implemented language features include:
 
-- Global scalar declarations for `int`, `long`, `long long`, `float`, `double`, `bool`, `char`, fixed-size `char[]`, and `string`.
+- Global scalar declarations for `int`, `long`, `long long`, `float`, `double`, `bool`, and `char`, plus fixed-size raw `char[]` buffers. `string` is the owning standard-library class, not a compiler built-in scalar type.
 - Local block storage for scalars, arrays, strings, pointers, and struct/class instances. Block-local aliases stop being visible after the closing brace, while generated backing storage remains unique for COBOL.
 - Arithmetic, comparison, boolean, assignment, unary, and `ABS` expressions over integral and floating types, with widening and diagnostics for unsafe conversions.
 - `void` and value-returning functions, including parameter passing and generated return slots for COBOL.
@@ -51,7 +51,7 @@ CBL-C is intentionally C-like, but its data model maps onto COBOL storage and ca
 - `struct` and `record`-style storage, nested fields, arrays, and generated COBOL group items.
 - `class` declarations with public/private members, constructors, methods, copy-constructor style flows, `const` member enforcement, receiver-specialized COBOL method paragraphs, and C++-style out-of-class method definitions.
 - Pointer support for `void *`, `char *`, `int *`, struct pointers, pointer indexing, pointer arithmetic, address-of, dereference, casts, `std::malloc`, `std::realloc`, and `std::free`.
-- Built-in `string` behavior including constructor-style initialization, assignment, append, clear, length, capacity, empty, equality, compare, contains, starts-with, and ends-with operations.
+- The standard-library `string` class, including constructor-style initialization, assignment, append, clear, length, capacity, empty, equality, compare, contains, starts-with, and ends-with methods.
 - `display`, `return`, `if` / `else`, `while`, function calls, method calls, and selected file-style syntax used by the reverse pipeline.
 
 The authoritative language and compiler-behavior standard is [`docs/cblc_language_standard.md`](docs/cblc_language_standard.md). The samples in [`samples/cblc`](samples/cblc) and [`samples/feature_showcase`](samples/feature_showcase) show larger examples.

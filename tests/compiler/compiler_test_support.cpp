@@ -76,34 +76,58 @@ void test_cleanup_example_artifacts_with_log(const char *source_path, const char
 
 int test_create_temp_directory(char *buffer, size_t buffer_size)
 {
+    std::error_code error;
+    std::filesystem::path root;
+    std::filesystem::path working_directory;
+    std::filesystem::path directory;
+    std::string directory_name;
+    int suffix;
+
     if (!buffer)
         return (FT_FAILURE);
     if (buffer_size == 0)
         return (FT_FAILURE);
-    std::filesystem::path directory = std::filesystem::temp_directory_path()
-        / std::filesystem::path("ctoc_compiler_test");
-    int suffix = 0;
+
+    /*
+     * Keep subprocess fixtures in the shared test workspace. Some sandboxed
+     * Windows runners virtualize the system temp directory for the test
+     * process without making those files visible to spawned compiler tools.
+     */
+    working_directory = std::filesystem::current_path(error);
+    if (error)
+        return (FT_FAILURE);
+    root = working_directory / ".ctoc_test_tmp";
+    std::filesystem::create_directories(root, error);
+    if (error)
+        return (FT_FAILURE);
+
+    directory_name = "ctoc_compiler_test";
+    directory = root / directory_name;
+    suffix = 0;
     while (std::filesystem::exists(directory))
-        directory = std::filesystem::temp_directory_path()
-            / std::filesystem::path("ctoc_compiler_test_" + std::to_string(++suffix));
-    if (!std::filesystem::create_directory(directory))
+        directory = root / std::filesystem::path(
+            directory_name + "_" + std::to_string(++suffix));
+    if (!std::filesystem::create_directory(directory, error) || error)
         return (FT_FAILURE);
     size_t required = ft_strlcpy(buffer, directory.string().c_str(), buffer_size);
     if (required >= buffer_size)
+    {
+        std::filesystem::remove(directory, error);
         return (FT_FAILURE);
+    }
     return (FT_SUCCESS);
 }
 
 int test_join_path(const char *directory, const char *name, char *buffer, size_t buffer_size)
 {
-    int length;
+    std::string joined_path;
 
     if (!directory || !name || !buffer)
         return (FT_FAILURE);
-    length = std::snprintf(buffer, buffer_size, "%s/%s", directory, name);
-    if (length < 0)
+    if (buffer_size == 0)
         return (FT_FAILURE);
-    if (static_cast<size_t>(length) >= buffer_size)
+    joined_path = (std::filesystem::path(directory) / name).make_preferred().string();
+    if (ft_strlcpy(buffer, joined_path.c_str(), buffer_size) >= buffer_size)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }

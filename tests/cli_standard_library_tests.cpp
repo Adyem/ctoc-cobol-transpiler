@@ -29,7 +29,7 @@ static void cli_standard_library_unset_environment(const char *name)
 FT_TEST(test_cli_standard_library_emits_all_programs)
 {
     const t_transpiler_standard_library_entry *entries;
-    char directory_template[64];
+    char directory_template[TRANSPILE_FILE_PATH_MAX];
     char command[512];
     char program_path[TRANSPILE_FILE_PATH_MAX];
     char manifest_path[TRANSPILE_FILE_PATH_MAX];
@@ -146,7 +146,7 @@ cleanup:
 
 FT_TEST(test_cli_cobol_translation_emits_required_standard_library_programs)
 {
-    char directory_template[64];
+    char directory_template[TRANSPILE_FILE_PATH_MAX];
     char source_path[TRANSPILE_FILE_PATH_MAX];
     char target_path[TRANSPILE_FILE_PATH_MAX];
     char required_path[TRANSPILE_FILE_PATH_MAX];
@@ -184,13 +184,17 @@ FT_TEST(test_cli_cobol_translation_emits_required_standard_library_programs)
         goto cleanup;
     if (std::snprintf(command, sizeof(command),
             "./ctoc_cobol_transpiler --direction cblc-to-cobol --input %s --output %s --output-dir %s",
-            source_path, "main.cob", directory_template) < 0
+            source_path, target_path, directory_template) < 0
         || test_run_command(command) != FT_SUCCESS)
         goto cleanup;
     if (test_read_text_file(required_path, file_buffer, sizeof(file_buffer)) != FT_SUCCESS
         || !ft_strnstr(file_buffer, "PROGRAM-ID. CBLC-STRLEN.",
             std::strlen(file_buffer)))
+    {
+        std::printf("Assertion failed: required CBLC-STRLEN output missing or malformed at %s\n",
+            required_path);
         goto cleanup;
+    }
     if (test_read_text_file(manifest_path, file_buffer, sizeof(file_buffer)) != FT_SUCCESS
         || !ft_strnstr(file_buffer,
             "\"template_contract\": \"CBLC-TEMPLATE-TYPE-SUBSTITUTION@6\"",
@@ -203,9 +207,15 @@ FT_TEST(test_cli_cobol_translation_emits_required_standard_library_programs)
         || !ft_strnstr(file_buffer, "\"dependencies\": [\"CBLC-STRLEN\"]",
             std::strlen(file_buffer))
         || ft_strnstr(file_buffer, "CBLC-ABS", std::strlen(file_buffer)))
+    {
+        std::printf("Assertion failed: required-library manifest is missing expected dependency data\n");
         goto cleanup;
+    }
     if (test_read_text_file(unrelated_path, file_buffer, sizeof(file_buffer)) == FT_SUCCESS)
+    {
+        std::printf("Assertion failed: unrelated CBLC-ABS output should not be emitted\n");
         goto cleanup;
+    }
     status = FT_SUCCESS;
 cleanup:
     test_remove_file(source_path);
@@ -220,7 +230,7 @@ cleanup:
 
 FT_TEST(test_cli_cobol_translation_can_deploy_complete_standard_library)
 {
-    char directory_template[64];
+    char directory_template[TRANSPILE_FILE_PATH_MAX];
     char source_path[TRANSPILE_FILE_PATH_MAX];
     char target_path[TRANSPILE_FILE_PATH_MAX];
     char all_path[TRANSPILE_FILE_PATH_MAX];
@@ -228,8 +238,10 @@ FT_TEST(test_cli_cobol_translation_can_deploy_complete_standard_library)
     char command[1024];
     char file_buffer[131072];
     int status;
+    int validation_env_set;
 
     status = FT_FAILURE;
+    validation_env_set = 0;
     if (test_create_temp_directory(directory_template, sizeof(directory_template)) != FT_SUCCESS)
         return (FT_FAILURE);
     if (std::snprintf(source_path, sizeof(source_path), "%s/main.cblc", directory_template) < 0
@@ -241,21 +253,32 @@ FT_TEST(test_cli_cobol_translation_can_deploy_complete_standard_library)
     if (test_write_text_file(source_path,
             "void main() { return; }\n") != FT_SUCCESS)
         goto cleanup;
+    if (cli_standard_library_set_environment(
+            "CTOC_SKIP_STANDARD_LIBRARY_VALIDATION", "1") != FT_SUCCESS)
+        goto cleanup;
+    validation_env_set = 1;
     if (std::snprintf(command, sizeof(command),
-            "CTOC_SKIP_STANDARD_LIBRARY_VALIDATION=1 ./ctoc_cobol_transpiler "
-            "--direction cblc-to-cobol --input %s --output %s "
-            "--output-dir %s --emit-all-standard-library", source_path, "main.cob",
+            "./ctoc_cobol_transpiler --direction cblc-to-cobol --input %s --output %s "
+            "--output-dir %s --emit-all-standard-library", source_path, target_path,
             directory_template) < 0 || test_run_command(command) != FT_SUCCESS)
         goto cleanup;
     if (test_read_text_file(all_path, file_buffer, sizeof(file_buffer)) != FT_SUCCESS
         || !ft_strnstr(file_buffer, "PROGRAM-ID. CBLC-ABS.", std::strlen(file_buffer)))
+    {
+        std::printf("Assertion failed: emit-all did not produce CBLC-ABS at %s\n", all_path);
         goto cleanup;
+    }
     if (test_read_text_file(manifest_path, file_buffer, sizeof(file_buffer)) != FT_SUCCESS
         || !ft_strnstr(file_buffer, "CBLC-ABS", std::strlen(file_buffer))
         || !ft_strnstr(file_buffer, "CBLC-STRCMP", std::strlen(file_buffer)))
+    {
+        std::printf("Assertion failed: emit-all manifest is missing expected standard-library artifacts\n");
         goto cleanup;
+    }
     status = FT_SUCCESS;
 cleanup:
+    if (validation_env_set)
+        cli_standard_library_unset_environment("CTOC_SKIP_STANDARD_LIBRARY_VALIDATION");
     test_remove_file(source_path);
     test_remove_file(target_path);
     test_remove_file(all_path);

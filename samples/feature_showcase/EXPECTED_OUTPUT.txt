@@ -41,9 +41,3 @@ SHOWCASE READY
 Standard library functions bundled with the showcase:
 stdlib/CBLC-ABS.cob
 stdlib/CBLC-ABS.so
-stdlib/CBLC-STRCAT.cob
-stdlib/CBLC-STRCAT.so
-stdlib/CBLC-STRCPY.cob
-stdlib/CBLC-STRCPY.so
-stdlib/CBLC-STRLEN.cob
-stdlib/CBLC-STRLEN.so

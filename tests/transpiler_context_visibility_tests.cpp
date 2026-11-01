@@ -1,5 +1,22 @@
 #include "test_suites.hpp"
 
+static size_t test_cblc_visibility_type_index(const t_cblc_translation_unit *unit,
+    const char *type_name)
+{
+    size_t index;
+
+    if (!unit || !type_name)
+        return (static_cast<size_t>(-1));
+    index = 0;
+    while (index < unit->struct_type_count)
+    {
+        if (std::strcmp(unit->struct_types[index].source_name, type_name) == 0)
+            return (index);
+        index += 1;
+    }
+    return (static_cast<size_t>(-1));
+}
+
 FT_TEST(test_transpiler_context_allows_private_duplicates)
 {
     t_transpiler_context context;
@@ -559,23 +576,28 @@ FT_TEST(test_cblc_import_type_stubs_allow_direct_imported_class_declaration)
     if (test_expect_success(cblc_parse_translation_unit(consumer_source, &consumer_unit),
             "consumer should parse imported class declarations") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(consumer_unit.struct_type_count, 2,
-            "consumer should contain builtin string and imported class stub") != FT_SUCCESS)
+    if (test_expect_size_t_equal(consumer_unit.struct_type_count, 1,
+            "consumer should contain the imported class stub") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].is_imported, 1,
+    if (test_expect_int_equal(consumer_unit.struct_types[
+                test_cblc_visibility_type_index(&consumer_unit, "Ledger")].is_imported, 1,
             "imported class should be marked as imported") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(consumer_unit.struct_types[1].field_count, 2,
+    if (test_expect_size_t_equal(consumer_unit.struct_types[
+                test_cblc_visibility_type_index(&consumer_unit, "Ledger")].field_count, 2,
             "imported class should preserve field metadata") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(consumer_unit.struct_types[1].method_count, 1,
+    if (test_expect_size_t_equal(consumer_unit.struct_types[
+                test_cblc_visibility_type_index(&consumer_unit, "Ledger")].method_count, 1,
             "imported class should preserve public method metadata") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].fields[0].visibility,
+    if (test_expect_int_equal(consumer_unit.struct_types[
+                test_cblc_visibility_type_index(&consumer_unit, "Ledger")].fields[0].visibility,
             CBLC_MEMBER_VISIBILITY_PRIVATE,
             "imported class should preserve private field visibility") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].fields[1].visibility,
+    if (test_expect_int_equal(consumer_unit.struct_types[
+                test_cblc_visibility_type_index(&consumer_unit, "Ledger")].fields[1].visibility,
             CBLC_MEMBER_VISIBILITY_PUBLIC,
             "imported class should preserve public field visibility") != FT_SUCCESS)
         goto cleanup;
@@ -817,22 +839,27 @@ FT_TEST(test_cblc_import_type_stubs_preserve_imported_constructor_metadata)
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "consumer type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(consumer_unit.struct_types[1].constructor_count, 2,
+    if (test_expect_size_t_equal(consumer_unit.struct_types[
+                test_cblc_visibility_type_index(&consumer_unit, "Counter")].constructor_count, 2,
             "imported class should preserve constructor overload count") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].has_default_constructor, 1,
+    if (test_expect_int_equal(consumer_unit.struct_types[
+                test_cblc_visibility_type_index(&consumer_unit, "Counter")].has_default_constructor, 1,
             "imported class should preserve default constructor flag") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(consumer_unit.struct_types[1].constructors[1].parameter_count, 1,
+    if (test_expect_size_t_equal(consumer_unit.struct_types[
+                test_cblc_visibility_type_index(&consumer_unit, "Counter")].constructors[1].parameter_count, 1,
             "imported class should preserve parameterized constructor arity") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(static_cast<int>(
-                consumer_unit.struct_types[1].constructors[1].parameters[0].kind),
+                consumer_unit.struct_types[test_cblc_visibility_type_index(&consumer_unit,
+                    "Counter")].constructors[1].parameters[0].kind),
             TRANSPILE_FUNCTION_PARAMETER_INT,
             "imported class should preserve constructor parameter kind") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_cstring_equal(
-                consumer_unit.struct_types[1].constructors[1].parameters[0].actual_source_name,
+                consumer_unit.struct_types[test_cblc_visibility_type_index(&consumer_unit,
+                    "Counter")].constructors[1].parameters[0].actual_source_name,
                 "Counter__ctor_1__start",
                 "imported class should preserve constructor parameter storage name") != FT_SUCCESS)
         goto cleanup;
@@ -885,10 +912,12 @@ FT_TEST(test_cblc_import_type_stubs_preserve_imported_destructor_metadata)
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "consumer type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].has_destructor, 1,
+    if (test_expect_int_equal(consumer_unit.struct_types[
+                test_cblc_visibility_type_index(&consumer_unit, "Counter")].has_destructor, 1,
             "imported class should preserve destructor presence") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].has_destructor_definition, 0,
+    if (test_expect_int_equal(consumer_unit.struct_types[
+                test_cblc_visibility_type_index(&consumer_unit, "Counter")].has_destructor_definition, 0,
             "imported class should preserve lack of destructor definition") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;

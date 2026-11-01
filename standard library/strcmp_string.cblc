@@ -1,7 +1,0 @@
-int F(string first, string second)
-{
-    int result;
-    String object(first);
-    result = object.strcmp(second);
-    return result;
-}

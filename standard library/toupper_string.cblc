@@ -1,6 +1,0 @@
-void F(string source)
-{
-    String object(source);
-    object.toupper();
-    source = object.value;
-}

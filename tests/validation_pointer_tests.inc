@@ -208,6 +208,96 @@ FT_TEST(test_cblc_generate_cobol_emits_pointer_allocation_and_free)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_cblc_delete_null_pointer_is_a_noop)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    const t_cblc_data_item *object_pointer;
+    const t_cblc_data_item *array_pointer;
+    char object_guard[TRANSPILE_IDENTIFIER_MAX + 40];
+    char object_free[TRANSPILE_IDENTIFIER_MAX + 40];
+    char object_end[32];
+    char array_guard[TRANSPILE_IDENTIFIER_MAX + 40];
+    char array_free[TRANSPILE_IDENTIFIER_MAX + 40];
+    char array_end[32];
+    const char *object_guard_position;
+    const char *object_free_position;
+    const char *object_end_position;
+    const char *array_guard_position;
+    const char *array_free_position;
+    const char *array_end_position;
+    size_t data_index;
+
+    source = "class Resource { public: ~Resource() { display(\"RESOURCE-DTOR\"); } };\n"
+        "Resource *object;\n"
+        "int *buffer;\n"
+        "void main() { delete object; delete[] buffer; return; }\n";
+    generated_cobol = NULL;
+    object_pointer = NULL;
+    array_pointer = NULL;
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS
+        || cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
+        || !generated_cobol)
+    {
+        std::printf("Assertion failed: null-safe delete program should generate COBOL (%s)\n",
+            unit.parse_error_message);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    data_index = 0;
+    while (data_index < unit.data_count)
+    {
+        if (std::strcmp(unit.data_items[data_index].source_name, "object") == 0)
+            object_pointer = &unit.data_items[data_index];
+        else if (std::strcmp(unit.data_items[data_index].source_name, "buffer") == 0)
+            array_pointer = &unit.data_items[data_index];
+        data_index += 1;
+    }
+    if (!object_pointer || !array_pointer
+        || std::snprintf(object_guard, sizeof(object_guard),
+            "IF %s NOT = NULL", object_pointer->cobol_name) < 0
+        || std::snprintf(object_free, sizeof(object_free), "FREE %s",
+            object_pointer->cobol_name) < 0
+        || std::snprintf(array_guard, sizeof(array_guard),
+            "IF %s NOT = NULL", array_pointer->cobol_name) < 0
+        || std::snprintf(array_free, sizeof(array_free), "FREE %s",
+            array_pointer->cobol_name) < 0)
+    {
+        cma_free(generated_cobol);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    ft_strlcpy(object_end, "END-IF.", sizeof(object_end));
+    ft_strlcpy(array_end, "END-IF.", sizeof(array_end));
+    object_guard_position = std::strstr(generated_cobol, object_guard);
+    object_free_position = object_guard_position
+        ? std::strstr(object_guard_position, object_free) : NULL;
+    object_end_position = object_free_position
+        ? std::strstr(object_free_position, object_end) : NULL;
+    array_guard_position = std::strstr(generated_cobol, array_guard);
+    array_free_position = array_guard_position
+        ? std::strstr(array_guard_position, array_free) : NULL;
+    array_end_position = array_free_position
+        ? std::strstr(array_free_position, array_end) : NULL;
+    if (!object_guard_position || !object_free_position || !object_end_position
+        || !array_guard_position || !array_free_position || !array_end_position
+        || !(object_guard_position < object_free_position
+            && object_free_position < object_end_position
+            && array_guard_position < array_free_position
+            && array_free_position < array_end_position))
+    {
+        std::printf("Assertion failed: delete and delete[] must skip destructor/free work for null pointers\n");
+        cma_free(generated_cobol);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_transpiler_validation_accepts_pointer_indexed_reads_and_writes)
 {
     const char *source;
@@ -1820,6 +1910,7 @@ FT_TEST(test_cblc_generate_c_emits_struct_pointer_field_access)
             std::strlen(generated_c)))
     {
         std::printf("Assertion failed: generated C should declare struct pointers\n");
+        std::printf("Generated C:\n%s\n", generated_c);
         goto cleanup;
     }
     if (!ft_strnstr(generated_c, "current = &point;", std::strlen(generated_c)))
@@ -1975,6 +2066,7 @@ FT_TEST(test_cblc_generate_c_emits_struct_pointer_return_function)
     if (!ft_strnstr(generated_c, "t_Point * get_point(void)", std::strlen(generated_c)))
     {
         std::printf("Assertion failed: generated C should emit struct pointer return type\n");
+        std::printf("Generated C:\n%s\n", generated_c);
         goto cleanup;
     }
     if (!ft_strnstr(generated_c, "return (&point);", std::strlen(generated_c)))
@@ -2161,6 +2253,7 @@ FT_TEST(test_cblc_generate_c_emits_pointer_receiver_method_call)
             std::strlen(generated_c)))
     {
         std::printf("Assertion failed: generated C should call reusable methods through pointer receivers\n");
+        std::printf("Generated C:\n%s\n", generated_c);
         goto cleanup;
     }
     if (!ft_strnstr(generated_c, "cblc_method_Counter_reset(current_counter);",
@@ -2173,6 +2266,50 @@ FT_TEST(test_cblc_generate_c_emits_pointer_receiver_method_call)
 cleanup:
     if (generated_c)
         cma_free(generated_c);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_accepts_owned_char_array_lifecycle)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "char *buffer;\n"
+        "void main()\n"
+        "{\n"
+        "    buffer = new char[16];\n"
+        "    buffer[0] = 'A';\n"
+        "    delete[] buffer;\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "char-array ownership source should parse") != FT_SUCCESS
+        || test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "char-array ownership source should generate COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol
+        || !ft_strnstr(generated_cobol, "ALLOCATE 16 CHARACTERS RETURNING BUFFER",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "FREE BUFFER",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "SET BUFFER TO NULL.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: char-array new/delete should lower to allocation and exactly one release\n");
+        if (generated_cobol)
+            std::printf("Generated COBOL:\n%s\n", generated_cobol);
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
     cblc_translation_unit_dispose(&unit);
     return (status);
 }

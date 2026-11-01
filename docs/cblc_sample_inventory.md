@@ -19,8 +19,8 @@ the authoritative language standard.
 - **Constructs:** A single global buffer, lowercase `void main()` entrypoint, literal assignment, and explicit `return;` statement.
 
 ### `samples/cblc/copy_file.cblc`
-- **Purpose:** Demonstrates the baseline file copy loop used throughout the CBL-C language standard and ensures the runtime string buffer path
-  is represented in fixtures.
+- **Purpose:** Demonstrates the baseline file copy loop used throughout the CBL-C language standard and ensures raw character-buffer I/O
+  is represented in fixtures independently of the owning `string` class.
 - **Constructs:** `file` declarations, scalar `char` buffers, `function` definitions (`process_file`, `main`), `open`/`close`
   pairs, `while` loops, `read`/`write` built-ins, and string literals.
 

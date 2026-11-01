@@ -10,7 +10,7 @@
 #include "../imported/test_runner.hpp"
 #include "cblc_transpiler.hpp"
 
-#define FT_SKIP 2
+#define FT_SKIP IMPORTED_TEST_SKIPPED
 
 typedef struct s_test_case
 {
@@ -41,8 +41,13 @@ typedef struct s_test_output_capture
     } \
     static int registered_##name(void) \
     { \
-        if (name() == FT_SUCCESS) \
+        int status; \
+ \
+        status = name(); \
+        if (status == FT_SUCCESS) \
             return (1); \
+        if (status == FT_SKIP) \
+            return (IMPORTED_TEST_SKIPPED); \
         return (0); \
     } \
     int name(void)
@@ -109,8 +114,14 @@ int test_capture_stderr_end(t_test_output_capture *capture, char *buffer, size_t
     std::ptrdiff_t *length);
 
 #define FT_REQUIRE_COBC() \
-    if (test_require_cobc_dependency(__func__) != FT_SUCCESS) \
-        return (FT_FAILURE);
+    do \
+    { \
+        int _ft_status; \
+ \
+        _ft_status = test_require_cobc_dependency(__func__); \
+        if (_ft_status != FT_SUCCESS) \
+            return (_ft_status); \
+    } while (0)
 
 #define FT_REQUIRE_FORWARD_TRANSLATION() \
     do \
@@ -121,7 +132,7 @@ int test_capture_stderr_end(t_test_output_capture *capture, char *buffer, size_t
         if (_ft_status == FT_FAILURE) \
             return (FT_FAILURE); \
         if (_ft_status == FT_SKIP) \
-            return (FT_SUCCESS); \
+            return (FT_SKIP); \
     } while (0)
 
 #endif

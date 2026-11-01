@@ -194,12 +194,22 @@ int test_capture_stderr_end(t_test_output_capture *capture, char *buffer, size_t
 
 int test_cobc_available(void)
 {
+    const char *null_device;
+    char probe_command[128];
+
     if (g_checked_cobc)
         return (g_has_cobc);
     test_prepare_cobc_toolchain();
     g_checked_cobc = 1;
-    g_has_cobc = (std::system("cobc --version > cobc_probe.log 2>&1") == 0);
-    std::remove("cobc_probe.log");
+#ifdef _WIN32
+    null_device = "NUL";
+#else
+    null_device = "/dev/null";
+#endif
+    if (std::snprintf(probe_command, sizeof(probe_command),
+            "cobc --version > %s 2>&1", null_device) < 0)
+        return (0);
+    g_has_cobc = (std::system(probe_command) == 0);
     return (g_has_cobc);
 }
 
@@ -219,12 +229,22 @@ int test_forward_translation_requested(void)
 
 int test_require_cobc_dependency(const char *test_name)
 {
+    const char *require_cobc;
+
     if (test_cobc_available())
         return (FT_SUCCESS);
     if (!test_name || test_name[0] == '\0')
         test_name = "COBOL compiler dependent test";
-    std::printf("Missing dependency: install 'cobc' to run %s.\n", test_name);
-    return (FT_FAILURE);
+    require_cobc = std::getenv("CTOC_REQUIRE_COBC");
+    if (require_cobc && test_parse_truthy_env(require_cobc))
+    {
+        std::printf("Required dependency 'cobc' is missing or failed its --version launch probe; install or repair the COBOL compiler to run %s.\n",
+            test_name);
+        return (FT_FAILURE);
+    }
+    std::printf("Skipping %s: 'cobc --version' did not succeed in this local profile (compiler missing, misconfigured, or unable to launch).\n",
+        test_name);
+    return (FT_SKIP);
 }
 
 int test_require_forward_translation_dependency(const char *test_name)
@@ -240,10 +260,7 @@ int test_require_forward_translation_dependency(const char *test_name)
     }
     if (test_cobc_available())
         return (FT_SUCCESS);
-    if (!test_name || test_name[0] == '\0')
-        test_name = "forward translation test";
-    std::printf("Missing dependency: install 'cobc' to run %s.\n", test_name);
-    return (FT_FAILURE);
+    return (test_require_cobc_dependency(test_name));
 }
 
 static void test_format_index(size_t value, char *buffer, size_t buffer_size)
@@ -937,7 +954,10 @@ static int test_execute_command(const char *command, int expect_success)
         }
     }
     if ((std::system(command_text.c_str()) == 0) != (expect_success != 0))
+    {
+        std::fprintf(stderr, "Test command failed: %s\n", command_text.c_str());
         return (FT_FAILURE);
+    }
     return (FT_SUCCESS);
 }
 

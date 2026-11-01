@@ -305,7 +305,9 @@ static void cblc_merge_member_exception_summary(const t_cblc_translation_unit *u
             ? statement->target : statement->source;
         receiver = cblc_find_data_item_by_cobol(unit, receiver_name);
         type = receiver ? cblc_find_receiver_type(unit, receiver) : NULL;
-        method = type ? cblc_find_method_on_type(type, statement->call_identifier) : NULL;
+        method = type ? cblc_find_method_on_type_for_arguments(unit, type,
+            statement->call_identifier, statement->call_arguments,
+            statement->call_argument_count) : NULL;
         if (!method)
             return ;
         summary.exception_type_count = method->exception_type_count;
@@ -587,11 +589,13 @@ int cblc_resolve_translation_unit_calls(t_transpiler_context *context, const cha
                         parameter.kind = signature->parameter_kinds[index];
                         parameter.array_count = signature->parameter_array_counts[index];
                         parameter.length = signature->parameter_lengths[index];
-                        if (parameter.kind != TRANSPILE_FUNCTION_PARAMETER_STRUCT
-                            && parameter.kind != TRANSPILE_FUNCTION_PARAMETER_STRUCT_POINTER
-                            && (cblc_extract_call_argument(statement, index, argument,
-                                    sizeof(argument)) != FT_SUCCESS
-                                || !cblc_argument_matches_parameter(unit, argument, &parameter)))
+                        ft_strlcpy(parameter.type_name,
+                            signature->parameter_type_names[index],
+                            sizeof(parameter.type_name));
+                        if (cblc_extract_call_argument(statement, index, argument,
+                                sizeof(argument)) != FT_SUCCESS
+                            || !cblc_argument_matches_parameter(unit, argument,
+                                &parameter))
                         {
                             char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
 

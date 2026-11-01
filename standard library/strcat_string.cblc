@@ -1,6 +1,0 @@
-void F(string destination, string left, string right)
-{
-    String object(destination);
-    object.strcat(left, right);
-    destination = object.value;
-}

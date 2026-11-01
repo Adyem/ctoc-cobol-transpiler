@@ -1652,6 +1652,13 @@ int transpiler_context_init(t_transpiler_context *context)
     context->warning_settings.string_truncation = 1;
     context->warning_settings.shadow = 1;
     context->warning_settings.unused = 1;
+    context->max_source_bytes = TRANSPILE_DEFAULT_MAX_SOURCE_BYTES;
+    context->max_lifetime_edge_transfers =
+        TRANSPILE_DEFAULT_MAX_LIFETIME_EDGE_TRANSFERS;
+    context->max_template_instantiations =
+        TRANSPILE_DEFAULT_MAX_TEMPLATE_INSTANTIATIONS;
+    context->max_template_instantiation_depth =
+        CBLC_TEMPLATE_DEFAULT_MAX_DEPTH;
     context->ast_dump_enabled = 0;
     context->copybook_graph_enabled = 0;
     context->semantic_diff_enabled = 0;
@@ -1857,6 +1864,7 @@ void transpiler_context_dispose(t_transpiler_context *context)
     context->warning_settings.string_truncation = 1;
     context->warning_settings.shadow = 1;
     context->warning_settings.unused = 1;
+    context->max_source_bytes = TRANSPILE_DEFAULT_MAX_SOURCE_BYTES;
     context->ast_dump_enabled = 0;
     context->copybook_graph_enabled = 0;
     context->semantic_diff_enabled = 0;

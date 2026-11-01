@@ -6,6 +6,8 @@
 
 #include "round_trip_pipeline_helpers.hpp"
 
+#include <string>
+
 static int run_inline_cblc_to_cobol_execution_test(const char *source,
     const char *base_name, const char *expected_output)
 {
@@ -36,15 +38,62 @@ static int run_inline_cblc_to_cobol_execution_test(const char *source,
     log_path = NULL;
     directory_created = 0;
     status = FT_FAILURE;
-    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "inline CBL-C sample should parse") != FT_SUCCESS)
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        if (unit.parse_error_message[0] != '\0')
+            std::printf("CBL-C parser diagnostic: %s\n", unit.parse_error_message);
+        test_expect_success(FT_FAILURE, "inline CBL-C sample should parse");
         goto cleanup;
+    }
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
             "inline CBL-C sample should convert to COBOL") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(transpiler_validate_generated_cobol(generated_cobol),
-            "inline generated COBOL should validate") != FT_SUCCESS)
+    if (transpiler_validate_generated_cobol(generated_cobol) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: inline generated COBOL should validate\n");
+        {
+            t_parser diagnostic_parser;
+            t_ast_node *diagnostic_program;
+
+            diagnostic_program = NULL;
+            parser_init(&diagnostic_parser, generated_cobol);
+            if (parser_parse_program(&diagnostic_parser, &diagnostic_program) != FT_SUCCESS)
+            {
+                if (diagnostic_parser.has_error_token
+                    && diagnostic_parser.error_token.lexeme)
+                {
+                    std::printf("COBOL parser stopped at line %zu, column %zu near '%.*s'\n",
+                        diagnostic_parser.error_token.line,
+                        diagnostic_parser.error_token.column,
+                        static_cast<int>(diagnostic_parser.error_token.length),
+                        diagnostic_parser.error_token.lexeme);
+                    {
+                        size_t source_line;
+                        const char *source_cursor;
+                        source_line = 1;
+                        source_cursor = generated_cobol;
+                        while (source_cursor && *source_cursor != '\0'
+                            && source_line < diagnostic_parser.error_token.line)
+                        {
+                            if (*source_cursor == '\n')
+                                source_line += 1;
+                            source_cursor += 1;
+                        }
+                        if (source_cursor && *source_cursor != '\0')
+                            std::printf("Generated line %zu: %.*s\n", source_line,
+                                static_cast<int>(std::strcspn(source_cursor, "\r\n")),
+                                source_cursor);
+                    }
+                }
+                else
+                    std::printf("COBOL parser stopped without recording an error token\n");
+            }
+            if (diagnostic_program)
+                ast_node_destroy(diagnostic_program);
+            parser_dispose(&diagnostic_parser);
+        }
         goto cleanup;
+    }
     if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
         goto cleanup;
     directory_created = 1;
@@ -68,13 +117,19 @@ static int run_inline_cblc_to_cobol_execution_test(const char *source,
     log_path = compile_log_path;
     if (compile_generated_cobol(binary_path, source_path, compile_log_path,
             "cobc should compile generated inline COBOL sample") != FT_SUCCESS)
+    {
+        if (test_read_text_file(compile_log_path, output_buffer,
+                sizeof(output_buffer)) == FT_SUCCESS)
+            std::printf("COBOL compiler diagnostics:\n%s\n", output_buffer);
         goto cleanup;
+    }
     if (execute_binary(directory, binary_name, output_name,
             "generated inline COBOL binary should execute successfully") != FT_SUCCESS)
         goto cleanup;
     if (test_read_text_file(output_path, output_buffer, sizeof(output_buffer)) != FT_SUCCESS)
         goto cleanup;
-    if (std::strncmp(output_buffer, expected_output, std::strlen(expected_output) + 1) != 0)
+    if (std::strncmp(output_buffer, expected_output,
+            std::strlen(expected_output) + 1) != 0)
     {
         std::printf("Assertion failed: generated inline COBOL binary should emit expected output\n");
         goto cleanup;
@@ -89,6 +144,197 @@ cleanup:
     if (generated_cobol)
         cma_free(generated_cobol);
     cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+static const char *g_nested_replacement_exception_source =
+    "void main() {\n"
+    "    try { throw 1; }\n"
+    "    catch (int first_error) {\n"
+    "        try { throw 2; }\n"
+    "        catch (int second_error) { display(\"REPLACEMENT CAUGHT\"); }\n"
+    "    }\n"
+    "    display(\"AFTER REPLACEMENT\");\n"
+    "    return;\n"
+    "}\n";
+
+FT_TEST(test_cblc_nested_replacement_exception_generates_handler_flow)
+{
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(g_nested_replacement_exception_source, &unit)
+        != FT_SUCCESS)
+    {
+        std::printf("nested replacement-exception parse diagnostic: %s\n",
+            unit.parse_error_message);
+        goto cleanup;
+    }
+    if (cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS)
+    {
+        std::printf("nested replacement-exception COBOL generation failed\n");
+        goto cleanup;
+    }
+    if (transpiler_validate_generated_cobol(generated_cobol) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: nested replacement-exception COBOL should pass structural validation\n");
+        goto cleanup;
+    }
+    if (!std::strstr(generated_cobol, "DISPLAY \"REPLACEMENT CAUGHT\""))
+    {
+        std::printf("Assertion failed: replacement exception should retain its nested handler body\n");
+        goto cleanup;
+    }
+    if (!std::strstr(generated_cobol, "DISPLAY \"AFTER REPLACEMENT\""))
+    {
+        std::printf("Assertion failed: replacement exception should preserve normal continuation after its handler\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_nested_replacement_exception_executes_and_continues)
+{
+    return (run_inline_cblc_to_cobol_execution_test(
+        g_nested_replacement_exception_source,
+        "nested_replacement_exception_generated",
+        "REPLACEMENT CAUGHT\nAFTER REPLACEMENT\n"));
+}
+
+static const char *g_active_raise_guard_source =
+    "void main() {\n"
+    "    try { throw 1; }\n"
+    "    catch (int caught) { display(\"CATCH RAN\"); }\n"
+    "    display(\"AFTER THROW\");\n"
+    "}\n";
+
+static int build_active_raise_mutation(const char *source,
+    std::string *mutated_cobol)
+{
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    const char *call_marker;
+    size_t insertion_offset;
+    int status;
+
+    if (!source || !mutated_cobol)
+        return (FT_FAILURE);
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS
+        || cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
+        || transpiler_validate_generated_cobol(generated_cobol) != FT_SUCCESS)
+        goto cleanup;
+    call_marker = std::strstr(generated_cobol,
+        "           PERFORM CBLC-TRY-CALL-");
+    if (!call_marker)
+        goto cleanup;
+    insertion_offset = static_cast<size_t>(call_marker - generated_cobol);
+    *mutated_cobol = generated_cobol;
+    mutated_cobol->insert(insertion_offset,
+        "           MOVE 'Y' TO CBLC-EX-RAISING.\n");
+    if (transpiler_validate_generated_cobol(mutated_cobol->c_str()) != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_active_raise_guard_mutated_cobol_validates)
+{
+    std::string mutated_cobol;
+
+    if (build_active_raise_mutation(g_active_raise_guard_source,
+            &mutated_cobol) != FT_SUCCESS
+        || mutated_cobol.find("MOVE 'Y' TO CBLC-EX-RAISING.") == std::string::npos
+        || mutated_cobol.find("PERFORM CBLC-TERMINATE") == std::string::npos
+        || mutated_cobol.find("STOP RUN.") == std::string::npos)
+    {
+        std::printf("Assertion failed: forced active-raise mutation should validate with its terminal abort path\n");
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cblc_active_raise_guard_terminates_generated_program)
+{
+    char directory[256];
+    char source_path[256];
+    char binary_path[256];
+    char output_path[256];
+    char compile_log_path[256];
+    char output_buffer[2048];
+    std::string mutated_cobol;
+    const char *log_path;
+    int status;
+    int directory_created;
+
+    FT_REQUIRE_COBC();
+    FT_REQUIRE_FORWARD_TRANSLATION();
+    directory[0] = '\0';
+    source_path[0] = '\0';
+    binary_path[0] = '\0';
+    output_path[0] = '\0';
+    compile_log_path[0] = '\0';
+    log_path = NULL;
+    directory_created = 0;
+    status = FT_FAILURE;
+    if (build_active_raise_mutation(g_active_raise_guard_source,
+            &mutated_cobol) != FT_SUCCESS)
+    {
+        std::printf("active-raise mutation fixture failed to build\n");
+        goto cleanup;
+    }
+    if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
+        goto cleanup;
+    directory_created = 1;
+    if (test_join_path(directory, "active_raise_guard.cob", source_path,
+            sizeof(source_path)) != FT_SUCCESS
+        || test_join_path(directory, "active_raise_guard.bin", binary_path,
+            sizeof(binary_path)) != FT_SUCCESS
+        || test_join_path(directory, "active_raise_guard.txt", output_path,
+            sizeof(output_path)) != FT_SUCCESS
+        || std::snprintf(compile_log_path, sizeof(compile_log_path),
+            "%s/active_raise_guard.log", directory) < 0
+        || test_write_text_file(source_path, mutated_cobol.c_str()) != FT_SUCCESS)
+        goto cleanup;
+    log_path = compile_log_path;
+    if (compile_generated_cobol(binary_path, source_path, compile_log_path,
+            "cobc should compile the forced active-raise mutation") != FT_SUCCESS)
+        goto cleanup;
+    if (execute_binary(directory, "active_raise_guard.bin", "active_raise_guard.txt",
+            "forced active-raise guard program should terminate") != FT_SUCCESS
+        || test_read_text_file(output_path, output_buffer,
+            sizeof(output_buffer)) != FT_SUCCESS)
+        goto cleanup;
+    if (!std::strstr(output_buffer, "Fatal CBL-C double exception")
+        || std::strstr(output_buffer, "CATCH RAN")
+        || std::strstr(output_buffer, "AFTER THROW"))
+    {
+        std::printf("Assertion failed: active raise must terminate before catch dispatch or source fallthrough\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (directory_created)
+    {
+        test_cleanup_example_artifacts_with_log(source_path, binary_path,
+            output_path, log_path);
+        test_remove_directory(directory);
+    }
     return (status);
 }
 
@@ -374,6 +620,284 @@ FT_TEST(test_cblc_inline_class_methods_translates_to_cobol_and_executes)
         "}\n";
     return (run_inline_cblc_to_cobol_execution_test(source,
             "inline_class_methods_generated", "CLASS OK\n"));
+}
+
+FT_TEST(test_cblc_owned_char_array_new_delete_translates_to_cobol_and_executes)
+{
+    const char *source;
+
+    source = "char *buffer;\n"
+        "void main()\n"
+        "{\n"
+        "    buffer = new char[16];\n"
+        "    buffer[0] = 'A';\n"
+        "    delete[] buffer;\n"
+        "    display(\"CHAR BUFFER LIFETIME OK\");\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "owned_char_array_lifecycle", "CHAR BUFFER LIFETIME OK\n"));
+}
+
+FT_TEST(test_cblc_class_owned_char_pointer_field_runs_destructor)
+{
+    const char *source;
+
+    source = "class OwnedBuffer\n"
+        "{\n"
+        "    private:\n"
+        "    char *data;\n"
+        "    public:\n"
+        "    OwnedBuffer()\n"
+        "    {\n"
+        "        data = new char[16];\n"
+        "    }\n"
+        "    ~OwnedBuffer()\n"
+        "    {\n"
+        "        delete[] data;\n"
+        "    }\n"
+        "};\n"
+        "void main()\n"
+        "{\n"
+        "    OwnedBuffer buffer;\n"
+        "    display(\"CLASS OWNED BUFFER LIFETIME OK\");\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "owned_buf_lifecycle",
+            "CLASS OWNED BUFFER LIFETIME OK\n"));
+}
+
+FT_TEST(test_cblc_nested_string_class_field_constructs_and_destroys_in_cobol)
+{
+    const char *source;
+
+    source = "class Person { string name; };\n"
+        "Person person;\n"
+        "void main() {\n"
+        "    display(\"NESTED STRING CLASS LIFETIME OK\");\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+        "nested_string_class_lifecycle", "NESTED STRING CLASS LIFETIME OK\n"));
+}
+
+FT_TEST(test_cblc_class_member_array_constructs_and_destroys_each_element)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    const char *element_two_reference;
+    const char *element_one_reference;
+    const char *throw_payload;
+    const char *completed_count_increment;
+    const char *scan_cursor;
+    int status;
+
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    source = "int constructed;\n"
+        "int should_throw;\n"
+        "int destroyed;\n"
+        "class Leaf {\n"
+        "    int payload;\n"
+        "    public:\n"
+        "    Leaf() {\n"
+        "        if (should_throw == 1) { throw 9; }\n"
+        "        constructed = constructed + 1;\n"
+        "        payload = 21;\n"
+        "    }\n"
+        "    ~Leaf() { destroyed = destroyed + payload; }\n"
+        "    int value() { return payload; }\n"
+        "};\n"
+        "class Owner {\n"
+        "    Leaf values[2];\n"
+        "};\n"
+        "int make_sum() { Owner owner; return 42; }\n"
+        "void main() {\n"
+        "    int observed;\n"
+        "    observed = make_sum();\n"
+        "    if (observed == 42 && constructed == 2 && destroyed == 42) {\n"
+        "        display(\"CLASS MEMBER ARRAY LIFETIME OK\");\n"
+        "    } else {\n"
+        "        display(\"CLASS MEMBER ARRAY LIFETIME BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "class member array source should parse") != FT_SUCCESS)
+    {
+        if (unit.parse_error_message[0] != '\0')
+            std::printf("CBL-C parser diagnostic: %s\n", unit.parse_error_message);
+        goto cleanup;
+    }
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "class member array source should generate COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(transpiler_validate_generated_cobol(generated_cobol),
+            "generated class member array COBOL should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(std::strstr(generated_cobol,
+                "CBLC-EX-RAISING PIC X") != NULL
+                && std::strstr(generated_cobol, "CBLC-TERMINATE.") != NULL,
+            1, "constructor throws require exception state and fatal termination paragraphs")
+        != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(std::strstr(generated_cobol, "OCCURS 2 TIMES") != NULL,
+            1, "class member arrays should be emitted as COBOL tables") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(std::strstr(generated_cobol, "CONSTRUCTED") != NULL
+                && std::strstr(generated_cobol, "DESTROYED") != NULL,
+            1, "per-element constructor and destructor bodies should be emitted")
+        != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_int_equal(std::strstr(generated_cobol,
+                "MAKE-SUM-OWNER-VALUES-CBLC-LIVE-COUNT") != NULL
+                && std::strstr(generated_cobol,
+                    "IF MAKE-SUM-OWNER-VALUES-CBLC-LIVE-COUNT >= 2") != NULL,
+            1, "cleanup should dispatch only constructed array elements") != FT_SUCCESS)
+        goto cleanup;
+    throw_payload = std::strstr(generated_cobol,
+        "MOVE 9 TO CBLC-EX-INT-PAYLOAD");
+    completed_count_increment = std::strstr(generated_cobol,
+        "COMPUTE MAKE-SUM-OWNER-VALUES-CBLC-LIVE-COUNT");
+    if (test_expect_int_equal(throw_payload != NULL && completed_count_increment != NULL
+                && throw_payload < completed_count_increment,
+            1, "a throwing element must transfer before it is marked constructed")
+        != FT_SUCCESS)
+        goto cleanup;
+    element_two_reference = NULL;
+    element_one_reference = NULL;
+    scan_cursor = generated_cobol;
+    while (scan_cursor)
+    {
+        const char *match;
+
+        match = std::strstr(scan_cursor, "MAKE-SUM-OWNER-VALUES-PAYLOAD(2)");
+        if (!match)
+            break ;
+        element_two_reference = match;
+        scan_cursor = match + 1;
+    }
+    scan_cursor = generated_cobol;
+    while (scan_cursor)
+    {
+        const char *match;
+
+        match = std::strstr(scan_cursor, "MAKE-SUM-OWNER-VALUES-PAYLOAD(1)");
+        if (!match)
+            break ;
+        element_one_reference = match;
+        scan_cursor = match + 1;
+    }
+    if (test_expect_int_equal(element_two_reference != NULL
+                && element_one_reference != NULL
+                && element_two_reference < element_one_reference,
+            1, "member array elements should be destroyed in reverse order") != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_lowercase_string_resolves_to_declared_class)
+{
+    const char *source;
+
+    source = "class string\n"
+        "{\n"
+        "    private:\n"
+        "    char *data;\n"
+        "    int stored_length;\n"
+        "    int storage_capacity;\n"
+        "    public:\n"
+        "    string(int initial_length)\n"
+        "    {\n"
+        "        data = new char[initial_length];\n"
+        "        data[0] = 'S';\n"
+        "        stored_length = initial_length;\n"
+        "        storage_capacity = initial_length;\n"
+        "    }\n"
+        "    ~string()\n"
+        "    {\n"
+        "        delete[] data;\n"
+        "    }\n"
+        "    int len()\n"
+        "    {\n"
+        "        return stored_length;\n"
+        "    }\n"
+        "    char first_byte()\n"
+        "    {\n"
+        "        return data[0];\n"
+        "    }\n"
+        "};\n"
+        "int observed;\n"
+        "void main()\n"
+        "{\n"
+        "    string text(9);\n"
+        "    observed = text.len();\n"
+        "    if (observed == 9 && text.first_byte() == 'S') {\n"
+        "        display(\"LOWERCASE STRING CLASS OK\");\n"
+        "    } else {\n"
+        "        display(\"LOWERCASE STRING CLASS BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "string_class_type", "LOWERCASE STRING CLASS OK\n"));
+}
+
+FT_TEST(test_cblc_pointer_owning_class_parameter_copies_and_cleans_up)
+{
+    const char *source;
+
+    source = "class Buffer\n"
+        "{\n"
+        "    private:\n"
+        "    char *data;\n"
+        "    public:\n"
+        "    Buffer(char initial)\n"
+        "    {\n"
+        "        data = new char[1];\n"
+        "        data[0] = initial;\n"
+        "    }\n"
+        "    Buffer(Buffer source)\n"
+        "    {\n"
+        "        data = new char[1];\n"
+        "        data[0] = source.data[0];\n"
+        "    }\n"
+        "    ~Buffer()\n"
+        "    {\n"
+        "        delete[] data;\n"
+        "    }\n"
+        "    char first()\n"
+        "    {\n"
+        "        return data[0];\n"
+        "    }\n"
+        "};\n"
+        "int read_first(Buffer value)\n"
+        "{\n"
+        "    return value.first();\n"
+        "}\n"
+        "void main()\n"
+        "{\n"
+        "    Buffer source('B');\n"
+        "    int observed;\n"
+        "    observed = read_first(source);\n"
+        "    if (observed == 66) {\n"
+        "        display(\"CLASS PARAMETER OWNERSHIP OK\");\n"
+        "    } else {\n"
+        "        display(\"CLASS PARAMETER OWNERSHIP BAD\");\n"
+        "    }\n"
+        "    return;\n"
+        "}\n";
+    return (run_inline_cblc_to_cobol_execution_test(source,
+            "class_parameter_owned_buffer",
+            "CLASS PARAMETER OWNERSHIP OK\n"));
 }
 
 FT_TEST(test_cblc_inline_array_access_translates_to_cobol_and_executes)

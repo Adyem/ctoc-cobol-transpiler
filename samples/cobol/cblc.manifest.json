@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "mode": "cblc-to-cobol",
+  "runtime": "external-standard-library",
+  "template_contract": "CBLC-TEMPLATE-TYPE-SUBSTITUTION@6",
+  "artifacts": [
+    {
+      "kind": "target",
+      "id": "MAIN",
+      "path": "samples/cobol/vector_nested_borrow_probe.cob",
+      "source_hash": "fnv1a64:17257733d827349e",
+      "module_dependencies": [],
+      "hash": "fnv1a64:10e95f5979fbf46b",
+      "dependencies": []
+    }
+  ]
+}

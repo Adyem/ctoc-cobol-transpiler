@@ -2,7 +2,9 @@
 
 #define TRANSPILE_STANDARD_LIBRARY_ENTRY(name, buffer, program, result_kind, result_type, \
         parameters, hidden_outputs, failure, generator) \
-    {name, buffer, program, result_kind, result_type, parameters, hidden_outputs, failure, 1u, generator}
+    {name, buffer, program, result_kind, result_type, parameters, hidden_outputs, failure, \
+        TRANSPILE_STANDARD_LIBRARY_INTERFACE_VERSION_CURRENT, \
+        TRANSPILE_STANDARD_LIBRARY_ABI_VERSION_CURRENT, generator}
 
 static const t_transpiler_standard_library_entry g_transpiler_standard_library_entries[] = {
     TRANSPILE_STANDARD_LIBRARY_ENTRY("std::abs", TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE,
@@ -13,26 +15,14 @@ static const t_transpiler_standard_library_entry g_transpiler_standard_library_e
         "CBLC-ATOI", TRANSPILE_STANDARD_LIBRARY_RETURN_INT, "int", "char *source",
         "CBLC-RETURN-F; CBLC-EX-CONTEXT", TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE,
         transpiler_standard_library_generate_atoi),
-    TRANSPILE_STANDARD_LIBRARY_ENTRY("std::atoi", TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING,
-        "CBLC-ATOI-STRING", TRANSPILE_STANDARD_LIBRARY_RETURN_INT, "int", "String source",
-        "CBLC-RETURN-F; CBLC-EX-CONTEXT", TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE,
-        transpiler_standard_library_generate_atoi_string),
     TRANSPILE_STANDARD_LIBRARY_ENTRY("std::atol", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR,
         "CBLC-ATOL", TRANSPILE_STANDARD_LIBRARY_RETURN_INT, "long", "char *source",
         "CBLC-RETURN-F; CBLC-EX-CONTEXT", TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE,
         transpiler_standard_library_generate_atol),
-    TRANSPILE_STANDARD_LIBRARY_ENTRY("std::atol", TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING,
-        "CBLC-ATOL-STRING", TRANSPILE_STANDARD_LIBRARY_RETURN_INT, "long", "String source",
-        "CBLC-RETURN-F; CBLC-EX-CONTEXT", TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE,
-        transpiler_standard_library_generate_atol_string),
     TRANSPILE_STANDARD_LIBRARY_ENTRY("std::atoll", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR,
         "CBLC-ATOLL", TRANSPILE_STANDARD_LIBRARY_RETURN_INT, "long long", "char *source",
         "CBLC-RETURN-F; CBLC-EX-CONTEXT", TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE,
         transpiler_standard_library_generate_atoll),
-    TRANSPILE_STANDARD_LIBRARY_ENTRY("std::atoll", TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING,
-        "CBLC-ATOLL-STRING", TRANSPILE_STANDARD_LIBRARY_RETURN_INT, "long long", "String source",
-        "CBLC-RETURN-F; CBLC-EX-CONTEXT", TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE,
-        transpiler_standard_library_generate_atoll_string),
     TRANSPILE_STANDARD_LIBRARY_ENTRY("std::fabs", TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE,
         "CBLC-FABS", TRANSPILE_STANDARD_LIBRARY_RETURN_DOUBLE, "double", "double operand",
         "CBLC-RETURN-F; CBLC-EX-CONTEXT", TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE,
@@ -104,66 +94,34 @@ static const t_transpiler_standard_library_entry g_transpiler_standard_library_e
         "CBLC-STRLEN", TRANSPILE_STANDARD_LIBRARY_RETURN_INT, "int", "char *source",
         "CBLC-RETURN-F; CBLC-EX-CONTEXT", TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE,
         transpiler_standard_library_generate_strlen),
-    TRANSPILE_STANDARD_LIBRARY_ENTRY("std::strlen", TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING,
-        "CBLC-STRLEN-STRING", TRANSPILE_STANDARD_LIBRARY_RETURN_INT, "int", "String source",
-        "CBLC-RETURN-F; CBLC-EX-CONTEXT", TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE,
-        transpiler_standard_library_generate_strlen_string),
     TRANSPILE_STANDARD_LIBRARY_ENTRY("std::strnlen", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR,
         "CBLC-STRNLEN", TRANSPILE_STANDARD_LIBRARY_RETURN_INT, "int",
         "char *source, int request", "CBLC-RETURN-F; CBLC-EX-CONTEXT",
         TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE, transpiler_standard_library_generate_strnlen),
-    TRANSPILE_STANDARD_LIBRARY_ENTRY("std::strnlen", TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING,
-        "CBLC-STRNLEN-STRING", TRANSPILE_STANDARD_LIBRARY_RETURN_INT, "int",
-        "String source, int request", "CBLC-RETURN-F; CBLC-EX-CONTEXT",
-        TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE, transpiler_standard_library_generate_strnlen_string),
     TRANSPILE_STANDARD_LIBRARY_ENTRY("std::strcmp", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR,
         "CBLC-STRCMP", TRANSPILE_STANDARD_LIBRARY_RETURN_INT, "int",
         "char *first, char *second", "CBLC-RETURN-F; CBLC-EX-CONTEXT",
         TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE, transpiler_standard_library_generate_strcmp),
-    TRANSPILE_STANDARD_LIBRARY_ENTRY("std::strcmp", TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING,
-        "CBLC-STRCMP-STRING", TRANSPILE_STANDARD_LIBRARY_RETURN_INT, "int",
-        "String first, String second", "CBLC-RETURN-F; CBLC-EX-CONTEXT",
-        TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE, transpiler_standard_library_generate_strcmp_string),
     TRANSPILE_STANDARD_LIBRARY_ENTRY("std::strcpy", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR,
         "CBLC-STRCPY", TRANSPILE_STANDARD_LIBRARY_RETURN_VOID, "void",
         "char *destination, char *source", "status", TRANSPILE_STANDARD_LIBRARY_FAILURE_COMPATIBILITY,
         transpiler_standard_library_generate_strcpy),
-    TRANSPILE_STANDARD_LIBRARY_ENTRY("std::strcpy", TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING,
-        "CBLC-STRCPY-STRING", TRANSPILE_STANDARD_LIBRARY_RETURN_VOID, "void",
-        "String destination, String source", "", TRANSPILE_STANDARD_LIBRARY_FAILURE_THROWS,
-        transpiler_standard_library_generate_strcpy_string),
     TRANSPILE_STANDARD_LIBRARY_ENTRY("std::strncpy", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR,
         "CBLC-STRNCPY", TRANSPILE_STANDARD_LIBRARY_RETURN_VOID, "void",
         "char *destination, char *source, int request", "status",
         TRANSPILE_STANDARD_LIBRARY_FAILURE_COMPATIBILITY, transpiler_standard_library_generate_strncpy),
-    TRANSPILE_STANDARD_LIBRARY_ENTRY("std::strncpy", TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING,
-        "CBLC-STRNCPY-STRING", TRANSPILE_STANDARD_LIBRARY_RETURN_VOID, "void",
-        "String destination, String source, int request", "", TRANSPILE_STANDARD_LIBRARY_FAILURE_THROWS,
-        transpiler_standard_library_generate_strncpy_string),
     TRANSPILE_STANDARD_LIBRARY_ENTRY("std::memcmp", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR,
         "CBLC-MEMCMP", TRANSPILE_STANDARD_LIBRARY_RETURN_INT, "int",
         "char *first, char *second, int count", "CBLC-RETURN-F; CBLC-EX-CONTEXT",
         TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE, transpiler_standard_library_generate_memcmp),
-    TRANSPILE_STANDARD_LIBRARY_ENTRY("std::memcmp", TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING,
-        "CBLC-MEMCMP-STRING", TRANSPILE_STANDARD_LIBRARY_RETURN_INT, "int",
-        "String first, String second, int count", "CBLC-RETURN-F; CBLC-EX-CONTEXT",
-        TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE, transpiler_standard_library_generate_memcmp_string),
     TRANSPILE_STANDARD_LIBRARY_ENTRY("std::strcat", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR,
         "CBLC-STRCAT", TRANSPILE_STANDARD_LIBRARY_RETURN_VOID, "void",
         "char *destination, char *left, char *right", "status; result_length",
         TRANSPILE_STANDARD_LIBRARY_FAILURE_COMPATIBILITY, transpiler_standard_library_generate_strcat),
-    TRANSPILE_STANDARD_LIBRARY_ENTRY("std::strcat", TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING,
-        "CBLC-STRCAT-STRING", TRANSPILE_STANDARD_LIBRARY_RETURN_VOID, "void",
-        "String destination, String left, String right", "", TRANSPILE_STANDARD_LIBRARY_FAILURE_THROWS,
-        transpiler_standard_library_generate_strcat_string),
     TRANSPILE_STANDARD_LIBRARY_ENTRY("std::strtod", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR,
         "CBLC-STRTOD", TRANSPILE_STANDARD_LIBRARY_RETURN_DOUBLE, "double", "char *source",
         "CBLC-RETURN-F; CBLC-EX-CONTEXT", TRANSPILE_STANDARD_LIBRARY_FAILURE_THROWS,
         transpiler_standard_library_generate_strtod),
-    TRANSPILE_STANDARD_LIBRARY_ENTRY("std::strtod", TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING,
-        "CBLC-STRTOD-STRING", TRANSPILE_STANDARD_LIBRARY_RETURN_DOUBLE, "double", "String source",
-        "CBLC-RETURN-F; CBLC-EX-CONTEXT", TRANSPILE_STANDARD_LIBRARY_FAILURE_THROWS,
-        transpiler_standard_library_generate_strtod_string),
     TRANSPILE_STANDARD_LIBRARY_ENTRY("std::pow", TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE,
         "CBLC-POWEROF", TRANSPILE_STANDARD_LIBRARY_RETURN_DOUBLE, "double",
         "double base, double exponent", "CBLC-RETURN-F; CBLC-EX-CONTEXT",
@@ -184,18 +142,10 @@ static const t_transpiler_standard_library_entry g_transpiler_standard_library_e
         "CBLC-TOUPPER", TRANSPILE_STANDARD_LIBRARY_RETURN_CHAR_POINTER, "char *",
         "char *text", "CBLC-RETURN-PTR; CBLC-EX-CONTEXT", TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE,
         transpiler_standard_library_generate_toupper),
-    TRANSPILE_STANDARD_LIBRARY_ENTRY("std::toupper", TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING,
-        "CBLC-TOUPPER-STRING", TRANSPILE_STANDARD_LIBRARY_RETURN_VOID, "void",
-        "String text", "", TRANSPILE_STANDARD_LIBRARY_FAILURE_THROWS,
-        transpiler_standard_library_generate_toupper_string),
     TRANSPILE_STANDARD_LIBRARY_ENTRY("std::tolower", TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR,
         "CBLC-TOLOWER", TRANSPILE_STANDARD_LIBRARY_RETURN_CHAR_POINTER, "char *",
         "char *text", "CBLC-RETURN-PTR; CBLC-EX-CONTEXT", TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE,
         transpiler_standard_library_generate_tolower),
-    TRANSPILE_STANDARD_LIBRARY_ENTRY("std::tolower", TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING,
-        "CBLC-TOLOWER-STRING", TRANSPILE_STANDARD_LIBRARY_RETURN_VOID, "void",
-        "String text", "", TRANSPILE_STANDARD_LIBRARY_FAILURE_THROWS,
-        transpiler_standard_library_generate_tolower_string),
     TRANSPILE_STANDARD_LIBRARY_ENTRY("std::isdigit", TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE,
         "CBLC-ISDIGIT", TRANSPILE_STANDARD_LIBRARY_RETURN_INT, "int", "char current",
         "CBLC-RETURN-F; CBLC-EX-CONTEXT", TRANSPILE_STANDARD_LIBRARY_FAILURE_NONE,
@@ -241,6 +191,31 @@ const t_transpiler_standard_library_entry *transpiler_standard_library_lookup_wi
                 || entries[index].buffer_kind == buffer_kind)
                 return (&entries[index]);
         }
+        index += 1;
+    }
+    return (NULL);
+}
+
+const t_transpiler_standard_library_entry *transpiler_standard_library_lookup_versioned(
+    const char *qualified_name, t_transpiler_standard_library_buffer_kind buffer_kind,
+    unsigned int interface_version, unsigned int abi_version)
+{
+    const t_transpiler_standard_library_entry *entries;
+    size_t entry_count;
+    size_t index;
+
+    if (!qualified_name || interface_version == 0 || abi_version == 0)
+        return (NULL);
+    entries = transpiler_standard_library_get_entries(&entry_count);
+    index = 0;
+    while (index < entry_count)
+    {
+        if (std::strcmp(entries[index].qualified_name, qualified_name) == 0
+            && (buffer_kind == TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE
+                || entries[index].buffer_kind == buffer_kind)
+            && entries[index].interface_version == interface_version
+            && entries[index].abi_version == abi_version)
+            return (&entries[index]);
         index += 1;
     }
     return (NULL);

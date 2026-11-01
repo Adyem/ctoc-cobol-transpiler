@@ -512,9 +512,11 @@ Current status: explicit multi-parameter function applications now share the
 canonical argument-reference cache and substitute dependent parameters and
 returns independently. Pointer return kinds are supported by the shared shape
 resolver. Integer fixed-array parameters now use an exact-shape, by-value-copy
-ABI into callee `OCCURS` storage; capacity-bearing string arrays and
-recursively supported concrete struct arrays use explicit ownership/shape
-rules. Explicitly `borrowed` pointer fields use shallow aliasing; owning
+ABI into callee `OCCURS` storage; raw `char[N]` buffers and recursively
+supported concrete struct arrays use explicit ownership/shape rules. The
+owning `string` class is not a fixed-buffer array type and remains unsupported
+as an array element until lifecycle-aware construction, copying, rollback, and
+destruction are implemented. Explicitly `borrowed` pointer fields use shallow aliasing; owning
 pointer fields and other non-trivial ownership layouts remain rejected until
 their lifecycle contract is defined. Deduction remains intentionally limited to
 the existing exact one-parameter rules.
@@ -671,40 +673,26 @@ preserving stable error codes and messages. Future work can expose this
 metadata through frontend related spans and add a bounded instantiation trace
 without changing the primary diagnostic contract.
 
-The first array ABI is intentionally narrow: `int[N]`, explicit
-capacity-bearing `string(C)[N]`, and recursively trivial concrete `Type[N]`
-arguments are accepted in dependent function parameters. The caller must
-provide a named array with exactly matching shape; lowering copies each
-integer element, string element length and active buffer, or struct field into
-callee-owned `OCCURS N TIMES` storage. Array decay, implicit bound or capacity
-conversion, indexed expressions, literals, and non-trivial struct layouts
-remain rejected. This creates a deterministic ABI boundary that can later be
-generalized to other element layouts without changing template cache identity.
+The supported fixed-array ABI is limited to `int[N]` and the documented
+trivially-copyable concrete `Type[N]` subset. Raw character arrays are explicit
+`char[N]` buffers, not string objects. The former capacity-bearing
+`string(C)[N]` source type has been removed; arrays of owning `string` class
+objects remain unsupported until lifecycle-aware array construction, copying,
+rollback, and destruction are implemented. Do not treat historical tests or
+ABI descriptions for the removed spelling as support evidence.
 
-### 10.1 String array ABI and trivially-copyable struct array ABI
+### 10.1 Trivially-copyable struct array ABI
 
-String arrays now use a capacity-bearing element layout, and a bounded
-trivially-copyable struct-array subset is enabled:
+The bounded trivially-copyable struct-array subset remains enabled:
 
-1. String array arguments use `string(C)[N]`. Capacity and count are included
-   in the canonical reference and generated name. Caller and callee require
-   identical capacity and count; lowering copies each `LEN` plus active `BUF`
-   contents into callee-owned storage. A dynamic source does not transfer its
-   `PTR` or `CAP`; ownership remains with the source. The ABI contract is
-   versioned and covered by local and compiler-backed tests.
-2. Trivial struct arrays use concrete struct identity and exact element count.
-   Lowering emits an `OCCURS` group and copies each element group with explicit
+1. Struct arrays use concrete struct identity and exact element count. Lowering
+   emits an `OCCURS` group and copies each element group with explicit
    subscripts. The accepted layout contains scalar fields and recursively
-   trivial nested structs, fixed character buffers, and `const string(C)` fields
-   represented as fixed buffers. Mutable string fields use per-element deep
-   copies with source-capacity preservation and explicit destination cleanup;
-   explicitly `borrowed` pointer fields are copied shallowly without transferring
-   pointee ownership, while owning pointer fields remain rejected.
-3. Borrowed pointer fields are a bounded aliasing tier: construction initializes
+   trivial nested structs, fixed character buffers, and explicitly borrowed
+   pointer fields; owning pointer fields remain rejected.
+2. Borrowed pointer fields are a bounded aliasing tier: construction initializes
    each pointer to NULL, array argument lowering copies pointer values, and
    destruction never frees the pointee. The caller must keep each pointee alive
    through callee use. Layout identity for imported structs is versioned as
-   `CBLC-LAYOUT@1`; future work should add richer layout-version migration and
-   an owning-pointer contract. Constructor-argument forwarding for struct arrays
-   is implemented for the bounded element-wise ABI and covered by execution
-   tests.
+   `CBLC-LAYOUT@1`; richer layout-version migration and owning-pointer semantics
+   remain future work.

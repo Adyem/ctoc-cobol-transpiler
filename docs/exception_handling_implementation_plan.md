@@ -8,16 +8,18 @@
 
 CBL-C should provide structured exceptions that feel familiar to a C++ programmer while retaining deterministic CBL-C object lifetimes and producing ordinary COBOL control flow.
 
-The current implementation covers parsing and lowering of integer and string throws,
+The current implementation covers parsing and lowering of integer and bounded exception-message throws,
 typed and catch-all handlers, rethrows, lexical cleanup metadata, propagation from local
 throwing calls through shared generated COBOL exception state, a fatal guard for
 double exceptions during generated raising or cleanup, and typed payload storage for
 trivially copyable user-defined structs/classes. It also supports recursively copyable
-payloads containing inline or dynamically owned string fields by generated field-wise
-`BUF`/`LEN` copying and allocation/free cleanup. Pointer fields, arrays, and user-defined
+payloads containing inline or dynamically owned character-buffer fields by generated
+field-wise `BUF`/`LEN` copying and allocation/free cleanup. Pointer fields, arrays, and user-defined
 destructors remain rejected until generated move/copy construction and destruction
-dispatch are available. Scalar, string, trivial-struct, and supported managed-struct
-`const Type&` catches bind to the active payload group. Directly throwing class methods
+dispatch are available. Scalar, trivial-struct, and supported managed-struct
+`const Type&` catches bind to the active payload group. The owning `string` class is
+not represented by the bounded exception-message payload; throwing/catching that
+non-trivial class remains gated on pointer-aware class lifecycle dispatch. Directly throwing class methods
 are emitted as exception-aware paragraphs and callers check the shared context after
 method or constructor `PERFORM` calls.
 Constructor field progress is tracked in declaration order so a constructor failure
@@ -45,7 +47,7 @@ stubs reject incompatible versions. Generated context records now include and po
 Registration also rejects different exported
 type names that claim the same nonzero type ID with a dedicated diagnostic. Type IDs
 include the exception ABI version in their deterministic hash input. Runtime
-throws of strings whose live length exceeds the bounded 256-byte string payload
+throws of exception messages whose live length exceeds the bounded 256-byte message payload
 storage terminate through `CBLC-TERMINATE` instead of silently truncating. The generated context also keeps
 separate dynamic-type and payload-owner fields so derived-to-base matching does not erase the
 concrete type identity and payload cleanup can be audited explicitly.
@@ -350,22 +352,25 @@ Track materialized temporaries explicitly. Except when lifetime extension is def
 This phase is necessary before supporting complex nested calls safely. Until implemented, reject expressions whose required temporary lifetime cannot be represented correctly.
 
 The current native CBL-C subset enforces this boundary conservatively: `throw` accepts
-literal values, existing scalar/string/struct objects, and rethrow, but does not accept
+literal values, existing scalar/character-buffer/trivial-struct objects, and rethrow, but does not accept
 temporary constructor expressions or other unnamed materializations. Those forms fail
 parsing instead of entering the exception context without a tracked owner.
 
-### 6.6 Managed strings
+### 6.6 Owning `string` class
 
-The current language defines `string` as a managed fixed-capacity value object, while the emitter can also use dynamic backing storage for relevant forms. Give every string value an explicit ownership category:
+The source-language `string` is the canonical standard-library class, not a
+compiler-created fixed-capacity value or a borrowed buffer view. Its current
+implementation owns dynamically allocated character storage. Exception payload
+support for this non-trivial class is gated on pointer-aware construction,
+copy/move, and destruction dispatch; it must never fall back to the bounded
+exception-message buffer. Borrowed character data remains a separate raw-buffer
+interface and is not an owning `string` instance.
 
-- **inline owned:** buffer is part of the value; destructor resets metadata but does not free storage;
-- **dynamic owned:** destructor releases its allocated pointer exactly once and clears pointer, length, and capacity;
-- **borrowed view/reference:** destructor performs no release;
-- **moved-from:** valid empty non-owner; destructor is harmless.
-
-String cleanup happens at the same lexical boundaries as class cleanup. A string field is destroyed as part of its containing object's reverse field destruction. String arrays are destroyed in reverse element order, limited to the initialized element count.
-
-Assignment must not change lexical lifetime. It replaces the held value using an exception-safe sequence: prepare new storage/value first, then release old ownership, then commit metadata. Self-assignment and aliasing require explicit handling.
+`string` cleanup follows ordinary class lifetime boundaries: a string field is
+destroyed as part of its containing object, and string elements are destroyed
+according to the container's initialized-element count. Assignment must prepare
+replacement state before releasing old ownership, with explicit self-assignment
+and aliasing guarantees.
 
 ### 6.7 Catch parameter and exception lifetime
 
@@ -468,11 +473,11 @@ The current lowering implements the arithmetic portion of this boundary for comp
 a `try`: generated `ON SIZE ERROR` clauses raise an integer-compatible numeric failure, apply
 the active/raising/cleaning double-exception guard, and enter ordinary handler dispatch. File-status
 handling is also implemented for the generated sequential-file model: each file has a `FILE STATUS`
-item, OPEN/CLOSE/WRITE failures and non-EOF READ failures become string payload exceptions, and
+item, OPEN/CLOSE/WRITE failures and non-EOF READ failures become bounded exception-message payloads, and
 status `10` remains ordinary `AT END` behavior. Native CBL-C indexed declarations using
 `file indexed <name> \"<path>\";` now emit `ORGANIZATION IS INDEXED`, a record key, and an
 `INVALID KEY` scope on writes; the resulting file status is normalized through the same
-string exception payload and cleanup path. External-call adapters remain release-gated
+exception-message payload and cleanup path. External-call adapters remain release-gated
 follow-up work. Raw external calls made inside a `try` now use native
 `CALL ... ON EXCEPTION` lowering with the same integer-compatible context payload and
 double-exception guard; calls already using the exception-aware ABI continue to pass the

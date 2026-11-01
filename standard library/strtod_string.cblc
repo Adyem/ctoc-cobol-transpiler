@@ -1,7 +1,0 @@
-double F(string source)
-{
-    double result;
-    String object(source);
-    result = object.strtod();
-    return result;
-}

@@ -73,7 +73,7 @@ SRC         = \
     src/transpiler/transpiler_pipeline.cpp \
     src/transpiler/transpiler_parallel.cpp \
     src/transpiler/transpiler_cblc.cpp \
-    src/transpiler/transpiler_cblc_intrinsics.cpp \
+    src/transpiler/backend_typed_ir.cpp \
     src/transpiler/transpiler_cli.cpp \
     src/formatter/cblc_formatter.cpp \
     src/transpiler/transpiler_logging.cpp \
@@ -308,6 +308,7 @@ TEST_SRC    = imported/libft_test_runner.cpp \
               tests/cobol_type_tests.cpp \
               tests/compiler/compiler_test_support.cpp \
               tests/compiler/incremental_cache_tests.cpp \
+              tests/compiler/backend_typed_ir_tests.cpp \
               tests/compiler/cobol/copy_file_tests.cpp \
               tests/compiler/cobol/filter_prefix_tests.cpp \
               tests/compiler/cobol/return_numeric_tests.cpp \
@@ -391,6 +392,11 @@ $(STANDARD_LIBRARY_EMBEDDED_HEADER): scripts/embed_standard_library.py FORCE
 
 $(STANDARD_LIBRARY_NATIVE_OBJ): $(STANDARD_LIBRARY_EMBEDDED_HEADER)
 
+# The CBLC implementation is split across textual .inc files, which are not
+# emitted into the compiler-generated dependency file for transpiler_cblc.cpp.
+# Track them explicitly so incremental builds cannot reuse a stale compiler.
+$(OBJ_DIR)/src/transpiler/transpiler_cblc.o: $(wildcard src/cblc/*.inc)
+
 $(LSP_NAME): $(LSP_OBJ) $(OBJS_NO_MAIN)
 	@$(CC) $(CFLAGS) $(LSP_OBJ) $(OBJS_NO_MAIN) -o $@ $(LDFLAGS)
 
@@ -428,11 +434,7 @@ fclean: clean
 re: fclean all
 
 test: $(TEST_NAME)
-ifeq ($(OS),Windows_NT)
-	@set "PATH=C:\ProgramData\chocolatey\lib\gnucobol\tools\bin;%PATH%" && .\$(TEST_NAME)
-else
 	@./$(TEST_NAME)
-endif
 
 both: all debug
 

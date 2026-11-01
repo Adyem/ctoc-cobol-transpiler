@@ -1,5 +1,22 @@
 #include "test_suites.hpp"
 
+static size_t test_cblc_constructor_type_index(const t_cblc_translation_unit *unit,
+    const char *type_name)
+{
+    size_t index;
+
+    if (!unit || !type_name)
+        return (static_cast<size_t>(-1));
+    index = 0;
+    while (index < unit->struct_type_count)
+    {
+        if (std::strcmp(unit->struct_types[index].source_name, type_name) == 0)
+            return (index);
+        index += 1;
+    }
+    return (static_cast<size_t>(-1));
+}
+
 
 FT_TEST(test_cblc_import_type_stubs_preserve_method_parameter_count_from_signature)
 {
@@ -59,7 +76,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_method_parameter_count_from_signatu
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(consumer_unit.struct_types[1].methods[0].parameter_count, 2,
+    if (test_expect_size_t_equal(consumer_unit.struct_types[test_cblc_constructor_type_index(&consumer_unit, signature.name)].methods[0].parameter_count, 2,
             "imported method should preserve parameter count") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -119,14 +136,14 @@ FT_TEST(test_cblc_import_type_stubs_preserve_struct_pointer_field_type_names_fro
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].fields[0].kind,
+    if (test_expect_int_equal(consumer_unit.struct_types[test_cblc_constructor_type_index(&consumer_unit, signature.name)].fields[0].kind,
             CBLC_DATA_KIND_STRUCT_POINTER,
             "imported field should preserve struct pointer kind") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(consumer_unit.struct_types[1].fields[0].declared_type_name,
+    if (test_expect_cstring_equal(consumer_unit.struct_types[test_cblc_constructor_type_index(&consumer_unit, signature.name)].fields[0].declared_type_name,
             "Node", "imported field should preserve struct pointer declared type name") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(consumer_unit.struct_types[1].fields[0].struct_type_name,
+    if (test_expect_cstring_equal(consumer_unit.struct_types[test_cblc_constructor_type_index(&consumer_unit, signature.name)].fields[0].struct_type_name,
             "Node", "imported field should preserve struct pointer pointee type name") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -194,7 +211,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_method_second_parameter_source_name
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_cstring_equal(
-                consumer_unit.struct_types[1].methods[0].parameters[1].source_name,
+                consumer_unit.struct_types[test_cblc_constructor_type_index(&consumer_unit, signature.name)].methods[0].parameters[1].source_name,
                 "right", "imported method should preserve second parameter source name")
             != FT_SUCCESS)
         goto cleanup;
@@ -263,7 +280,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_method_second_parameter_actual_name
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_cstring_equal(
-                consumer_unit.struct_types[1].methods[0].parameters[1].actual_source_name,
+                consumer_unit.struct_types[test_cblc_constructor_type_index(&consumer_unit, signature.name)].methods[0].parameters[1].actual_source_name,
                 "Counter__mix__right",
                 "imported method should preserve second parameter actual source name")
             != FT_SUCCESS)
@@ -333,7 +350,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_method_second_parameter_cobol_name_
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_cstring_equal(
-                consumer_unit.struct_types[1].methods[0].parameters[1].cobol_name,
+                consumer_unit.struct_types[test_cblc_constructor_type_index(&consumer_unit, signature.name)].methods[0].parameters[1].cobol_name,
                 "COUNTER-MIX-RIGHT",
                 "imported method should preserve second parameter COBOL name")
             != FT_SUCCESS)
@@ -399,7 +416,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_method_second_parameter_type_name_f
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_cstring_equal(
-                consumer_unit.struct_types[1].methods[0].parameters[1].type_name,
+                consumer_unit.struct_types[test_cblc_constructor_type_index(&consumer_unit, signature.name)].methods[0].parameters[1].type_name,
                 "int", "imported method should preserve second parameter type name")
             != FT_SUCCESS)
         goto cleanup;
@@ -439,7 +456,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_string_constructor_parameter_kind_f
     signature.visibility = TRANSPILE_SYMBOL_PUBLIC;
     signature.constructor_count = 1;
     signature.constructors[0].parameter_count = 1;
-    signature.constructors[0].parameter_kinds[0] = TRANSPILE_FUNCTION_PARAMETER_STRING;
+    signature.constructors[0].parameter_kinds[0] = TRANSPILE_FUNCTION_PARAMETER_CHAR_BUFFER;
     ft_strlcpy(signature.constructors[0].parameter_type_names[0], "string",
         sizeof(signature.constructors[0].parameter_type_names[0]));
     if (test_expect_success(transpiler_context_register_module(&context, "writer_mod",
@@ -458,8 +475,8 @@ FT_TEST(test_cblc_import_type_stubs_preserve_string_constructor_parameter_kind_f
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(static_cast<int>(
-                consumer_unit.struct_types[1].constructors[0].parameters[0].kind),
-            TRANSPILE_FUNCTION_PARAMETER_STRING,
+                consumer_unit.struct_types[test_cblc_constructor_type_index(&consumer_unit, signature.name)].constructors[0].parameters[0].kind),
+            TRANSPILE_FUNCTION_PARAMETER_CHAR_BUFFER,
             "imported constructor should preserve string parameter kind") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -517,7 +534,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_char_pointer_constructor_parameter_
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(static_cast<int>(
-                consumer_unit.struct_types[1].constructors[0].parameters[0].kind),
+                consumer_unit.struct_types[test_cblc_constructor_type_index(&consumer_unit, signature.name)].constructors[0].parameters[0].kind),
             TRANSPILE_FUNCTION_PARAMETER_CHAR_POINTER,
             "imported constructor should preserve char pointer parameter kind") != FT_SUCCESS)
         goto cleanup;
@@ -576,7 +593,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_struct_pointer_constructor_paramete
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_cstring_equal(
-                consumer_unit.struct_types[1].constructors[0].parameters[0].type_name,
+                consumer_unit.struct_types[test_cblc_constructor_type_index(&consumer_unit, signature.name)].constructors[0].parameters[0].type_name,
                 "Node", "imported constructor should preserve struct pointer pointee type name")
             != FT_SUCCESS)
         goto cleanup;
@@ -642,7 +659,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_constructor_second_parameter_cobol_
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_cstring_equal(
-                consumer_unit.struct_types[1].constructors[0].parameters[1].cobol_name,
+                consumer_unit.struct_types[test_cblc_constructor_type_index(&consumer_unit, signature.name)].constructors[0].parameters[1].cobol_name,
                 "COUNTER-CTOR-RIGHT",
                 "imported constructor should preserve second parameter COBOL name")
             != FT_SUCCESS)
@@ -704,7 +721,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_constructor_parameter_count_from_si
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(consumer_unit.struct_types[1].constructors[0].parameter_count, 2,
+    if (test_expect_size_t_equal(consumer_unit.struct_types[test_cblc_constructor_type_index(&consumer_unit, signature.name)].constructors[0].parameter_count, 2,
             "imported constructor should preserve parameter count") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;

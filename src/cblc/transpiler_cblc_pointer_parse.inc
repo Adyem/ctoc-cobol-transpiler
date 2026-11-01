@@ -87,7 +87,7 @@ static int cblc_parse_pointer_address_of_reference(const char **cursor,
     if (cblc_parse_data_reference_text(cursor, unit, &item, &is_length_reference,
             reference, sizeof(reference)) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (!item || is_length_reference || item->kind == CBLC_DATA_KIND_STRING
+    if (!item || is_length_reference || item->kind == CBLC_DATA_KIND_CHAR_BUFFER
         || (item->array_count > 0
             && std::strncmp(reference, item->cobol_name, sizeof(item->cobol_name)) == 0)
         || !cblc_pointer_address_of_is_compatible(target_kind, item->kind))
@@ -102,6 +102,7 @@ static int cblc_parse_pointer_arithmetic_reference(const char **cursor,
     t_cblc_translation_unit *unit, t_cblc_data_kind target_kind,
     t_cblc_data_item **out_item, char *out_reference, size_t out_reference_size)
 {
+    const char *start;
     char source_reference[TRANSPILE_STATEMENT_TEXT_MAX];
     char operand_reference[TRANSPILE_STATEMENT_TEXT_MAX];
     t_cblc_data_item *source_item;
@@ -111,17 +112,27 @@ static int cblc_parse_pointer_arithmetic_reference(const char **cursor,
     if (!cursor || !*cursor || !unit || !out_item || !out_reference
         || out_reference_size == 0)
         return (FT_FAILURE);
+    start = *cursor;
     if (target_kind == CBLC_DATA_KIND_VOID_POINTER)
         return (FT_FAILURE);
     if (cblc_parse_data_reference_text(cursor, unit, &source_item, NULL,
             source_reference, sizeof(source_reference)) != FT_SUCCESS)
+    {
+        *cursor = start;
         return (FT_FAILURE);
+    }
     if (!source_item || source_item->kind != target_kind
         || source_item->kind == CBLC_DATA_KIND_VOID_POINTER)
+    {
+        *cursor = start;
         return (FT_FAILURE);
+    }
     cblc_skip_whitespace(cursor);
     if (**cursor != '+' && **cursor != '-')
+    {
+        *cursor = start;
         return (FT_FAILURE);
+    }
     operator_char = **cursor;
     *cursor += 1;
     cblc_skip_whitespace(cursor);
@@ -133,7 +144,10 @@ static int cblc_parse_pointer_arithmetic_reference(const char **cursor,
         while (**cursor >= '0' && **cursor <= '9')
         {
             if (length + 1 >= sizeof(operand_reference))
+            {
+                *cursor = start;
                 return (FT_FAILURE);
+            }
             operand_reference[length] = **cursor;
             length += 1;
             *cursor += 1;
@@ -144,13 +158,22 @@ static int cblc_parse_pointer_arithmetic_reference(const char **cursor,
     {
         if (cblc_parse_data_reference_text(cursor, unit, &operand_item, NULL,
                 operand_reference, sizeof(operand_reference)) != FT_SUCCESS)
+        {
+            *cursor = start;
             return (FT_FAILURE);
+        }
         if (!operand_item || operand_item->kind != CBLC_DATA_KIND_INT)
+        {
+            *cursor = start;
             return (FT_FAILURE);
+        }
     }
     if (std::snprintf(out_reference, out_reference_size, "%s %c %s", source_reference,
             operator_char, operand_reference) < 0)
+    {
+        *cursor = start;
         return (FT_FAILURE);
+    }
     *out_item = source_item;
     return (FT_SUCCESS);
 }
@@ -396,6 +419,8 @@ static int cblc_parse_struct_pointer_declaration(const char **cursor,
     const char *start;
     const t_cblc_struct_type *type;
     char type_identifier[TRANSPILE_IDENTIFIER_MAX];
+    char template_arguments[CBLC_TEMPLATE_PARAMETER_MAX][TRANSPILE_IDENTIFIER_MAX];
+    size_t template_argument_count;
     char identifier[TRANSPILE_IDENTIFIER_MAX];
     char cobol_name[TRANSPILE_IDENTIFIER_MAX];
 
@@ -404,7 +429,37 @@ static int cblc_parse_struct_pointer_declaration(const char **cursor,
     start = *cursor;
     if (cblc_parse_identifier(cursor, type_identifier, sizeof(type_identifier)) != FT_SUCCESS)
         return (FT_FAILURE);
-    type = cblc_find_struct_type(unit, type_identifier);
+    cblc_skip_whitespace(cursor);
+    if (**cursor == '<')
+    {
+        *cursor += 1;
+        if (cblc_parse_template_argument_list(cursor, unit, template_arguments,
+                &template_argument_count, 1) != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        cblc_skip_whitespace(cursor);
+        if (**cursor != '>')
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        *cursor += 1;
+        type = cblc_instantiate_template_struct_arguments(unit, type_identifier,
+            template_arguments, template_argument_count);
+        if (type)
+        {
+            size_t argument_ref_id;
+
+            if (cblc_template_argument_ref(unit, type->source_name,
+                    &argument_ref_id) == FT_SUCCESS)
+                cblc_record_struct_template_use(unit, type_identifier,
+                    argument_ref_id, cblc_source_offset(unit, start));
+        }
+    }
+    else
+        type = cblc_find_struct_type(unit, type_identifier);
     if (!type)
     {
         *cursor = start;

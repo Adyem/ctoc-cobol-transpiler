@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux / GnuCOBOL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CTOC_REQUIRE_COBC: "1"
+      CTOC_ENABLE_FORWARD_TRANSLATION: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install compiler and runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y build-essential make python3 gnucobol
+      - name: Build compiler, LSP, and test runner
+        run: make all tests
+      - name: Run test suite
+        run: make test
+
+  windows:
+    name: Windows UCRT64 / GnuCOBOL
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CTOC_REQUIRE_COBC: "1"
+      CTOC_ENABLE_FORWARD_TRANSLATION: "1"
+    steps:
+      - name: Keep checkout line endings compatible with MSYS2 tools
+        run: git config --global core.autocrlf input
+      - uses: actions/checkout@v7
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            base-devel
+            make
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-gnucobol
+            mingw-w64-ucrt-x86_64-python
+      - name: Build compiler, LSP, and test runner
+        shell: msys2 {0}
+        run: make all tests
+      - name: Run test suite
+        shell: msys2 {0}
+        run: make test

@@ -1,5 +1,22 @@
 #include "test_suites.hpp"
 
+static size_t test_cblc_metadata_type_index(const t_cblc_translation_unit *unit,
+    const char *type_name)
+{
+    size_t index;
+
+    if (!unit || !type_name)
+        return (static_cast<size_t>(-1));
+    index = 0;
+    while (index < unit->struct_type_count)
+    {
+        if (std::strcmp(unit->struct_types[index].source_name, type_name) == 0)
+            return (index);
+        index += 1;
+    }
+    return (static_cast<size_t>(-1));
+}
+
 FT_TEST(test_cblc_import_type_stubs_preserve_const_field_metadata_from_signature)
 {
     t_cblc_translation_unit consumer_unit;
@@ -44,7 +61,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_const_field_metadata_from_signature
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].fields[0].is_const, 1,
+    if (test_expect_int_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].fields[0].is_const, 1,
             "imported field should preserve const metadata") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -102,10 +119,10 @@ FT_TEST(test_cblc_import_type_stubs_preserve_array_field_metadata_from_signature
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(consumer_unit.struct_types[1].fields[0].array_count, 4,
+    if (test_expect_size_t_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].fields[0].array_count, 4,
             "imported field should preserve array count metadata") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(consumer_unit.struct_types[1].fields[0].length, 16,
+    if (test_expect_size_t_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].fields[0].length, 16,
             "imported field should preserve declared length metadata") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -165,13 +182,13 @@ FT_TEST(test_cblc_import_type_stubs_preserve_struct_field_type_names_from_signat
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(consumer_unit.struct_types[1].fields[0].declared_type_name,
+    if (test_expect_cstring_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].fields[0].declared_type_name,
             "Point", "imported field should preserve declared type name") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(consumer_unit.struct_types[1].fields[0].struct_type_name,
+    if (test_expect_cstring_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].fields[0].struct_type_name,
             "Point", "imported field should preserve struct type name") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].fields[0].kind,
+    if (test_expect_int_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].fields[0].kind,
             CBLC_DATA_KIND_STRUCT,
             "imported field should preserve struct kind metadata") != FT_SUCCESS)
         goto cleanup;
@@ -231,15 +248,15 @@ FT_TEST(test_cblc_import_type_stubs_preserve_field_visibility_order_from_signatu
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].fields[0].visibility,
+    if (test_expect_int_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].fields[0].visibility,
             CBLC_MEMBER_VISIBILITY_PRIVATE,
             "first imported field should preserve private visibility") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].fields[1].visibility,
+    if (test_expect_int_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].fields[1].visibility,
             CBLC_MEMBER_VISIBILITY_PUBLIC,
             "second imported field should preserve public visibility") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(consumer_unit.struct_types[1].fields[1].source_name,
+    if (test_expect_cstring_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].fields[1].source_name,
             "visible", "imported field order should be preserved") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -305,15 +322,15 @@ FT_TEST(test_cblc_import_type_stubs_preserve_method_parameter_metadata_from_sign
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(consumer_unit.struct_types[1].methods[0].parameters[0].source_name,
+    if (test_expect_cstring_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].methods[0].parameters[0].source_name,
             "delta", "imported method should preserve parameter source name") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_cstring_equal(
-                consumer_unit.struct_types[1].methods[0].parameters[0].actual_source_name,
+                consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].methods[0].parameters[0].actual_source_name,
                 "Counter__add__delta",
                 "imported method should preserve parameter actual source name") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(consumer_unit.struct_types[1].methods[0].parameters[0].type_name,
+    if (test_expect_cstring_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].methods[0].parameters[0].type_name,
             "int", "imported method should preserve parameter type name") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -371,11 +388,11 @@ FT_TEST(test_cblc_import_type_stubs_preserve_method_return_struct_metadata_from_
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].methods[0].return_kind,
+    if (test_expect_int_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].methods[0].return_kind,
             CBLC_FUNCTION_RETURN_STRUCT,
             "imported method should preserve struct return kind") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(consumer_unit.struct_types[1].methods[0].return_type_name,
+    if (test_expect_cstring_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].methods[0].return_type_name,
             "Point", "imported method should preserve struct return type name") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -431,7 +448,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_private_method_visibility_from_sign
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].methods[0].visibility,
+    if (test_expect_int_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].methods[0].visibility,
             CBLC_MEMBER_VISIBILITY_PRIVATE,
             "imported method should preserve private visibility") != FT_SUCCESS)
         goto cleanup;
@@ -493,10 +510,10 @@ FT_TEST(test_cblc_import_type_stubs_preserve_method_definition_metadata_from_sig
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].methods[0].has_definition, 1,
+    if (test_expect_int_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].methods[0].has_definition, 1,
             "imported method should preserve definition flag") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(consumer_unit.struct_types[1].methods[0].statement_count, 1,
+    if (test_expect_size_t_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].methods[0].statement_count, 1,
             "imported method should preserve statement count") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -554,10 +571,10 @@ FT_TEST(test_cblc_import_type_stubs_preserve_constructor_definition_metadata_fro
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].constructors[0].has_definition, 1,
+    if (test_expect_int_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].constructors[0].has_definition, 1,
             "imported constructor should preserve definition flag") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(consumer_unit.struct_types[1].constructors[0].statement_count, 1,
+    if (test_expect_size_t_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].constructors[0].statement_count, 1,
             "imported constructor should preserve statement count") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -691,7 +708,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_struct_kind_from_signature)
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].is_class, 0,
+    if (test_expect_int_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].is_class, 0,
             "imported struct should preserve non-class kind") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -736,7 +753,7 @@ FT_TEST(test_cblc_import_type_stubs_mark_imported_types_from_signature)
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].is_imported, 1,
+    if (test_expect_int_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].is_imported, 1,
             "imported type stubs should be marked imported") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -782,7 +799,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_default_constructor_flag_from_signa
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].has_default_constructor, 1,
+    if (test_expect_int_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].has_default_constructor, 1,
             "imported type should preserve default constructor flag") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -829,7 +846,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_destructor_definition_flag_from_sig
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].has_destructor_definition, 1,
+    if (test_expect_int_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].has_destructor_definition, 1,
             "imported type should preserve destructor definition flag") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -879,7 +896,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_destructor_statement_metadata_from_
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(consumer_unit.struct_types[1].destructor_statement_count, 1,
+    if (test_expect_size_t_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].destructor_statement_count, 1,
             "imported type should preserve destructor statement count") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -941,16 +958,16 @@ FT_TEST(test_cblc_import_type_stubs_preserve_constructor_parameter_metadata_from
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_cstring_equal(
-                consumer_unit.struct_types[1].constructors[0].parameters[0].source_name,
+                consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].constructors[0].parameters[0].source_name,
                 "start", "imported constructor should preserve parameter source name") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_cstring_equal(
-                consumer_unit.struct_types[1].constructors[0].parameters[0].actual_source_name,
+                consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].constructors[0].parameters[0].actual_source_name,
                 "Counter__ctor__start",
                 "imported constructor should preserve parameter actual source name") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_cstring_equal(
-                consumer_unit.struct_types[1].constructors[0].parameters[0].type_name,
+                consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].constructors[0].parameters[0].type_name,
                 "int", "imported constructor should preserve parameter type name") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -1099,7 +1116,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_char_pointer_method_parameter_kind_
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(static_cast<int>(
-                consumer_unit.struct_types[1].methods[0].parameters[0].kind),
+                consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].methods[0].parameters[0].kind),
             TRANSPILE_FUNCTION_PARAMETER_CHAR_POINTER,
             "imported method should preserve char pointer parameter kind") != FT_SUCCESS)
         goto cleanup;
@@ -1164,7 +1181,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_struct_pointer_method_parameter_typ
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(consumer_unit.struct_types[1].methods[0].parameters[0].type_name,
+    if (test_expect_cstring_equal(consumer_unit.struct_types[test_cblc_metadata_type_index(&consumer_unit, signature.name)].methods[0].parameters[0].type_name,
             "Node", "imported struct pointer parameter should preserve pointee type name")
             != FT_SUCCESS)
         goto cleanup;

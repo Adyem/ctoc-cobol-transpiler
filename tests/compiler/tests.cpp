@@ -4,6 +4,7 @@
 
 const t_test_case *get_compiler_cobol_tests(size_t *count);
 const t_test_case *get_compiler_incremental_cache_tests(size_t *count);
+const t_test_case *get_compiler_backend_typed_ir_tests(size_t *count);
 
 const t_test_case *get_compiler_tests(size_t *count)
 {
@@ -12,8 +13,10 @@ const t_test_case *get_compiler_tests(size_t *count)
     static int initialized = 0;
     const t_test_case *cobol_tests;
     const t_test_case *cache_tests;
+    const t_test_case *backend_tests;
     size_t cobol_count;
     size_t cache_count;
+    size_t backend_count;
     size_t index;
     size_t offset;
 
@@ -21,7 +24,8 @@ const t_test_case *get_compiler_tests(size_t *count)
     {
         cobol_tests = get_compiler_cobol_tests(&cobol_count);
         cache_tests = get_compiler_incremental_cache_tests(&cache_count);
-        combined_count = cobol_count + cache_count;
+        backend_tests = get_compiler_backend_typed_ir_tests(&backend_count);
+        combined_count = cobol_count + cache_count + backend_count;
         if (combined_count > 0)
         {
             combined = static_cast<t_test_case *>(calloc(combined_count, sizeof(t_test_case)));
@@ -46,6 +50,13 @@ const t_test_case *get_compiler_tests(size_t *count)
             while (index < cache_count)
             {
                 combined[offset + index] = cache_tests[index];
+                index += 1;
+            }
+            offset += cache_count;
+            index = 0;
+            while (index < backend_count)
+            {
+                combined[offset + index] = backend_tests[index];
                 index += 1;
             }
         }

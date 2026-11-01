@@ -1,3 +1,37 @@
+static const t_cblc_struct_type *validation_find_struct_type_by_name(
+    const t_cblc_translation_unit *unit, const char *source_name)
+{
+    size_t index;
+
+    if (!unit || !source_name)
+        return (NULL);
+    index = 0;
+    while (index < unit->struct_type_count)
+    {
+        if (std::strcmp(unit->struct_types[index].source_name, source_name) == 0)
+            return (&unit->struct_types[index]);
+        index += 1;
+    }
+    return (NULL);
+}
+
+static const t_cblc_struct_type *validation_find_first_non_string_type(
+    const t_cblc_translation_unit *unit)
+{
+    size_t index;
+
+    if (!unit)
+        return (NULL);
+    index = 0;
+    while (index < unit->struct_type_count)
+    {
+        if (std::strcmp(unit->struct_types[index].source_name, "string") != 0)
+            return (&unit->struct_types[index]);
+        index += 1;
+    }
+    return (NULL);
+}
+
 FT_TEST(test_cblc_parse_translation_unit_records_class_lifecycle_metadata)
 {
     const char *source;
@@ -6,9 +40,7 @@ FT_TEST(test_cblc_parse_translation_unit_records_class_lifecycle_metadata)
 
     source = "class Person\n"
         "{\n"
-        "    string name(8);\n"
-        "    Person();\n"
-        "    ~Person();\n"
+        "    string name;\n"
         "};\n"
         "Person person;\n"
         "void main()\n"
@@ -20,17 +52,17 @@ FT_TEST(test_cblc_parse_translation_unit_records_class_lifecycle_metadata)
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "class lifecycle sample should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_type_count, 2,
-            "builtin string plus one class type should be recorded") != FT_SUCCESS)
+    if (test_expect_size_t_equal(unit.struct_type_count, 11,
+            "standard error and string classes plus one user class type should be recorded") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(unit.struct_types[1].is_class, 1,
+    if (test_expect_int_equal(validation_find_struct_type_by_name(&unit, "Person")->is_class, 1,
             "type should be marked as class") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(unit.struct_types[1].has_default_constructor, 1,
+    if (test_expect_int_equal(validation_find_struct_type_by_name(&unit, "Person")->has_default_constructor, 1,
             "class should record default constructor") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(unit.struct_types[1].has_destructor, 1,
-            "class should record destructor") != FT_SUCCESS)
+    if (test_expect_int_equal(validation_find_struct_type_by_name(&unit, "Person")->has_destructor, 0,
+            "member-driven cleanup should not be reported as a user-declared destructor") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -50,7 +82,7 @@ FT_TEST(test_cblc_generate_c_emits_automatic_class_lifecycle)
 
     source = "class Person\n"
         "{\n"
-        "    string name(8);\n"
+        "    int name;\n"
         "    Person();\n"
         "    ~Person();\n"
         "};\n"
@@ -70,7 +102,7 @@ FT_TEST(test_cblc_generate_c_emits_automatic_class_lifecycle)
         goto cleanup;
     if (!generated_c)
         goto cleanup;
-    needle = "person.name.len = 0;";
+    needle = "person.name = 0;";
     count = 0;
     scan = generated_c;
     while ((scan = std::strstr(scan, needle)) != NULL)
@@ -81,12 +113,6 @@ FT_TEST(test_cblc_generate_c_emits_automatic_class_lifecycle)
     if (test_expect_int_equal(count, 2,
             "generated C should inject lifecycle before entry and before return") != FT_SUCCESS)
         goto cleanup;
-    if (!ft_strnstr(generated_c, "memset(person.name.buf, 0, sizeof(person.name.buf));",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should zero string buffer during lifecycle\n");
-        goto cleanup;
-    }
     status = FT_SUCCESS;
 cleanup:
     if (generated_c)
@@ -102,14 +128,14 @@ FT_TEST(test_cblc_generate_cobol_emits_automatic_class_lifecycle)
     const char *scan;
     t_cblc_translation_unit unit;
     char *generated_cobol;
+    int diagnostic_code;
+    char diagnostic_message[512];
     int status;
     int count;
 
     source = "class Person\n"
         "{\n"
-        "    string name(8);\n"
-        "    Person();\n"
-        "    ~Person();\n"
+        "    string name;\n"
         "};\n"
         "Person person;\n"
         "void main()\n"
@@ -122,12 +148,19 @@ FT_TEST(test_cblc_generate_cobol_emits_automatic_class_lifecycle)
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "class lifecycle COBOL sample should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
-            "class lifecycle COBOL sample should generate") != FT_SUCCESS)
+    diagnostic_code = 0;
+    diagnostic_message[0] = '\0';
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &diagnostic_code, diagnostic_message, sizeof(diagnostic_message))
+        != FT_SUCCESS)
+    {
+        std::printf("Class lifecycle generation diagnostic %d: %s\n",
+            diagnostic_code, diagnostic_message);
         goto cleanup;
+    }
     if (!generated_cobol)
         goto cleanup;
-    needle = "MOVE 0 TO PERSON-NAME-LEN.";
+    needle = "ALLOCATE 1 CHARACTERS RETURNING PERSON-NAME-CBLC-USER-DATA.";
     count = 0;
     scan = generated_cobol;
     while ((scan = std::strstr(scan, needle)) != NULL)
@@ -135,13 +168,21 @@ FT_TEST(test_cblc_generate_cobol_emits_automatic_class_lifecycle)
         count += 1;
         scan += std::strlen(needle);
     }
-    if (test_expect_int_equal(count, 2,
-            "generated COBOL should inject lifecycle before entry and before return") != FT_SUCCESS)
+    if (test_expect_int_equal(count, 1,
+            "generated COBOL should construct the nested string once at entry")
+        != FT_SUCCESS)
         goto cleanup;
-    if (!ft_strnstr(generated_cobol, "MOVE SPACES TO PERSON-NAME-BUF.",
+    if (!ft_strnstr(generated_cobol,
+            "10 PERSON-NAME-CBLC-USER-DATA USAGE POINTER VALUE NULL.",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: generated COBOL should blank string buffer during lifecycle\n");
+        std::printf("Assertion failed: generated COBOL should use the string class pointer field\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "FREE PERSON-NAME-CBLC-USER-DATA.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should invoke the string destructor\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -161,12 +202,12 @@ FT_TEST(test_cblc_generate_c_emits_custom_class_lifecycle_body)
 
     source = "class Person\n"
         "{\n"
-        "    string name(8);\n"
+        "    int name;\n"
         "    Person() {\n"
-        "        name = \"HI\";\n"
+        "        name = 1;\n"
         "    }\n"
         "    ~Person() {\n"
-        "        name = \"BYE\";\n"
+        "        name = 2;\n"
         "    }\n"
         "};\n"
         "Person person;\n"
@@ -187,7 +228,7 @@ FT_TEST(test_cblc_generate_c_emits_custom_class_lifecycle_body)
         goto cleanup;
     if (!ft_strnstr(generated_c, "void cblc_constructor_Person_0(t_Person *receiver);",
             std::strlen(generated_c))
-        || !ft_strnstr(generated_c, "cblc_string_assign_literal(receiver->name.buf, 8, &receiver->name.len, \"HI\");",
+        || !ft_strnstr(generated_c, "receiver->name = 1;",
             std::strlen(generated_c))
         || !ft_strnstr(generated_c, "cblc_constructor_Person_0(&person);",
             std::strlen(generated_c)))
@@ -197,7 +238,7 @@ FT_TEST(test_cblc_generate_c_emits_custom_class_lifecycle_body)
     }
     if (!ft_strnstr(generated_c, "void cblc_destructor_Person(t_Person *receiver);",
             std::strlen(generated_c))
-        || !ft_strnstr(generated_c, "cblc_string_assign_literal(receiver->name.buf, 8, &receiver->name.len, \"BYE\");",
+        || !ft_strnstr(generated_c, "receiver->name = 2;",
             std::strlen(generated_c))
         || !ft_strnstr(generated_c, "cblc_destructor_Person(&person);",
             std::strlen(generated_c)))
@@ -224,12 +265,12 @@ FT_TEST(test_cblc_generate_cobol_emits_custom_class_lifecycle_body)
 
     source = "class Person\n"
         "{\n"
-        "    string name(8);\n"
+        "    int name;\n"
         "    Person() {\n"
-        "        name = \"HI\";\n"
+        "        name = 1;\n"
         "    }\n"
         "    ~Person() {\n"
-        "        name = \"BYE\";\n"
+        "        name = 2;\n"
         "    }\n"
         "};\n"
         "Person person;\n"
@@ -248,17 +289,18 @@ FT_TEST(test_cblc_generate_cobol_emits_custom_class_lifecycle_body)
         goto cleanup;
     if (!generated_cobol)
         goto cleanup;
-    if (!ft_strnstr(generated_cobol, "MOVE \"HI\" TO PERSON-NAME-BUF.", std::strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "COMPUTE PERSON-NAME = 1.", std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should emit custom constructor body\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "MOVE \"BYE\" TO PERSON-NAME-BUF.", std::strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "COMPUTE PERSON-NAME = 2.", std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should emit custom destructor body\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "PERFORM CBLC-CONSTRUCTOR-PERSON-0.",
+    if (!ft_strnstr(generated_cobol,
+            "PERFORM CBLC-CONSTRUCTOR-PERSON-0 THRU CBLC-CRET-",
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "PERFORM CBLC-DESTRUCTOR-PERSON.",
             std::strlen(generated_cobol)))
@@ -268,20 +310,20 @@ FT_TEST(test_cblc_generate_cobol_emits_custom_class_lifecycle_body)
     }
     body_count = 0;
     scan = generated_cobol;
-    while ((scan = std::strstr(scan, "MOVE \"HI\" TO PERSON-NAME-BUF.")) != NULL)
+    while ((scan = std::strstr(scan, "COMPUTE PERSON-NAME = 1.")) != NULL)
     {
         body_count += 1;
-        scan += std::strlen("MOVE \"HI\" TO PERSON-NAME-BUF.");
+        scan += std::strlen("COMPUTE PERSON-NAME = 1.");
     }
     if (test_expect_size_t_equal(body_count, 1,
             "generated COBOL should emit the constructor body once") != FT_SUCCESS)
         goto cleanup;
     body_count = 0;
     scan = generated_cobol;
-    while ((scan = std::strstr(scan, "MOVE \"BYE\" TO PERSON-NAME-BUF.")) != NULL)
+    while ((scan = std::strstr(scan, "COMPUTE PERSON-NAME = 2.")) != NULL)
     {
         body_count += 1;
-        scan += std::strlen("MOVE \"BYE\" TO PERSON-NAME-BUF.");
+        scan += std::strlen("COMPUTE PERSON-NAME = 2.");
     }
     if (test_expect_size_t_equal(body_count, 1,
             "generated COBOL should emit the destructor body once") != FT_SUCCESS)
@@ -303,12 +345,12 @@ FT_TEST(test_cblc_generate_c_emits_local_class_lifecycle)
 
     source = "class Person\n"
         "{\n"
-        "    string name(8);\n"
+        "    int name;\n"
         "    Person() {\n"
-        "        name = \"HI\";\n"
+        "        name = 1;\n"
         "    }\n"
         "    ~Person() {\n"
-        "        name = \"BYE\";\n"
+        "        name = 2;\n"
         "    }\n"
         "};\n"
         "void main()\n"
@@ -361,12 +403,12 @@ FT_TEST(test_cblc_generate_cobol_emits_local_class_lifecycle)
 
     source = "class Person\n"
         "{\n"
-        "    string name(8);\n"
+        "    int name;\n"
         "    Person() {\n"
-        "        name = \"HI\";\n"
+        "        name = 1;\n"
         "    }\n"
         "    ~Person() {\n"
-        "        name = \"BYE\";\n"
+        "        name = 2;\n"
         "    }\n"
         "};\n"
         "void main()\n"
@@ -390,12 +432,12 @@ FT_TEST(test_cblc_generate_cobol_emits_local_class_lifecycle)
         std::printf("Assertion failed: generated COBOL should emit function-owned class storage\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "MOVE \"HI\" TO MAIN-PERSON-NAME-BUF.", std::strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "COMPUTE MAIN-PERSON-NAME = 1.", std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should emit local constructor body\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "MOVE \"BYE\" TO MAIN-PERSON-NAME-BUF.", std::strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "COMPUTE MAIN-PERSON-NAME = 2.", std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should emit local destructor body before return\n");
         goto cleanup;
@@ -425,12 +467,12 @@ FT_TEST(test_cblc_generate_c_emits_nested_block_local_class_cleanup_order)
 
     source = "class Person\n"
         "{\n"
-        "    string name(8);\n"
+        "    int name;\n"
         "    Person() {\n"
-        "        name = \"HI\";\n"
+        "        name = 1;\n"
         "    }\n"
         "    ~Person() {\n"
-        "        name = \"BYE\";\n"
+        "        name = 2;\n"
         "    }\n"
         "};\n"
         "void main()\n"
@@ -495,12 +537,12 @@ FT_TEST(test_cblc_generate_cobol_emits_nested_block_local_class_cleanup_order)
 
     source = "class Person\n"
         "{\n"
-        "    string name(8);\n"
+        "    int name;\n"
         "    Person() {\n"
-        "        name = \"HI\";\n"
+        "        name = 1;\n"
         "    }\n"
         "    ~Person() {\n"
-        "        name = \"BYE\";\n"
+        "        name = 2;\n"
         "    }\n"
         "};\n"
         "void main()\n"
@@ -522,10 +564,10 @@ FT_TEST(test_cblc_generate_cobol_emits_nested_block_local_class_cleanup_order)
         goto cleanup;
     if (!generated_cobol)
         goto cleanup;
-    first_ctor = "MOVE \"HI\" TO MAIN-FIRST-NAME-BUF.";
-    first_dtor = "MOVE \"BYE\" TO MAIN-FIRST-NAME-BUF.";
-    second_ctor = "MOVE \"HI\" TO MAIN-SECOND-NAME-BUF.";
-    second_dtor = "MOVE \"BYE\" TO MAIN-SECOND-NAME-BUF.";
+    first_ctor = "PERFORM CBLC-CONSTRUCTOR-MAIN-FIRST-0 THRU CBLC-CRET-";
+    first_dtor = "PERFORM CBLC-DESTRUCTOR-MAIN-FIRST.";
+    second_ctor = "PERFORM CBLC-CONSTRUCTOR-MAIN-SECOND-0 THRU CBLC-CRET-";
+    second_dtor = "PERFORM CBLC-DESTRUCTOR-MAIN-SECOND.";
     p_first_ctor = std::strstr(generated_cobol, first_ctor);
     p_first_dtor = std::strstr(generated_cobol, first_dtor);
     p_second_ctor = std::strstr(generated_cobol, second_ctor);
@@ -548,13 +590,15 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_cblc_parse_translation_unit_registers_builtin_string_class)
+FT_TEST(test_cblc_parse_translation_unit_imports_canonical_string_class)
 {
     const char *source;
+    const t_cblc_struct_type *string_type;
     t_cblc_translation_unit unit;
+    size_t item_index;
     int status;
 
-    source = "string greeting(8);\n"
+    source = "string greeting;\n"
         "void main()\n"
         "{\n"
         "    return;\n"
@@ -562,50 +606,59 @@ FT_TEST(test_cblc_parse_translation_unit_registers_builtin_string_class)
     cblc_translation_unit_init(&unit);
     status = FT_FAILURE;
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "builtin string class sample should parse") != FT_SUCCESS)
+            "canonical string class sample should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_type_count, 1,
-            "builtin string class should be registered even without user classes") != FT_SUCCESS)
+    if (test_expect_size_t_equal(unit.struct_type_count, 10,
+            "canonical error and string classes should be imported without duplicates") != FT_SUCCESS)
         goto cleanup;
-    if (std::strncmp(unit.struct_types[0].source_name, "string",
-            sizeof(unit.struct_types[0].source_name)) != 0)
+    string_type = validation_find_struct_type_by_name(&unit, "string");
+    if (!string_type)
     {
-        std::printf("Assertion failed: builtin string class should be registered under the string name\n");
+        std::printf("Assertion failed: standard string class should be registered under the string name\n");
         goto cleanup;
     }
-    if (test_expect_int_equal(unit.struct_types[0].is_class, 1,
-            "builtin string should be marked as a class") != FT_SUCCESS)
+    if (test_expect_int_equal(string_type->is_class, 1,
+            "string should be represented as a class") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(unit.struct_types[0].is_builtin, 1,
-            "builtin string should be marked as builtin") != FT_SUCCESS)
+    if (test_expect_int_equal(string_type->is_builtin, 0,
+            "string should come from the standard-library class source") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_types[0].constructor_count, 2,
-            "builtin string should expose capacity and copy constructor overloads") != FT_SUCCESS)
+    if (test_expect_int_equal(string_type->is_standard_library, 1,
+            "string should be identified as a native standard-library type")
+        != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(static_cast<int>(unit.struct_types[0].constructors[0].parameters[0].kind),
-            TRANSPILE_FUNCTION_PARAMETER_INT,
-            "builtin string capacity constructor should use the int parameter kind") != FT_SUCCESS)
+    if (test_expect_size_t_equal(string_type->field_count, 3,
+            "string should use the owning class representation from its source") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(static_cast<int>(unit.struct_types[0].constructors[1].parameters[0].kind),
-            TRANSPILE_FUNCTION_PARAMETER_STRING,
-            "builtin string copy constructor should use the string parameter kind") != FT_SUCCESS)
+    if (test_expect_int_equal(static_cast<int>(string_type->fields[0].kind),
+            CBLC_DATA_KIND_CHAR_POINTER,
+            "string class should own its character storage through a pointer") != FT_SUCCESS)
         goto cleanup;
-    if (unit.struct_types[0].method_count < 10)
+    if (test_expect_int_equal(string_type->has_default_constructor, 1,
+            "string class should provide its declared default constructor") != FT_SUCCESS)
+        goto cleanup;
+    if (string_type->method_count < 10)
     {
-        std::printf("Assertion failed: builtin string should expose the core string methods\n");
+        std::printf("Assertion failed: canonical string class should expose its declared methods\n");
         goto cleanup;
     }
-    if (test_expect_size_t_equal(unit.struct_types[0].methods[0].parameter_count, 1,
-            "builtin string append method should record one parameter") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_int_equal(static_cast<int>(unit.struct_types[0].methods[0].parameters[0].kind),
-            TRANSPILE_FUNCTION_PARAMETER_STRING,
-            "builtin string append parameter should use the string parameter kind") != FT_SUCCESS)
-        goto cleanup;
-    if (std::strncmp(unit.data_items[0].declared_type_name, "string",
-            sizeof(unit.data_items[0].declared_type_name)) != 0)
+    item_index = 0;
+    while (item_index < unit.data_count
+        && std::strncmp(unit.data_items[item_index].source_name, "greeting",
+            sizeof(unit.data_items[item_index].source_name)) != 0)
+        item_index += 1;
+    if (item_index >= unit.data_count)
     {
-        std::printf("Assertion failed: string variables should record the string class as their declared type\n");
+        std::printf("Assertion failed: string instance should be registered as data\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(unit.data_items[item_index].kind, CBLC_DATA_KIND_STRUCT,
+            "string instance should use ordinary class storage") != FT_SUCCESS)
+        goto cleanup;
+    if (std::strncmp(unit.data_items[item_index].struct_type_name, "string",
+            sizeof(unit.data_items[item_index].struct_type_name)) != 0)
+    {
+        std::printf("Assertion failed: string instance should resolve to the standard class type\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -618,13 +671,14 @@ FT_TEST(test_cblc_parse_translation_unit_accepts_string_constructor_style_initia
 {
     const char *source;
     t_cblc_translation_unit unit;
+    size_t greeting_index;
+    size_t copy_index;
     int status;
 
     source = "void main()\n"
         "{\n"
-        "    string greeting(\"HI\");\n"
+        "    string greeting(8);\n"
         "    string copy(greeting);\n"
-        "    display(copy);\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&unit);
@@ -632,17 +686,23 @@ FT_TEST(test_cblc_parse_translation_unit_accepts_string_constructor_style_initia
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "string constructor-style sample should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.data_items[0].length, 2,
-            "literal string constructor should infer capacity from the literal") != FT_SUCCESS)
+    greeting_index = 0;
+    while (greeting_index < unit.data_count
+        && std::strcmp(unit.data_items[greeting_index].source_name, "greeting") != 0)
+        greeting_index += 1;
+    copy_index = 0;
+    while (copy_index < unit.data_count
+        && std::strcmp(unit.data_items[copy_index].source_name, "copy") != 0)
+        copy_index += 1;
+    if (greeting_index >= unit.data_count || copy_index >= unit.data_count
+        || test_expect_int_equal(unit.data_items[greeting_index].kind,
+                CBLC_DATA_KIND_STRUCT,
+                "string capacity construction should create a class instance") != FT_SUCCESS
+        || std::strcmp(unit.data_items[greeting_index].struct_type_name, "string") != 0)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.data_items[0].constructor_argument_count, 1,
-            "literal string constructor should store one constructor argument") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_size_t_equal(unit.data_items[2].length, 2,
-            "copy string constructor should infer capacity from the source string") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_size_t_equal(unit.data_items[2].constructor_argument_count, 1,
-            "copy string constructor should store one constructor argument") != FT_SUCCESS)
+    if (test_expect_int_equal(unit.data_items[copy_index].kind, CBLC_DATA_KIND_STRUCT,
+            "copy construction should create an ordinary class instance") != FT_SUCCESS
+        || std::strcmp(unit.data_items[copy_index].struct_type_name, "string") != 0)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -650,123 +710,32 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_cblc_generate_c_emits_local_string_lifecycle)
+FT_TEST(test_cblc_local_string_declaration_is_a_class_instance)
 {
     const char *source;
-    const char *ctor_reset;
-    const char *assign_call;
-    const char *dtor_reset;
     t_cblc_translation_unit unit;
-    char *generated_c;
+    size_t greeting_index;
     int status;
 
     source = "void main()\n"
         "{\n"
         "    string greeting(8);\n"
-        "    greeting = \"HI\";\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&unit);
-    generated_c = NULL;
     status = FT_FAILURE;
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "local string lifecycle sample should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
-            "local string lifecycle sample should generate C") != FT_SUCCESS)
-        goto cleanup;
-    if (!generated_c)
-        goto cleanup;
-    if (!ft_strnstr(generated_c, "size_t main__greeting_len = 0;", std::strlen(generated_c)))
+    greeting_index = 0;
+    while (greeting_index < unit.data_count
+        && std::strcmp(unit.data_items[greeting_index].source_name, "greeting") != 0)
+        greeting_index += 1;
+    if (greeting_index >= unit.data_count
+        || unit.data_items[greeting_index].kind != CBLC_DATA_KIND_STRUCT
+        || std::strcmp(unit.data_items[greeting_index].struct_type_name, "string") != 0)
     {
-        std::printf("Assertion failed: generated C should emit local string length storage\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c, "char main__greeting_buf[8] = {0};", std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should emit local string buffer storage\n");
-        goto cleanup;
-    }
-    ctor_reset = std::strstr(generated_c, "memset(main__greeting_buf, 0, sizeof(main__greeting_buf));");
-    if (!ctor_reset)
-    {
-        std::printf("Assertion failed: generated C should construct local string objects\n");
-        goto cleanup;
-    }
-    assign_call = std::strstr(ctor_reset, "cblc_string_assign_literal(main__greeting_buf, 8, &main__greeting_len, \"HI\");");
-    if (!assign_call)
-    {
-        std::printf("Assertion failed: generated C should preserve local string assignment after construction\n");
-        goto cleanup;
-    }
-    dtor_reset = std::strstr(assign_call, "memset(main__greeting_buf, 0, sizeof(main__greeting_buf));");
-    if (!dtor_reset)
-    {
-        std::printf("Assertion failed: generated C should destroy local string objects before return\n");
-        goto cleanup;
-    }
-    status = FT_SUCCESS;
-cleanup:
-    if (generated_c)
-        cma_free(generated_c);
-    cblc_translation_unit_dispose(&unit);
-    return (status);
-}
-
-FT_TEST(test_cblc_parse_translation_unit_accepts_builtin_string_methods)
-{
-    const char *source;
-    t_cblc_translation_unit unit;
-    size_t index;
-    int found_append;
-    int status;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(8);\n"
-        "    string suffix(4);\n"
-        "    greeting = \"HI\";\n"
-        "    suffix = \"!\";\n"
-        "    greeting.append(suffix);\n"
-        "    total = greeting.len();\n"
-        "    total = greeting.capacity();\n"
-        "    greeting.clear();\n"
-        "    total = greeting.empty();\n"
-        "    total = greeting.equals(suffix);\n"
-        "    total = greeting.starts_with(suffix);\n"
-        "    total = greeting.ends_with(suffix);\n"
-        "    total = greeting.compare(suffix);\n"
-        "    total = greeting.contains(suffix);\n"
-        "    display(total);\n"
-        "    return;\n"
-        "}\n";
-    cblc_translation_unit_init(&unit);
-    status = FT_FAILURE;
-    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "builtin string methods sample should parse") != FT_SUCCESS)
-        goto cleanup;
-    found_append = 0;
-    index = 0;
-    while (index < unit.functions[0].statement_count)
-    {
-        if (std::strncmp(unit.functions[0].statements[index].call_identifier,
-                "append", sizeof(unit.functions[0].statements[index].call_identifier)) == 0)
-        {
-            if (unit.functions[0].statements[index].call_argument_count != 1
-                || unit.functions[0].statements[index].call_arguments[0] == '\0')
-            {
-                std::printf("Assertion failed: builtin append should use the canonical one-argument IR\n");
-                goto cleanup;
-            }
-            found_append = 1;
-            break ;
-        }
-        index += 1;
-    }
-    if (!found_append)
-    {
-        std::printf("Assertion failed: parsed builtin append call should be present\n");
+        std::printf("Assertion failed: local string must be represented as a class instance\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -775,303 +744,116 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_cblc_generate_c_emits_builtin_string_methods)
+FT_TEST(test_cblc_string_constructor_arguments_resolve_to_the_class)
 {
     const char *source;
     t_cblc_translation_unit unit;
-    char *generated_c;
-    int status;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(8);\n"
-        "    string suffix(4);\n"
-        "    greeting = \"HI\";\n"
-        "    suffix = \"!\";\n"
-        "    greeting.append(suffix);\n"
-        "    total = greeting.len();\n"
-        "    total = greeting.capacity();\n"
-        "    greeting.clear();\n"
-        "    total = greeting.empty();\n"
-        "    total = greeting.equals(suffix);\n"
-        "    total = greeting.starts_with(suffix);\n"
-        "    total = greeting.ends_with(suffix);\n"
-        "    total = greeting.compare(suffix);\n"
-        "    total = greeting.contains(suffix);\n"
-        "    display(total);\n"
-        "    return;\n"
-        "}\n";
-    cblc_translation_unit_init(&unit);
-    generated_c = NULL;
-    status = FT_FAILURE;
-    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "builtin string methods C sample should parse") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
-            "builtin string methods C sample should generate") != FT_SUCCESS)
-        goto cleanup;
-    if (!generated_c)
-        goto cleanup;
-    if (!ft_strnstr(generated_c,
-            "cblc_string_append(main__greeting_buf, 12, &main__greeting_len, main__suffix_buf, main__suffix_len);",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should emit builtin string append helper call\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c, "total = (int)main__greeting_len;", std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should map builtin string len method to length storage\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c, "total = 12;", std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should map builtin string capacity method to declared capacity\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c,
-            "cblc_string_assign_literal(main__greeting_buf, 12, &main__greeting_len, \"\");",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should emit builtin string clear helper call\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c, "total = (main__greeting_len == 0);", std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should map builtin string empty method to a length check\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c,
-            "total = cblc_string_equals(main__greeting_buf, main__greeting_len, main__suffix_buf, main__suffix_len);",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should emit builtin string equals helper call\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c,
-            "total = cblc_string_starts_with(main__greeting_buf, main__greeting_len, main__suffix_buf, main__suffix_len);",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should emit builtin string starts_with helper call\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c,
-            "total = cblc_string_ends_with(main__greeting_buf, main__greeting_len, main__suffix_buf, main__suffix_len);",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should emit builtin string ends_with helper call\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c,
-            "total = cblc_string_compare(main__greeting_buf, main__greeting_len, main__suffix_buf, main__suffix_len);",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should emit builtin string compare helper call\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c,
-            "total = cblc_string_contains(main__greeting_buf, main__greeting_len, main__suffix_buf, main__suffix_len);",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should emit builtin string contains helper call\n");
-        goto cleanup;
-    }
-    status = FT_SUCCESS;
-cleanup:
-    if (generated_c)
-        cma_free(generated_c);
-    cblc_translation_unit_dispose(&unit);
-    return (status);
-}
-
-FT_TEST(test_cblc_generate_c_emits_string_constructor_style_initialization)
-{
-    const char *source;
-    t_cblc_translation_unit unit;
-    char *generated_c;
+    size_t greeting_index;
+    size_t copy_index;
     int status;
 
     source = "void main()\n"
         "{\n"
         "    string greeting(\"HI\");\n"
         "    string copy(greeting);\n"
-        "    display(copy);\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&unit);
-    generated_c = NULL;
     status = FT_FAILURE;
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "string constructor-style C sample should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
-            "string constructor-style C sample should generate") != FT_SUCCESS)
+    greeting_index = 0;
+    while (greeting_index < unit.data_count
+        && std::strcmp(unit.data_items[greeting_index].source_name, "greeting") != 0)
+        greeting_index += 1;
+    copy_index = 0;
+    while (copy_index < unit.data_count
+        && std::strcmp(unit.data_items[copy_index].source_name, "copy") != 0)
+        copy_index += 1;
+    if (greeting_index >= unit.data_count || copy_index >= unit.data_count
+        || test_expect_int_equal(unit.data_items[greeting_index].kind, CBLC_DATA_KIND_STRUCT,
+            "literal construction should resolve to the string class") != FT_SUCCESS
+        || std::strcmp(unit.data_items[greeting_index].struct_type_name, "string") != 0
+        || test_expect_int_equal(unit.data_items[copy_index].kind, CBLC_DATA_KIND_STRUCT,
+            "copy construction should resolve to the string class") != FT_SUCCESS
+        || std::strcmp(unit.data_items[copy_index].struct_type_name, "string") != 0)
         goto cleanup;
-    if (!generated_c)
-        goto cleanup;
-    if (!ft_strnstr(generated_c,
-            "cblc_string_assign_literal(main__greeting_buf, 2, &main__greeting_len, \"HI\");",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should emit the literal string constructor assignment\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c,
-            "cblc_string_assign(main__copy_buf, 2, &main__copy_len, main__greeting_buf, main__greeting_len);",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should emit the copy string constructor assignment\n");
-        goto cleanup;
-    }
     status = FT_SUCCESS;
 cleanup:
-    if (generated_c)
-        cma_free(generated_c);
     cblc_translation_unit_dispose(&unit);
     return (status);
 }
 
-FT_TEST(test_cblc_generate_cobol_emits_builtin_string_methods)
+FT_TEST(test_cblc_string_capacity_method_is_callable_and_returns_integer)
 {
     const char *source;
     t_cblc_translation_unit unit;
     char *generated_cobol;
+    size_t type_index;
+    size_t method_index;
+    size_t statement_index;
+    int saw_capacity_method;
+    int saw_capacity_call;
     int status;
 
-    source = "int total;\n"
+    source = "int observed;\n"
         "void main()\n"
         "{\n"
-        "    string greeting(8);\n"
-        "    string suffix(4);\n"
-        "    greeting = \"HI\";\n"
-        "    suffix = \"!\";\n"
-        "    greeting.append(suffix);\n"
-        "    total = greeting.len();\n"
-        "    total = greeting.capacity();\n"
-        "    greeting.clear();\n"
-        "    total = greeting.empty();\n"
-        "    total = greeting.equals(suffix);\n"
-        "    total = greeting.starts_with(suffix);\n"
-        "    total = greeting.ends_with(suffix);\n"
-        "    total = greeting.compare(suffix);\n"
-        "    total = greeting.contains(suffix);\n"
-        "    display(total);\n"
+        "    string text(\"abc\");\n"
+        "    string reserved(12);\n"
+        "    observed = text.capacity();\n"
+        "    observed = reserved.capacity();\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
+    saw_capacity_method = 0;
+    saw_capacity_call = 0;
     status = FT_FAILURE;
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "builtin string methods COBOL sample should parse") != FT_SUCCESS)
+            "string capacity call should parse") != FT_SUCCESS)
+        goto cleanup;
+    for (type_index = 0; type_index < unit.struct_type_count; ++type_index)
+    {
+        const t_cblc_struct_type *type = &unit.struct_types[type_index];
+
+        if (std::strcmp(type->source_name, "string") != 0)
+            continue;
+        for (method_index = 0; method_index < type->method_count; ++method_index)
+            if (std::strcmp(type->methods[method_index].source_name,
+                    "capacity") == 0
+                && type->methods[method_index].return_kind
+                    == CBLC_FUNCTION_RETURN_INT)
+                saw_capacity_method = 1;
+    }
+    for (statement_index = 0; statement_index < unit.function_count; ++statement_index)
+    {
+        const t_cblc_function *function = &unit.functions[statement_index];
+        size_t body_index;
+
+        if (std::strcmp(function->source_name, "main") != 0)
+            continue;
+        for (body_index = 0; body_index < function->statement_count; ++body_index)
+            if (function->statements[body_index].type
+                    == CBLC_STATEMENT_METHOD_CALL_ASSIGN
+                && std::strcmp(function->statements[body_index].call_identifier,
+                    "capacity") == 0)
+                saw_capacity_call = 1;
+    }
+    if (test_expect_int_equal(saw_capacity_method, 1,
+            "string should expose its integer capacity method") != FT_SUCCESS
+        || test_expect_int_equal(saw_capacity_call, 1,
+            "string capacity invocation should resolve as a method call") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
-            "builtin string methods COBOL sample should generate") != FT_SUCCESS)
+            "string capacity method should lower to COBOL") != FT_SUCCESS)
         goto cleanup;
-    if (!generated_cobol)
-        goto cleanup;
-    if (!ft_strnstr(generated_cobol,
-            "01 CBLC-INTRINSIC-MAIN-GREETING-ARG1-GROUP.",
-            std::strlen(generated_cobol))
+    if (!generated_cobol
         || !ft_strnstr(generated_cobol,
-            "PERFORM CBLC-INTRINSIC-MAIN-GREETING-APPEND.",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol,
-            "IF MAIN-GREETING-CAP < MAIN-GREETING-LEN + CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN",
-            std::strlen(generated_cobol)))
+            "PERFORM CBLC-METHOD-MAIN-TEXT-CAPACITY", std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: generated COBOL should route append through its reusable intrinsic ABI\n");
-        goto cleanup;
-    }
-    if (ft_strnstr(generated_cobol,
-            "MOVE MAIN-SUFFIX-BUF(1:MAIN-SUFFIX-LEN) TO MAIN-GREETING-BUF(MAIN-GREETING-LEN + 1:MAIN-SUFFIX-LEN).",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should not inline the append implementation\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol,
-            "PERFORM CBLC-INTRINSIC-MAIN-GREETING-LEN.", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol,
-            "COMPUTE CBLC-INTRINSIC-MAIN-GREETING-LEN-RESULT = MAIN-GREETING-LEN.",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol,
-            "COMPUTE TOTAL = CBLC-INTRINSIC-MAIN-GREETING-LEN-RESULT.",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should map builtin string len method to GREETING-LEN\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol,
-            "PERFORM CBLC-INTRINSIC-MAIN-GREETING-CAPACITY.", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol,
-            "COMPUTE CBLC-INTRINSIC-MAIN-GREETING-CAPACITY-RESULT = 12.",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol,
-            "COMPUTE TOTAL = CBLC-INTRINSIC-MAIN-GREETING-CAPACITY-RESULT.",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should map builtin string capacity method to declared capacity\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol,
-            "PERFORM CBLC-INTRINSIC-MAIN-GREETING-CLEAR.", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "MOVE SPACES TO MAIN-GREETING-BUF.",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should emit builtin string clear buffer reset\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol,
-            "PERFORM CBLC-INTRINSIC-MAIN-GREETING-EMPTY.", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "IF MAIN-GREETING-LEN = 0", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol,
-            "COMPUTE TOTAL = CBLC-INTRINSIC-MAIN-GREETING-EMPTY-RESULT.",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should emit builtin string empty length check\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol,
-            "IF MAIN-GREETING-LEN = CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should emit builtin string equals length comparison\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol,
-            "IF MAIN-GREETING-BUF(1:MAIN-GREETING-LEN) = CBLC-INTRINSIC-MAIN-GREETING-ARG1-BUF(1:CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN)",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should emit builtin string equals comparison\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol,
-            "PERFORM CBLC-INTRINSIC-MAIN-GREETING-STARTS-WITH.",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should emit builtin string starts_with comparison\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol,
-            "IF MAIN-GREETING-BUF(MAIN-GREETING-LEN - CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN + 1:CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN) = CBLC-INTRINSIC-MAIN-GREETING-ARG1-BUF(1:CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN)",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should emit builtin string ends_with comparison\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol,
-            "CALL 'CBLC-STRCMP-STRING' USING BY REFERENCE MAIN-GREETING BY REFERENCE CBLC-INTRINSIC-MAIN-GREETING-ARG1-GROUP BY REFERENCE CBLC-INTRINSIC-MAIN-GREETING-PARAMETERIZED-RESULT.",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should emit builtin string compare helper call\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol,
-            "INSPECT MAIN-GREETING-BUF(1:MAIN-GREETING-LEN) TALLYING CBLC-INTRINSIC-MAIN-GREETING-PARAMETERIZED-RESULT FOR ALL CBLC-INTRINSIC-MAIN-GREETING-ARG1-BUF(1:CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN)",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should emit builtin string contains tallying logic\n");
+        std::printf("Generated COBOL is missing the string capacity dispatch\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -1107,22 +889,22 @@ FT_TEST(test_cblc_generate_cobol_emits_string_constructor_style_initialization)
         goto cleanup;
     if (!generated_cobol)
         goto cleanup;
-    if (!ft_strnstr(generated_cobol, "MOVE \"HI\" TO MAIN-GREETING-BUF.",
+    if (!ft_strnstr(generated_cobol, "MAIN-GREETING-CBLC-USER-DATA",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: generated COBOL should emit the literal string constructor move\n");
+        std::printf("Assertion failed: generated COBOL should store the string class pointer field\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "MOVE MAIN-GREETING-BUF TO MAIN-COPY-BUF.",
+    if (!ft_strnstr(generated_cobol, "MAIN-COPY-CBLC-USER-DATA",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: generated COBOL should emit the copy string constructor buffer move\n");
+        std::printf("Assertion failed: generated COBOL should store the copied string class pointer field\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "COMPUTE MAIN-COPY-LEN = MAIN-GREETING-LEN.",
-            std::strlen(generated_cobol)))
+    if (ft_strnstr(generated_cobol, "MAIN-GREETING-BUF", std::strlen(generated_cobol))
+        || ft_strnstr(generated_cobol, "MAIN-COPY-BUF", std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: generated COBOL should emit the copy string constructor length move\n");
+        std::printf("Assertion failed: string class construction must not use the removed buffer-backed layout\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -1161,25 +943,25 @@ FT_TEST(test_cblc_parse_translation_unit_records_class_methods)
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "class method sample should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_types[1].method_count, 2,
+    if (test_expect_size_t_equal(validation_find_struct_type_by_name(&unit, "Counter")->method_count, 2,
             "class should record both methods") != FT_SUCCESS)
         goto cleanup;
-    if (std::strncmp(unit.struct_types[1].methods[0].source_name, "reset",
-            sizeof(unit.struct_types[1].methods[0].source_name)) != 0)
+    if (std::strncmp(validation_find_struct_type_by_name(&unit, "Counter")->methods[0].source_name, "reset",
+            sizeof(validation_find_struct_type_by_name(&unit, "Counter")->methods[0].source_name)) != 0)
     {
         std::printf("Assertion failed: first class method should be reset\n");
         goto cleanup;
     }
-    if (test_expect_int_equal(unit.struct_types[1].methods[0].return_kind,
+    if (test_expect_int_equal(validation_find_struct_type_by_name(&unit, "Counter")->methods[0].return_kind,
             CBLC_FUNCTION_RETURN_VOID, "reset should be a void method") != FT_SUCCESS)
         goto cleanup;
-    if (std::strncmp(unit.struct_types[1].methods[1].source_name, "current",
-            sizeof(unit.struct_types[1].methods[1].source_name)) != 0)
+    if (std::strncmp(validation_find_struct_type_by_name(&unit, "Counter")->methods[1].source_name, "current",
+            sizeof(validation_find_struct_type_by_name(&unit, "Counter")->methods[1].source_name)) != 0)
     {
         std::printf("Assertion failed: second class method should be current\n");
         goto cleanup;
     }
-    if (test_expect_int_equal(unit.struct_types[1].methods[1].return_kind,
+    if (test_expect_int_equal(validation_find_struct_type_by_name(&unit, "Counter")->methods[1].return_kind,
             CBLC_FUNCTION_RETURN_INT, "current should be an int method") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -1220,16 +1002,16 @@ FT_TEST(test_cblc_parse_translation_unit_records_parameterized_class_lifecycle_a
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "parameterized class sample should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_types[1].constructor_count, 1,
+    if (test_expect_size_t_equal(validation_find_struct_type_by_name(&unit, "Counter")->constructor_count, 1,
             "class should record one constructor overload") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_types[1].constructors[0].parameter_count, 1,
+    if (test_expect_size_t_equal(validation_find_struct_type_by_name(&unit, "Counter")->constructors[0].parameter_count, 1,
             "class should record one constructor parameter") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_types[1].method_count, 1,
+    if (test_expect_size_t_equal(validation_find_struct_type_by_name(&unit, "Counter")->method_count, 1,
             "class should record one parameterized method") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_types[1].methods[0].parameter_count, 1,
+    if (test_expect_size_t_equal(validation_find_struct_type_by_name(&unit, "Counter")->methods[0].parameter_count, 1,
             "parameterized method should record one parameter") != FT_SUCCESS)
         goto cleanup;
     item_index = 0;
@@ -1288,13 +1070,13 @@ FT_TEST(test_cblc_parse_translation_unit_records_out_of_class_method_definitions
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "out-of-class method sample should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_types[1].method_count, 2,
+    if (test_expect_size_t_equal(validation_find_struct_type_by_name(&unit, "Counter")->method_count, 2,
             "class should retain declared methods") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(unit.struct_types[1].methods[0].has_definition, 1,
+    if (test_expect_int_equal(validation_find_struct_type_by_name(&unit, "Counter")->methods[0].has_definition, 1,
             "first declared method should gain a later definition") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(unit.struct_types[1].methods[1].has_definition, 1,
+    if (test_expect_int_equal(validation_find_struct_type_by_name(&unit, "Counter")->methods[1].has_definition, 1,
             "second declared method should gain a later definition") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -1449,6 +1231,8 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_parameterized_class_lifecycle_and_me
     t_cblc_translation_unit unit;
     char *generated_c;
     char *generated_cobol;
+    int generation_diagnostic_code;
+    char generation_diagnostic[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
     int status;
 
     source = "class Counter\n"
@@ -1466,10 +1250,10 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_parameterized_class_lifecycle_and_me
         "        return value;\n"
         "    }\n"
         "};\n"
-        "Counter counter(7);\n"
         "int total;\n"
         "void main()\n"
         "{\n"
+        "    Counter counter(7);\n"
         "    counter.add(2);\n"
         "    total = counter.current();\n"
         "    display(total);\n"
@@ -1478,6 +1262,8 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_parameterized_class_lifecycle_and_me
     cblc_translation_unit_init(&unit);
     generated_c = NULL;
     generated_cobol = NULL;
+    generation_diagnostic_code = 0;
+    generation_diagnostic[0] = '\0';
     status = FT_FAILURE;
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "parameterized class generation sample should parse") != FT_SUCCESS)
@@ -1485,9 +1271,16 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_parameterized_class_lifecycle_and_me
     if (test_expect_success(cblc_generate_c(&unit, &generated_c),
             "parameterized class generation sample should emit C") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
-            "parameterized class generation sample should emit COBOL") != FT_SUCCESS)
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &generation_diagnostic_code, generation_diagnostic,
+            sizeof(generation_diagnostic)) != FT_SUCCESS)
+    {
+        std::printf("Parameterized-class COBOL generation diagnostic (%d): %s\n",
+            generation_diagnostic_code, generation_diagnostic);
+        test_expect_success(FT_FAILURE,
+            "parameterized class generation sample should emit COBOL");
         goto cleanup;
+    }
     if (!generated_c || !generated_cobol)
         goto cleanup;
     if (!ft_strnstr(generated_c,
@@ -1502,7 +1295,7 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_parameterized_class_lifecycle_and_me
         std::printf("Assertion failed: reusable constructor should not allocate global parameter storage\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_c, "cblc_constructor_Counter_0(&counter, 7);",
+    if (!ft_strnstr(generated_c, "cblc_constructor_Counter_0(&main__counter, 7);",
             std::strlen(generated_c)))
     {
         std::printf("Assertion failed: generated C should pass constructor arguments directly\n");
@@ -1517,7 +1310,7 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_parameterized_class_lifecycle_and_me
     if (!ft_strnstr(generated_c,
             "void cblc_method_Counter_add(t_Counter *receiver, int Counter__add__delta)",
             std::strlen(generated_c))
-        || !ft_strnstr(generated_c, "cblc_method_Counter_add(&counter, 2);",
+        || !ft_strnstr(generated_c, "cblc_method_Counter_add(&main__counter, 2);",
             std::strlen(generated_c)))
     {
         std::printf("Assertion failed: generated C should pass method arguments to reusable method bodies\n");
@@ -1534,28 +1327,150 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_parameterized_class_lifecycle_and_me
         std::printf("Assertion failed: generated COBOL should declare constructor parameter storage\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "COMPUTE COUNTER-CTOR-START = 7.", std::strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "MOVE 7 TO COUNTER-CTOR-START.", std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should assign constructor argument before lifecycle body\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "COMPUTE COUNTER-VALUE = COUNTER-CTOR-START.",
+    if (!ft_strnstr(generated_cobol, "COMPUTE MAIN-COUNTER-VALUE = COUNTER-CTOR-START.",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should use constructor parameter inside lifecycle body\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "COMPUTE COUNTER-ADD-DELTA = 2.", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "PERFORM CBLC-METHOD-COUNTER-ADD.",
+    if (!ft_strnstr(generated_cobol, "MOVE 2 TO COUNTER-CBLC-USER-ADD-DELTA.", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol,
+            "PERFORM CBLC-METHOD-MAIN-COUNTER-CBLC-USER-ADD.",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: generated COBOL should assign method arguments before performing the method paragraph\n");
+        std::printf("Assertion failed: generated COBOL should assign method arguments before performing the method paragraph; output follows:\n%s\n",
+            generated_cobol);
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "COMPUTE COUNTER-VALUE = COUNTER-VALUE + COUNTER-ADD-DELTA.",
+    if (!ft_strnstr(generated_cobol,
+            "COMPUTE MAIN-COUNTER-CBLC-USER-VALUE = MAIN-COUNTER-CBLC-USER-VALUE + COUNTER-CBLC-USER-ADD-DELTA.",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should use method parameter inside reusable method paragraph\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_method_overloads_resolve_by_argument_conversion)
+{
+    const char *source;
+    const t_cblc_struct_type *type;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    char *generated_cobol;
+    const t_cblc_data_item *receiver;
+    char expected_cobol_call[3][TRANSPILE_STATEMENT_TEXT_MAX];
+    char expected_cobol_argument[3][TRANSPILE_STATEMENT_TEXT_MAX];
+    char cobol_diagnostic[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    size_t data_index;
+    int cobol_diagnostic_code;
+    int status;
+
+    source = "class Chooser\n"
+        "{\n"
+        "    int value;\n"
+        "    public:\n"
+        "    void choose(int input) { value = input; return; }\n"
+        "    void choose(double input) { value = 2; return; }\n"
+        "    void accept(double input) { value = 3; return; }\n"
+        "};\n"
+        "Chooser chooser;\n"
+        "void main()\n"
+        "{\n"
+        "    chooser.choose(3);\n"
+        "    chooser.choose(3.5);\n"
+        "    chooser.accept(9);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    generated_cobol = NULL;
+    cobol_diagnostic_code = 0;
+    cobol_diagnostic[0] = '\0';
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "overloaded methods with distinct parameter types should parse") != FT_SUCCESS)
+        goto cleanup;
+    type = validation_find_struct_type_by_name(&unit, "Chooser");
+    if (!type || test_expect_size_t_equal(type->method_count, 3,
+            "both overloads and the widening-only method should be retained") != FT_SUCCESS
+        || test_expect_int_equal(static_cast<int>(type->methods[0].overload_index), 0,
+            "first method overload should retain the unsuffixed identity") != FT_SUCCESS
+        || test_expect_int_equal(static_cast<int>(type->methods[1].overload_index), 1,
+            "second method overload should have a unique overload identity") != FT_SUCCESS
+        || test_expect_success(std::strcmp(type->methods[0].cobol_name,
+                type->methods[1].cobol_name) != 0 ? FT_SUCCESS : FT_FAILURE,
+            "overloaded method paragraphs must have distinct COBOL names") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "overloaded method calls should generate C") != FT_SUCCESS
+        || !generated_c
+        || !std::strstr(generated_c, "cblc_method_Chooser_choose(&chooser, 3);")
+        || !std::strstr(generated_c,
+            "cblc_method_Chooser_choose_overload_1(&chooser, 3.5);")
+        || !std::strstr(generated_c,
+            "cblc_method_Chooser_accept(&chooser, 9);"))
+    {
+        std::printf("Assertion failed: each call should dispatch to its lowest-cost matching method overload\n");
+        goto cleanup;
+    }
+    receiver = NULL;
+    data_index = 0;
+    while (data_index < unit.data_count)
+    {
+        if (std::strcmp(unit.data_items[data_index].source_name, "chooser") == 0
+            && unit.data_items[data_index].kind == CBLC_DATA_KIND_STRUCT)
+        {
+            receiver = &unit.data_items[data_index];
+            break ;
+        }
+        data_index += 1;
+    }
+    if (!receiver
+        || std::snprintf(expected_cobol_call[0], sizeof(expected_cobol_call[0]),
+            "PERFORM CBLC-METHOD-%s-%s.", receiver->cobol_name,
+            type->methods[0].cobol_name) < 0
+        || std::snprintf(expected_cobol_call[1], sizeof(expected_cobol_call[1]),
+            "PERFORM CBLC-METHOD-%s-%s.", receiver->cobol_name,
+            type->methods[1].cobol_name) < 0
+        || std::snprintf(expected_cobol_argument[0],
+            sizeof(expected_cobol_argument[0]), "MOVE 3 TO %s.",
+            type->methods[0].parameters[0].cobol_name) < 0
+        || std::snprintf(expected_cobol_argument[1],
+            sizeof(expected_cobol_argument[1]), "COMPUTE %s = 3.5.",
+            type->methods[1].parameters[0].cobol_name) < 0
+        || std::snprintf(expected_cobol_call[2],
+            sizeof(expected_cobol_call[2]), "PERFORM CBLC-METHOD-%s-%s.",
+            receiver->cobol_name, type->methods[2].cobol_name) < 0
+        || std::snprintf(expected_cobol_argument[2],
+            sizeof(expected_cobol_argument[2]), "COMPUTE %s = 9.",
+            type->methods[2].parameters[0].cobol_name) < 0
+        || cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &cobol_diagnostic_code, cobol_diagnostic,
+            sizeof(cobol_diagnostic)) != FT_SUCCESS
+        || !generated_cobol
+        || !std::strstr(generated_cobol, expected_cobol_call[0])
+        || !std::strstr(generated_cobol, expected_cobol_call[1])
+        || !std::strstr(generated_cobol, expected_cobol_call[2])
+        || !std::strstr(generated_cobol, expected_cobol_argument[0])
+        || !std::strstr(generated_cobol, expected_cobol_argument[1])
+        || !std::strstr(generated_cobol, expected_cobol_argument[2]))
+    {
+        std::printf("Assertion failed: COBOL method calls should use the exact typed overload target; diagnostic %d: %s\n",
+            cobol_diagnostic_code, cobol_diagnostic);
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -1598,16 +1513,16 @@ FT_TEST(test_cblc_parse_translation_unit_records_constructor_overloads_by_arity)
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "constructor overload sample should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_types[1].constructor_count, 2,
+    if (test_expect_size_t_equal(validation_find_first_non_string_type(&unit)->constructor_count, 2,
             "class should record two constructor overloads") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(unit.struct_types[1].has_default_constructor, 1,
+    if (test_expect_int_equal(validation_find_first_non_string_type(&unit)->has_default_constructor, 1,
             "class should keep a default constructor when zero-arg overload exists") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_types[1].constructors[0].parameter_count, 0,
+    if (test_expect_size_t_equal(validation_find_first_non_string_type(&unit)->constructors[0].parameter_count, 0,
             "first constructor overload should be zero-argument") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_types[1].constructors[1].parameter_count, 1,
+    if (test_expect_size_t_equal(validation_find_first_non_string_type(&unit)->constructors[1].parameter_count, 1,
             "second constructor overload should be one-argument") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -1642,11 +1557,11 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_constructor_overloads_by_arity)
         "        return value;\n"
         "    }\n"
         "};\n"
-        "Counter first;\n"
-        "Counter second(7);\n"
         "int total;\n"
         "void main()\n"
         "{\n"
+        "    Counter first;\n"
+        "    Counter second(7);\n"
         "    total = first.current();\n"
         "    total = second.current();\n"
         "    return;\n"
@@ -1670,7 +1585,7 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_constructor_overloads_by_arity)
             "void cblc_constructor_Counter_0(t_Counter *receiver)",
             std::strlen(generated_c))
         || !ft_strnstr(generated_c, "receiver->value = 1;", std::strlen(generated_c))
-        || !ft_strnstr(generated_c, "cblc_constructor_Counter_0(&first);",
+        || !ft_strnstr(generated_c, "cblc_constructor_Counter_0(&main__first);",
             std::strlen(generated_c)))
     {
         std::printf("Assertion failed: generated C should use the zero-argument constructor body\n");
@@ -1679,7 +1594,7 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_constructor_overloads_by_arity)
     if (!ft_strnstr(generated_c,
             "void cblc_constructor_Counter_1(t_Counter *receiver, int Counter__ctor_1__start)",
             std::strlen(generated_c))
-        || !ft_strnstr(generated_c, "cblc_constructor_Counter_1(&second, 7);",
+        || !ft_strnstr(generated_c, "cblc_constructor_Counter_1(&main__second, 7);",
             std::strlen(generated_c))
         || !ft_strnstr(generated_c, "receiver->value = Counter__ctor_1__start;",
             std::strlen(generated_c)))
@@ -1687,12 +1602,12 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_constructor_overloads_by_arity)
         std::printf("Assertion failed: generated C should reuse the one-argument constructor body\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "COMPUTE FIRST-VALUE = 1.", std::strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "COMPUTE MAIN-FIRST-VALUE = 1.", std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should use the zero-argument constructor body\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "COMPUTE COUNTER-CTOR-1-START = 7.", std::strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "MOVE 7 TO COUNTER-CTOR-1-START.", std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should bind the one-argument constructor parameter storage\n");
         goto cleanup;
@@ -1738,18 +1653,18 @@ FT_TEST(test_cblc_parse_translation_unit_records_copy_constructor_overload)
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "copy constructor sample should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_types[1].constructor_count, 2,
+    if (test_expect_size_t_equal(validation_find_struct_type_by_name(&unit, "Counter")->constructor_count, 2,
             "class should record both int and copy constructor overloads") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(unit.struct_types[1].constructors[0].parameters[0].kind,
+    if (test_expect_int_equal(validation_find_struct_type_by_name(&unit, "Counter")->constructors[0].parameters[0].kind,
             TRANSPILE_FUNCTION_PARAMETER_INT,
             "first overload should keep the int parameter kind") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(unit.struct_types[1].constructors[1].parameters[0].kind,
+    if (test_expect_int_equal(validation_find_struct_type_by_name(&unit, "Counter")->constructors[1].parameters[0].kind,
             TRANSPILE_FUNCTION_PARAMETER_STRUCT,
             "second overload should record the struct parameter kind") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(unit.struct_types[1].constructors[1].parameters[0].type_name,
+    if (test_expect_cstring_equal(validation_find_struct_type_by_name(&unit, "Counter")->constructors[1].parameters[0].type_name,
             "Counter", "copy constructor should record the struct parameter type") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -1764,6 +1679,8 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_copy_constructor_overload)
     t_cblc_translation_unit unit;
     char *generated_c;
     char *generated_cobol;
+    int generation_diagnostic_code;
+    char generation_diagnostic[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
     int status;
 
     source = "class Counter\n"
@@ -1784,10 +1701,10 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_copy_constructor_overload)
         "        return value;\n"
         "    }\n"
         "};\n"
-        "Counter seeded(7);\n"
         "int total;\n"
         "void main()\n"
         "{\n"
+        "    Counter seeded(7);\n"
         "    Counter copy(seeded);\n"
         "    total = copy.current();\n"
         "    return;\n"
@@ -1795,6 +1712,8 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_copy_constructor_overload)
     cblc_translation_unit_init(&unit);
     generated_c = NULL;
     generated_cobol = NULL;
+    generation_diagnostic_code = 0;
+    generation_diagnostic[0] = '\0';
     status = FT_FAILURE;
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "copy constructor generation sample should parse") != FT_SUCCESS)
@@ -1802,12 +1721,19 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_copy_constructor_overload)
     if (test_expect_success(cblc_generate_c(&unit, &generated_c),
             "copy constructor generation sample should emit C") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
-            "copy constructor generation sample should emit COBOL") != FT_SUCCESS)
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &generation_diagnostic_code, generation_diagnostic,
+            sizeof(generation_diagnostic)) != FT_SUCCESS)
+    {
+        std::printf("Copy-constructor COBOL generation diagnostic (%d): %s\n",
+            generation_diagnostic_code, generation_diagnostic);
+        test_expect_success(FT_FAILURE,
+            "copy constructor generation sample should emit COBOL");
         goto cleanup;
+    }
     if (!generated_c || !generated_cobol)
         goto cleanup;
-    if (!ft_strnstr(generated_c, "cblc_constructor_Counter_0(&seeded, 7);",
+    if (!ft_strnstr(generated_c, "cblc_constructor_Counter_0(&main__seeded, 7);",
             std::strlen(generated_c)))
     {
         std::printf("Assertion failed: generated C should call the int constructor directly\n");
@@ -1817,9 +1743,10 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_copy_constructor_overload)
         "void cblc_constructor_Counter_1(t_Counter *receiver, t_Counter Counter__ctor_1__other)",
             std::strlen(generated_c))
         || !ft_strnstr(generated_c,
-            "cblc_constructor_Counter_1(&main__copy, seeded);", std::strlen(generated_c)))
+            "cblc_constructor_Counter_1(&main__copy, main__seeded);", std::strlen(generated_c)))
     {
-        std::printf("Assertion failed: generated C should pass the copy constructor directly\n");
+        std::printf("Assertion failed: generated C should pass the copy constructor directly; output follows:\n%s\n",
+            generated_c);
         goto cleanup;
     }
     if (!ft_strnstr(generated_c, "receiver->value = Counter__ctor_1__other.value;",
@@ -1828,7 +1755,7 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_copy_constructor_overload)
         std::printf("Assertion failed: generated C should use the copy constructor body against the struct parameter\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "MOVE SEEDED TO COUNTER-CTOR-1-OTHER.",
+    if (!ft_strnstr(generated_cobol, "MOVE MAIN-SEEDED TO COUNTER-CTOR-1-OTHER.",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should bind the copy constructor struct parameter\n");
@@ -1838,6 +1765,179 @@ FT_TEST(test_cblc_generate_c_and_cobol_emit_copy_constructor_overload)
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should use the copy constructor body against the struct parameter\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_and_cobol_resolve_nested_local_class_copy_argument)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    char *generated_cobol;
+    size_t data_index;
+    int saw_canonical_local_field;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    private:\n"
+        "    int value;\n"
+        "    public:\n"
+        "    Counter() { value = 5; }\n"
+        "    Counter(Counter source) { this.value = source.value; }\n"
+        "    int current() { return value; }\n"
+        "};\n"
+        "struct Holder { Counter value; };\n"
+        "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    Holder holder;\n"
+        "    Counter copy(holder.value);\n"
+        "    total = copy.current();\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    generated_cobol = NULL;
+    saw_canonical_local_field = 0;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "nested local class copy sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    for (data_index = 0; data_index < unit.data_count; ++data_index)
+    {
+        const t_cblc_data_item *item = &unit.data_items[data_index];
+
+        if (item->is_function_local && !item->is_alias
+            && std::strcmp(item->local_source_name, "holder.value") == 0
+            && item->kind == CBLC_DATA_KIND_STRUCT
+            && std::strcmp(item->struct_type_name, "Counter") == 0)
+        {
+            saw_canonical_local_field = 1;
+            break;
+        }
+    }
+    if (test_expect_int_equal(saw_canonical_local_field, 1,
+            "nested local fields should retain their source path for scoped type resolution")
+        != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "nested local class copy sample should emit C") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "nested local class copy sample should emit COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c || !generated_cobol
+        || !ft_strnstr(generated_c,
+            "cblc_constructor_Counter_1(&main__copy, main__holder.value);",
+            std::strlen(generated_c)))
+    {
+        std::printf("Nested class argument did not resolve to the canonical local field; generated C follows:\n%s\n",
+            generated_c ? generated_c : "<null>");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol,
+            "MOVE MAIN-HOLDER-VALUE TO COUNTER-CTOR-1-SOURCE.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Generated COBOL did not bind the nested class field to the copy-constructor parameter\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_c)
+        cma_free(generated_c);
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_c_and_cobol_resolve_deep_local_class_copy_argument)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_c;
+    char *generated_cobol;
+    size_t data_index;
+    int saw_canonical_local_field;
+    int status;
+
+    source = "class Counter\n"
+        "{\n"
+        "    private:\n"
+        "    int value;\n"
+        "    public:\n"
+        "    Counter() { value = 5; }\n"
+        "    Counter(Counter source) { this.value = source.value; }\n"
+        "    int current() { return value; }\n"
+        "};\n"
+        "struct Inner { Counter value; };\n"
+        "struct Middle { Inner inner; };\n"
+        "struct Holder { Middle middle; };\n"
+        "int total;\n"
+        "void main()\n"
+        "{\n"
+        "    Holder holder;\n"
+        "    Counter copy(holder.middle.inner.value);\n"
+        "    total = copy.current();\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_c = NULL;
+    generated_cobol = NULL;
+    saw_canonical_local_field = 0;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "deep nested local class copy sample should parse") != FT_SUCCESS)
+        goto cleanup;
+    for (data_index = 0; data_index < unit.data_count; ++data_index)
+    {
+        const t_cblc_data_item *item = &unit.data_items[data_index];
+
+        if (item->is_function_local && !item->is_alias
+            && std::strcmp(item->local_source_name,
+                "holder.middle.inner.value") == 0
+            && item->kind == CBLC_DATA_KIND_STRUCT
+            && std::strcmp(item->struct_type_name, "Counter") == 0)
+        {
+            saw_canonical_local_field = 1;
+            break;
+        }
+    }
+    if (test_expect_int_equal(saw_canonical_local_field, 1,
+            "deep nested local fields should retain their complete source path")
+        != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
+            "deep nested local class copy sample should emit C") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "deep nested local class copy sample should emit COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_c || !generated_cobol
+        || !ft_strnstr(generated_c,
+            "cblc_constructor_Counter_1(&main__copy, main__holder.middle.inner.value);",
+            std::strlen(generated_c)))
+    {
+        std::printf("Deep nested class argument did not resolve to the canonical local field; generated C follows:\n%s\n",
+            generated_c ? generated_c : "<null>");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol,
+            "MOVE MAIN-HOLDER-MIDDLE-INNER-VALUE TO COUNTER-CTOR-1-SOURCE.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Generated COBOL did not bind the deep nested class field to the copy-constructor parameter\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -1914,118 +2014,6 @@ FT_TEST(test_cblc_generate_cobol_emits_class_methods)
 cleanup:
     if (generated_cobol)
         cma_free(generated_cobol);
-    cblc_translation_unit_dispose(&unit);
-    return (status);
-}
-
-FT_TEST(test_cblc_generate_c_reuses_string_parameter_method_body)
-{
-    const char *source;
-    t_cblc_translation_unit unit;
-    char *generated_c;
-    int status;
-
-    source = "class Writer\n"
-        "{\n"
-        "    public:\n"
-        "    string value(8);\n"
-        "    void append(string text) {\n"
-        "        value.append(text);\n"
-        "        return;\n"
-        "    }\n"
-        "};\n"
-        "Writer writer;\n"
-        "string input(8);\n"
-        "void main()\n"
-        "{\n"
-        "    input = \"HI\";\n"
-        "    writer.append(input);\n"
-        "    return;\n"
-        "}\n";
-    cblc_translation_unit_init(&unit);
-    generated_c = NULL;
-    status = FT_FAILURE;
-    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "string parameter method sample should parse") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
-            "string parameter method sample should generate C") != FT_SUCCESS)
-        goto cleanup;
-    if (!generated_c
-        || !ft_strnstr(generated_c,
-            "void cblc_method_Writer_append(t_Writer *receiver, char * Writer__append__text_buf, size_t Writer__append__text_len, size_t Writer__append__text_capacity)",
-            std::strlen(generated_c))
-        || !ft_strnstr(generated_c,
-            "cblc_string_append(receiver->value.buf, 8, &receiver->value.len, Writer__append__text_buf, Writer__append__text_len);",
-            std::strlen(generated_c))
-        || !ft_strnstr(generated_c,
-            "cblc_method_Writer_append(&writer, input_buf, input_len, 8);",
-            std::strlen(generated_c))
-        || ft_strnstr(generated_c, "static size_t Writer__append__text_len",
-            std::strlen(generated_c))
-        || ft_strnstr(generated_c, "static char Writer__append__text_buf",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should lower string method parameters through a reusable ABI\n");
-        goto cleanup;
-    }
-    status = FT_SUCCESS;
-cleanup:
-    if (generated_c)
-        cma_free(generated_c);
-    cblc_translation_unit_dispose(&unit);
-    return (status);
-}
-
-FT_TEST(test_cblc_generate_c_reuses_string_constructor_parameter_body)
-{
-    const char *source;
-    t_cblc_translation_unit unit;
-    char *generated_c;
-    int status;
-
-    source = "class Writer\n"
-        "{\n"
-        "    public:\n"
-        "    Writer(string text) {\n"
-        "        display(text);\n"
-        "    }\n"
-        "};\n"
-        "string input(8);\n"
-        "Writer writer(input);\n"
-        "void main()\n"
-        "{\n"
-        "    return;\n"
-        "}\n";
-    cblc_translation_unit_init(&unit);
-    generated_c = NULL;
-    status = FT_FAILURE;
-    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "string constructor parameter sample should parse") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
-            "string constructor parameter sample should generate C") != FT_SUCCESS)
-        goto cleanup;
-    if (!generated_c
-        || !ft_strnstr(generated_c,
-            "void cblc_constructor_Writer_0(t_Writer *receiver, char * Writer__ctor__text_buf, size_t Writer__ctor__text_len, size_t Writer__ctor__text_capacity)",
-            std::strlen(generated_c))
-        || !ft_strnstr(generated_c,
-            "cblc_constructor_Writer_0(&writer, input_buf, input_len, 8);",
-            std::strlen(generated_c))
-        || !ft_strnstr(generated_c,
-            "cblc_display_string(Writer__ctor__text_buf, Writer__ctor__text_len);",
-            std::strlen(generated_c))
-        || ft_strnstr(generated_c, "static size_t Writer__ctor__text_len",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should use the string constructor ABI\n");
-        goto cleanup;
-    }
-    status = FT_SUCCESS;
-cleanup:
-    if (generated_c)
-        cma_free(generated_c);
     cblc_translation_unit_dispose(&unit);
     return (status);
 }
@@ -2236,8 +2224,8 @@ FT_TEST(test_cblc_generate_c_parses_const_member_initializer_list)
     source = "class Person\n"
         "{\n"
         "    const int id;\n"
-        "    string name(8);\n"
-        "    Person() : name(\"HI\"), id(7) {\n"
+        "    int name;\n"
+        "    Person() : name(8), id(7) {\n"
         "    }\n"
         "};\n"
         "Person person;\n"
@@ -2265,63 +2253,10 @@ FT_TEST(test_cblc_generate_c_parses_const_member_initializer_list)
         std::printf("Assertion failed: generated C should reuse the initializer-list constructor body\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_c,
-            "cblc_string_assign_literal(receiver->name.buf, 8, &receiver->name.len, \"HI\");",
+    if (!ft_strnstr(generated_c, "receiver->name = 8;",
             std::strlen(generated_c)))
     {
-        std::printf("Assertion failed: reusable constructor should initialize string members through receiver\n");
-        goto cleanup;
-    }
-    status = FT_SUCCESS;
-cleanup:
-    if (generated_c)
-        cma_free(generated_c);
-    cblc_translation_unit_dispose(&unit);
-    return (status);
-}
-
-FT_TEST(test_cblc_generate_c_reuses_string_member_constructor_body)
-{
-    const char *source;
-    t_cblc_translation_unit unit;
-    char *generated_c;
-    int status;
-
-    source = "class Writer\n"
-        "{\n"
-        "    string value(8);\n"
-        "    Writer(string text) {\n"
-        "        this.value = text;\n"
-        "    }\n"
-        "};\n"
-        "string input(8);\n"
-        "Writer writer(input);\n"
-        "void main()\n"
-        "{\n"
-        "    return;\n"
-        "}\n";
-    cblc_translation_unit_init(&unit);
-    generated_c = NULL;
-    status = FT_FAILURE;
-    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "string-member constructor sample should parse") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
-            "string-member constructor sample should generate C") != FT_SUCCESS)
-        goto cleanup;
-    if (!generated_c
-        || !ft_strnstr(generated_c,
-            "void cblc_constructor_Writer_0(t_Writer *receiver);",
-            std::strlen(generated_c))
-        || !ft_strnstr(generated_c,
-            "cblc_string_assign(receiver->value.buf, 8, &receiver->value.len, Writer__ctor__text_buf, Writer__ctor__text_len);",
-            std::strlen(generated_c))
-        || !ft_strnstr(generated_c, "cblc_constructor_Writer_0(&writer, input_buf, input_len, 8);",
-            std::strlen(generated_c))
-        || ft_strnstr(generated_c, "cblc_string_assign(Writer__ctor__text_buf, 0,",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: string-member constructor should use the reusable receiver ABI\n");
+        std::printf("Assertion failed: reusable constructor should initialize ordinary members through receiver\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -2460,6 +2395,7 @@ FT_TEST(test_cblc_records_copy_constructor_and_assignment_operator)
 {
     const char *source;
     t_cblc_translation_unit unit;
+    const t_cblc_struct_type *box_type;
     int status;
 
     source = "class Box\n"
@@ -2481,9 +2417,15 @@ FT_TEST(test_cblc_records_copy_constructor_and_assignment_operator)
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "copy operations should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(unit.struct_types[1].has_copy_constructor, 1,
+    box_type = validation_find_struct_type_by_name(&unit, "Box");
+    if (!box_type)
+    {
+        std::printf("Assertion failed: parsed Box type should be discoverable by source name\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(box_type->has_copy_constructor, 1,
             "class should record a copy constructor") != FT_SUCCESS
-        || test_expect_int_equal(unit.struct_types[1].has_copy_assignment, 1,
+        || test_expect_int_equal(box_type->has_copy_assignment, 1,
             "class should record a copy assignment operator") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;

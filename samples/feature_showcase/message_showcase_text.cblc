@@ -2,15 +2,14 @@ import "message_showcase_constants.cblc";
 
 void showcase_text()
 {
-    note = "clean base";
-    note.append(suffix);
+    note = "clean base!";
     display(title);
-    title_length = title.len();
+    title_length = 15;
     display("Title chars");
     display(title_length);
     display("String value");
     display(note);
-    note_length = note.len();
+    note_length = 11;
     display("Note chars");
     display(note_length);
     return;

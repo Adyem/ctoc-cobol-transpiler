@@ -1,6 +1,0 @@
-void F(string destination, string source)
-{
-    String object(destination);
-    object.strcpy(source);
-    destination = object.value;
-}

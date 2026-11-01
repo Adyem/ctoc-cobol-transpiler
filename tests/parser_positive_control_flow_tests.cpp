@@ -249,6 +249,56 @@ FT_TEST(test_parser_parses_control_flow_statements)
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_parser_parses_go_to_statement_and_target)
+{
+    const char *source;
+    t_parser parser;
+    t_ast_node *program;
+    t_ast_node *procedure_division;
+    t_ast_node *paragraph;
+    t_ast_node *sequence;
+    t_ast_node *go_to_statement;
+
+    source = "IDENTIFICATION DIVISION.\n"
+        "PROGRAM-ID. GO-TO-TEST.\n"
+        "ENVIRONMENT DIVISION.\n"
+        "DATA DIVISION.\n"
+        "PROCEDURE DIVISION.\n"
+        "MAIN.\n"
+        "    GO TO CBLC-FRETURN-0.\n"
+        "CBLC-FRETURN-0.\n"
+        "    STOP RUN.\n";
+    parser_init(&parser, source);
+    program = NULL;
+    if (parser_parse_program(&parser, &program) != FT_SUCCESS)
+    {
+        if (parser.has_error_token && parser.error_token.lexeme)
+            std::printf("GO TO parser stopped at %zu:%zu near '%.*s'\n",
+                parser.error_token.line, parser.error_token.column,
+                static_cast<int>(parser.error_token.length), parser.error_token.lexeme);
+        parser_dispose(&parser);
+        return (FT_FAILURE);
+    }
+    parser_dispose(&parser);
+    if (!program)
+        return (FT_FAILURE);
+    procedure_division = ast_node_get_child(program, 3);
+    paragraph = procedure_division
+        ? ast_node_get_child(procedure_division, 0) : NULL;
+    sequence = paragraph ? ast_node_get_child(paragraph, 0) : NULL;
+    go_to_statement = sequence ? ast_node_get_child(sequence, 0) : NULL;
+    if (!go_to_statement || go_to_statement->kind != AST_NODE_GO_TO_STATEMENT
+        || !go_to_statement->token.lexeme
+        || std::strncmp(go_to_statement->token.lexeme, "CBLC-FRETURN-0",
+            go_to_statement->token.length) != 0)
+    {
+        ast_node_destroy(program);
+        return (FT_FAILURE);
+    }
+    ast_node_destroy(program);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_parser_parses_read_next_with_lock_clause)
 {
     const char *source;

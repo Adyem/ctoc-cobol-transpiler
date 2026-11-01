@@ -9,10 +9,12 @@ then parsed and lowered through the normal CBL-C-to-COBOL pipeline when the
 native standard-library backend is enabled.
 
 Each source unit keeps the public COBOL program name in its entry function
-name (`CBLC_STRLEN` becomes `CBLC-STRLEN`). String overloads use the managed
-CBL-C `string` value type. Their storage is copied according to the normal
-string value ABI, and the compiler-generated lifecycle releases temporary
-string storage at function exit, return, and exceptional control-flow edges.
+name (`CBLC_STRLEN` becomes `CBLC-STRLEN`). The 1.0 public text abstraction
+is the standard-library class `string`; raw byte/character storage uses
+`char[]` or supported character pointers. The removed compiler-managed string
+type is not part of the language or ABI. Owning text is represented only by
+the `string` class; low-level character interop uses explicit raw-buffer
+interfaces.
 
 Migration rules:
 
@@ -24,7 +26,10 @@ Migration rules:
    produces equivalent output and status behavior.
 
 All cataloged units are represented here as `.cblc` sources, including the
-character, string, numeric, math, rounding, date, and conversion helpers. The
+raw-character, numeric, math, rounding, date, and conversion helpers. Owning
+text operations are methods of the canonical `string` class in `string.cblc`;
+there is no fixed-buffer `string` helper ABI. Raw `char*` interop remains
+available through the explicitly character-buffer-oriented helpers. The
 `vector<T>` template container is also defined here. It provides the core
 value-oriented operations `size`, `max_size`, `capacity`, `empty`, `reserve`,
   `shrink_to_fit`, `resize`, `push_back`, `emplace_back`, `insert`, `erase`,
@@ -35,9 +40,10 @@ block, so it does not rely on a platform-specific realloc extension.
 The current element contract is value assignment plus byte-relocatable storage.
 Scalar types such as `int` are supported. Full C++-style iterator/reference
 semantics, allocator customization, and constructor/destructor dispatch for
-non-trivial class or string elements remain planned lifecycle extensions; those
-must be implemented before advertising `vector<string>` or arbitrary RAII
-element support.
+non-trivial class elements remain planned lifecycle extensions; those must be
+implemented before advertising `vector<string>` or arbitrary RAII element
+support. Tests for `vector<string>` must instantiate the canonical class and
+must not rely on a compiler-created string representation.
 four C++ files remaining under `src/standard_library` are infrastructure only:
 the catalog, usage-state tracking, the source embedder/native lowering bridge,
 and ABI compatibility wrappers. None contains a COBOL template.

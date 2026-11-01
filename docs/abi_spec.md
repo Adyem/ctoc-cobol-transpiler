@@ -6,6 +6,32 @@ captures calling conventions, return-slot expectations, linkage section layout, 
 alignment assumptions so external systems can interoperate with the transpiler's
 output without reverse-engineering the generated source.
 
+## 0. Versioned standard-library implementation contract
+
+Each standard-library catalog entry has two independent version numbers:
+
+- `interface_version` versions the public contract: source-level signature,
+  return/failure behavior, and ownership/borrowing guarantees.
+- `abi_version` versions the generated COBOL linkage contract: program name,
+  argument order and representation, result slots, exception context, and
+  other hidden outputs.
+
+An implementation-only change that preserves both contracts does not require a
+version bump. A source-level behavior or ownership change increments the
+interface version even if its COBOL record layout is unchanged. A linkage or
+representation change increments the ABI version even if the source-level
+contract is unchanged. If both change, increment both. Consumers that pin a
+contract use the exact-version registry lookup; an unknown version must not
+silently resolve to the newest entry.
+
+The registry maps each emitted program name to the relative path of its
+canonical `.cblc` implementation. The C++ embedder records that identity and
+the compiler routes the source through normal CBL-C parsing and COBOL lowering.
+C++ registry/generator code may describe, embed, version, and dispatch the
+implementation; it must not hold a second implementation body. A historical
+COBOL ABI is represented as an explicitly declared compatibility adapter that
+delegates to the canonical implementation.
+
 ## 1. Calling Convention
 
 Generated call sites always issue COBOL `CALL` statements with by-reference

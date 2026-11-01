@@ -1,5 +1,22 @@
 #include "test_suites.hpp"
 
+static size_t test_cblc_imported_type_index(const t_cblc_translation_unit *unit,
+    const char *type_name)
+{
+    size_t index;
+
+    if (!unit || !type_name)
+        return (static_cast<size_t>(-1));
+    index = 0;
+    while (index < unit->struct_type_count)
+    {
+        if (std::strcmp(unit->struct_types[index].source_name, type_name) == 0)
+            return (index);
+        index += 1;
+    }
+    return (static_cast<size_t>(-1));
+}
+
 FT_TEST(test_cblc_import_type_stubs_skip_private_types_from_signature)
 {
     t_cblc_translation_unit consumer_unit;
@@ -198,7 +215,8 @@ FT_TEST(test_cblc_import_type_stubs_preserve_type_cobol_name_from_signature)
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(consumer_unit.struct_types[1].cobol_name,
+    if (test_expect_cstring_equal(consumer_unit.struct_types[
+                test_cblc_imported_type_index(&consumer_unit, "Counter")].cobol_name,
             "COUNTER", "imported type should preserve derived COBOL name") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -252,7 +270,8 @@ FT_TEST(test_cblc_import_type_stubs_preserve_field_cobol_name_from_signature)
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(consumer_unit.struct_types[1].fields[0].cobol_name,
+    if (test_expect_cstring_equal(consumer_unit.struct_types[
+                test_cblc_imported_type_index(&consumer_unit, "Ledger")].fields[0].cobol_name,
             "AMOUNT", "imported field should preserve derived COBOL name") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -308,7 +327,8 @@ FT_TEST(test_cblc_import_type_stubs_preserve_method_cobol_name_from_signature)
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(consumer_unit.struct_types[1].methods[0].cobol_name,
+    if (test_expect_cstring_equal(consumer_unit.struct_types[
+                test_cblc_imported_type_index(&consumer_unit, "Writer")].methods[0].cobol_name,
             "WRITE", "imported method should preserve derived COBOL name") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -348,7 +368,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_method_parameter_cobol_name_from_si
     signature.method_count = 1;
     ft_strlcpy(signature.methods[0].name, "write", sizeof(signature.methods[0].name));
     signature.methods[0].parameter_count = 1;
-    signature.methods[0].parameter_kinds[0] = TRANSPILE_FUNCTION_PARAMETER_STRING;
+    signature.methods[0].parameter_kinds[0] = TRANSPILE_FUNCTION_PARAMETER_CHAR_BUFFER;
     ft_strlcpy(signature.methods[0].parameter_source_names[0], "text",
         sizeof(signature.methods[0].parameter_source_names[0]));
     ft_strlcpy(signature.methods[0].parameter_actual_source_names[0], "Writer__write__text",
@@ -375,7 +395,8 @@ FT_TEST(test_cblc_import_type_stubs_preserve_method_parameter_cobol_name_from_si
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_cstring_equal(
-                consumer_unit.struct_types[1].methods[0].parameters[0].cobol_name,
+                consumer_unit.struct_types[test_cblc_imported_type_index(&consumer_unit,
+                    "Writer")].methods[0].parameters[0].cobol_name,
                 "WRITER-WRITE-TEXT",
                 "imported method parameter should preserve COBOL name") != FT_SUCCESS)
         goto cleanup;
@@ -396,10 +417,12 @@ FT_TEST(test_cblc_import_type_stubs_preserve_constructor_parameter_cobol_name_fr
     t_transpiler_type_signature signature;
     int context_initialized;
     int status;
+    size_t counter_index;
 
     cblc_translation_unit_init(&consumer_unit);
     context_initialized = 0;
     status = FT_FAILURE;
+    counter_index = 0;
     std::memset(&signature, 0, sizeof(signature));
     signature.constructors = NULL;
     if (test_expect_success(transpiler_context_init(&context),
@@ -439,8 +462,16 @@ FT_TEST(test_cblc_import_type_stubs_preserve_constructor_parameter_cobol_name_fr
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
+    while (counter_index < consumer_unit.struct_type_count
+        && std::strcmp(consumer_unit.struct_types[counter_index].source_name, "Counter") != 0)
+        counter_index += 1;
+    if (counter_index >= consumer_unit.struct_type_count)
+    {
+        std::printf("Assertion failed: imported Counter type should exist\n");
+        goto cleanup;
+    }
     if (test_expect_cstring_equal(
-                consumer_unit.struct_types[1].constructors[0].parameters[0].cobol_name,
+                consumer_unit.struct_types[counter_index].constructors[0].parameters[0].cobol_name,
                 "COUNTER-CTOR-START",
                 "imported constructor parameter should preserve COBOL name") != FT_SUCCESS)
         goto cleanup;
@@ -461,10 +492,12 @@ FT_TEST(test_cblc_import_type_stubs_preserve_void_pointer_method_parameter_kind_
     t_transpiler_type_signature signature;
     int context_initialized;
     int status;
+    size_t allocator_index;
 
     cblc_translation_unit_init(&consumer_unit);
     context_initialized = 0;
     status = FT_FAILURE;
+    allocator_index = 0;
     std::memset(&signature, 0, sizeof(signature));
     signature.methods = NULL;
     if (test_expect_success(transpiler_context_init(&context),
@@ -505,8 +538,17 @@ FT_TEST(test_cblc_import_type_stubs_preserve_void_pointer_method_parameter_kind_
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
+    while (allocator_index < consumer_unit.struct_type_count
+        && std::strcmp(consumer_unit.struct_types[allocator_index].source_name,
+            "Allocator") != 0)
+        allocator_index += 1;
+    if (allocator_index >= consumer_unit.struct_type_count)
+    {
+        std::printf("Assertion failed: imported Allocator type should exist\n");
+        goto cleanup;
+    }
     if (test_expect_int_equal(static_cast<int>(
-                consumer_unit.struct_types[1].methods[0].parameters[0].kind),
+                consumer_unit.struct_types[allocator_index].methods[0].parameters[0].kind),
             TRANSPILE_FUNCTION_PARAMETER_VOID_POINTER,
             "imported method should preserve void pointer parameter kind") != FT_SUCCESS)
         goto cleanup;
@@ -551,8 +593,8 @@ FT_TEST(test_cblc_import_type_stubs_skip_when_module_has_no_imports)
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(consumer_unit.struct_type_count, 1,
-            "consumer without imports should retain only builtin string type") != FT_SUCCESS)
+    if (test_expect_size_t_equal(consumer_unit.struct_type_count, 0,
+            "consumer without imports should not receive synthetic types") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -590,7 +632,7 @@ FT_TEST(test_cblc_import_type_stubs_skip_same_module_exports)
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_type_count, 1,
+    if (test_expect_size_t_equal(unit.struct_type_count, 0,
             "same-module exports should not be imported as extra stubs") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -649,8 +691,8 @@ FT_TEST(test_cblc_import_type_stubs_import_multiple_direct_modules)
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(consumer_unit.struct_type_count, 3,
-            "consumer should receive builtin string plus both directly imported types")
+    if (test_expect_size_t_equal(consumer_unit.struct_type_count, 2,
+            "consumer should receive only the two directly imported types")
             != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -668,10 +710,12 @@ FT_TEST(test_cblc_import_type_stubs_preserve_string_method_parameter_kind_from_s
     t_transpiler_type_signature signature;
     int context_initialized;
     int status;
+    size_t writer_index;
 
     cblc_translation_unit_init(&consumer_unit);
     context_initialized = 0;
     status = FT_FAILURE;
+    writer_index = 0;
     std::memset(&signature, 0, sizeof(signature));
     signature.methods = NULL;
     if (test_expect_success(transpiler_context_init(&context),
@@ -688,7 +732,7 @@ FT_TEST(test_cblc_import_type_stubs_preserve_string_method_parameter_kind_from_s
     signature.method_count = 1;
     ft_strlcpy(signature.methods[0].name, "write", sizeof(signature.methods[0].name));
     signature.methods[0].parameter_count = 1;
-    signature.methods[0].parameter_kinds[0] = TRANSPILE_FUNCTION_PARAMETER_STRING;
+    signature.methods[0].parameter_kinds[0] = TRANSPILE_FUNCTION_PARAMETER_CHAR_BUFFER;
     ft_strlcpy(signature.methods[0].parameter_source_names[0], "text",
         sizeof(signature.methods[0].parameter_source_names[0]));
     ft_strlcpy(signature.methods[0].parameter_actual_source_names[0], "Writer__write__text",
@@ -712,9 +756,17 @@ FT_TEST(test_cblc_import_type_stubs_preserve_string_method_parameter_kind_from_s
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
+    while (writer_index < consumer_unit.struct_type_count
+        && std::strcmp(consumer_unit.struct_types[writer_index].source_name, "Writer") != 0)
+        writer_index += 1;
+    if (writer_index >= consumer_unit.struct_type_count)
+    {
+        std::printf("Assertion failed: imported Writer type should exist\n");
+        goto cleanup;
+    }
     if (test_expect_int_equal(static_cast<int>(
-                consumer_unit.struct_types[1].methods[0].parameters[0].kind),
-            TRANSPILE_FUNCTION_PARAMETER_STRING,
+                consumer_unit.struct_types[writer_index].methods[0].parameters[0].kind),
+            TRANSPILE_FUNCTION_PARAMETER_CHAR_BUFFER,
             "imported method should preserve string parameter kind") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -734,10 +786,12 @@ FT_TEST(test_cblc_import_type_stubs_preserve_int_pointer_method_parameter_kind_f
     t_transpiler_type_signature signature;
     int context_initialized;
     int status;
+    size_t writer_index;
 
     cblc_translation_unit_init(&consumer_unit);
     context_initialized = 0;
     status = FT_FAILURE;
+    writer_index = 0;
     std::memset(&signature, 0, sizeof(signature));
     signature.methods = NULL;
     if (test_expect_success(transpiler_context_init(&context),
@@ -780,8 +834,16 @@ FT_TEST(test_cblc_import_type_stubs_preserve_int_pointer_method_parameter_kind_f
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
+    while (writer_index < consumer_unit.struct_type_count
+        && std::strcmp(consumer_unit.struct_types[writer_index].source_name, "Writer") != 0)
+        writer_index += 1;
+    if (writer_index >= consumer_unit.struct_type_count)
+    {
+        std::printf("Assertion failed: imported Writer type should exist\n");
+        goto cleanup;
+    }
     if (test_expect_int_equal(static_cast<int>(
-                consumer_unit.struct_types[1].methods[0].parameters[0].kind),
+                consumer_unit.struct_types[writer_index].methods[0].parameters[0].kind),
             TRANSPILE_FUNCTION_PARAMETER_INT_POINTER,
             "imported method should preserve int pointer parameter kind") != FT_SUCCESS)
         goto cleanup;
@@ -802,10 +864,12 @@ FT_TEST(test_cblc_import_type_stubs_preserve_void_pointer_method_return_metadata
     t_transpiler_type_signature signature;
     int context_initialized;
     int status;
+    size_t allocator_index;
 
     cblc_translation_unit_init(&consumer_unit);
     context_initialized = 0;
     status = FT_FAILURE;
+    allocator_index = 0;
     std::memset(&signature, 0, sizeof(signature));
     signature.methods = NULL;
     if (test_expect_success(transpiler_context_init(&context),
@@ -840,11 +904,20 @@ FT_TEST(test_cblc_import_type_stubs_preserve_void_pointer_method_return_metadata
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].methods[0].return_kind,
+    while (allocator_index < consumer_unit.struct_type_count
+        && std::strcmp(consumer_unit.struct_types[allocator_index].source_name,
+            "Allocator") != 0)
+        allocator_index += 1;
+    if (allocator_index >= consumer_unit.struct_type_count)
+    {
+        std::printf("Assertion failed: imported Allocator type should exist\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(consumer_unit.struct_types[allocator_index].methods[0].return_kind,
             CBLC_FUNCTION_RETURN_VOID_POINTER,
             "imported method should preserve void pointer return kind") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(consumer_unit.struct_types[1].methods[0].return_type_name,
+    if (test_expect_cstring_equal(consumer_unit.struct_types[allocator_index].methods[0].return_type_name,
             "void", "imported method should preserve void pointer return type name") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -864,10 +937,12 @@ FT_TEST(test_cblc_import_type_stubs_preserve_char_pointer_method_return_metadata
     t_transpiler_type_signature signature;
     int context_initialized;
     int status;
+    size_t reader_index;
 
     cblc_translation_unit_init(&consumer_unit);
     context_initialized = 0;
     status = FT_FAILURE;
+    reader_index = 0;
     std::memset(&signature, 0, sizeof(signature));
     signature.methods = NULL;
     if (test_expect_success(transpiler_context_init(&context),
@@ -902,11 +977,19 @@ FT_TEST(test_cblc_import_type_stubs_preserve_char_pointer_method_return_metadata
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].methods[0].return_kind,
+    while (reader_index < consumer_unit.struct_type_count
+        && std::strcmp(consumer_unit.struct_types[reader_index].source_name, "Reader") != 0)
+        reader_index += 1;
+    if (reader_index >= consumer_unit.struct_type_count)
+    {
+        std::printf("Assertion failed: imported Reader type should exist\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(consumer_unit.struct_types[reader_index].methods[0].return_kind,
             CBLC_FUNCTION_RETURN_CHAR_POINTER,
             "imported method should preserve char pointer return kind") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(consumer_unit.struct_types[1].methods[0].return_type_name,
+    if (test_expect_cstring_equal(consumer_unit.struct_types[reader_index].methods[0].return_type_name,
             "char", "imported method should preserve char pointer return type name") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -926,10 +1009,12 @@ FT_TEST(test_cblc_import_type_stubs_preserve_int_pointer_method_return_metadata_
     t_transpiler_type_signature signature;
     int context_initialized;
     int status;
+    size_t reader_index;
 
     cblc_translation_unit_init(&consumer_unit);
     context_initialized = 0;
     status = FT_FAILURE;
+    reader_index = 0;
     std::memset(&signature, 0, sizeof(signature));
     signature.methods = NULL;
     if (test_expect_success(transpiler_context_init(&context),
@@ -964,11 +1049,19 @@ FT_TEST(test_cblc_import_type_stubs_preserve_int_pointer_method_return_metadata_
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].methods[0].return_kind,
+    while (reader_index < consumer_unit.struct_type_count
+        && std::strcmp(consumer_unit.struct_types[reader_index].source_name, "Reader") != 0)
+        reader_index += 1;
+    if (reader_index >= consumer_unit.struct_type_count)
+    {
+        std::printf("Assertion failed: imported Reader type should exist\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(consumer_unit.struct_types[reader_index].methods[0].return_kind,
             CBLC_FUNCTION_RETURN_INT_POINTER,
             "imported method should preserve int pointer return kind") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(consumer_unit.struct_types[1].methods[0].return_type_name,
+    if (test_expect_cstring_equal(consumer_unit.struct_types[reader_index].methods[0].return_type_name,
             "int", "imported method should preserve int pointer return type name") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -988,10 +1081,12 @@ FT_TEST(test_cblc_import_type_stubs_preserve_struct_pointer_method_return_metada
     t_transpiler_type_signature signature;
     int context_initialized;
     int status;
+    size_t walker_index;
 
     cblc_translation_unit_init(&consumer_unit);
     context_initialized = 0;
     status = FT_FAILURE;
+    walker_index = 0;
     std::memset(&signature, 0, sizeof(signature));
     signature.methods = NULL;
     if (test_expect_success(transpiler_context_init(&context),
@@ -1026,11 +1121,19 @@ FT_TEST(test_cblc_import_type_stubs_preserve_struct_pointer_method_return_metada
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "type stub import should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(consumer_unit.struct_types[1].methods[0].return_kind,
+    while (walker_index < consumer_unit.struct_type_count
+        && std::strcmp(consumer_unit.struct_types[walker_index].source_name, "Walker") != 0)
+        walker_index += 1;
+    if (walker_index >= consumer_unit.struct_type_count)
+    {
+        std::printf("Assertion failed: imported Walker type should exist\n");
+        goto cleanup;
+    }
+    if (test_expect_int_equal(consumer_unit.struct_types[walker_index].methods[0].return_kind,
             CBLC_FUNCTION_RETURN_STRUCT_POINTER,
             "imported method should preserve struct pointer return kind") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_cstring_equal(consumer_unit.struct_types[1].methods[0].return_type_name,
+    if (test_expect_cstring_equal(consumer_unit.struct_types[walker_index].methods[0].return_type_name,
             "Node", "imported method should preserve struct pointer return type name") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
@@ -1181,8 +1284,8 @@ FT_TEST(test_cblc_import_type_stubs_do_not_follow_transitive_imports)
     if (test_expect_success(cblc_import_translation_unit_type_stubs(&context, "main_mod",
                 &consumer_unit), "direct import type stub pass should succeed") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(consumer_unit.struct_type_count, 1,
-            "consumer should only retain builtin string without transitive type") != FT_SUCCESS)
+    if (test_expect_size_t_equal(consumer_unit.struct_type_count, 0,
+            "consumer should not synthesize a legacy builtin string type") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:

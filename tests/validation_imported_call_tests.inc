@@ -716,7 +716,7 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_cblc_resolve_translation_unit_calls_accepts_external_string_literal_argument)
+FT_TEST(test_cblc_resolve_translation_unit_calls_accepts_constructed_external_string_argument)
 {
     const char *main_source;
     const char *worker_source;
@@ -729,7 +729,8 @@ FT_TEST(test_cblc_resolve_translation_unit_calls_accepts_external_string_literal
     main_source = "import \"worker_mod\";\n"
         "void main()\n"
         "{\n"
-        "    worker(\"HELLO\");\n"
+        "    string label(\"HELLO\");\n"
+        "    worker(label);\n"
         "    return;\n"
         "}\n";
     worker_source = "void worker(string value)\n"
@@ -744,7 +745,7 @@ FT_TEST(test_cblc_resolve_translation_unit_calls_accepts_external_string_literal
             &worker_unit, &context, &context_initialized, 1) != FT_SUCCESS)
         goto cleanup;
     if (test_expect_success(cblc_resolve_translation_unit_calls(&context, "main_mod",
-                &main_unit), "external string literal argument should resolve") != FT_SUCCESS)
+                &main_unit), "constructed external string argument should resolve") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -999,7 +1000,7 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_cblc_generate_c_emits_external_string_literal_argument)
+FT_TEST(test_cblc_generate_c_emits_external_string_class_argument)
 {
     const char *main_source;
     const char *worker_source;
@@ -1011,9 +1012,10 @@ FT_TEST(test_cblc_generate_c_emits_external_string_literal_argument)
     int status;
 
     main_source = "import \"worker_mod\";\n"
+        "string message(\"HELLO\");\n"
         "void main()\n"
         "{\n"
-        "    worker(\"HELLO\");\n"
+        "    worker(message);\n"
         "    return;\n"
         "}\n";
     worker_source = "void worker(string value)\n"
@@ -1031,12 +1033,12 @@ FT_TEST(test_cblc_generate_c_emits_external_string_literal_argument)
     if (cblc_resolve_translation_unit_calls(&context, "main_mod", &main_unit) != FT_SUCCESS)
         goto cleanup;
     if (test_expect_success(cblc_generate_c(&main_unit, &generated_c),
-            "external string literal call should generate C") != FT_SUCCESS)
+            "external string class call should generate C") != FT_SUCCESS)
         goto cleanup;
-    if (!generated_c || !ft_strnstr(generated_c, "worker(\"HELLO\");",
+    if (!generated_c || !ft_strnstr(generated_c, "worker(message);",
             std::strlen(generated_c)))
     {
-        std::printf("Assertion failed: generated C should preserve external string literal argument\n");
+        std::printf("Assertion failed: generated C should preserve external string class argument\n");
         goto cleanup;
     }
     status = FT_SUCCESS;

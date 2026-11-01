@@ -1,6 +1,74 @@
 #include "test_suites.hpp"
 
 #include "compatibility/memory_compat.hpp"
+#include "src/transpiler/backend_typed_ir.hpp"
+
+static size_t validation_count_text_occurrences(const char *text,
+    const char *needle)
+{
+    size_t count = 0;
+    size_t needle_length;
+    const char *cursor;
+
+    if (!text || !needle || needle[0] == '\0')
+        return 0;
+    needle_length = std::strlen(needle);
+    cursor = text;
+    while ((cursor = std::strstr(cursor, needle)) != NULL)
+    {
+        ++count;
+        cursor += needle_length;
+    }
+    return count;
+}
+
+static size_t validation_count_paragraph_definitions(const char *text,
+    const char *prefix)
+{
+    const char *cursor;
+    size_t count;
+    size_t prefix_length;
+
+    if (!text || !prefix || prefix[0] == '\0')
+        return (0);
+    cursor = text;
+    prefix_length = std::strlen(prefix);
+    count = 0;
+    while ((cursor = std::strstr(cursor, prefix)) != NULL)
+    {
+        const char *line_end;
+
+        line_end = std::strchr(cursor, '\n');
+        if ((cursor == text || cursor[-1] == '\n') && line_end
+            && line_end > cursor && line_end[-1] == '.')
+            count += 1;
+        cursor += prefix_length;
+    }
+    return (count);
+}
+
+static const char *validation_find_last_paragraph_before(const char *text,
+    const char *prefix, const char *before)
+{
+    const char *cursor;
+    const char *last_match;
+
+    if (!text || !prefix || !before || text > before)
+        return (NULL);
+    cursor = text;
+    last_match = NULL;
+    while ((cursor = std::strstr(cursor, prefix)) != NULL && cursor < before)
+    {
+        const char *line_end;
+
+        line_end = std::strchr(cursor, '\n');
+        if ((cursor == text || cursor[-1] == '\n') && line_end
+            && line_end < before && line_end > cursor && line_end[-1] == '.')
+            last_match = cursor;
+        cursor += std::strlen(prefix);
+    }
+    return (last_match);
+}
 
 FT_TEST(test_standard_library_migrated_helpers_use_direct_returns)
 {
@@ -124,49 +192,6 @@ FT_TEST(test_standard_library_typed_parsers_return_multi_field_values)
     return (FT_SUCCESS);
 }
 
-FT_TEST(test_cblc_intrinsic_registry_is_complete_for_builtin_string_methods)
-{
-    static const char *expected_names[] = {
-        "append", "len", "clear", "empty", "equals", "capacity",
-        "starts_with", "ends_with", "compare", "contains"
-    };
-    size_t count;
-    const t_cblc_intrinsic_entry *entries;
-    size_t index;
-
-    entries = cblc_intrinsic_get_entries(&count);
-    if (!entries || count != sizeof(expected_names) / sizeof(expected_names[0]))
-    {
-        std::printf("Assertion failed: intrinsic registry should expose all builtin string methods\n");
-        return (FT_FAILURE);
-    }
-    index = 0;
-    while (index < count)
-    {
-        if (std::strcmp(entries[index].name, expected_names[index]) != 0
-            || cblc_intrinsic_lookup(expected_names[index]) != &entries[index])
-        {
-            std::printf("Assertion failed: intrinsic registry order and lookup should agree\n");
-            return (FT_FAILURE);
-        }
-        index += 1;
-    }
-    if (cblc_intrinsic_lookup("not_an_intrinsic") != NULL)
-    {
-        std::printf("Assertion failed: unknown intrinsic should not resolve\n");
-        return (FT_FAILURE);
-    }
-    if (!cblc_intrinsic_accepts_argument_count(&entries[0], 1)
-        || cblc_intrinsic_accepts_argument_count(&entries[0], 0)
-        || !cblc_intrinsic_accepts_argument_count(&entries[1], 0)
-        || cblc_intrinsic_accepts_argument_count(&entries[1], 1))
-    {
-        std::printf("Assertion failed: intrinsic argument metadata should be enforced\n");
-        return (FT_FAILURE);
-    }
-    return (FT_SUCCESS);
-}
-
 FT_TEST(test_transpiler_validation_accepts_valid_cblc)
 {
     const char *source;
@@ -202,11 +227,12 @@ FT_TEST(test_transpiler_validation_accepts_string_declaration)
 {
     const char *source;
 
-    source = "string greeting(16);\n"
+    source = "int length;\n"
+        "string greeting(16);\n"
         "void main()\n"
         "{\n"
-        "    greeting = \"HI\";\n"
-        "    display(greeting.len);\n"
+        "    length = greeting.len();\n"
+        "    display(length);\n"
         "    return;\n"
         "}\n";
     if (test_expect_success(transpiler_validate_generated_cblc(source),
@@ -215,19 +241,12 @@ FT_TEST(test_transpiler_validation_accepts_string_declaration)
     return (FT_SUCCESS);
 }
 
-FT_TEST(test_cblc_string_class_exposes_native_helper_methods)
+FT_TEST(test_cblc_standard_string_class_uses_cblc_method_bodies)
 {
     static const char *method_names[] = {
-        "atoi", "atol", "atoll", "strlen", "strnlen", "strcmp",
-        "strcpy", "strncpy", "memcmp", "strcat", "strtod", "toupper",
-        "tolower"
-    };
-    static const char *program_names[] = {
-        "CBLC-ATOI-STRING", "CBLC-ATOL-STRING", "CBLC-ATOLL-STRING",
-        "CBLC-STRLEN-STRING", "CBLC-STRNLEN-STRING", "CBLC-STRCMP-STRING",
-        "CBLC-STRCPY-STRING", "CBLC-STRNCPY-STRING", "CBLC-MEMCMP-STRING",
-        "CBLC-STRCAT-STRING", "CBLC-STRTOD-STRING", "CBLC-TOUPPER-STRING",
-        "CBLC-TOLOWER-STRING"
+        "append", "len", "clear", "empty", "equals", "capacity",
+        "starts_with", "ends_with", "compare", "contains", "is_valid_utf8",
+        "strcpy", "parse_int", "move_assign"
     };
     const t_cblc_struct_type *string_type;
     t_cblc_translation_unit unit;
@@ -236,28 +255,38 @@ FT_TEST(test_cblc_string_class_exposes_native_helper_methods)
     size_t index;
     int status;
 
-    source = "string text(16);\n"
-        "string other(16);\n"
-        "int result;\n"
-        "void main() {\n"
-        "    result = text.strlen();\n"
-        "    result = text.strnlen(4);\n"
-        "    result = text.strcmp(other);\n"
+    source = "void main() {\n"
+        "    string text(\"literal value\");\n"
+        "    string other(\"literal value\");\n"
+        "    string *other_pointer;\n"
+        "    string invalid_capacity(-1);\n"
+        "    int result;\n"
+        "    result = text.len();\n"
+        "    result = text.capacity();\n"
+        "    result = text.empty();\n"
+        "    result = text.equals(other);\n"
+        "    result = text.starts_with(other);\n"
+        "    result = text.ends_with(other);\n"
+        "    result = text.compare(other);\n"
+        "    result = text.contains(other);\n"
+        "    result = text.is_valid_utf8();\n"
+        "    text.append(other);\n"
         "    text.strcpy(other);\n"
-        "    text.strncpy(other, 4);\n"
-        "    result = text.memcmp(other, 4);\n"
-        "    text.strcat(other, other);\n"
-        "    text.toupper();\n"
-        "    text.tolower();\n"
+        "    other_pointer = &other;\n"
+        "    text.move_assign(other_pointer);\n"
+        "    try { result = text.parse_int(); }\n"
+        "    catch (int parse_status) { result = parse_status; }\n"
+        "    text.clear();\n"
         "    return;\n"
         "}\n";
     generated_cobol = NULL;
     status = FT_FAILURE;
     cblc_translation_unit_init(&unit);
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "string native helper method calls should parse") != FT_SUCCESS)
+            "canonical string class method calls should parse") != FT_SUCCESS)
     {
-        std::printf("string helper diagnostic: parse failed\n");
+        std::printf("canonical string class diagnostic: parse failed (%s)\n",
+            unit.parse_error_message);
         goto cleanup;
     }
     string_type = NULL;
@@ -291,37 +320,39 @@ FT_TEST(test_cblc_string_class_exposes_native_helper_methods)
                 break;
             }
         }
-        if (!method || std::strcmp(method->implementation_program_name,
-                program_names[index]) != 0)
+        if (!method || !method->has_definition
+            || method->implementation_program_name[0] != '\0')
         {
-            std::printf("Assertion failed: string helper should be a native class method (%s got %s)\n",
-                method_names[index], method ? method->implementation_program_name : "<missing>");
+            std::printf("Assertion failed: string method should have its implementation in string.cblc (%s)\n",
+                method_names[index]);
             goto cleanup;
         }
         index += 1;
     }
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
-            "string native helper methods should generate COBOL") != FT_SUCCESS)
+            "canonical string class methods should generate COBOL") != FT_SUCCESS)
     {
-        std::printf("string helper diagnostic: generation failed\n");
+        std::printf("canonical string class diagnostic: generation failed\n");
         goto cleanup;
     }
-    index = 3;
-    while (index < sizeof(method_names) / sizeof(method_names[0]))
+    if (!generated_cobol
+        || !std::strstr(generated_cobol, "CBLC-METHOD-MAIN-TEXT-LEN.")
+        || !std::strstr(generated_cobol, "CBLC-METHOD-MAIN-TEXT-CAPACITY.")
+        || !std::strstr(generated_cobol, "CBLC-METHOD-MAIN-TEXT-EMPTY.")
+        || !std::strstr(generated_cobol, "CBLC-METHOD-MAIN-TEXT-EQUALS.")
+        || !std::strstr(generated_cobol, "CBLC-METHOD-MAIN-TEXT-STARTS-WITH.")
+        || !std::strstr(generated_cobol, "CBLC-METHOD-MAIN-TEXT-ENDS-WITH.")
+        || !std::strstr(generated_cobol, "CBLC-METHOD-MAIN-TEXT-COMPARE.")
+        || !std::strstr(generated_cobol, "CBLC-METHOD-MAIN-TEXT-CONTAINS.")
+        || !std::strstr(generated_cobol, "CBLC-METHOD-MAIN-TEXT-IS-VALID-UTF8.")
+        || !std::strstr(generated_cobol, "CBLC-METHOD-MAIN-TEXT-APPEND.")
+        || !std::strstr(generated_cobol, "CBLC-METHOD-MAIN-TEXT-MOVE-ASSIGN.")
+        || !std::strstr(generated_cobol, "CBLC-METHOD-MAIN-TEXT-PARSE-INT.")
+        || std::strstr(generated_cobol, "CBLC-INTRINSIC-MAIN-TEXT-EQUALS")
+        || std::strstr(generated_cobol, "CBLC-STRLEN-STRING"))
     {
-        if (index == 10)
-        {
-            index += 1;
-            continue;
-        }
-        if (!generated_cobol || !ft_strnstr(generated_cobol, program_names[index],
-                std::strlen(generated_cobol)))
-        {
-            std::printf("Assertion failed: generated COBOL should call each string helper program (%s)\n",
-                program_names[index]);
-            goto cleanup;
-        }
-        index += 1;
+        std::printf("Assertion failed: string operations should lower to class method paragraphs, not helper adapters\n");
+        goto cleanup;
     }
     status = FT_SUCCESS;
 cleanup:
@@ -331,41 +362,316 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_transpiler_validation_accepts_string_assignment_and_length_usage)
+FT_TEST(test_cblc_string_class_replaces_legacy_string_helper_overloads)
+{
+    static const struct
+    {
+        const char *call;
+        const char *method;
+    } cases[] = {
+        {"integer_result = left.atoi();", "ATOI"},
+        {"integer_result = left.atol();", "ATOL"},
+        {"integer_result = left.atoll();", "ATOLL"},
+        {"integer_result = left.strlen();", "STRLEN"},
+        {"integer_result = left.strnlen(8);", "STRNLEN"},
+        {"integer_result = left.strcmp(right);", "STRCMP"},
+        {"left.strcpy(right);", "STRCPY"},
+        {"left.strncpy(right, 8);", "STRNCPY"},
+        {"integer_result = left.memcmp(right, 8);", "MEMCMP"},
+        {"left.strcat(left, right);", "STRCAT"},
+        {"double_result = left.parse_double();", "PARSE-DOUBLE"},
+        {"left.toupper();", "TOUPPER"},
+        {"left.tolower();", "TOLOWER"}
+    };
+    size_t index;
+    index = 0;
+    while (index < sizeof(cases) / sizeof(cases[0]))
+    {
+        char source[512];
+        char paragraph[96];
+        t_cblc_translation_unit unit;
+        char *generated_cobol;
+
+        std::snprintf(source, sizeof(source),
+            "void main() { int integer_result; double double_result; "
+            "string left(16); string right(16); %s return; }",
+            cases[index].call);
+        cblc_translation_unit_init(&unit);
+        generated_cobol = NULL;
+        if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+        {
+            std::printf("Assertion failed: string class method failed to parse (%s); diagnostic %d: %s\n",
+                cases[index].call, unit.parse_error_code, unit.parse_error_message);
+            cblc_translation_unit_dispose(&unit);
+            return (FT_FAILURE);
+        }
+        if (cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
+            || !generated_cobol)
+        {
+            std::printf("Assertion failed: string class method failed COBOL generation (%s)\n",
+                cases[index].call);
+            if (generated_cobol)
+                cma_free(generated_cobol);
+            cblc_translation_unit_dispose(&unit);
+            return (FT_FAILURE);
+        }
+        std::snprintf(paragraph, sizeof(paragraph),
+            "CBLC-METHOD-MAIN-LEFT-%s", cases[index].method);
+        if (!std::strstr(generated_cobol, paragraph))
+        {
+            std::printf("Assertion failed: string class replacement method was not emitted: %s\n",
+                paragraph);
+            cma_free(generated_cobol);
+            cblc_translation_unit_dispose(&unit);
+            return (FT_FAILURE);
+        }
+        if (std::strstr(generated_cobol, "CBLC-STRLEN-STRING")
+            || std::strstr(generated_cobol, "CBLC-ATOI-STRING"))
+        {
+            std::printf("Assertion failed: migrated string operations must call class methods rather than removed built-in-string adapters\n");
+            cma_free(generated_cobol);
+            cblc_translation_unit_dispose(&unit);
+            return (FT_FAILURE);
+        }
+        cma_free(generated_cobol);
+        cblc_translation_unit_dispose(&unit);
+        ++index;
+    }
+    return (FT_SUCCESS);
+}
+
+FT_TEST(test_cblc_move_construct_at_dispatches_to_pointer_constructor)
+{
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    const char *source;
+    int diagnostic_code;
+    char diagnostic_message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    int status;
+
+    source = "class Transfer {\n"
+        "public:\n"
+        "int value;\n"
+        "Transfer() { value = 0; }\n"
+        "Transfer(Transfer *source) { value = source->value; source->value = 0; }\n"
+        "~Transfer() { value = 0; }\n"
+        "};\n"
+        "void move_item(Transfer *storage, Transfer *source_pointer) {\n"
+        "cblc_move_construct_at(storage[0], source_pointer);\n"
+        "cblc_destroy_at(storage[0]);\n"
+        "return;\n"
+        "}\n"
+        "void main() { return; }\n";
+    generated_cobol = NULL;
+    diagnostic_code = 0;
+    diagnostic_message[0] = '\0';
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("move construction diagnostic: parse failed (code=%d, message='%s', functions=%zu, data=%zu)\n",
+            unit.parse_error_code, unit.parse_error_message, unit.function_count,
+            unit.data_count);
+        goto cleanup;
+    }
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &diagnostic_code, diagnostic_message,
+            sizeof(diagnostic_message)) != FT_SUCCESS
+        || !generated_cobol)
+    {
+        std::printf("move construction diagnostic: COBOL generation failed (%d: %s)\n",
+            diagnostic_code, diagnostic_message);
+        goto cleanup;
+    }
+    if (!std::strstr(generated_cobol,
+            "PERFORM CBLC-CONSTRUCTOR-CBLC-SPTR-MOVE-ITEM-STORAGE-1 ")
+        || !std::strstr(generated_cobol,
+            "CBLC-SPTR-TRANSFER-CTOR-1-SOURCE-CBLC-USER-VALUE")
+        || !std::strstr(generated_cobol,
+            "CBLC-SPTR-MOVE-ITEM-STORAGE-CBLC-USER-VALUE = 0")
+        || std::strstr(generated_cobol, "->") != NULL)
+    {
+        std::printf("Assertion failed: move construction must invoke the pointer-taking constructor\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_relocate_construct_at_emits_typed_copy_fallback)
+{
+    t_cblc_translation_unit unit;
+    cblc::backend::typed_function function_ir;
+    cblc::backend::control_flow_graph function_cfg;
+    cblc::backend::lifecycle_cleanup_plan cleanup_plan;
+    cblc::backend::verification_diagnostic ir_diagnostic;
+    char *generated_cobol;
+    const char *source;
+    const char *copy_dispatch;
+    const char *exception_transfer;
+    const char *cleanup_dispatch;
+    size_t function_index;
+    int diagnostic_code;
+    char diagnostic_message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    int status;
+
+    source = "class Transfer {\n"
+        "public:\n"
+        "int value;\n"
+        "Transfer() { value = 0; }\n"
+        "Transfer(Transfer *source) { value = source->value; throw 1; }\n"
+        "Transfer(Transfer source) { value = source.value; throw 2; }\n"
+        "~Transfer() { value = 0; }\n"
+        "};\n"
+        "void relocate_copy(Transfer *storage) {\n"
+        "Transfer source;\n"
+        "cblc_relocate_at(storage[0], source);\n"
+        "cblc_destroy_at(storage[0]);\n"
+        "return;\n"
+        "}\n"
+        "void main() { return; }\n";
+    generated_cobol = NULL;
+    diagnostic_code = 0;
+    diagnostic_message[0] = '\0';
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("relocation dispatch diagnostic: parse failed (%s)\n",
+            unit.parse_error_message);
+        goto cleanup;
+    }
+    function_index = 0;
+    while (function_index < unit.function_count
+        && std::strcmp(unit.functions[function_index].source_name,
+            "relocate_copy") != 0)
+        ++function_index;
+    if (function_index == unit.function_count
+        || !cblc::backend::lower_scalar_function(&unit, function_index, &function_ir,
+            &ir_diagnostic))
+    {
+        std::printf("relocation dispatch diagnostic: typed lowering failed at op %u (%s)\n",
+            ir_diagnostic.operation, ir_diagnostic.message.c_str());
+        goto cleanup;
+    }
+    if (!cblc::backend::build_structured_control_flow_graph_with_cleanup(
+            function_ir, &function_cfg, &cleanup_plan, &ir_diagnostic))
+    {
+        std::printf("relocation dispatch diagnostic: typed CFG failed at op %u (%s)\n",
+            ir_diagnostic.operation, ir_diagnostic.message.c_str());
+        goto cleanup;
+    }
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &diagnostic_code, diagnostic_message,
+            sizeof(diagnostic_message)) != FT_SUCCESS || !generated_cobol)
+    {
+        std::printf("relocation dispatch diagnostic: COBOL generation failed (%d: %s)\n",
+            diagnostic_code, diagnostic_message);
+        goto cleanup;
+    }
+    copy_dispatch = std::strstr(generated_cobol,
+        "CBLC-CONSTRUCTOR-CBLC-SPTR-RELOCATE-COPY-STORAGE-2 THRU");
+    exception_transfer = copy_dispatch
+        ? std::strstr(copy_dispatch, "IF CBLC-EX-ACTIVE = 'Y'") : NULL;
+    cleanup_dispatch = exception_transfer
+        ? std::strstr(exception_transfer, "PERFORM CBLC-EX-CLEANUP-") : NULL;
+    if (!copy_dispatch || !exception_transfer || !cleanup_dispatch
+        || std::strstr(generated_cobol,
+            "CBLC-CONSTRUCTOR-CBLC-SPTR-RELOCATE-COPY-STORAGE-1 THRU")
+            != NULL)
+    {
+        std::printf("Assertion failed: throwing relocation move must dispatch to the typed copy constructor\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_move_construct_at_rejects_copy_only_type)
+{
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    const char *source;
+    int status;
+
+    source = "class CopyOnly {\n"
+        "public:\n"
+        "int value;\n"
+        "CopyOnly() { value = 0; }\n"
+        "CopyOnly(CopyOnly source) { value = source.value; }\n"
+        "};\n"
+        "void main() {\n"
+        "CopyOnly source;\n"
+        "CopyOnly *storage;\n"
+        "CopyOnly *source_pointer;\n"
+        "storage = new CopyOnly[1];\n"
+        "source_pointer = &source;\n"
+        "cblc_move_construct_at(storage[0], source_pointer);\n"
+        "delete[] storage;\n"
+        "return;\n"
+        "}\n";
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("move construction rejection diagnostic: parse failed (%s)\n",
+            unit.parse_error_message);
+        goto cleanup;
+    }
+    if (cblc_generate_cobol(&unit, &generated_cobol) == FT_SUCCESS)
+    {
+        std::printf("Assertion failed: explicit move construction must not silently copy a copy-only type\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_transpiler_validation_accepts_string_class_method_usage)
 {
     const char *source;
 
     source = "string greeting(12);\n"
-        "string copy(12);\n"
         "int total;\n"
         "void main()\n"
         "{\n"
-        "    greeting = \"HELLO\";\n"
-        "    copy = greeting;\n"
-        "    total = greeting.len + copy.len;\n"
-        "    display(copy);\n"
+        "    greeting.clear();\n"
+        "    total = greeting.len();\n"
         "    display(total);\n"
         "    return;\n"
         "}\n";
     if (test_expect_success(transpiler_validate_generated_cblc(source),
-            "validator should accept string assignments and length usage")
+            "validator should accept string class methods and length usage")
         != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
 
-FT_TEST(test_transpiler_validation_accepts_int_array_and_string_array_declarations)
+FT_TEST(test_transpiler_validation_accepts_int_array_and_string_class_declarations)
 {
     const char *source;
 
     source = "int numbers[16];\n"
-        "string names[4](12);\n"
+        "string greeting(12);\n"
         "void main()\n"
         "{\n"
         "    return;\n"
         "}\n";
     if (test_expect_success(transpiler_validate_generated_cblc(source),
-            "validator should accept int arrays and string arrays with explicit capacity")
+            "validator should accept int arrays and owning string class instances")
         != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
@@ -375,11 +681,12 @@ FT_TEST(test_transpiler_validation_accepts_string_capacity_parentheses)
 {
     const char *source;
 
-    source = "string greeting(16);\n"
+    source = "int total;\n"
+        "string greeting(16);\n"
         "void main()\n"
         "{\n"
-        "    greeting = \"HI\";\n"
-        "    display(greeting.len);\n"
+        "    total = greeting.len();\n"
+        "    display(total);\n"
         "    return;\n"
         "}\n";
     if (test_expect_success(transpiler_validate_generated_cblc(source),
@@ -411,19 +718,18 @@ FT_TEST(test_transpiler_validation_accepts_indexed_array_usage)
 
     source = "int numbers[3];\n"
         "int total;\n"
-        "string names[2](8);\n"
+        "char names[2];\n"
         "void main()\n"
         "{\n"
         "    numbers[0] = 7;\n"
         "    total = numbers[0];\n"
-        "    names[1] = \"HI\";\n"
+        "    names[1] = 'H';\n"
         "    display(numbers[0]);\n"
         "    display(names[1]);\n"
-        "    display(names[1].len);\n"
         "    return;\n"
         "}\n";
     if (test_expect_success(transpiler_validate_generated_cblc(source),
-            "validator should accept indexed int and string array usage") != FT_SUCCESS)
+            "validator should accept indexed int and raw char array usage") != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
 }
@@ -435,7 +741,7 @@ FT_TEST(test_transpiler_validation_accepts_const_declarations)
 
     source = "const int answer = 42;\n"
         "const char marker = 'A';\n"
-        "const string greeting(12) = \"HELLO\";\n"
+        "const string greeting(\"HELLO\");\n"
         "void main()\n"
         "{\n"
         "    display(answer);\n"
@@ -496,25 +802,6 @@ FT_TEST(test_transpiler_validation_accepts_const_char_buffer_declaration)
         "}\n";
     if (test_expect_success(transpiler_validate_generated_cblc(source),
             "validator should accept const char buffer declarations")
-        != FT_SUCCESS)
-        return (FT_FAILURE);
-    return (FT_SUCCESS);
-}
-
-FT_TEST(test_transpiler_validation_accepts_const_string_length_usage)
-{
-    const char *source;
-
-    source = "const string greeting(12) = \"HELLO\";\n"
-        "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    total = greeting.len;\n"
-        "    display(total);\n"
-        "    return;\n"
-        "}\n";
-    if (test_expect_success(transpiler_validate_generated_cblc(source),
-            "validator should accept reading const string length")
         != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
@@ -682,7 +969,7 @@ FT_TEST(test_cblc_templates_instantiate_struct_fields)
             "one-parameter template should parse and instantiate") != FT_SUCCESS)
         goto cleanup;
     if (unit.template_definition_count != 1 || unit.template_instantiation_count != 1
-        || unit.struct_type_count < 3 || unit.type_ref_count < 2
+        || unit.struct_type_count < 2 || unit.type_ref_count < 2
         || unit.template_instantiations[0].argument_ref_id >= unit.type_ref_count
         || unit.template_instantiations[0].applied_ref_id >= unit.type_ref_count
         || unit.type_refs[unit.template_instantiations[0].applied_ref_id].kind
@@ -717,6 +1004,67 @@ FT_TEST(test_cblc_templates_instantiate_struct_fields)
 cleanup:
     if (generated_cobol)
         cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_template_string_argument_resolves_to_class_field)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    const t_cblc_struct_type *instantiated_type;
+    int status;
+
+    source = "template <typename T>\n"
+        "struct box { T value; };\n"
+        "box<string> item;\n"
+        "void main() { return; }\n";
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "template specialization with standard string class should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (unit.template_instantiation_count != 1
+        || unit.template_instantiations[0].struct_type_index >= unit.struct_type_count)
+    {
+        std::printf("Assertion failed: string class should create one concrete template specialization\n");
+        goto cleanup;
+    }
+    instantiated_type = &unit.struct_types[
+        unit.template_instantiations[0].struct_type_index];
+    if (instantiated_type->field_count != 1
+        || instantiated_type->fields[0].kind != CBLC_DATA_KIND_STRUCT
+        || std::strncmp(instantiated_type->fields[0].struct_type_name, "string",
+            sizeof(instantiated_type->fields[0].struct_type_name)) != 0)
+    {
+        std::printf("Assertion failed: template field should retain the owning string class type\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_string_class_import_ignores_literals)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "void main() { display(\"string\"); return; }\n";
+    status = FT_FAILURE;
+    cblc_translation_unit_init(&unit);
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "source containing only a string literal should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (unit.struct_type_count != 0)
+    {
+        std::printf("Assertion failed: a string literal must not trigger implicit class import\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
     cblc_translation_unit_dispose(&unit);
     return (status);
 }
@@ -1048,16 +1396,17 @@ FT_TEST(test_cblc_template_function_rejects_nontrivial_struct_array_abi)
 
     sources[0] = "template <typename T>\n"
         "void consume(T value) { return; }\n"
-        "string names[3](8);\n"
+        "int value;\n"
         "void main() {\n"
-        "    consume<string[3]>(names);\n"
+        "    consume<string[3]>(value);\n"
         "    return;\n"
         "}\n";
-    sources[1] = "struct Point { string names[2](8); };\n"
+    sources[1] = "struct Point { string name; };\n"
         "template <typename T>\n"
         "void consume(T value) { return; }\n"
+        "int value;\n"
         "void main() {\n"
-        "    consume<Point[2]>(0);\n"
+        "    consume<Point[2]>(value);\n"
         "    return;\n"
         "}\n";
     index = 0;
@@ -1131,54 +1480,26 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_cblc_template_function_string_array_abi)
+FT_TEST(test_cblc_template_function_rejects_capacity_encoded_string_array_type)
 {
     const char *source;
     t_cblc_translation_unit unit;
-    char *generated_cobol;
-    int status;
 
     source = "template <typename T>\n"
-        "void consume(T values) { display(\"CONSUMED\"); return; }\n"
-        "string names[3](8);\n"
+        "void consume(T value) { return; }\n"
         "void main() {\n"
-        "    names[1] = \"one\";\n"
-        "    consume<string(8)[3]>(names);\n"
+        "    consume<string(8)[3]>(value);\n"
         "    return;\n"
         "}\n";
-    generated_cobol = NULL;
-    status = FT_FAILURE;
     cblc_translation_unit_init(&unit);
-    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS
-        || unit.function_instantiation_count != 1
-        || unit.functions[unit.function_instantiations[0].function_index].parameter_count != 1
-        || unit.functions[unit.function_instantiations[0].function_index].parameters[0].kind
-            != TRANSPILE_FUNCTION_PARAMETER_STRING
-        || unit.functions[unit.function_instantiations[0].function_index].parameters[0].length != 8
-        || unit.functions[unit.function_instantiations[0].function_index].parameters[0].array_count != 3)
+    if (cblc_parse_translation_unit(source, &unit) == FT_SUCCESS)
     {
-        std::printf("Assertion failed: string array template function should preserve capacity and shape\n");
-        goto cleanup;
+        std::printf("Assertion failed: capacity-encoded string arrays should not be a source type\n");
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
     }
-    if (cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
-        || !generated_cobol
-        || !ft_strnstr(generated_cobol, "OCCURS 3 TIMES.", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol,
-            "COMPUTE CBLC-TPL-CONSUME-STRING-CAP8-ARR3-VALUES-LEN",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "MOVE NAMES-BUF TO", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "DISPLAY \"CONSUMED\"", std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: string array template function should emit per-element copy ABI (generated=%s)\n",
-            generated_cobol ? generated_cobol : "<null>");
-        goto cleanup;
-    }
-    status = FT_SUCCESS;
-cleanup:
-    if (generated_cobol)
-        cma_free(generated_cobol);
     cblc_translation_unit_dispose(&unit);
-    return (status);
+    return (FT_SUCCESS);
 }
 
 FT_TEST(test_cblc_template_function_struct_array_abi)
@@ -1266,7 +1587,7 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_cblc_template_function_const_string_struct_array_abi)
+FT_TEST(test_cblc_template_function_rejects_const_string_struct_array)
 {
     const char *source;
     t_cblc_translation_unit unit;
@@ -1284,16 +1605,11 @@ FT_TEST(test_cblc_template_function_const_string_struct_array_abi)
     generated_cobol = NULL;
     status = FT_FAILURE;
     cblc_translation_unit_init(&unit);
-    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS
-        || unit.function_instantiation_count != 1
-        || cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
-        || !generated_cobol
-        || !ft_strnstr(generated_cobol, "POINTS-NAME-BUF PIC X(8)", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "MOVE POINTS-NAME-BUF(1) TO", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "DISPLAY \"CONST STRING ARRAY\"", std::strlen(generated_cobol)))
+    if (cblc_parse_translation_unit(source, &unit) == FT_SUCCESS
+        && cblc_generate_cobol(&unit, &generated_cobol) == FT_SUCCESS
+        && generated_cobol)
     {
-        std::printf("Assertion failed: const fixed string struct array should emit value copies (generated=%s)\n",
-            generated_cobol ? generated_cobol : "<null>");
+        std::printf("Assertion failed: arrays containing owning string class fields must not lower as raw fixed buffers\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -1304,7 +1620,7 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_cblc_template_function_mutable_string_struct_array_abi)
+FT_TEST(test_cblc_template_function_rejects_mutable_string_struct_array)
 {
     const char *source;
     t_cblc_translation_unit unit;
@@ -1322,17 +1638,11 @@ FT_TEST(test_cblc_template_function_mutable_string_struct_array_abi)
     generated_cobol = NULL;
     status = FT_FAILURE;
     cblc_translation_unit_init(&unit);
-    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS
-        || unit.function_instantiation_count != 1
-        || cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
-        || !generated_cobol
-        || !std::strstr(generated_cobol, "POINTS-NAME-PTR USAGE POINTER")
-        || !std::strstr(generated_cobol, "ALLOCATE 8 CHARACTERS RETURNING POINTS-NAME-PTR(1)")
-        || !std::strstr(generated_cobol, "FREE CBLC-TPL-CONSUME-POINT-ARR2-VALUES-NAME-PTR(1)")
-        || !std::strstr(generated_cobol, "DISPLAY \"MUTABLE STRING ARRAY\""))
+    if (cblc_parse_translation_unit(source, &unit) == FT_SUCCESS
+        && cblc_generate_cobol(&unit, &generated_cobol) == FT_SUCCESS
+        && generated_cobol)
     {
-        std::printf("Assertion failed: mutable string struct array should emit owned copies and cleanup (generated=%s)\n",
-            generated_cobol ? generated_cobol : "<null>");
+        std::printf("Assertion failed: arrays containing owning string class fields must not lower with the removed buffer ABI\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -1412,9 +1722,8 @@ FT_TEST(test_cblc_template_function_deduces_exact_string_argument)
         "    display(value);\n"
         "    return;\n"
         "}\n"
-        "string message;\n"
         "void main() {\n"
-        "    message = \"hello\";\n"
+        "    string message(\"hello\");\n"
         "    sink(message);\n"
         "    sink<string>(message);\n"
         "    return;\n"
@@ -1422,9 +1731,15 @@ FT_TEST(test_cblc_template_function_deduces_exact_string_argument)
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     status = FT_FAILURE;
-    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "template function should deduce an exact string argument") != FT_SUCCESS)
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("template string deduction diagnostic: code=%d message=%s template=%s arguments=%s\n",
+            unit.parse_error_code, unit.parse_error_message,
+            unit.template_error_name, unit.template_error_arguments);
+        test_expect_success(FT_FAILURE,
+            "template function should deduce an exact string argument");
         goto cleanup;
+    }
     if (unit.function_instantiation_count != 1)
     {
         std::printf("Assertion failed: explicit and deduced string calls should share one instance\n");
@@ -1587,6 +1902,40 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_template_instantiation_limit_combines_class_and_function_instances)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "template <typename T>\n"
+        "struct box { T value; };\n"
+        "template <typename T>\n"
+        "T identity(T value) { return value; }\n"
+        "box<int> first;\n"
+        "int result;\n"
+        "void main() { result = identity<int>(1); return; }\n";
+    cblc_translation_unit_init(&unit);
+    unit.template_max_instantiations = 1;
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) == FT_SUCCESS
+        || unit.parse_error_code != TRANSPILE_ERROR_TEMPLATE_INSTANTIATION_FAILED
+        || std::strcmp(unit.parse_error_message,
+            "template instantiation limit exceeded") != 0
+        || std::strcmp(unit.template_error_name, "identity") != 0
+        || std::strcmp(unit.template_error_arguments, "int") != 0
+        || unit.template_instantiation_count != 1
+        || unit.function_instantiation_count != 0)
+    {
+        std::printf("Assertion failed: template limit should count class and function specializations together\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_template_names_are_bounded_and_deterministic)
 {
     const char *source;
@@ -1723,8 +2072,8 @@ FT_TEST(test_cblc_template_class_constructor_is_concrete)
         "        value = initial;\n"
         "    }\n"
         "};\n"
-        "box<int> item(7);\n"
         "void main() {\n"
+        "    box<int> item(7);\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&unit);
@@ -1752,16 +2101,14 @@ FT_TEST(test_cblc_template_class_constructor_is_concrete)
         std::printf("Assertion failed: template constructor should be concretely substituted\n");
         goto cleanup;
     }
-    /* Constructor metadata is validated above.  Generation of this isolated
-     * template-class fixture depends on the complete module lifecycle. */
-    if (cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS)
-    {
-        status = FT_SUCCESS;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "concrete template constructor should generate COBOL") != FT_SUCCESS)
         goto cleanup;
-    }
     if (!generated_cobol
-        || !ft_strnstr(generated_cobol, "CBLC-TPL-BOX-INT-CTOR-INITIAL", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "CBLC-CONSTRUCTOR-ITEM-0", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "CBLC-CONSTRUCTOR-MAIN-ITEM-0", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "MOVE CBLC-P-", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "TO MAIN-ITEM-CBLC-USER-VALUE.",
+            std::strlen(generated_cobol))
         || ft_strnstr(generated_cobol, "T VALUE", std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: template constructor output should be concrete\n");
@@ -2328,10 +2675,9 @@ FT_TEST(test_cblc_generate_cobol_emits_string_group)
     char *generated_cobol;
     int status;
 
-    source = "string greeting(8);\n"
-        "void main()\n"
+    source = "void main()\n"
         "{\n"
-        "    greeting = \"HELLO\";\n"
+        "    string greeting(\"HELLO\");\n"
         "    display(greeting);\n"
         "    return;\n"
         "}\n";
@@ -2346,27 +2692,27 @@ FT_TEST(test_cblc_generate_cobol_emits_string_group)
         goto cleanup;
     if (!generated_cobol)
         goto cleanup;
-    if (!ft_strnstr(generated_cobol, "01 GREETING.", std::strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "01 MAIN-GREETING.", std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should declare GREETING group\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "05 GREETING-LEN PIC 9(4) COMP VALUE 0.",
+    if (!ft_strnstr(generated_cobol, "05 MAIN-GREETING-STORED-LENGTH PIC S9(9).",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: generated COBOL should declare GREETING length field\n");
+        std::printf("Assertion failed: generated COBOL should declare the string class length field\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "01 GREETING-BUF BASED PIC X(8).",
+    if (!ft_strnstr(generated_cobol, "05 MAIN-GREETING-CBLC-USER-DATA USAGE POINTER",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: generated COBOL should declare GREETING buffer\n");
+        std::printf("Assertion failed: generated COBOL should declare the owning string class pointer\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "DISPLAY GREETING-BUF(1:GREETING-LEN)",
-            std::strlen(generated_cobol)))
+    if (ft_strnstr(generated_cobol, "01 MAIN-GREETING-BUF ", std::strlen(generated_cobol))
+        || ft_strnstr(generated_cobol, "05 MAIN-GREETING-LEN ", std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: generated COBOL should display buffer slice using length\n");
+        std::printf("Assertion failed: the owning string class must not use the removed fixed-buffer layout\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -2385,7 +2731,6 @@ FT_TEST(test_cblc_generate_c_emits_array_declarations)
     int status;
 
     source = "int numbers[16];\n"
-        "string names[4](12);\n"
         "void main()\n"
         "{\n"
         "    return;\n"
@@ -2406,13 +2751,6 @@ FT_TEST(test_cblc_generate_c_emits_array_declarations)
         std::printf("Assertion failed: generated C should emit int array storage\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_c,
-            "static struct { size_t len; char buf[12]; } names[4] = {{0}};",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should emit string array storage\n");
-        goto cleanup;
-    }
     status = FT_SUCCESS;
 cleanup:
     if (generated_c)
@@ -2429,7 +2767,6 @@ FT_TEST(test_cblc_generate_cobol_emits_array_declarations)
     int status;
 
     source = "int numbers[16];\n"
-        "string names[4](12);\n"
         "void main()\n"
         "{\n"
         "    return;\n"
@@ -2451,22 +2788,6 @@ FT_TEST(test_cblc_generate_cobol_emits_array_declarations)
         std::printf("Assertion failed: generated COBOL should emit int array OCCURS storage\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "01 NAMES OCCURS 4 TIMES.",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should emit string array group OCCURS storage\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol, "05 NAMES-CAP PIC 9(4) COMP VALUE 0.",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "05 NAMES-PTR USAGE POINTER VALUE NULL.",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "01 NAMES-BUF BASED PIC X(12).",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should keep string array element capacity\n");
-        goto cleanup;
-    }
     status = FT_SUCCESS;
 cleanup:
     if (generated_cobol)
@@ -2484,15 +2805,11 @@ FT_TEST(test_cblc_generate_c_emits_indexed_array_access)
 
     source = "int numbers[3];\n"
         "int total;\n"
-        "string names[2](8);\n"
         "void main()\n"
         "{\n"
         "    numbers[0] = 7;\n"
         "    total = numbers[0];\n"
-        "    names[1] = \"HI\";\n"
         "    display(numbers[0]);\n"
-        "    display(names[1]);\n"
-        "    display(names[1].len);\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&unit);
@@ -2516,24 +2833,6 @@ FT_TEST(test_cblc_generate_c_emits_indexed_array_access)
         std::printf("Assertion failed: generated C should read from int array element\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_c,
-            "cblc_string_assign_literal(names[1].buf, 8, &names[1].len, \"HI\");",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should assign string array literal to indexed element\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c, "cblc_display_string(names[1].buf, names[1].len);",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should display indexed string element\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c, "cblc_display_size(names[1].len);", std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should display indexed string length\n");
-        goto cleanup;
-    }
     status = FT_SUCCESS;
 cleanup:
     if (generated_c)
@@ -2551,15 +2850,11 @@ FT_TEST(test_cblc_generate_cobol_emits_indexed_array_access)
 
     source = "int numbers[3];\n"
         "int total;\n"
-        "string names[2](8);\n"
         "void main()\n"
         "{\n"
         "    numbers[0] = 7;\n"
         "    total = numbers[0];\n"
-        "    names[1] = \"HI\";\n"
         "    display(numbers[0]);\n"
-        "    display(names[1]);\n"
-        "    display(names[1].len);\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&unit);
@@ -2583,25 +2878,6 @@ FT_TEST(test_cblc_generate_cobol_emits_indexed_array_access)
         std::printf("Assertion failed: generated COBOL should read from int array element\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "SET ADDRESS OF NAMES-BUF TO NAMES-PTR(2)",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "MOVE \"HI\" TO NAMES-BUF.",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should assign indexed string buffer\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol, "DISPLAY NAMES-BUF(1:NAMES-LEN(2)).",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should display indexed string element\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol, "DISPLAY NAMES-LEN(2).", std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should display indexed string length\n");
-        goto cleanup;
-    }
     status = FT_SUCCESS;
 cleanup:
     if (generated_cobol)
@@ -2620,15 +2896,11 @@ FT_TEST(test_cblc_generate_c_emits_variable_index_array_access)
     source = "int numbers[3];\n"
         "int total;\n"
         "int index;\n"
-        "string names[2](8);\n"
         "void main()\n"
         "{\n"
         "    index = 1;\n"
         "    total = numbers[index];\n"
-        "    names[index] = \"HI\";\n"
         "    display(numbers[index]);\n"
-        "    display(names[index]);\n"
-        "    display(names[index].len);\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&unit);
@@ -2645,24 +2917,6 @@ FT_TEST(test_cblc_generate_c_emits_variable_index_array_access)
     if (!ft_strnstr(generated_c, "total = numbers[index];", std::strlen(generated_c)))
     {
         std::printf("Assertion failed: generated C should read int array with variable index\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c,
-            "cblc_string_assign_literal(names[index].buf, 8, &names[index].len, \"HI\");",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should assign indexed string array with variable index\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c, "cblc_display_string(names[index].buf, names[index].len);",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should display indexed string array with variable index\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c, "cblc_display_size(names[index].len);", std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should display indexed string length with variable index\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -2683,15 +2937,11 @@ FT_TEST(test_cblc_generate_cobol_emits_variable_index_array_access)
     source = "int numbers[3];\n"
         "int total;\n"
         "int index;\n"
-        "string names[2](8);\n"
         "void main()\n"
         "{\n"
         "    index = 1;\n"
         "    total = numbers[index];\n"
-        "    names[index] = \"HI\";\n"
         "    display(numbers[index]);\n"
-        "    display(names[index]);\n"
-        "    display(names[index].len);\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&unit);
@@ -2709,26 +2959,6 @@ FT_TEST(test_cblc_generate_cobol_emits_variable_index_array_access)
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should read int array with variable index\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol, "SET ADDRESS OF NAMES-BUF TO NAMES-PTR(INDEX + 1)",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "MOVE \"HI\" TO NAMES-BUF.",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should assign string array with variable index\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol, "DISPLAY NAMES-BUF(1:NAMES-LEN(INDEX + 1)).",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should display string array with variable index\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol, "DISPLAY NAMES-LEN(INDEX + 1).",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should display string length with variable index\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -3300,7 +3530,8 @@ FT_TEST(test_cblc_generate_cobol_emits_parameter_slot_assignments_for_local_call
         std::printf("Assertion failed: generated COBOL should assign argument into parameter storage before PERFORM\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "PERFORM ADD-ONE.", std::strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "PERFORM ADD-ONE THRU CBLC-FRETURN-",
+            std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should perform local helper after assigning parameters\n");
         goto cleanup;
@@ -3352,7 +3583,8 @@ FT_TEST(test_cblc_generate_cobol_emits_struct_returning_function_and_call_assign
         std::printf("Assertion failed: generated COBOL should emit a grouped return slot for struct-returning functions\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "PERFORM MAKE-POINT.", std::strlen(generated_cobol)))
+    if (!ft_strnstr(generated_cobol, "PERFORM MAKE-POINT THRU CBLC-FRETURN-",
+            std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should perform the struct-returning helper\n");
         goto cleanup;
@@ -3374,6 +3606,8 @@ FT_TEST(test_cblc_parse_translation_unit_records_struct_returning_method)
 {
     const char *source;
     t_cblc_translation_unit unit;
+    const t_cblc_struct_type *builder_type;
+    size_t type_index;
     int status;
 
     source = "struct Point\n"
@@ -3402,15 +3636,31 @@ FT_TEST(test_cblc_parse_translation_unit_records_struct_returning_method)
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "struct-returning method sample should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_types[2].method_count, 1,
+    builder_type = NULL;
+    type_index = 0;
+    while (type_index < unit.struct_type_count)
+    {
+        if (std::strcmp(unit.struct_types[type_index].source_name, "Builder") == 0)
+        {
+            builder_type = &unit.struct_types[type_index];
+            break;
+        }
+        type_index += 1;
+    }
+    if (!builder_type)
+    {
+        std::printf("Assertion failed: Builder type should be present in the canonical type table\n");
+        goto cleanup;
+    }
+    if (test_expect_size_t_equal(builder_type->method_count, 1,
             "class should record one struct-returning method") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_int_equal(unit.struct_types[2].methods[0].return_kind,
+    if (test_expect_int_equal(builder_type->methods[0].return_kind,
             CBLC_FUNCTION_RETURN_STRUCT,
             "method should record a struct return kind") != FT_SUCCESS)
         goto cleanup;
-    if (std::strncmp(unit.struct_types[2].methods[0].return_type_name, "Point",
-            sizeof(unit.struct_types[2].methods[0].return_type_name)) != 0)
+    if (std::strncmp(builder_type->methods[0].return_type_name, "Point",
+            sizeof(builder_type->methods[0].return_type_name)) != 0)
     {
         std::printf("Assertion failed: method should record the struct return type name\n");
         goto cleanup;
@@ -3968,71 +4218,231 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_cblc_generate_cobol_handles_string_assignments_and_length_computations)
+FT_TEST(test_cblc_generate_cobol_handles_string_class_construction_and_methods)
 {
     const char *source;
     t_cblc_translation_unit unit;
     char *generated_cobol;
+    char diagnostic_message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    int diagnostic_code;
     int status;
 
-    source = "string greeting(8);\n"
-        "string target(8);\n"
-        "int total;\n"
-        "void main()\n"
+    source = "void main()\n"
         "{\n"
-        "    greeting = \"HELLO\";\n"
-        "    target = greeting;\n"
-        "    total = greeting.len + target.len;\n"
-        "    display(target);\n"
+        "    string greeting(\"HELLO\");\n"
+        "    string target(greeting);\n"
+        "    int total;\n"
+        "    greeting.append(target);\n"
+        "    total = greeting.len();\n"
         "    display(total);\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
+    diagnostic_message[0] = '\0';
+    diagnostic_code = 0;
     status = FT_FAILURE;
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "string programs should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
-            "string programs should convert to COBOL") != FT_SUCCESS)
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &diagnostic_code, diagnostic_message, sizeof(diagnostic_message))
+        != FT_SUCCESS)
+    {
+        std::printf("String COBOL generation diagnostic (%d): %s\n",
+            diagnostic_code, diagnostic_message);
+        test_expect_success(FT_FAILURE, "string programs should convert to COBOL");
         goto cleanup;
+    }
     if (!generated_cobol)
         goto cleanup;
-    if (!ft_strnstr(generated_cobol, "MOVE \"HELLO\" TO GREETING-BUF",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: literal assignment should target GREETING-BUF\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol, "MOVE 5 TO GREETING-LEN",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: literal assignment should update GREETING-LEN\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol, "MOVE GREETING TO TARGET",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: string to string assignment should move groups\n");
-        goto cleanup;
-    }
     if (!ft_strnstr(generated_cobol,
-            "COMPUTE TOTAL = GREETING-LEN + TARGET-LEN",
+            "PERFORM CBLC-DESTRUCTOR-CBLC-USER-STRING-APPEND-SOURCE.",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: length expressions should translate into COMPUTE\n");
+        std::printf("Assertion failed: generated method code should destroy its by-value string parameter\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "DISPLAY TARGET-BUF(1:TARGET-LEN)",
+    if (!ft_strnstr(generated_cobol, "GREETING-CBLC-USER-DATA",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: DISPLAY of string should use buffer slice\n");
+        std::printf("Assertion failed: generated code should use the owning string class layout\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "DISPLAY TOTAL",
+    if (!ft_strnstr(generated_cobol, "TARGET-CBLC-USER-DATA",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: DISPLAY of int should emit standard form\n");
+        std::printf("Assertion failed: copy construction should use a second class instance\n");
+        goto cleanup;
+    }
+    if (ft_strnstr(generated_cobol, "01 GREETING-BUF ", std::strlen(generated_cobol))
+        || ft_strnstr(generated_cobol, "01 TARGET-BUF ", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: string class objects must not use the old fixed-buffer layout\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_method_parameters_destroy_in_reverse_declaration_order)
+{
+    const char *source =
+        "class Item { private: int value; public: Item() { value = 0; } "
+        "~Item() { value = 0; } };\n"
+        "class Receiver { public: void consume(Item first, Item second) { "
+        "return; } };\n"
+        "void main() { Receiver receiver; Item first; Item second; "
+        "receiver.consume(first, second); return; }\n";
+    t_cblc_translation_unit unit;
+    char *generated_cobol = NULL;
+    const t_cblc_method *consume = NULL;
+    char first_cleanup[TRANSPILE_IDENTIFIER_MAX + 32];
+    char second_cleanup[TRANSPILE_IDENTIFIER_MAX + 32];
+    const char *first_call;
+    const char *second_call;
+    size_t type_index;
+    int status = FT_FAILURE;
+
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("By-value method parameter cleanup fixture did not parse: %s\n",
+            unit.parse_error_message);
+        goto cleanup;
+    }
+    for (type_index = 0; type_index < unit.struct_type_count; ++type_index)
+        if (std::strcmp(unit.struct_types[type_index].source_name, "Receiver") == 0)
+        {
+            size_t method_index;
+            for (method_index = 0;
+                method_index < unit.struct_types[type_index].method_count;
+                ++method_index)
+                if (std::strcmp(unit.struct_types[type_index].methods[method_index]
+                        .source_name, "consume") == 0)
+                    consume = &unit.struct_types[type_index].methods[method_index];
+        }
+    if (!consume || consume->parameter_count != 2
+        || std::snprintf(first_cleanup, sizeof(first_cleanup),
+            "PERFORM CBLC-DESTRUCTOR-%s.", consume->parameters[0].cobol_name) < 0
+        || std::snprintf(second_cleanup, sizeof(second_cleanup),
+            "PERFORM CBLC-DESTRUCTOR-%s.", consume->parameters[1].cobol_name) < 0)
+    {
+        std::printf("By-value method parameter metadata is incomplete\n");
+        goto cleanup;
+    }
+    if (cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
+        || !generated_cobol)
+    {
+        std::printf("By-value method parameters should lower to COBOL\n");
+        goto cleanup;
+    }
+    first_call = std::strstr(generated_cobol, first_cleanup);
+    second_call = std::strstr(generated_cobol, second_cleanup);
+    if (!first_call || !second_call || second_call >= first_call)
+    {
+        std::printf("Method parameters must be destroyed in reverse declaration order (first=%s second=%s)\n",
+            first_call ? "present" : "missing",
+            second_call ? "present" : "missing");
+        if (generated_cobol)
+        {
+            const char *cursor = generated_cobol;
+            while ((cursor = std::strstr(cursor, "PERFORM CBLC-DESTRUCTOR-")) != NULL)
+            {
+                const char *line_end = std::strchr(cursor, '\n');
+                const size_t line_length = line_end
+                    ? static_cast<size_t>(line_end - cursor)
+                    : std::strlen(cursor);
+                std::printf("  emitted: %.*s\n", static_cast<int>(line_length), cursor);
+                cursor += line_length;
+            }
+        }
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_method_throw_cleans_by_value_parameters)
+{
+    const char *source =
+        "class Item { private: int value; public: Item() { value = 0; } "
+        "~Item() { value = 0; } };\n"
+        "class Receiver { public: void fail(Item first, Item second) { "
+        "throw 7; } };\n"
+        "void main() { Receiver receiver; Item first; Item second; "
+        "receiver.fail(first, second); return; }\n";
+    t_cblc_translation_unit unit;
+    char *generated_cobol = NULL;
+    const t_cblc_method *method = NULL;
+    const t_cblc_statement *throw_statement = NULL;
+    char second_cleanup[TRANSPILE_IDENTIFIER_MAX + 32];
+    char first_cleanup[TRANSPILE_IDENTIFIER_MAX + 32];
+    const char *cleanup_start;
+    const char *second_call;
+    const char *first_call;
+    size_t type_index;
+    int status = FT_FAILURE;
+
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("Throwing method parameter fixture did not parse: %s\n",
+            unit.parse_error_message);
+        goto cleanup;
+    }
+    for (type_index = 0; type_index < unit.struct_type_count; ++type_index)
+        if (std::strcmp(unit.struct_types[type_index].source_name, "Receiver") == 0)
+        {
+            size_t method_index;
+            for (method_index = 0;
+                method_index < unit.struct_types[type_index].method_count;
+                ++method_index)
+                if (std::strcmp(unit.struct_types[type_index].methods[method_index]
+                        .source_name, "fail") == 0)
+                    method = &unit.struct_types[type_index].methods[method_index];
+        }
+    if (!method || method->parameter_count != 2)
+    {
+        std::printf("Throwing method parameter metadata is incomplete\n");
+        goto cleanup;
+    }
+    for (type_index = 0; type_index < method->statement_count; ++type_index)
+        if (method->statements[type_index].type == CBLC_STATEMENT_THROW)
+            throw_statement = &method->statements[type_index];
+    if (!throw_statement || throw_statement->exception_cleanup_count != 2
+        || std::strcmp(throw_statement->exception_cleanup_targets[0],
+            method->parameters[1].cobol_name) != 0
+        || std::strcmp(throw_statement->exception_cleanup_targets[1],
+            method->parameters[0].cobol_name) != 0
+        || std::snprintf(second_cleanup, sizeof(second_cleanup),
+            "PERFORM CBLC-DESTRUCTOR-%s.", method->parameters[1].cobol_name) < 0
+        || std::snprintf(first_cleanup, sizeof(first_cleanup),
+            "PERFORM CBLC-DESTRUCTOR-%s.", method->parameters[0].cobol_name) < 0)
+    {
+        std::printf("Throw must capture parameter cleanup in reverse declaration order\n");
+        goto cleanup;
+    }
+    if (cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
+        || !generated_cobol)
+    {
+        std::printf("Throwing method parameters should lower to COBOL\n");
+        goto cleanup;
+    }
+    cleanup_start = std::strstr(generated_cobol, "CBLC-EX-CLEANING.");
+    second_call = cleanup_start ? std::strstr(cleanup_start, second_cleanup) : NULL;
+    first_call = cleanup_start ? std::strstr(cleanup_start, first_cleanup) : NULL;
+    if (!second_call || !first_call || second_call >= first_call)
+    {
+        std::printf("Generated throw cleanup must destroy method parameters in reverse order\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -4117,6 +4527,158 @@ cleanup:
         cma_free(generated_cobol);
     cblc_translation_unit_dispose(&unit);
     return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_reports_unresolved_local_call)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    char diagnostic_message[256];
+    int diagnostic_code;
+    int status;
+
+    source = "void main() { missing(); return; }\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    diagnostic_code = 0;
+    diagnostic_message[0] = '\0';
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "unresolved local call sample should parse before lowering") != FT_SUCCESS)
+        goto cleanup;
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &diagnostic_code, diagnostic_message, sizeof(diagnostic_message))
+            != FT_FAILURE
+        || diagnostic_code != TRANSPILE_ERROR_FUNCTION_UNRESOLVED
+        || std::strcmp(diagnostic_message,
+            "unresolved call 'missing' in function 'main' at line 1") != 0)
+    {
+        std::printf("Assertion failed: unresolved local call should report its symbol, function, and source line; code=%d message='%s'\n",
+            diagnostic_code, diagnostic_message);
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_vector_string_template_specialization_emits)
+{
+    const char *errors_source;
+    const char *string_source;
+    const char *vector_source;
+    const char *program_source;
+    std::string combined_source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    char diagnostic_message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    int diagnostic_code;
+    int status;
+
+    errors_source = transpiler_standard_library_get_native_source("CBLC-ERRORS");
+    string_source = transpiler_standard_library_get_native_source("CBLC-STRING");
+    vector_source = transpiler_standard_library_get_native_source("CBLC-VECTOR");
+    program_source = "void main() {\n"
+        "vector<string> words;\n"
+        "string *borrowed;\n"
+        "int length;\n"
+        "words.emplace_back(); borrowed = words.at(0); "
+        "length = borrowed->len(); return; }\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    diagnostic_code = 0;
+    diagnostic_message[0] = '\0';
+    status = FT_FAILURE;
+    if (!errors_source || !string_source || !vector_source)
+    {
+        std::printf("Assertion failed: embedded errors, string, and vector sources should be available\n");
+        goto cleanup;
+    }
+    combined_source = std::string(errors_source) + "\n" + string_source + "\n"
+        + vector_source + "\n" + program_source;
+    if (test_expect_success(cblc_parse_translation_unit(combined_source.c_str(), &unit),
+            "canonical string and vector source should parse together") != FT_SUCCESS)
+    {
+        std::printf("vector<string> parse diagnostic: %s\n", unit.parse_error_message);
+        goto cleanup;
+    }
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &diagnostic_code, diagnostic_message, sizeof(diagnostic_message)) != FT_SUCCESS)
+    {
+        std::printf("vector<string> generation diagnostic (%d): %s\n",
+            diagnostic_code, diagnostic_message);
+        goto cleanup;
+    }
+    if (!generated_cobol
+        || !std::strstr(generated_cobol,
+            "VECTOR-STRING-EMPLACE-BACK-OVL1-RELOCATION-INDEX")
+        || !std::strstr(generated_cobol,
+            "COMPUTE MAIN-WORDS-COUNT = MAIN-WORDS-COUNT + 1")
+        || !std::strstr(generated_cobol, "STORED-LENGTH")
+        || !std::strstr(generated_cobol, "STORAGE-CAPACITY"))
+    {
+        std::printf("Assertion failed: vector<string> inline specialization should update the vector count and emit concrete string lifecycle storage (relocation=%d count-update=%d string=%d)\n",
+            generated_cobol && std::strstr(generated_cobol,
+                "VECTOR-STRING-EMPLACE-BACK-OVL1-RELOCATION-INDEX") != NULL,
+            generated_cobol && std::strstr(generated_cobol,
+                "COMPUTE MAIN-WORDS-COUNT = MAIN-WORDS-COUNT + 1") != NULL,
+            generated_cobol && std::strstr(generated_cobol,
+                "STORED-LENGTH") != NULL);
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_reports_typed_ir_verification_failure)
+{
+    const char *source = "void main() { if (1) { } return; }\n";
+    t_cblc_translation_unit unit;
+    char *generated_cobol = NULL;
+    char diagnostic_message[512];
+    int diagnostic_code = 0;
+    int status = FT_FAILURE;
+    bool corrupted_if_end = false;
+
+    cblc_translation_unit_init(&unit);
+    diagnostic_message[0] = '\0';
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS
+        || unit.function_count == 0)
+        goto cleanup;
+    for (size_t index = 0; index < unit.functions[0].statement_count; ++index)
+        if (unit.functions[0].statements[index].type == CBLC_STATEMENT_IF_END)
+        {
+            /* Simulate an invalid parser/backend handoff; do not alter source text. */
+            unit.functions[0].statements[index].type = CBLC_STATEMENT_WHILE_END;
+            corrupted_if_end = true;
+            break;
+        }
+    if (!corrupted_if_end
+        || cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &diagnostic_code, diagnostic_message, sizeof(diagnostic_message))
+            != FT_FAILURE
+        || diagnostic_code != TRANSPILE_ERROR_BACKEND_IR_VERIFICATION
+        || std::strstr(diagnostic_message, "typed IR verification failed") == NULL
+        || std::strstr(diagnostic_message, "main") == NULL)
+    {
+        std::printf("Assertion failed: typed IR rejection should return a stable code and verifier message; code=%d message='%s'\n",
+            diagnostic_code, diagnostic_message);
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return status;
 }
 
 FT_TEST(test_cblc_parse_translation_unit_accepts_external_return_assignment)
@@ -4241,53 +4803,81 @@ FT_TEST(test_cblc_parse_translation_unit_accepts_struct_fields)
 {
     const char *source;
     t_cblc_translation_unit unit;
+    size_t point_type_index;
+    size_t string_type_index;
+    size_t point_index;
+    size_t x_index;
+    size_t name_index;
+    size_t item_index;
     int status;
 
     source = "struct Point\n"
         "{\n"
         "    int x;\n"
-        "    string name(8);\n"
+        "    string name;\n"
         "};\n"
         "Point point;\n"
         "void main()\n"
         "{\n"
         "    point.x = 7;\n"
-        "    point.name = \"HI\";\n"
         "    display(point.x);\n"
-        "    display(point.name);\n"
-        "    display(point.name.len);\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&unit);
     status = FT_FAILURE;
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "struct program should parse") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_type_count, 2,
-            "builtin string plus one user struct type should be recorded") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_size_t_equal(unit.data_count, 3,
-            "struct instance should register parent plus field items") != FT_SUCCESS)
-        goto cleanup;
-    if (std::strncmp(unit.data_items[0].source_name, "point",
-            sizeof(unit.data_items[0].source_name)) != 0
-        || unit.data_items[0].kind != CBLC_DATA_KIND_STRUCT)
     {
-        std::printf("Assertion failed: first data item should be the struct instance\n");
+        std::printf("struct parse diagnostic: %d %s\n", unit.parse_error_code,
+            unit.parse_error_message);
         goto cleanup;
     }
-    if (std::strncmp(unit.data_items[1].source_name, "point.x",
-            sizeof(unit.data_items[1].source_name)) != 0
-        || unit.data_items[1].kind != CBLC_DATA_KIND_INT)
+    point_type_index = static_cast<size_t>(-1);
+    string_type_index = static_cast<size_t>(-1);
+    for (size_t type_index = 0; type_index < unit.struct_type_count; ++type_index)
+    {
+        if (std::strcmp(unit.struct_types[type_index].source_name, "Point") == 0)
+            point_type_index = type_index;
+        else if (std::strcmp(unit.struct_types[type_index].source_name, "string") == 0)
+            string_type_index = type_index;
+    }
+    if (point_type_index == static_cast<size_t>(-1)
+        || string_type_index == static_cast<size_t>(-1))
+    {
+        std::printf("Assertion failed: canonical string class and user Point type should both be registered\n");
+        goto cleanup;
+    }
+    point_index = static_cast<size_t>(-1);
+    x_index = static_cast<size_t>(-1);
+    name_index = static_cast<size_t>(-1);
+    item_index = 0;
+    while (item_index < unit.data_count)
+    {
+        if (std::strcmp(unit.data_items[item_index].source_name, "point") == 0)
+            point_index = item_index;
+        else if (std::strcmp(unit.data_items[item_index].source_name, "point.x") == 0)
+            x_index = item_index;
+        else if (std::strcmp(unit.data_items[item_index].source_name, "point.name") == 0)
+            name_index = item_index;
+        item_index += 1;
+    }
+    if (point_index == static_cast<size_t>(-1)
+        || unit.data_items[point_index].kind != CBLC_DATA_KIND_STRUCT)
+    {
+        std::printf("Assertion failed: struct instance should be registered as data item\n");
+        goto cleanup;
+    }
+    if (x_index == static_cast<size_t>(-1)
+        || unit.data_items[x_index].kind != CBLC_DATA_KIND_INT)
     {
         std::printf("Assertion failed: struct int field should be registered as data item\n");
         goto cleanup;
     }
-    if (std::strncmp(unit.data_items[2].source_name, "point.name",
-            sizeof(unit.data_items[2].source_name)) != 0
-        || unit.data_items[2].kind != CBLC_DATA_KIND_STRING)
+    if (name_index == static_cast<size_t>(-1)
+        || unit.data_items[name_index].kind != CBLC_DATA_KIND_STRUCT
+        || std::strcmp(unit.data_items[name_index].struct_type_name, "string") != 0)
     {
-        std::printf("Assertion failed: struct string field should be registered as data item\n");
+        std::printf("Assertion failed: struct string field should be a string class instance\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -4302,27 +4892,31 @@ FT_TEST(test_cblc_generate_cobol_emits_struct_groups)
     t_cblc_translation_unit unit;
     char *generated_cobol;
     int status;
+    int parse_status;
 
     source = "struct Point\n"
         "{\n"
         "    int x;\n"
-        "    string name(8);\n"
+        "    string name;\n"
         "};\n"
         "Point point;\n"
         "void main()\n"
         "{\n"
         "    point.x = 7;\n"
-        "    point.name = \"HI\";\n"
-        "    display(point.name);\n"
-        "    display(point.name.len);\n"
+        "    display(point.x);\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     status = FT_FAILURE;
-    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+    parse_status = cblc_parse_translation_unit(source, &unit);
+    if (test_expect_success(parse_status,
             "struct COBOL sample should parse") != FT_SUCCESS)
+    {
+        std::printf("struct COBOL parse diagnostic: %d %s\n",
+            unit.parse_error_code, unit.parse_error_message);
         goto cleanup;
+    }
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
             "struct COBOL sample should generate") != FT_SUCCESS)
         goto cleanup;
@@ -4343,10 +4937,21 @@ FT_TEST(test_cblc_generate_cobol_emits_struct_groups)
         std::printf("Assertion failed: generated COBOL should emit string struct field group\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "10 POINT-NAME-LEN PIC 9(4) COMP VALUE 0.",
+    if (!ft_strnstr(generated_cobol,
+            "10 POINT-NAME-CBLC-USER-DATA USAGE POINTER VALUE NULL.",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: generated COBOL should emit struct string length field\n");
+        std::printf("Assertion failed: generated COBOL should emit the owning string data pointer\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol,
+            "10 POINT-NAME-STORED-LENGTH PIC S9(9).",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol,
+            "10 POINT-NAME-STORAGE-CAPACITY PIC S9(9).",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: generated COBOL should emit the owning string length and capacity fields\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_cobol, "COMPUTE POINT-X = 7.", std::strlen(generated_cobol)))
@@ -4354,15 +4959,9 @@ FT_TEST(test_cblc_generate_cobol_emits_struct_groups)
         std::printf("Assertion failed: generated COBOL should assign to struct int field\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "DISPLAY POINT-NAME-BUF(1:POINT-NAME-LEN)",
-            std::strlen(generated_cobol)))
+    if (ft_strnstr(generated_cobol, "POINT-NAME-BUF", std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: generated COBOL should display struct string field via slice\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_cobol, "DISPLAY POINT-NAME-LEN", std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should display struct string length\n");
+        std::printf("Assertion failed: owning string fields must not retain the removed inline-buffer layout\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -4380,7 +4979,7 @@ FT_TEST(test_cblc_generate_c_emits_main_and_helpers)
     char *generated_c;
     int status;
 
-    source = "string greeting(8);\n"
+    source = "char greeting[8];\n"
         "int counter;\n"
         "void helper()\n"
         "{\n"
@@ -4411,12 +5010,7 @@ FT_TEST(test_cblc_generate_c_emits_main_and_helpers)
         std::printf("Assertion failed: generated C should include stddef header\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_c, "static size_t greeting_len = 0;", std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should declare greeting length variable\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c, "static char greeting_buf[8] = {0};", std::strlen(generated_c)))
+    if (!ft_strnstr(generated_c, "static char greeting[8] = {0};", std::strlen(generated_c)))
     {
         std::printf("Assertion failed: generated C should declare greeting buffer\n");
         goto cleanup;
@@ -4431,16 +5025,16 @@ FT_TEST(test_cblc_generate_c_emits_main_and_helpers)
         std::printf("Assertion failed: generated C should define an int main wrapper\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_c, "cblc_string_assign_literal(greeting_buf, 8, &greeting_len, \"HELLO\");",
+    if (!ft_strnstr(generated_c, "cblc_char_assign_literal(greeting, 8, \"HELLO\");",
             std::strlen(generated_c)))
     {
-        std::printf("Assertion failed: generated C should assign greeting literal via helper\n");
+        std::printf("Assertion failed: generated C should assign a literal to the fixed char array\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_c, "cblc_display_string(greeting_buf, greeting_len);",
+    if (!ft_strnstr(generated_c, "cblc_display_char_buffer(greeting, 8);",
             std::strlen(generated_c)))
     {
-        std::printf("Assertion failed: generated C should display greeting using helper\n");
+        std::printf("Assertion failed: generated C should display the fixed char array\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -4506,15 +5100,13 @@ FT_TEST(test_cblc_generate_c_emits_struct_types_and_field_access)
     source = "struct Point\n"
         "{\n"
         "    int x;\n"
-        "    string name(8);\n"
+        "    int name;\n"
         "};\n"
         "Point point;\n"
         "void main()\n"
         "{\n"
         "    point.x = 7;\n"
-        "    point.name = \"HELLO\";\n"
         "    display(point.name);\n"
-        "    display(point.name.len);\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&unit);
@@ -4533,10 +5125,9 @@ FT_TEST(test_cblc_generate_c_emits_struct_types_and_field_access)
         std::printf("Assertion failed: generated C should emit struct typedef\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_c, "struct { size_t len; char buf[8]; } name;",
-            std::strlen(generated_c)))
+    if (!ft_strnstr(generated_c, "int name;", std::strlen(generated_c)))
     {
-        std::printf("Assertion failed: generated C should emit nested string storage in struct\n");
+        std::printf("Assertion failed: generated C should emit scalar storage in struct\n");
         goto cleanup;
     }
     if (!ft_strnstr(generated_c, "static t_Point point = {0};", std::strlen(generated_c)))
@@ -4549,21 +5140,9 @@ FT_TEST(test_cblc_generate_c_emits_struct_types_and_field_access)
         std::printf("Assertion failed: generated C should assign to struct int field\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_c, "cblc_string_assign_literal(point.name.buf, 8, &point.name.len, \"HELLO\");",
-            std::strlen(generated_c)))
+    if (!ft_strnstr(generated_c, "int name;", std::strlen(generated_c)))
     {
-        std::printf("Assertion failed: generated C should assign struct string field via helper\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c, "cblc_display_string(point.name.buf, point.name.len);",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should display struct string field via helper\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c, "cblc_display_size(point.name.len);", std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should display struct string length\n");
+        std::printf("Assertion failed: generated C should emit scalar storage for the field\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -4578,11 +5157,14 @@ FT_TEST(test_cblc_parse_translation_unit_accepts_nested_struct_fields)
 {
     const char *source;
     t_cblc_translation_unit unit;
+    size_t address_index;
+    size_t city_index;
+    size_t item_index;
     int status;
 
     source = "struct Address\n"
         "{\n"
-        "    string city(16);\n"
+        "    string city;\n"
         "};\n"
         "struct Person\n"
         "{\n"
@@ -4592,35 +5174,45 @@ FT_TEST(test_cblc_parse_translation_unit_accepts_nested_struct_fields)
         "Person person;\n"
         "void main()\n"
         "{\n"
-        "    person.address.city = \"GHENT\";\n"
         "    person.age = 7;\n"
-        "    display(person.address.city);\n"
-        "    display(person.address.city.len);\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&unit);
     status = FT_FAILURE;
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "nested struct program should parse") != FT_SUCCESS)
+    {
+        std::printf("nested struct diagnostic: %d %s\n", unit.parse_error_code,
+            unit.parse_error_message);
         goto cleanup;
-    if (test_expect_size_t_equal(unit.struct_type_count, 3,
-            "builtin string plus two user struct types should be recorded") != FT_SUCCESS)
+    }
+    if (test_expect_size_t_equal(unit.struct_type_count, 12,
+            "standard error and string classes plus two user struct types should be recorded") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_size_t_equal(unit.data_count, 4,
-            "nested struct instance should register aggregate path items recursively") != FT_SUCCESS)
-        goto cleanup;
-    if (std::strncmp(unit.data_items[1].source_name, "person.address",
-            sizeof(unit.data_items[1].source_name)) != 0
-        || unit.data_items[1].kind != CBLC_DATA_KIND_STRUCT)
+    address_index = static_cast<size_t>(-1);
+    city_index = static_cast<size_t>(-1);
+    item_index = 0;
+    while (item_index < unit.data_count)
+    {
+        if (std::strcmp(unit.data_items[item_index].source_name,
+                "person.address") == 0)
+            address_index = item_index;
+        else if (std::strcmp(unit.data_items[item_index].source_name,
+                "person.address.city") == 0)
+            city_index = item_index;
+        item_index += 1;
+    }
+    if (address_index == static_cast<size_t>(-1)
+        || unit.data_items[address_index].kind != CBLC_DATA_KIND_STRUCT)
     {
         std::printf("Assertion failed: nested struct field should be registered as aggregate data item\n");
         goto cleanup;
     }
-    if (std::strncmp(unit.data_items[2].source_name, "person.address.city",
-            sizeof(unit.data_items[2].source_name)) != 0
-        || unit.data_items[2].kind != CBLC_DATA_KIND_STRING)
+    if (city_index == static_cast<size_t>(-1)
+        || unit.data_items[city_index].kind != CBLC_DATA_KIND_STRUCT
+        || std::strcmp(unit.data_items[city_index].struct_type_name, "string") != 0)
     {
-        std::printf("Assertion failed: nested primitive field should be registered recursively\n");
+        std::printf("Assertion failed: nested string member should resolve to the owning string class\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -4638,7 +5230,7 @@ FT_TEST(test_cblc_generate_cobol_emits_nested_struct_groups)
 
     source = "struct Address\n"
         "{\n"
-        "    string city(16);\n"
+        "    string city;\n"
         "};\n"
         "struct Person\n"
         "{\n"
@@ -4648,9 +5240,6 @@ FT_TEST(test_cblc_generate_cobol_emits_nested_struct_groups)
         "Person person;\n"
         "void main()\n"
         "{\n"
-        "    person.address.city = \"GHENT\";\n"
-        "    display(person.address.city);\n"
-        "    display(person.address.city.len);\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&unit);
@@ -4674,16 +5263,16 @@ FT_TEST(test_cblc_generate_cobol_emits_nested_struct_groups)
         std::printf("Assertion failed: generated COBOL should emit nested string group\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "15 PERSON-ADDRESS-CITY-LEN PIC 9(4) COMP VALUE 0.",
+    if (!ft_strnstr(generated_cobol, "STORED-LENGTH",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: generated COBOL should emit nested string length field\n");
+        std::printf("Assertion failed: generated COBOL should emit nested owning-string length storage\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_cobol, "DISPLAY PERSON-ADDRESS-CITY-BUF(1:PERSON-ADDRESS-CITY-LEN)",
+    if (!ft_strnstr(generated_cobol, "STORAGE-CAPACITY",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: generated COBOL should display nested string field via slice\n");
+        std::printf("Assertion failed: generated COBOL should emit nested owning-string capacity storage\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -4703,7 +5292,7 @@ FT_TEST(test_cblc_generate_c_emits_nested_struct_types_and_field_access)
 
     source = "struct Address\n"
         "{\n"
-        "    string city(16);\n"
+        "    int city;\n"
         "};\n"
         "struct Person\n"
         "{\n"
@@ -4713,9 +5302,6 @@ FT_TEST(test_cblc_generate_c_emits_nested_struct_types_and_field_access)
         "Person person;\n"
         "void main()\n"
         "{\n"
-        "    person.address.city = \"GHENT\";\n"
-        "    display(person.address.city);\n"
-        "    display(person.address.city.len);\n"
         "    return;\n"
         "}\n";
     cblc_translation_unit_init(&unit);
@@ -4739,16 +5325,9 @@ FT_TEST(test_cblc_generate_c_emits_nested_struct_types_and_field_access)
         std::printf("Assertion failed: generated C should embed nested struct field type\n");
         goto cleanup;
     }
-    if (!ft_strnstr(generated_c, "cblc_string_assign_literal(person.address.city.buf, 16, &person.address.city.len, \"GHENT\");",
-            std::strlen(generated_c)))
+    if (!ft_strnstr(generated_c, "int city;", std::strlen(generated_c)))
     {
-        std::printf("Assertion failed: generated C should assign nested string field via helper\n");
-        goto cleanup;
-    }
-    if (!ft_strnstr(generated_c, "cblc_display_string(person.address.city.buf, person.address.city.len);",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should display nested string field via helper\n");
+        std::printf("Assertion failed: generated C should preserve nested scalar field\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -4797,6 +5376,129 @@ FT_TEST(test_transpiler_validation_accepts_working_storage_program)
             "validator should accept COBOL with working-storage items") != FT_SUCCESS)
         return (FT_FAILURE);
     return (FT_SUCCESS);
+}
+
+FT_TEST(test_transpiler_validation_resolves_go_to_paragraph_targets)
+{
+    const char *source;
+
+    source = "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. GO-VALIDATE.\n"
+        "       ENVIRONMENT DIVISION.\n"
+        "       DATA DIVISION.\n"
+        "       PROCEDURE DIVISION.\n"
+        "       MAIN.\n"
+        "           GO TO DONE.\n"
+        "       DONE.\n"
+        "           STOP RUN.\n";
+    return (test_expect_success(transpiler_validate_generated_cobol(source),
+        "validator should accept GO TO with a defined paragraph target"));
+}
+
+FT_TEST(test_transpiler_validation_rejects_unresolved_go_to_target)
+{
+    const char *source;
+
+    source = "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. GO-INVALID.\n"
+        "       ENVIRONMENT DIVISION.\n"
+        "       DATA DIVISION.\n"
+        "       PROCEDURE DIVISION.\n"
+        "       MAIN.\n"
+        "           GO TO MISSING-PARAGRAPH.\n"
+        "           STOP RUN.\n";
+    return (test_expect_int_equal(transpiler_validate_generated_cobol(source),
+        FT_FAILURE, "validator should reject GO TO to an undefined paragraph"));
+}
+
+FT_TEST(test_transpiler_validation_resolves_perform_thru_targets)
+{
+    const char *source;
+
+    source = "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. PERFORM-VALIDATE.\n"
+        "       ENVIRONMENT DIVISION.\n"
+        "       DATA DIVISION.\n"
+        "       PROCEDURE DIVISION.\n"
+        "       MAIN.\n"
+        "           PERFORM WORKER THRU DONE.\n"
+        "           STOP RUN.\n"
+        "       WORKER.\n"
+        "           CONTINUE.\n"
+        "       DONE.\n"
+        "           EXIT.\n";
+    return (test_expect_success(transpiler_validate_generated_cobol(source),
+        "validator should resolve both PERFORM THRU paragraph targets"));
+}
+
+FT_TEST(test_transpiler_validation_rejects_unresolved_perform_target)
+{
+    const char *source;
+
+    source = "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. PERFORM-INVALID.\n"
+        "       ENVIRONMENT DIVISION.\n"
+        "       DATA DIVISION.\n"
+        "       PROCEDURE DIVISION.\n"
+        "       MAIN.\n"
+        "           PERFORM MISSING-PARAGRAPH.\n"
+        "           STOP RUN.\n";
+    return (test_expect_int_equal(transpiler_validate_generated_cobol(source),
+        FT_FAILURE, "validator should reject PERFORM to an undefined paragraph"));
+}
+
+FT_TEST(test_transpiler_validation_rejects_unresolved_perform_thru_end_target)
+{
+    const char *source;
+
+    source = "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. PERFORM-THRU-INVALID.\n"
+        "       ENVIRONMENT DIVISION.\n"
+        "       DATA DIVISION.\n"
+        "       PROCEDURE DIVISION.\n"
+        "       MAIN.\n"
+        "           PERFORM WORKER THRU MISSING-PARAGRAPH.\n"
+        "           STOP RUN.\n"
+        "       WORKER.\n"
+        "           EXIT.\n";
+    return (test_expect_int_equal(transpiler_validate_generated_cobol(source),
+        FT_FAILURE, "validator should reject PERFORM THRU with an undefined end paragraph"));
+}
+
+FT_TEST(test_transpiler_validation_rejects_duplicate_paragraph_names)
+{
+    const char *source;
+
+    source = "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. DUPLICATE-PARAGRAPH.\n"
+        "       DATA DIVISION.\n"
+        "       PROCEDURE DIVISION.\n"
+        "       MAIN.\n"
+        "           CONTINUE.\n"
+        "       WORKER.\n"
+        "           CONTINUE.\n"
+        "       WORKER.\n"
+        "           STOP RUN.\n";
+    return (test_expect_int_equal(transpiler_validate_generated_cobol(source),
+        FT_FAILURE, "validator should reject duplicate generated paragraph names"));
+}
+
+FT_TEST(test_transpiler_validation_rejects_case_colliding_paragraph_names)
+{
+    const char *source;
+
+    source = "       IDENTIFICATION DIVISION.\n"
+        "       PROGRAM-ID. CASE-COLLISION.\n"
+        "       DATA DIVISION.\n"
+        "       PROCEDURE DIVISION.\n"
+        "       Main.\n"
+        "           CONTINUE.\n"
+        "       worker.\n"
+        "           CONTINUE.\n"
+        "       WORKER.\n"
+        "           STOP RUN.\n";
+    return (test_expect_int_equal(transpiler_validate_generated_cobol(source),
+        FT_FAILURE, "COBOL paragraph names that differ only by case must collide"));
 }
 
 FT_TEST(test_transpiler_validation_rejects_invalid_cobol)
@@ -5346,7 +6048,7 @@ FT_TEST(test_cblc_frontend_complete_filters_function_local_scope)
         "\n"
         "void main()\n"
         "{\n"
-        "    string message(8);\n"
+        "    string message;\n"
         "\n"
         "    return;\n"
         "}\n";
@@ -5527,7 +6229,7 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_cblc_frontend_complete_returns_builtin_string_members)
+FT_TEST(test_cblc_frontend_complete_returns_string_class_members)
 {
     const char *source;
     t_cblc_frontend_analysis analysis;
@@ -5545,9 +6247,10 @@ FT_TEST(test_cblc_frontend_complete_returns_builtin_string_members)
     int found_starts_with;
     int status;
 
-    source = "void main()\n"
+    source = "string greeting;\n"
+        "void main()\n"
         "{\n"
-        "    string.\n"
+        "    greeting.\n"
         "    return;\n"
         "}\n";
     status = FT_FAILURE;
@@ -5562,24 +6265,24 @@ FT_TEST(test_cblc_frontend_complete_returns_builtin_string_members)
     found_contains = 0;
     found_starts_with = 0;
     if (test_expect_success(cblc_frontend_analysis_init(&analysis),
-            "CBL-C frontend analysis should initialize for builtin string completion")
+            "CBL-C frontend analysis should initialize for string class completion")
         != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_expect_success(cblc_completion_list_init(&completions),
-            "CBL-C completion list should initialize for builtin string completion")
+            "CBL-C completion list should initialize for string class completion")
         != FT_SUCCESS)
     {
         cblc_frontend_analysis_dispose(&analysis);
         return (FT_FAILURE);
     }
     if (test_expect_success(cblc_frontend_analyze_document(&analysis,
-                "string_member_completion_sample.cblc", source) != FT_SUCCESS
+            "string_member_completion_sample.cblc", source) != FT_SUCCESS
                 ? FT_SUCCESS : FT_FAILURE,
-            "CBL-C builtin string completion sample should remain incomplete while typing")
+            "CBL-C string class completion sample should remain incomplete while typing")
         != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(cblc_frontend_complete(&analysis, 3, 12, &completions),
-            "CBL-C completion should succeed for builtin string member access") != FT_SUCCESS)
+    if (test_expect_success(cblc_frontend_complete(&analysis, 4, 14, &completions),
+            "CBL-C completion should succeed for string class member access") != FT_SUCCESS)
         goto cleanup;
     index = 0;
     while (index < completions.count)
@@ -5617,34 +6320,34 @@ FT_TEST(test_cblc_frontend_complete_returns_builtin_string_members)
         index += 1;
     }
     if (test_expect_int_equal(found_append, 1,
-            "CBL-C completion should include builtin string append") != FT_SUCCESS)
+            "CBL-C completion should include string class append") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(found_len, 1,
-            "CBL-C completion should include builtin string len") != FT_SUCCESS)
+            "CBL-C completion should include string class len") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(found_clear, 1,
-            "CBL-C completion should include builtin string clear") != FT_SUCCESS)
+            "CBL-C completion should include string class clear") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(found_capacity, 1,
-            "CBL-C completion should include builtin string capacity") != FT_SUCCESS)
+            "CBL-C completion should include string class capacity") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(found_empty, 1,
-            "CBL-C completion should include builtin string empty") != FT_SUCCESS)
+            "CBL-C completion should include string class empty") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(found_ends_with, 1,
-            "CBL-C completion should include builtin string ends_with") != FT_SUCCESS)
+            "CBL-C completion should include string class ends_with") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(found_equals, 1,
-            "CBL-C completion should include builtin string equals") != FT_SUCCESS)
+            "CBL-C completion should include string class equals") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(found_compare, 1,
-            "CBL-C completion should include builtin string compare") != FT_SUCCESS)
+            "CBL-C completion should include string class compare") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(found_contains, 1,
-            "CBL-C completion should include builtin string contains") != FT_SUCCESS)
+            "CBL-C completion should include string class contains") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_int_equal(found_starts_with, 1,
-            "CBL-C completion should include builtin string starts_with") != FT_SUCCESS)
+            "CBL-C completion should include string class starts_with") != FT_SUCCESS)
         goto cleanup;
     status = FT_SUCCESS;
 cleanup:
@@ -5794,11 +6497,11 @@ FT_TEST(test_cblc_generate_cobol_emits_native_try_catch_dispatch)
         || ft_strnstr(generated_cobol, "DWARF", std::strlen(generated_cobol))
         || ft_strnstr(generated_cobol, "_Unwind", std::strlen(generated_cobol))
         || ft_strnstr(generated_cobol, "__cxa_throw", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "MOVE SPACES TO CBLC-EX-STRING-BUF",
+        || !ft_strnstr(generated_cobol, "MOVE SPACES TO CBLC-EX-MESSAGE-BUF",
             std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "GO TO CBLC-TRY-MAIN-0-CATCH-0.",
+        || !ft_strnstr(generated_cobol, "GO TO CBLC-TRY-CBLC-TRY-CALL-",
             std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "CBLC-TRY-MAIN-0-DONE.", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "-0-DONE.", std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "CBLC-EX-TYPE-ID =", std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: generated COBOL should contain native exception dispatch\n");
@@ -5812,15 +6515,15 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_cblc_generate_cobol_guards_oversized_string_exception_payload)
+FT_TEST(test_cblc_string_class_exception_does_not_fall_back_to_legacy_message)
 {
     const char *source;
     t_cblc_translation_unit unit;
     char *generated_cobol;
     int status;
 
-    source = "string message(300);\n"
-        "void main() {\n"
+    source = "void main() {\n"
+        "    string message(300);\n"
         "    try { throw message; }\n"
         "    catch (string caught_message) { }\n"
         "}\n";
@@ -5828,17 +6531,18 @@ FT_TEST(test_cblc_generate_cobol_guards_oversized_string_exception_payload)
     generated_cobol = NULL;
     status = FT_FAILURE;
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "oversized string exception source should parse") != FT_SUCCESS)
+            "owning string exception source should parse") != FT_SUCCESS
+        || test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "owning string exception source should generate COBOL") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
-            "oversized string exception source should generate COBOL") != FT_SUCCESS)
-        goto cleanup;
-    if (!ft_strnstr(generated_cobol, "IF MESSAGE-LEN > 256",
+    if (!generated_cobol
+        || !ft_strnstr(generated_cobol, "CBLC-EX-PAYLOAD-STRING",
             std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "PERFORM CBLC-TERMINATE",
+        || ft_strnstr(generated_cobol,
+            "MOVE MESSAGE-LEN TO CBLC-EX-MESSAGE-LEN",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: oversized string throws should terminate before truncation\n");
+        std::printf("Assertion failed: owning string exceptions need their typed object payload, not the legacy message slot\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -5855,7 +6559,9 @@ FT_TEST(test_cblc_generate_cobol_clears_exception_before_return_from_catch)
     t_cblc_translation_unit unit;
     char *generated_cobol;
     const char *catch_label;
+    const char *cleaning_flag;
     const char *return_cleanup;
+    const char *active_clear;
     const char *handler_return;
     int status;
 
@@ -5873,17 +6579,76 @@ FT_TEST(test_cblc_generate_cobol_clears_exception_before_return_from_catch)
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
             "return-from-catch source should generate COBOL") != FT_SUCCESS)
         goto cleanup;
-    catch_label = ft_strnstr(generated_cobol, "CBLC-TRY-WORKER-0-CATCH-0.",
+    catch_label = ft_strnstr(generated_cobol, "CBLC-TRY-CBLC-TRY-CALL-",
         std::strlen(generated_cobol));
+    cleaning_flag = catch_label
+        ? ft_strnstr(catch_label, "MOVE 'Y' TO CBLC-EX-CLEANING",
+            std::strlen(catch_label)) : NULL;
     return_cleanup = catch_label
         ? ft_strnstr(catch_label, "PERFORM CBLC-EX-CLEAR-PAYLOAD",
             std::strlen(catch_label)) : NULL;
-    handler_return = catch_label
-        ? ft_strnstr(catch_label, "GOBACK", std::strlen(catch_label)) : NULL;
-    if (!catch_label || !return_cleanup || !handler_return
-        || return_cleanup > handler_return)
+    active_clear = return_cleanup
+        ? ft_strnstr(return_cleanup, "MOVE 'N' TO CBLC-EX-ACTIVE",
+            std::strlen(return_cleanup)) : NULL;
+    handler_return = active_clear
+        ? ft_strnstr(active_clear, "GO TO CBLC-FRETURN-",
+            std::strlen(active_clear)) : NULL;
+    if (!catch_label || !cleaning_flag || !return_cleanup || !active_clear
+        || !handler_return || cleaning_flag > return_cleanup
+        || return_cleanup > active_clear || active_clear > handler_return)
     {
         std::printf("Assertion failed: catch returns must clear the active payload first\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_reuses_identical_exception_cleanup_sequences)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "class Resource { ~Resource() { } };\n"
+        "void main() {\n"
+        "    int selector;\n"
+        "    selector = 0;\n"
+        "    try {\n"
+        "        Resource text;\n"
+        "        if (selector) { throw 1; }\n"
+        "        throw 2;\n"
+        "    }\n"
+        "    catch (int caught) { }\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "identical cleanup-path source should parse") != FT_SUCCESS
+        || test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "identical cleanup-path source should generate COBOL") != FT_SUCCESS)
+    {
+        std::printf("Cleanup-sequence fixture diagnostic: code=%d %s\n",
+            unit.parse_error_code, unit.parse_error_message);
+        goto cleanup;
+    }
+    if (!generated_cobol
+        || validation_count_text_occurrences(generated_cobol,
+            "       CBLC-EX-CLEANUP-MAIN-TIR-") != 1
+        || validation_count_text_occurrences(generated_cobol,
+            "PERFORM CBLC-EX-CLEANUP-MAIN-TIR-") != 2)
+    {
+        std::printf("Assertion failed: typed cleanup sharing expected one paragraph/two calls; found %zu paragraph markers and %zu calls\n",
+            generated_cobol ? validation_count_text_occurrences(generated_cobol,
+                "       CBLC-EX-CLEANUP-MAIN-TIR-") : 0,
+            generated_cobol ? validation_count_text_occurrences(generated_cobol,
+                "PERFORM CBLC-EX-CLEANUP-MAIN-TIR-") : 0);
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -5903,6 +6668,7 @@ FT_TEST(test_cblc_generate_cobol_materializes_value_before_catch_cleanup)
     const char *result_move;
     const char *payload_clear;
     const char *handler_return;
+    const char *catch_label_prefix;
     int status;
 
     source = "int worker() {\n"
@@ -5920,16 +6686,17 @@ FT_TEST(test_cblc_generate_cobol_materializes_value_before_catch_cleanup)
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
             "value-return-from-catch source should generate COBOL") != FT_SUCCESS)
         goto cleanup;
-    catch_label = ft_strnstr(generated_cobol, "CBLC-TRY-WORKER-0-CATCH-0.",
+    catch_label_prefix = "       CBLC-TRY-CBLC-TRY-CALL-";
+    result_move = ft_strnstr(generated_cobol, "MOVE 9 TO CBLC-RETURN-WORKER",
         std::strlen(generated_cobol));
-    result_move = catch_label
-        ? ft_strnstr(catch_label, "MOVE 9 TO CBLC-RETURN-WORKER",
-            std::strlen(catch_label)) : NULL;
+    catch_label = validation_find_last_paragraph_before(generated_cobol,
+        catch_label_prefix, result_move);
     payload_clear = catch_label
         ? ft_strnstr(catch_label, "PERFORM CBLC-EX-CLEAR-PAYLOAD",
             std::strlen(catch_label)) : NULL;
     handler_return = catch_label
-        ? ft_strnstr(catch_label, "GOBACK", std::strlen(catch_label)) : NULL;
+        ? ft_strnstr(catch_label, "GO TO CBLC-FRETURN-0",
+            std::strlen(catch_label)) : NULL;
     if (!catch_label || !result_move || !payload_clear || !handler_return
         || result_move > payload_clear || payload_clear > handler_return)
     {
@@ -5971,18 +6738,18 @@ FT_TEST(test_cblc_generate_cobol_qualifies_try_labels_per_function)
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
             "replacement-throw source should generate COBOL") != FT_SUCCESS)
         goto cleanup;
-    worker_catch = ft_strnstr(generated_cobol, "CBLC-TRY-WORKER-0-CATCH-0.",
-        std::strlen(generated_cobol));
+    replacement_payload = ft_strnstr(generated_cobol,
+        "MOVE 2 TO CBLC-EX-INT-PAYLOAD", std::strlen(generated_cobol));
+    worker_catch = validation_find_last_paragraph_before(generated_cobol,
+        "       CBLC-TRY-CBLC-TRY-CALL-", replacement_payload);
     replacement_clear = worker_catch
         ? ft_strnstr(worker_catch, "PERFORM CBLC-EX-CLEAR-PAYLOAD",
             std::strlen(worker_catch)) : NULL;
     replacement_payload = worker_catch
         ? ft_strnstr(worker_catch, "MOVE 2 TO CBLC-EX-INT-PAYLOAD",
             std::strlen(worker_catch)) : NULL;
-    if (!ft_strnstr(generated_cobol, "CBLC-TRY-WORKER-0-CATCH-0.",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "CBLC-TRY-MAIN-0-CATCH-0.",
-            std::strlen(generated_cobol))
+    if (validation_count_paragraph_definitions(generated_cobol,
+            "       CBLC-TRY-CALL-") != 2
         || !ft_strnstr(generated_cobol, "MOVE 2 TO CBLC-EX-INT-PAYLOAD",
             std::strlen(generated_cobol))
         || !replacement_clear || !replacement_payload
@@ -6007,9 +6774,11 @@ FT_TEST(test_cblc_generate_cobol_translates_size_error_into_exception_context)
     int status;
 
     source = "void main() {\n"
+        "    int left;\n"
+        "    int right;\n"
         "    int result;\n"
-        "    try { result = 1 + 2; }\n"
-        "    catch (int error_code) { display(error_code); }\n"
+        "    try { result = left + right; }\n"
+        "    catch (overflow_error error) { display(error.code); }\n"
         "}\n";
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
@@ -6022,14 +6791,71 @@ FT_TEST(test_cblc_generate_cobol_translates_size_error_into_exception_context)
         goto cleanup;
     if (!ft_strnstr(generated_cobol, "ON SIZE ERROR",
             std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "MOVE 1 TO CBLC-EX-INT-PAYLOAD",
+        || !ft_strnstr(generated_cobol,
+            "MOVE 1 TO CBLC-EX-PAYLOAD-OVERFLOW-ERROR-CODE",
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "END-COMPUTE.",
             std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "GO TO CBLC-TRY-MAIN-0-CATCH-0",
+        || !ft_strnstr(generated_cobol, "GO TO CBLC-TRY-",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "-CATCH-0",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: arithmetic size errors should use exception dispatch\n");
+        std::printf("Assertion failed: arithmetic size errors should use exception dispatch (size=%d payload=%d end=%d branch=%d catch=%d)\n",
+            ft_strnstr(generated_cobol, "ON SIZE ERROR", std::strlen(generated_cobol)) != NULL,
+            ft_strnstr(generated_cobol, "MOVE 1 TO CBLC-EX-INT-PAYLOAD", std::strlen(generated_cobol)) != NULL,
+            ft_strnstr(generated_cobol, "END-COMPUTE.", std::strlen(generated_cobol)) != NULL,
+            ft_strnstr(generated_cobol, "GO TO CBLC-TRY-", std::strlen(generated_cobol)) != NULL,
+            ft_strnstr(generated_cobol, "-CATCH-0", std::strlen(generated_cobol)) != NULL);
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_translates_floating_size_error_to_range_error)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "void main() {\n"
+        "    double left;\n"
+        "    double right;\n"
+        "    double result;\n"
+        "    try { result = left + right; }\n"
+        "    catch (range_error error) { display(error.code); }\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "floating size-error source should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "floating size-error source should generate COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol, "ON SIZE ERROR",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol,
+            "MOVE 1 TO CBLC-EX-PAYLOAD-RANGE-ERROR-CODE",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "END-COMPUTE.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: floating size errors should carry a range_error payload (on=%d payload=%d end=%d)\n",
+            ft_strnstr(generated_cobol, "ON SIZE ERROR",
+                std::strlen(generated_cobol)) != NULL,
+            ft_strnstr(generated_cobol,
+                "MOVE 1 TO CBLC-EX-PAYLOAD-RANGE-ERROR-CODE",
+                std::strlen(generated_cobol)) != NULL,
+            ft_strnstr(generated_cobol, "END-COMPUTE.",
+                std::strlen(generated_cobol)) != NULL);
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -6054,7 +6880,7 @@ FT_TEST(test_cblc_generate_cobol_translates_file_status_without_catching_eof)
         "        open(datafile, \"r\");\n"
         "        read(datafile, buffer);\n"
         "    }\n"
-        "    catch (string file_error) { display(file_error); }\n"
+        "    catch (...) { }\n"
         "}\n";
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
@@ -6073,7 +6899,7 @@ FT_TEST(test_cblc_generate_cobol_translates_file_status_without_catching_eof)
             "IF DATAFILE-STATUS NOT = \"00\" AND DATAFILE-STATUS NOT = \"10\"",
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol,
-            "MOVE DATAFILE-STATUS TO CBLC-EX-STRING-BUF",
+            "MOVE DATAFILE-STATUS TO CBLC-EX-MESSAGE-BUF",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: file status failures should become typed exceptions while EOF stays ordinary\n");
@@ -6098,7 +6924,7 @@ FT_TEST(test_cblc_generate_cobol_emits_indexed_file_invalid_key)
         "char record[16];\n"
         "void main() {\n"
         "    try { write(orders, record); }\n"
-        "    catch (string file_error) { display(file_error); }\n"
+        "    catch (...) { }\n"
         "}\n";
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
@@ -6156,7 +6982,9 @@ FT_TEST(test_cblc_generate_cobol_translates_raw_call_exception)
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "END-CALL.",
             std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "GO TO CBLC-TRY-MAIN-0-CATCH-0",
+        || !ft_strnstr(generated_cobol, "GO TO CBLC-TRY-",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "-CATCH-0",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: raw external calls should translate native call failures\n");
@@ -6175,8 +7003,9 @@ FT_TEST(test_cblc_generate_cobol_adapts_raw_call_outside_try)
     const char *source;
     t_cblc_translation_unit unit;
     char *generated_cobol;
-    const char *payload_clear;
     const char *adapted_call;
+    const char *uncaught_handler;
+    const char *failure_route;
     int status;
 
     source = "char buffer[8];\n"
@@ -6194,16 +7023,22 @@ FT_TEST(test_cblc_generate_cobol_adapts_raw_call_outside_try)
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
             "raw call outside try should generate COBOL") != FT_SUCCESS)
         goto cleanup;
-    payload_clear = ft_strnstr(generated_cobol, "PERFORM CBLC-EX-CLEAR-PAYLOAD",
-        std::strlen(generated_cobol));
     adapted_call = ft_strnstr(generated_cobol, "ON EXCEPTION", std::strlen(generated_cobol));
+    uncaught_handler = ft_strnstr(generated_cobol, "       CBLC-ROOT-UNCAUGHT.",
+        std::strlen(generated_cobol));
+    failure_route = ft_strnstr(generated_cobol,
+        "GO TO CBLC-ROOT-UNCAUGHT", std::strlen(generated_cobol));
     if (!ft_strnstr(generated_cobol, "ON EXCEPTION",
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "MOVE 1 TO CBLC-EX-INT-PAYLOAD",
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "STOP RUN",
             std::strlen(generated_cobol))
-        || !payload_clear || !adapted_call || payload_clear > adapted_call)
+        || !uncaught_handler || !failure_route || !adapted_call
+        || !ft_strnstr(uncaught_handler, "PERFORM CBLC-EX-CLEAR-PAYLOAD",
+            std::strlen(uncaught_handler))
+        || !ft_strnstr(adapted_call, "GO TO CBLC-ROOT-UNCAUGHT",
+            std::strlen(adapted_call)))
     {
         std::printf("Assertion failed: raw calls outside try should propagate native call failures\n");
         goto cleanup;
@@ -6239,7 +7074,7 @@ FT_TEST(test_cblc_generate_cobol_propagates_raw_call_effect_to_caller)
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
             "transitive raw-call source should generate COBOL") != FT_SUCCESS)
         goto cleanup;
-    if (!ft_strnstr(generated_cobol, "PERFORM WORKER.",
+    if (!ft_strnstr(generated_cobol, "PERFORM WORKER THRU CBLC-FRETURN-",
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "ON EXCEPTION",
             std::strlen(generated_cobol))
@@ -6262,6 +7097,63 @@ FT_TEST(test_cblc_generate_cobol_translates_allocation_failure)
     const char *source;
     t_cblc_translation_unit unit;
     char *generated_cobol;
+    int diagnostic_code;
+    char diagnostic_message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    int status;
+
+    source = "int *numbers;\n"
+        "void allocate_numbers() { numbers = new int[2]; }\n"
+        "void main() {\n"
+        "    try { allocate_numbers(); }\n"
+        "    catch (bad_alloc array_error) { display(array_error.code); }\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    diagnostic_code = 0;
+    diagnostic_message[0] = '\0';
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "allocation failure source should parse") != FT_SUCCESS)
+    {
+        std::printf("Allocation failure parse diagnostic: %s\n",
+            unit.parse_error_message);
+        goto cleanup;
+    }
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &diagnostic_code, diagnostic_message,
+            sizeof(diagnostic_message)) != FT_SUCCESS || !generated_cobol)
+    {
+        std::printf("Allocation failure generation diagnostic: %d: %s\n",
+            diagnostic_code, diagnostic_message);
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "IF NUMBERS = NULL",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "MOVE 1 TO CBLC-EX-PAYLOAD-BAD-ALLOC-CODE",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "CBLC-EX-DYNAMIC-TYPE-ID",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "CATCH-0.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: allocation failure should enter native exception dispatch\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_translates_malloc_allocation_failure)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int diagnostic_code;
+    char diagnostic_message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
     int status;
 
     source = "char *raw;\n"
@@ -6271,23 +7163,129 @@ FT_TEST(test_cblc_generate_cobol_translates_allocation_failure)
         "}\n";
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
+    diagnostic_code = 0;
+    diagnostic_message[0] = '\0';
     status = FT_FAILURE;
-    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "allocation failure source should parse") != FT_SUCCESS)
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("Malloc allocation failure parse diagnostic: %s\n",
+            unit.parse_error_message);
         goto cleanup;
-    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
-            "allocation failure source should generate COBOL") != FT_SUCCESS)
+    }
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &diagnostic_code, diagnostic_message,
+            sizeof(diagnostic_message)) != FT_SUCCESS || !generated_cobol)
+    {
+        std::printf("Malloc allocation failure generation diagnostic: %d: %s\n",
+            diagnostic_code, diagnostic_message);
         goto cleanup;
+    }
     if (!ft_strnstr(generated_cobol, "ALLOCATE 8 CHARACTERS RETURNING RAW",
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "IF RAW = NULL",
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "MOVE 1 TO CBLC-EX-INT-PAYLOAD",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "GO TO CBLC-TRY-MAIN-0-CATCH-0",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: allocation failure should enter native exception dispatch\n");
+        std::printf("Assertion failed: std::malloc failure should preserve its legacy integer exception payload\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_out_of_line_method_allocation_failure_enters_catch)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "int *allocation_result;\n"
+        "class AllocationOwner {\n"
+        "    public:\n"
+        "    void allocate();\n"
+        "};\n"
+        "void AllocationOwner::allocate() { allocation_result = new int[1]; }\n"
+        "void main() {\n"
+        "    AllocationOwner owner;\n"
+        "    try { owner.allocate(); }\n"
+        "    catch (bad_alloc allocation_error) { display(allocation_error.code); }\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: out-of-line allocation method source should parse: %s\n",
+            unit.parse_error_message);
+        goto cleanup;
+    }
+    if (cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: out-of-line allocation method source should generate COBOL\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "IF ", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, " = NULL", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "CBLC-EX-PAYLOAD-BAD-ALLOC-",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "CATCH-0.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: allocation in an out-of-line method should propagate to its caller's catch\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_out_of_line_constructor_allocation_failure_enters_catch)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "int *allocation_result;\n"
+        "class AllocationOwner {\n"
+        "    public:\n"
+        "    AllocationOwner();\n"
+        "};\n"
+        "AllocationOwner::AllocationOwner() { allocation_result = new int[1]; }\n"
+        "void main() {\n"
+        "    try { AllocationOwner owner; }\n"
+        "    catch (bad_alloc allocation_error) { display(allocation_error.code); }\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: out-of-line allocation constructor source should parse: %s\n",
+            unit.parse_error_message);
+        goto cleanup;
+    }
+    if (cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: out-of-line allocation constructor source should generate COBOL\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, " = NULL", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "CBLC-EX-PAYLOAD-BAD-ALLOC-",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "CATCH-0.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: allocation in an out-of-line constructor should reach its caller's catch\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -6332,13 +7330,14 @@ FT_TEST(test_cblc_generate_cobol_matches_derived_exception_in_base_catch)
 {
     const char *source;
     t_cblc_translation_unit unit;
+    const t_cblc_struct_type *derived_type;
     char *generated_cobol;
     int status;
 
     source = "class Base {\n"
         "    public:\n"
         "    int code;\n"
-        "    string message(8);\n"
+        "    char message;\n"
         "};\n"
         "class Derived : public Base {\n"
         "    public:\n"
@@ -6350,14 +7349,22 @@ FT_TEST(test_cblc_generate_cobol_matches_derived_exception_in_base_catch)
         "    catch (const Base& caught) { }\n"
         "}\n";
     cblc_translation_unit_init(&unit);
+    derived_type = NULL;
     generated_cobol = NULL;
     status = FT_FAILURE;
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "derived exception source should parse") != FT_SUCCESS)
+    {
+        std::printf("Derived exception parse diagnostic: %s\n",
+            unit.parse_error_message);
         goto cleanup;
-    if (!unit.struct_types[2].has_base_type
-        || std::strncmp(unit.struct_types[2].base_type_name, "Base",
-            sizeof(unit.struct_types[2].base_type_name)) != 0)
+    }
+    for (size_t type_index = 0; type_index < unit.struct_type_count; ++type_index)
+        if (std::strcmp(unit.struct_types[type_index].source_name, "Derived") == 0)
+            derived_type = &unit.struct_types[type_index];
+    if (!derived_type || !derived_type->has_base_type
+        || std::strncmp(derived_type->base_type_name, "Base",
+            sizeof(derived_type->base_type_name)) != 0)
     {
         std::printf("Assertion failed: derived type should record its base type\n");
         goto cleanup;
@@ -6395,7 +7402,7 @@ FT_TEST(test_cblc_generate_cobol_copies_derived_payload_for_base_value_catch)
     source = "class Base {\n"
         "    public:\n"
         "    int code;\n"
-        "    string message(8);\n"
+        "    string message;\n"
         "};\n"
         "class Derived : public Base {\n"
         "    public:\n"
@@ -6477,7 +7484,7 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_cblc_generate_cobol_emits_string_throw_payload)
+FT_TEST(test_cblc_generate_cobol_emits_literal_exception_message_payload)
 {
     const char *source;
     t_cblc_translation_unit unit;
@@ -6488,27 +7495,23 @@ FT_TEST(test_cblc_generate_cobol_emits_string_throw_payload)
         "    try {\n"
         "        throw \"FAILED\";\n"
         "    }\n"
-        "    catch (const string& caught_text) {\n"
-        "        display(caught_text);\n"
-        "    }\n"
+        "    catch (...) { }\n"
         "}\n";
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     status = FT_FAILURE;
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "string throw source should parse") != FT_SUCCESS)
+            "literal exception-message source should parse") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
-            "string throw source should generate COBOL") != FT_SUCCESS)
+            "literal exception-message source should generate COBOL") != FT_SUCCESS)
         goto cleanup;
-    if (!ft_strnstr(generated_cobol, "CBLC-EX-STRING-BUF",
+    if (!ft_strnstr(generated_cobol, "CBLC-EX-MESSAGE-BUF",
             std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "CBLC-EX-STRING-LEN",
-            std::strlen(generated_cobol))
-        || ft_strnstr(generated_cobol, "MOVE CBLC-EX-STRING-BUF TO CAUGHT-TEXT-BUF",
+        || !ft_strnstr(generated_cobol, "CBLC-EX-MESSAGE-LEN",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: generated COBOL should carry string exception payload\n");
+        std::printf("Assertion failed: generated COBOL should carry the literal exception message\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -6547,14 +7550,16 @@ FT_TEST(test_cblc_generate_cobol_propagates_local_throwing_call)
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
             "local throwing-call source should generate COBOL") != FT_SUCCESS)
         goto cleanup;
-    if (!ft_strnstr(generated_cobol, "PERFORM WORKER.", std::strlen(generated_cobol))
+    if (!ft_strnstr(generated_cobol, "PERFORM WORKER THRU CBLC-FRETURN-",
+            std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "IF CBLC-EX-ACTIVE = 'Y'",
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "PERFORM CBLC-EX-CLEANUP-MAIN-",
             std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "GO TO CBLC-TRY-MAIN-0-CATCH-0",
+        || !ft_strnstr(generated_cobol, "GO TO CBLC-TRY-CBLC-TRY-CALL-",
             std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "GOBACK.", std::strlen(generated_cobol)))
+        || !ft_strnstr(generated_cobol, "GO TO CBLC-FRETURN-",
+            std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: local throwing call should propagate through context\n");
         goto cleanup;
@@ -6596,9 +7601,9 @@ FT_TEST(test_cblc_generate_cobol_routes_nested_rethrow_to_outer_handler)
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
             "nested rethrow source should generate COBOL") != FT_SUCCESS)
         goto cleanup;
-    if (!ft_strnstr(generated_cobol, "GO TO CBLC-TRY-MAIN-1-CATCH-0.",
+    if (!ft_strnstr(generated_cobol, "GO TO CBLC-TRY-CBLC-TRY-CALL-",
             std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "GO TO CBLC-TRY-MAIN-0-CATCH-0",
+        || !ft_strnstr(generated_cobol, "PERFORM CBLC-TRY-CALL-",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: nested rethrow should dispatch to the enclosing handler\n");
@@ -6633,9 +7638,10 @@ FT_TEST(test_cblc_generate_cobol_exits_after_return_with_raii_cleanup)
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
             "RAII return source should generate COBOL") != FT_SUCCESS)
         goto cleanup;
-    if (!ft_strnstr(generated_cobol, "FREE WORKER-OWNED-TEXT-PTR",
+    if (!ft_strnstr(generated_cobol, "PERFORM CBLC-DESTRUCTOR-WORKER-OWNED-TEXT",
             std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "GOBACK.", std::strlen(generated_cobol)))
+        || !ft_strnstr(generated_cobol, "GO TO CBLC-FRETURN-",
+            std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: return should clean owned values and leave the procedure\n");
         goto cleanup;
@@ -6724,11 +7730,11 @@ FT_TEST(test_cblc_generate_cobol_propagates_throwing_method)
         goto cleanup;
     if (!ft_strnstr(generated_cobol, "CBLC-METHOD-WORKER-FAIL.",
             std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "PERFORM CBLC-METHOD-WORKER-FAIL.",
+        || !ft_strnstr(generated_cobol, "THRU CBLC-MRET-",
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "IF CBLC-EX-ACTIVE = 'Y'",
             std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "GOBACK",
+        || !ft_strnstr(generated_cobol, "GO TO CBLC-MRET-",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: throwing methods should propagate through the exception context\n");
@@ -6769,11 +7775,12 @@ FT_TEST(test_cblc_generate_cobol_propagates_throwing_constructor)
         goto cleanup;
     if (!ft_strnstr(generated_cobol, "CBLC-CONSTRUCTOR-MAIN-WORKER-0.",
             std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "PERFORM CBLC-CONSTRUCTOR-MAIN-WORKER-0.",
+        || !ft_strnstr(generated_cobol,
+            "PERFORM CBLC-CONSTRUCTOR-MAIN-WORKER-0 THRU CBLC-CRET-",
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "IF CBLC-EX-ACTIVE = 'Y'",
             std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "GOBACK",
+        || !ft_strnstr(generated_cobol, "GO TO CBLC-CRET-",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: throwing constructors should propagate through the exception context\n");
@@ -6934,9 +7941,11 @@ FT_TEST(test_cblc_generate_cobol_emits_context_for_throwing_method_without_try)
             "unhandled throwing method source should generate COBOL") != FT_SUCCESS)
         goto cleanup;
     if (!ft_strnstr(generated_cobol, "01 CBLC-EX-CONTEXT.", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "PERFORM CBLC-METHOD-WORKER-FAIL.",
+        || !ft_strnstr(generated_cobol, "CBLC-METHOD-WORKER-FAIL THRU CBLC-MRET-",
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "IF CBLC-EX-ACTIVE = 'Y'",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "STOP RUN",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: throwing method calls should enable the exception context without a local try\n");
@@ -6971,7 +7980,8 @@ FT_TEST(test_cblc_generate_cobol_emits_context_for_throwing_constructor_without_
             "unhandled throwing constructor source should generate COBOL") != FT_SUCCESS)
         goto cleanup;
     if (!ft_strnstr(generated_cobol, "01 CBLC-EX-CONTEXT.", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "PERFORM CBLC-CONSTRUCTOR-MAIN-WORKER-0.",
+        || !ft_strnstr(generated_cobol,
+            "PERFORM CBLC-CONSTRUCTOR-MAIN-WORKER-0 THRU CBLC-CRET-",
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "IF CBLC-EX-ACTIVE = 'Y'",
             std::strlen(generated_cobol)))
@@ -6994,9 +8004,15 @@ FT_TEST(test_cblc_generate_cobol_cleans_completed_constructor_fields_on_throw)
     char *generated_cobol;
     int status;
 
-    source = "class Person {\n"
-        "    string name(8);\n"
-        "    Person() { name = \"HI\"; throw 12; }\n"
+    source = "class Resource {\n"
+        "    private: char *data;\n"
+        "    public:\n"
+        "    Resource() { data = new char[1]; }\n"
+        "    ~Resource() { delete[] data; }\n"
+        "};\n"
+        "class Person {\n"
+        "    Resource name;\n"
+        "    Person() { throw 12; }\n"
         "};\n"
         "void main() {\n"
         "    try { Person person; }\n"
@@ -7011,10 +8027,139 @@ FT_TEST(test_cblc_generate_cobol_cleans_completed_constructor_fields_on_throw)
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
             "constructor field cleanup source should generate COBOL") != FT_SUCCESS)
         goto cleanup;
-    if (!ft_strnstr(generated_cobol, "FREE MAIN-PERSON-NAME-PTR",
+    if (!ft_strnstr(generated_cobol, "PERFORM CBLC-DESTRUCTOR-MAIN-PERSON-NAME",
             std::strlen(generated_cobol)))
     {
         std::printf("Assertion failed: completed constructor fields should be cleaned on throw\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_cleans_prior_local_when_constructor_throws)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    const char *cleanup_paragraph;
+    const char *cleanup_free;
+    const char *cleanup_exit;
+    int diagnostic_code;
+    char diagnostic_message[512];
+    int status;
+
+    source = "class Resource {\n"
+        "    private: char *data;\n"
+        "    public:\n"
+        "    Resource() { data = new char[1]; }\n"
+        "    ~Resource() { delete[] data; }\n"
+        "};\n"
+        "class Failing {\n"
+        "    Failing() { throw 14; }\n"
+        "};\n"
+        "void main() {\n"
+        "    try { Resource ready; Failing failing; }\n"
+        "    catch (int caught_value) { }\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "local constructor failure source should parse") != FT_SUCCESS)
+        goto cleanup;
+    diagnostic_code = 0;
+    diagnostic_message[0] = '\0';
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &diagnostic_code, diagnostic_message, sizeof(diagnostic_message))
+        != FT_SUCCESS)
+    {
+        std::printf("Local constructor cleanup diagnostic %d: %s\n",
+            diagnostic_code, diagnostic_message);
+        goto cleanup;
+    }
+    cleanup_paragraph = std::strstr(generated_cobol,
+        "\n       CBLC-EX-CLEANUP-MAIN-");
+    cleanup_free = cleanup_paragraph
+        ? std::strstr(cleanup_paragraph, "PERFORM CBLC-DESTRUCTOR-MAIN-READY.") : NULL;
+    cleanup_exit = cleanup_paragraph
+        ? std::strstr(cleanup_paragraph, "           EXIT.") : NULL;
+    if (!cleanup_paragraph || !cleanup_free || !cleanup_exit || cleanup_free >= cleanup_exit)
+    {
+        std::printf("Assertion failed: constructor-failure cleanup paragraph must release the completed local before exit\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_generate_cobol_runs_array_constructors_and_reverse_destructors)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    const char *second_destructor;
+    const char *first_destructor;
+    const char *free_statement;
+    size_t free_count;
+    int status;
+
+    source = "class Tracker {\n"
+        "    public:\n"
+        "    int value;\n"
+        "    char *owned;\n"
+        "    Tracker() { value = 7; }\n"
+        "    ~Tracker() { delete[] owned; display(value); }\n"
+        "};\n"
+        "Tracker trackers[2];\n"
+        "void main() { }\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("Class array lifecycle parse failed: %d %s\n",
+            unit.parse_error_code, unit.parse_error_message);
+        goto cleanup;
+    }
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "class array lifecycle source should generate COBOL") != FT_SUCCESS)
+        goto cleanup;
+    if (!ft_strnstr(generated_cobol, "TRACKERS-CBLC-USER-VALUE(1)",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "TRACKERS-CBLC-USER-VALUE(2)",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: array constructor body should run for every element\n");
+        goto cleanup;
+    }
+    second_destructor = std::strstr(generated_cobol,
+        "DISPLAY TRACKERS-CBLC-USER-VALUE(2)");
+    first_destructor = std::strstr(generated_cobol,
+        "DISPLAY TRACKERS-CBLC-USER-VALUE(1)");
+    if (!second_destructor || !first_destructor || second_destructor >= first_destructor)
+    {
+        std::printf("Assertion failed: array destructor bodies should run in reverse element order\n");
+        goto cleanup;
+    }
+    free_count = 0;
+    free_statement = generated_cobol;
+    while ((free_statement = std::strstr(free_statement, "FREE ")) != NULL)
+    {
+        free_count += 1;
+        free_statement += sizeof("FREE ") - 1;
+    }
+    if (free_count < 2)
+    {
+        std::printf("Assertion failed: each owning array element should execute its destructor\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -7032,11 +8177,17 @@ FT_TEST(test_cblc_generate_cobol_cleans_only_prior_fields_on_nested_constructor_
     char *generated_cobol;
     int status;
 
-    source = "class FailingField {\n"
+    source = "class Resource {\n"
+        "    private: char *data;\n"
+        "    public:\n"
+        "    Resource() { data = new char[1]; }\n"
+        "    ~Resource() { delete[] data; }\n"
+        "};\n"
+        "class FailingField {\n"
         "    FailingField() { throw 13; }\n"
         "};\n"
         "class Container {\n"
-        "    string ready(8);\n"
+        "    Resource ready;\n"
         "    FailingField failing;\n"
         "    Container() { }\n"
         "};\n"
@@ -7053,10 +8204,14 @@ FT_TEST(test_cblc_generate_cobol_cleans_only_prior_fields_on_nested_constructor_
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
             "nested constructor failure source should generate COBOL") != FT_SUCCESS)
         goto cleanup;
-    if (!ft_strnstr(generated_cobol, "FREE MAIN-CONTAINER-READY-PTR",
+    if (!ft_strnstr(generated_cobol,
+            "FREE MAIN-CONTAINER-READY-CBLC-USER-DATA",
+            std::strlen(generated_cobol))
+        || ft_strnstr(generated_cobol,
+            "PERFORM CBLC-DESTRUCTOR-MAIN-CONTAINER-FAILING",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: prior completed fields should be cleaned on nested constructor failure\n");
+        std::printf("Assertion failed: nested constructor failure must clean only prior completed fields\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -7075,9 +8230,9 @@ FT_TEST(test_cblc_generate_cobol_cleans_class_local_on_throw)
     int status;
 
     source = "class Person {\n"
-        "    string name(8);\n"
-        "    Person() { name = \"HI\"; }\n"
-        "    ~Person() { name = \"BYE\"; }\n"
+        "    int value;\n"
+        "    Person() { value = 1; }\n"
+        "    ~Person() { value = 0; }\n"
         "};\n"
         "void worker() { throw 4; }\n"
         "void main() {\n"
@@ -7089,7 +8244,11 @@ FT_TEST(test_cblc_generate_cobol_cleans_class_local_on_throw)
     status = FT_FAILURE;
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "class cleanup exception source should parse") != FT_SUCCESS)
+    {
+        std::printf("Class cleanup parse diagnostic (code=%d): %s\n",
+            unit.parse_error_code, unit.parse_error_message);
         goto cleanup;
+    }
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
             "class cleanup exception source should generate COBOL") != FT_SUCCESS)
         goto cleanup;
@@ -7100,6 +8259,13 @@ FT_TEST(test_cblc_generate_cobol_cleans_class_local_on_throw)
         || !ft_strnstr(generated_cobol, "MOVE 'Y' TO CBLC-EX-CLEANING",
             std::strlen(generated_cobol)))
     {
+        std::printf("Class cleanup emitted: cleanup=%d destructor=%d cleaning_flag=%d\n",
+            ft_strnstr(generated_cobol, "PERFORM CBLC-EX-CLEANUP-MAIN-",
+                std::strlen(generated_cobol)) != NULL,
+            ft_strnstr(generated_cobol, "PERFORM CBLC-DESTRUCTOR-MAIN-PERSON",
+                std::strlen(generated_cobol)) != NULL,
+            ft_strnstr(generated_cobol, "MOVE 'Y' TO CBLC-EX-CLEANING",
+                std::strlen(generated_cobol)) != NULL);
         std::printf("Assertion failed: class locals should be destroyed through exception cleanup\n");
         goto cleanup;
     }
@@ -7131,6 +8297,34 @@ FT_TEST(test_cblc_parse_rejects_throwing_destructor)
     if (unit.parse_error_code != TRANSPILE_ERROR_EXCEPTION_DESTRUCTOR_THROW)
     {
         std::printf("Assertion failed: throwing destructor should use a dedicated diagnostic\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_parse_failure_reports_top_level_source_location)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    int status;
+
+    source = "void main() { }\n"
+        "not_a_declaration;\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) != FT_FAILURE)
+    {
+        std::printf("Assertion failed: invalid top-level declarations must be rejected\n");
+        goto cleanup;
+    }
+    if (!std::strstr(unit.parse_error_message, "at 2:1")
+        || !std::strstr(unit.parse_error_message, "not_a_declaration"))
+    {
+        std::printf("Assertion failed: top-level parse diagnostic must include line, column, and nearby source; got '%s'\n",
+            unit.parse_error_message);
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -7206,104 +8400,82 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_cblc_generate_cobol_copies_inline_string_struct_exception_payload)
+FT_TEST(test_cblc_parse_rejects_const_string_struct_exception_payload)
 {
-    const char *source;
-    t_cblc_translation_unit unit;
-    char *generated_cobol;
-    int status;
-
-    source = "struct ErrorValue { const string message(8); int code; };\n"
+    const char *source = "struct ErrorValue { const string message; int code; };\n"
         "ErrorValue error_value;\n"
-        "void main() {\n"
-        "    try { throw error_value; }\n"
-        "    catch (ErrorValue caught_error) { }\n"
-        "}\n";
+        "void main() { try { throw error_value; } catch (ErrorValue) { } }\n";
+    t_cblc_translation_unit unit;
     cblc_translation_unit_init(&unit);
-    generated_cobol = NULL;
-    status = FT_FAILURE;
-    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "inline string struct exception source should parse") != FT_SUCCESS)
+    if (test_expect_int_equal(cblc_parse_translation_unit(source, &unit)
+                == FT_SUCCESS ? 1 : 0, 0,
+            "const owning string payload must not use the obsolete buffer-copy ABI")
+            != FT_SUCCESS
+        || !ft_strnstr(unit.parse_error_message, "non-trivial lifecycle",
+            std::strlen(unit.parse_error_message)))
     {
-        goto cleanup;
+        std::printf("Const string payload diagnostic: %s\n",
+            unit.parse_error_message);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
     }
-    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
-            "inline string struct exception source should generate COBOL") != FT_SUCCESS)
-        goto cleanup;
-    if (!ft_strnstr(generated_cobol, "01 CBLC-EX-PAYLOAD-ERRORVALUE.",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol,
-            "MOVE ERROR-VALUE-MESSAGE-BUF TO CBLC-EX-PAYLOAD-ERRORVALUE-MESSAGE-BUF",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol,
-            "MOVE ERROR-VALUE-MESSAGE-LEN TO CBLC-EX-PAYLOAD-ERRORVALUE-MESSAGE-LEN",
-            std::strlen(generated_cobol))
-        || ft_strnstr(generated_cobol,
-            "MOVE ERROR-VALUE TO CBLC-EX-PAYLOAD-ERRORVALUE.",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: inline string struct exceptions should use field-wise copying\n");
-        goto cleanup;
-    }
-    status = FT_SUCCESS;
-cleanup:
-    if (generated_cobol)
-        cma_free(generated_cobol);
     cblc_translation_unit_dispose(&unit);
-    return (status);
+    return (FT_SUCCESS);
 }
 
-FT_TEST(test_cblc_generate_cobol_copies_dynamic_string_struct_exception_payload)
+FT_TEST(test_cblc_generate_cobol_copies_string_struct_exception_payload)
 {
-    const char *source;
+    const char *source = "struct ErrorValue { string message; int code; };\n"
+        "void main() { ErrorValue error_value; try { throw error_value; } "
+        "catch (ErrorValue) { } }\n";
     t_cblc_translation_unit unit;
     char *generated_cobol;
-    const char *catch_cleanup;
-    const char *payload_clear;
+    const char *payload_cleanup;
+    const char *payload_free;
+    char generation_diagnostic[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    int generation_diagnostic_code;
     int status;
 
-    source = "struct ErrorValue { string message(8); int code; };\n"
-        "ErrorValue error_value;\n"
-        "void main() {\n"
-        "    try { throw error_value; }\n"
-        "    catch (ErrorValue caught_error) { }\n"
-        "}\n";
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
+    generation_diagnostic[0] = '\0';
+    generation_diagnostic_code = 0;
     status = FT_FAILURE;
-    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "dynamic string struct exception source should parse") != FT_SUCCESS)
+    if (test_expect_int_equal(cblc_parse_translation_unit(source, &unit)
+                == FT_SUCCESS ? 1 : 0, 1,
+            "copyable owning string payload should be accepted for lifecycle-aware lowering")
+            != FT_SUCCESS)
+    {
         goto cleanup;
-    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
-            "dynamic string struct exception source should generate COBOL") != FT_SUCCESS)
+    }
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &generation_diagnostic_code, generation_diagnostic,
+            sizeof(generation_diagnostic)) != FT_SUCCESS)
+    {
+        std::printf("String-owning exception payload lowering diagnostic (%d): %s\n",
+            generation_diagnostic_code, generation_diagnostic);
         goto cleanup;
-    catch_cleanup = ft_strnstr(generated_cobol,
-        "FREE CAUGHT-ERROR-MESSAGE-PTR", std::strlen(generated_cobol));
-    payload_clear = ft_strnstr(generated_cobol,
-        "PERFORM CBLC-EX-CLEAR-PAYLOAD", std::strlen(generated_cobol));
-    if (!ft_strnstr(generated_cobol,
-            "ALLOCATE ERROR-VALUE-MESSAGE-CAP CHARACTERS RETURNING CBLC-EX-PAYLOAD-ERRORVALUE-MESSAGE-PTR",
+    }
+    if (!generated_cobol
+        || !ft_strnstr(generated_cobol, "CBLC-EX-PAYLOAD-ERRORVALUE",
             std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol,
-            "IF CBLC-EX-PAYLOAD-ERRORVALUE-MESSAGE-PTR = NULL",
+        || !ft_strnstr(generated_cobol, "MESSAGE-CBLC-USER-DATA",
             std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "PERFORM CBLC-TERMINATE",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol,
-            "FREE CBLC-EX-PAYLOAD-ERRORVALUE-MESSAGE-PTR",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol,
-            "SET ADDRESS OF CBLC-EX-PAYLOAD-ERRORVALUE-MESSAGE-BUF TO CBLC-EX-PAYLOAD-ERRORVALUE-MESSAGE-PTR",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol,
-            "SET ADDRESS OF CAUGHT-ERROR-MESSAGE-BUF TO CAUGHT-ERROR-MESSAGE-PTR",
-            std::strlen(generated_cobol))
-        || !catch_cleanup || !payload_clear || catch_cleanup > payload_clear
-        || ft_strnstr(generated_cobol,
-            "MOVE CBLC-EX-PAYLOAD-ERRORVALUE TO CAUGHT-ERROR",
+        || !ft_strnstr(generated_cobol, "CBLC-DESTRUCTOR-CBLC-USER-STRING",
             std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: dynamic string struct exceptions should copy and clean ownership\n");
+        std::printf("Assertion failed: string-bearing exception payload must emit typed storage and string lifecycle dispatch\n");
+        goto cleanup;
+    }
+    payload_cleanup = ft_strnstr(generated_cobol, "CBLC-EX-CLEAR-PAYLOAD.",
+        std::strlen(generated_cobol));
+    payload_free = payload_cleanup
+        ? ft_strnstr(payload_cleanup,
+            "FREE CBLC-EX-PAYLOAD-ERRORVALUE-MESSAGE-CBLC-USER-DATA",
+            std::strlen(payload_cleanup)) : NULL;
+    if (!payload_cleanup || !payload_free)
+    {
+        std::printf("Assertion failed: exception cleanup must destroy the owning string field in its typed payload slot\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -7350,6 +8522,54 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_unit_lifetime_budget_reaches_cobol_generation)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int diagnostic_code;
+    char diagnostic_message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+    source = "void main() { int value; value = 1; return; }\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    diagnostic_code = 0;
+    diagnostic_message[0] = '\0';
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: budget propagation fixture should parse: %s\n",
+            unit.parse_error_message);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    unit.max_lifetime_edge_transfers = 0;
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &diagnostic_code, diagnostic_message,
+            sizeof(diagnostic_message)) == FT_SUCCESS)
+    {
+        std::printf("Assertion failed: zero lifetime edge-transfer budget should stop COBOL generation\n");
+        if (generated_cobol)
+            cma_free(generated_cobol);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    if (diagnostic_code != TRANSPILE_ERROR_BACKEND_IR_VERIFICATION
+        || !std::strstr(diagnostic_message, "resource_limit_exceeded")
+        || !std::strstr(diagnostic_message, "dimension=cfg_edge_transfers"))
+    {
+        std::printf("Assertion failed: lifetime budget should produce the structured resource diagnostic, got (%d) %s\n",
+            diagnostic_code, diagnostic_message);
+        if (generated_cobol)
+            cma_free(generated_cobol);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (FT_SUCCESS);
+}
+
 const t_test_case *get_validation_tests(size_t *count)
 {
     static const t_test_case tests[] = {
@@ -7361,6 +8581,8 @@ const t_test_case *get_validation_tests(size_t *count)
             test_standard_library_typed_parsers_return_multi_field_values},
         {"cblc_generate_cobol_emits_native_try_catch_dispatch",
             test_cblc_generate_cobol_emits_native_try_catch_dispatch},
+        {"cblc_unit_lifetime_budget_reaches_cobol_generation",
+            test_cblc_unit_lifetime_budget_reaches_cobol_generation},
         {"cblc_generate_cobol_requires_exception_context_for_external_throwing_entry",
             test_cblc_generate_cobol_requires_exception_context_for_external_throwing_entry},
         {"cblc_parser_preserves_try_and_catch_source_positions",
@@ -7375,6 +8597,8 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_generate_cobol_qualifies_try_labels_per_function},
         {"cblc_generate_cobol_translates_size_error_into_exception_context",
             test_cblc_generate_cobol_translates_size_error_into_exception_context},
+        {"cblc_generate_cobol_translates_floating_size_error_to_range_error",
+            test_cblc_generate_cobol_translates_floating_size_error_to_range_error},
         {"cblc_generate_cobol_translates_file_status_without_catching_eof",
             test_cblc_generate_cobol_translates_file_status_without_catching_eof},
         {"cblc_generate_cobol_emits_indexed_file_invalid_key",
@@ -7387,6 +8611,8 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_generate_cobol_propagates_raw_call_effect_to_caller},
         {"cblc_generate_cobol_translates_allocation_failure",
             test_cblc_generate_cobol_translates_allocation_failure},
+        {"cblc_generate_cobol_translates_malloc_allocation_failure",
+            test_cblc_generate_cobol_translates_malloc_allocation_failure},
         {"cblc_generate_cobol_matches_derived_exception_in_base_catch",
             test_cblc_generate_cobol_matches_derived_exception_in_base_catch},
         {"cblc_generate_cobol_does_not_match_private_base_catch",
@@ -7395,10 +8621,10 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_generate_cobol_copies_derived_payload_for_base_value_catch},
         {"cblc_generate_cobol_runs_base_constructor_before_derived_body",
             test_cblc_generate_cobol_runs_base_constructor_before_derived_body},
-        {"cblc_generate_cobol_emits_string_throw_payload",
-            test_cblc_generate_cobol_emits_string_throw_payload},
-        {"cblc_generate_cobol_guards_oversized_string_exception_payload",
-            test_cblc_generate_cobol_guards_oversized_string_exception_payload},
+        {"cblc_generate_cobol_emits_literal_exception_message_payload",
+            test_cblc_generate_cobol_emits_literal_exception_message_payload},
+        {"cblc_string_class_exception_does_not_fall_back_to_legacy_message",
+            test_cblc_string_class_exception_does_not_fall_back_to_legacy_message},
         {"cblc_generate_cobol_propagates_local_throwing_call",
             test_cblc_generate_cobol_propagates_local_throwing_call},
         {"cblc_generate_cobol_routes_nested_rethrow_to_outer_handler",
@@ -7413,6 +8639,10 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_generate_cobol_propagates_throwing_constructor},
         {"cblc_generate_cobol_cleans_completed_constructor_fields_on_throw",
             test_cblc_generate_cobol_cleans_completed_constructor_fields_on_throw},
+        {"cblc_generate_cobol_cleans_prior_local_when_constructor_throws",
+            test_cblc_generate_cobol_cleans_prior_local_when_constructor_throws},
+        {"cblc_generate_cobol_runs_array_constructors_and_reverse_destructors",
+            test_cblc_generate_cobol_runs_array_constructors_and_reverse_destructors},
         {"cblc_generate_cobol_cleans_only_prior_fields_on_nested_constructor_throw",
             test_cblc_generate_cobol_cleans_only_prior_fields_on_nested_constructor_throw},
         {"cblc_generate_cobol_exits_after_return_with_raii_cleanup",
@@ -7423,34 +8653,42 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_generate_cobol_cleans_class_local_on_throw},
         {"cblc_parse_rejects_throwing_destructor",
             test_cblc_parse_rejects_throwing_destructor},
+        {"cblc_parse_failure_reports_top_level_source_location",
+            test_cblc_parse_failure_reports_top_level_source_location},
         {"cblc_parse_rejects_untracked_temporary_exception_payload",
             test_cblc_parse_rejects_untracked_temporary_exception_payload},
         {"cblc_generate_cobol_copies_trivial_struct_exception_payload",
             test_cblc_generate_cobol_copies_trivial_struct_exception_payload},
-        {"cblc_generate_cobol_copies_inline_string_struct_exception_payload",
-            test_cblc_generate_cobol_copies_inline_string_struct_exception_payload},
-        {"cblc_generate_cobol_copies_dynamic_string_struct_exception_payload",
-            test_cblc_generate_cobol_copies_dynamic_string_struct_exception_payload},
+        {"cblc_parse_rejects_const_string_struct_exception_payload",
+            test_cblc_parse_rejects_const_string_struct_exception_payload},
+        {"cblc_generate_cobol_copies_string_struct_exception_payload",
+            test_cblc_generate_cobol_copies_string_struct_exception_payload},
         {"cblc_generate_cobol_binds_scalar_exception_reference",
             test_cblc_generate_cobol_binds_scalar_exception_reference},
-        {"cblc_intrinsic_registry_is_complete_for_builtin_string_methods",
-            test_cblc_intrinsic_registry_is_complete_for_builtin_string_methods},
         {"transpiler_validation_accepts_valid_cblc", test_transpiler_validation_accepts_valid_cblc},
         {"transpiler_validation_rejects_cblc_without_return", test_transpiler_validation_rejects_cblc_without_return},
         {"transpiler_validation_accepts_string_declaration", test_transpiler_validation_accepts_string_declaration},
-        {"cblc_string_class_exposes_native_helper_methods",
-            test_cblc_string_class_exposes_native_helper_methods},
-        {"transpiler_validation_accepts_string_assignment_and_length_usage",
-            test_transpiler_validation_accepts_string_assignment_and_length_usage},
-        {"transpiler_validation_accepts_int_array_and_string_array_declarations",
-            test_transpiler_validation_accepts_int_array_and_string_array_declarations},
+        {"cblc_standard_string_class_uses_cblc_method_bodies",
+            test_cblc_standard_string_class_uses_cblc_method_bodies},
+        {"cblc_string_class_replaces_legacy_string_helper_overloads",
+            test_cblc_string_class_replaces_legacy_string_helper_overloads},
+        {"transpiler_validation_accepts_string_class_method_usage",
+            test_transpiler_validation_accepts_string_class_method_usage},
+        {"transpiler_validation_accepts_int_array_and_string_class_declarations",
+            test_transpiler_validation_accepts_int_array_and_string_class_declarations},
         {"transpiler_validation_accepts_string_capacity_parentheses",
             test_transpiler_validation_accepts_string_capacity_parentheses},
+        {"transpiler_validation_rejects_legacy_string_bracket_capacity",
+            test_transpiler_validation_rejects_legacy_string_bracket_capacity},
         {"transpiler_validation_accepts_indexed_array_usage",
             test_transpiler_validation_accepts_indexed_array_usage},
         {"cblc_parse_translation_unit_records_imports", test_cblc_parse_translation_unit_records_imports},
         {"cblc_parse_translation_unit_records_copy_includes", test_cblc_parse_translation_unit_records_copy_includes},
         {"cblc_templates_instantiate_struct_fields", test_cblc_templates_instantiate_struct_fields},
+        {"cblc_template_string_argument_resolves_to_class_field",
+            test_cblc_template_string_argument_resolves_to_class_field},
+        {"cblc_string_class_import_ignores_literals",
+            test_cblc_string_class_import_ignores_literals},
         {"cblc_templates_instantiate_multi_parameter_struct_fields",
             test_cblc_templates_instantiate_multi_parameter_struct_fields},
         {"cblc_template_pointer_argument_preserves_shape",
@@ -7468,16 +8706,16 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_template_function_rejects_nontrivial_struct_array_abi},
         {"cblc_template_function_int_array_abi",
             test_cblc_template_function_int_array_abi},
-        {"cblc_template_function_string_array_abi",
-            test_cblc_template_function_string_array_abi},
+        {"cblc_template_function_rejects_capacity_encoded_string_array_type",
+            test_cblc_template_function_rejects_capacity_encoded_string_array_type},
         {"cblc_template_function_struct_array_abi",
             test_cblc_template_function_struct_array_abi},
         {"cblc_template_function_char_struct_array_abi",
             test_cblc_template_function_char_struct_array_abi},
-        {"cblc_template_function_const_string_struct_array_abi",
-            test_cblc_template_function_const_string_struct_array_abi},
-        {"cblc_template_function_mutable_string_struct_array_abi",
-            test_cblc_template_function_mutable_string_struct_array_abi},
+        {"cblc_template_function_rejects_const_string_struct_array",
+            test_cblc_template_function_rejects_const_string_struct_array},
+        {"cblc_template_function_rejects_mutable_string_struct_array",
+            test_cblc_template_function_rejects_mutable_string_struct_array},
         {"cblc_template_parse_reports_stable_diagnostic",
             test_cblc_template_parse_reports_stable_diagnostic},
         {"cblc_template_function_rejects_mismatched_argument",
@@ -7490,6 +8728,8 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_template_method_pointer_return_is_concrete},
         {"cblc_template_instantiation_limit_is_deterministic",
             test_cblc_template_instantiation_limit_is_deterministic},
+        {"cblc_template_instantiation_limit_combines_class_and_function_instances",
+            test_cblc_template_instantiation_limit_combines_class_and_function_instances},
         {"cblc_template_names_are_bounded_and_deterministic",
             test_cblc_template_names_are_bounded_and_deterministic},
         {"cblc_nested_template_type_application",
@@ -7550,8 +8790,12 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_generate_cobol_emits_external_int_return_linkage},
         {"cblc_generate_cobol_propagates_external_exception_context",
             test_cblc_generate_cobol_propagates_external_exception_context},
-        {"cblc_generate_cobol_handles_string_assignments_and_length_computations",
-            test_cblc_generate_cobol_handles_string_assignments_and_length_computations},
+        {"cblc_generate_cobol_handles_string_class_construction_and_methods",
+            test_cblc_generate_cobol_handles_string_class_construction_and_methods},
+        {"cblc_method_parameters_destroy_in_reverse_declaration_order",
+            test_cblc_method_parameters_destroy_in_reverse_declaration_order},
+        {"cblc_method_throw_cleans_by_value_parameters",
+            test_cblc_method_throw_cleans_by_value_parameters},
         {"cblc_generate_cobol_handles_multiplication_and_division",
             test_cblc_generate_cobol_handles_multiplication_and_division},
         {"cblc_generate_c_emits_struct_types_and_field_access",
@@ -7604,16 +8848,12 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_generate_c_emits_nested_block_local_class_cleanup_order},
         {"cblc_generate_cobol_emits_nested_block_local_class_cleanup_order",
             test_cblc_generate_cobol_emits_nested_block_local_class_cleanup_order},
-        {"cblc_parse_translation_unit_registers_builtin_string_class",
-            test_cblc_parse_translation_unit_registers_builtin_string_class},
-        {"cblc_generate_c_emits_local_string_lifecycle",
-            test_cblc_generate_c_emits_local_string_lifecycle},
-        {"cblc_parse_translation_unit_accepts_builtin_string_methods",
-            test_cblc_parse_translation_unit_accepts_builtin_string_methods},
-        {"cblc_generate_c_emits_builtin_string_methods",
-            test_cblc_generate_c_emits_builtin_string_methods},
-        {"cblc_generate_cobol_emits_builtin_string_methods",
-            test_cblc_generate_cobol_emits_builtin_string_methods},
+        {"cblc_parse_translation_unit_imports_canonical_string_class",
+            test_cblc_parse_translation_unit_imports_canonical_string_class},
+        {"cblc_local_string_declaration_is_a_class_instance",
+            test_cblc_local_string_declaration_is_a_class_instance},
+        {"cblc_string_constructor_arguments_resolve_to_the_class",
+            test_cblc_string_constructor_arguments_resolve_to_the_class},
         {"cblc_parse_translation_unit_records_class_methods",
             test_cblc_parse_translation_unit_records_class_methods},
         {"cblc_parse_translation_unit_records_out_of_class_method_definitions",
@@ -7628,18 +8868,16 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_generate_c_emits_out_of_class_method_definitions},
         {"cblc_generate_c_and_cobol_emit_parameterized_class_lifecycle_and_methods",
             test_cblc_generate_c_and_cobol_emit_parameterized_class_lifecycle_and_methods},
-        {"cblc_generate_c_reuses_string_parameter_method_body",
-            test_cblc_generate_c_reuses_string_parameter_method_body},
-        {"cblc_generate_c_reuses_string_constructor_parameter_body",
-            test_cblc_generate_c_reuses_string_constructor_parameter_body},
+        {"cblc_method_overloads_resolve_by_argument_conversion",
+            test_cblc_method_overloads_resolve_by_argument_conversion},
         {"cblc_generate_c_and_cobol_emit_constructor_overloads_by_arity",
             test_cblc_generate_c_and_cobol_emit_constructor_overloads_by_arity},
         {"cblc_generate_c_and_cobol_emit_copy_constructor_overload",
             test_cblc_generate_c_and_cobol_emit_copy_constructor_overload},
         {"cblc_generate_c_emits_struct_returning_function_and_call_assignment",
             test_cblc_generate_c_emits_struct_returning_function_and_call_assignment},
-        {"cblc_generate_c_emits_external_string_literal_argument",
-            test_cblc_generate_c_emits_external_string_literal_argument},
+        {"cblc_generate_c_emits_external_string_class_argument",
+            test_cblc_generate_c_emits_external_string_class_argument},
         {"cblc_generate_c_emits_external_pointer_argument",
             test_cblc_generate_c_emits_external_pointer_argument},
         {"cblc_generate_c_emits_external_mixed_parameterized_call_arguments",
@@ -7696,8 +8934,8 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_resolve_translation_unit_calls_rejects_unimported_external_parameterized_call},
         {"cblc_resolve_translation_unit_calls_accepts_external_string_variable_argument",
             test_cblc_resolve_translation_unit_calls_accepts_external_string_variable_argument},
-        {"cblc_resolve_translation_unit_calls_accepts_external_string_literal_argument",
-            test_cblc_resolve_translation_unit_calls_accepts_external_string_literal_argument},
+        {"cblc_resolve_translation_unit_calls_accepts_constructed_external_string_argument",
+            test_cblc_resolve_translation_unit_calls_accepts_constructed_external_string_argument},
         {"cblc_resolve_translation_unit_calls_rejects_external_string_argument_type_mismatch",
             test_cblc_resolve_translation_unit_calls_rejects_external_string_argument_type_mismatch},
         {"cblc_resolve_translation_unit_calls_accepts_external_int_pointer_argument",
@@ -7714,6 +8952,11 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_resolve_translation_unit_calls_accepts_external_pointer_return_with_argument},
         {"transpiler_validation_accepts_valid_cobol", test_transpiler_validation_accepts_valid_cobol},
         {"transpiler_validation_accepts_working_storage_program", test_transpiler_validation_accepts_working_storage_program},
+        {"transpiler_validation_resolves_go_to_paragraph_targets", test_transpiler_validation_resolves_go_to_paragraph_targets},
+        {"transpiler_validation_rejects_unresolved_go_to_target", test_transpiler_validation_rejects_unresolved_go_to_target},
+        {"transpiler_validation_resolves_perform_thru_targets", test_transpiler_validation_resolves_perform_thru_targets},
+        {"transpiler_validation_rejects_unresolved_perform_target", test_transpiler_validation_rejects_unresolved_perform_target},
+        {"transpiler_validation_rejects_unresolved_perform_thru_end_target", test_transpiler_validation_rejects_unresolved_perform_thru_end_target},
         {"transpiler_validation_rejects_invalid_cobol", test_transpiler_validation_rejects_invalid_cobol},
         {"lexer_token_get_span_reports_expected_columns",
             test_lexer_token_get_span_reports_expected_columns},
@@ -7742,105 +8985,14 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_frontend_complete_returns_public_members_only},
         {"cblc_frontend_complete_returns_std_namespace_functions",
             test_cblc_frontend_complete_returns_std_namespace_functions},
-        {"cblc_frontend_complete_returns_builtin_string_members",
-            test_cblc_frontend_complete_returns_builtin_string_members}
+        {"cblc_frontend_complete_returns_string_class_members",
+            test_cblc_frontend_complete_returns_string_class_members}
     };
 
     if (count)
         *count = sizeof(tests) / sizeof(tests[0]);
     return (tests);
 }
-FT_TEST(test_cblc_generate_c_emits_builtin_string_equals_literal)
-{
-    const char *source;
-    t_cblc_translation_unit unit;
-    char *generated_c;
-    int status;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(8);\n"
-        "    greeting = \"HI\";\n"
-        "    total = greeting.equals(\"HI\");\n"
-        "    return;\n"
-        "}\n";
-    cblc_translation_unit_init(&unit);
-    generated_c = NULL;
-    status = FT_FAILURE;
-    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "builtin string literal equals C sample should parse") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(cblc_generate_c(&unit, &generated_c),
-            "builtin string literal equals C sample should generate") != FT_SUCCESS)
-        goto cleanup;
-    if (!generated_c)
-        goto cleanup;
-    if (!ft_strnstr(generated_c,
-            "total = cblc_string_equals(main__greeting_buf, main__greeting_len, \"HI\", cblc_string_length(\"HI\"));",
-            std::strlen(generated_c)))
-    {
-        std::printf("Assertion failed: generated C should emit builtin string literal equals helper call\n");
-        goto cleanup;
-    }
-    status = FT_SUCCESS;
-cleanup:
-    if (generated_c)
-        cma_free(generated_c);
-    cblc_translation_unit_dispose(&unit);
-    return (status);
-}
-
-FT_TEST(test_cblc_generate_cobol_emits_builtin_string_equals_literal)
-{
-    const char *source;
-    t_cblc_translation_unit unit;
-    char *generated_cobol;
-    int status;
-
-    source = "int total;\n"
-        "void main()\n"
-        "{\n"
-        "    string greeting(8);\n"
-        "    greeting = \"HI\";\n"
-        "    total = greeting.equals(\"HI\");\n"
-        "    return;\n"
-        "}\n";
-    cblc_translation_unit_init(&unit);
-    generated_cobol = NULL;
-    status = FT_FAILURE;
-    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "builtin string literal equals COBOL sample should parse") != FT_SUCCESS)
-        goto cleanup;
-    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
-            "builtin string literal equals COBOL sample should generate") != FT_SUCCESS)
-        goto cleanup;
-    if (!generated_cobol)
-        goto cleanup;
-    if (!ft_strnstr(generated_cobol,
-            "MOVE \"HI\" TO CBLC-INTRINSIC-MAIN-GREETING-ARG1-BUF.",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol,
-            "COMPUTE CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN = 2.",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol,
-            "PERFORM CBLC-INTRINSIC-MAIN-GREETING-EQUALS.",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol,
-            "IF MAIN-GREETING-LEN = CBLC-INTRINSIC-MAIN-GREETING-ARG1-LEN",
-            std::strlen(generated_cobol)))
-    {
-        std::printf("Assertion failed: generated COBOL should emit builtin string literal equals comparison\n");
-        goto cleanup;
-    }
-    status = FT_SUCCESS;
-cleanup:
-    if (generated_cobol)
-        cma_free(generated_cobol);
-    cblc_translation_unit_dispose(&unit);
-    return (status);
-}
-
 FT_TEST(test_cblc_generate_cobol_emits_sequential_file_io)
 {
     const char *source;
@@ -7869,28 +9021,34 @@ FT_TEST(test_cblc_generate_cobol_emits_sequential_file_io)
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
             "sequential file source should generate COBOL") != FT_SUCCESS)
         goto cleanup;
-    if (!generated_cobol
-        || !ft_strnstr(generated_cobol,
-            "SELECT INPUT ASSIGN TO \"input.txt\" FILE STATUS IS INPUT-STATUS.",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol,
-            "SELECT CBLC-USER-OUTPUT ASSIGN TO \"output.txt\" FILE STATUS IS CBLC-USER-OUTPUT-STATUS.",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "FD INPUT.", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "OPEN INPUT INPUT.", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "PERFORM UNTIL CBLC-EOF-FLAG = 'Y'",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "READ INPUT INTO CBLC-USER-RECORD",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "WRITE CBLC-USER-OUTPUT-RECORD.",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "END-PERFORM.", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "CLOSE INPUT.", std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "CLOSE CBLC-USER-OUTPUT.",
-            std::strlen(generated_cobol)))
     {
-        std::printf("Assertion failed: generated COBOL should contain sequential file I/O\n");
-        goto cleanup;
+        static const char *const required_output[] = {
+            "SELECT INPUT ASSIGN TO \"input.txt\" FILE STATUS IS INPUT-STATUS.",
+            "SELECT CBLC-USER-OUTPUT ASSIGN TO \"output.txt\" FILE STATUS IS CBLC-USER-OUTPUT-STATUS.",
+            "FD INPUT.",
+            "OPEN INPUT INPUT.",
+            "PERFORM UNTIL CBLC-EOF-FLAG = 'Y'",
+            "READ INPUT INTO CBLC-USER-RECORD",
+            "WRITE CBLC-USER-OUTPUT-RECORD",
+            "END-PERFORM.",
+            "CLOSE INPUT.",
+            "CLOSE CBLC-USER-OUTPUT."
+        };
+        size_t index;
+
+        index = 0;
+        while (index < sizeof(required_output) / sizeof(required_output[0]))
+        {
+            if (!generated_cobol
+                || !ft_strnstr(generated_cobol, required_output[index],
+                    std::strlen(generated_cobol)))
+            {
+                std::printf("Assertion failed: generated COBOL is missing sequential file I/O: %s\n",
+                    required_output[index]);
+                goto cleanup;
+            }
+            index += 1;
+        }
     }
     status = FT_SUCCESS;
 cleanup:
@@ -7981,14 +9139,12 @@ FT_TEST(test_cblc_try_catch_nested_rethrow_preserves_outer_dispatch)
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
             "nested rethrow source should generate COBOL") != FT_SUCCESS)
         goto cleanup;
-    inner_catch = ft_strnstr(generated_cobol, "CBLC-TRY-MAIN-1-CATCH-0.",
+    inner_catch = ft_strnstr(generated_cobol, "CBLC-TRY-CALL-",
         std::strlen(generated_cobol));
     if (!inner_catch
         || !ft_strnstr(inner_catch, "PERFORM CBLC-EX-CLEAR-PAYLOAD",
             std::strlen(inner_catch))
-        || !ft_strnstr(generated_cobol, "CBLC-TRY-MAIN-0-CATCH-0.",
-            std::strlen(generated_cobol))
-        || !ft_strnstr(generated_cobol, "GO TO CBLC-TRY-MAIN-0-CATCH-0",
+        || !ft_strnstr(generated_cobol, "GO TO CBLC-TRY-CBLC-TRY-CALL-",
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "MOVE 2 TO CBLC-EX-INT-PAYLOAD",
             std::strlen(generated_cobol)))
@@ -8004,7 +9160,7 @@ cleanup:
     return (status);
 }
 
-FT_TEST(test_cblc_try_catch_double_exception_emits_abort_path)
+FT_TEST(test_cblc_throw_emits_active_raise_guard_and_abort_path)
 {
     const char *source;
     t_cblc_translation_unit unit;
@@ -8014,17 +9170,17 @@ FT_TEST(test_cblc_try_catch_double_exception_emits_abort_path)
 
     source = "void main() {\n"
         "    try { throw 1; }\n"
-        "    catch (int first_error) { throw 2; }\n"
+        "    catch (int first_error) { }\n"
         "}\n";
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     terminate_label = NULL;
     status = FT_FAILURE;
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
-            "double exception source should parse") != FT_SUCCESS)
+            "exception source should parse") != FT_SUCCESS)
         goto cleanup;
     if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
-            "double exception source should generate COBOL") != FT_SUCCESS)
+            "exception source should generate COBOL") != FT_SUCCESS)
         goto cleanup;
     terminate_label = ft_strnstr(generated_cobol, "CBLC-TERMINATE.",
         std::strlen(generated_cobol));
@@ -8034,11 +9190,14 @@ FT_TEST(test_cblc_try_catch_double_exception_emits_abort_path)
             std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "TO CBLC-EX-SECONDARY-TYPE-ID",
             std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol,
+            "MOVE 'Y' TO CBLC-EX-CLEANING\n           PERFORM CBLC-EX-CLEAR-PAYLOAD",
+            std::strlen(generated_cobol))
         || !ft_strnstr(generated_cobol, "PERFORM CBLC-TERMINATE",
             std::strlen(generated_cobol))
         || !ft_strnstr(terminate_label, "STOP RUN.", std::strlen(terminate_label)))
     {
-        std::printf("Assertion failed: exceptions raised during cleanup should abort through CBLC-TERMINATE\n");
+        std::printf("Assertion failed: generated throws should guard against re-entry during raising/cleanup and provide fatal termination\n");
         goto cleanup;
     }
     status = FT_SUCCESS;

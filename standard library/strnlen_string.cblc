@@ -1,7 +1,0 @@
-int F(string source, int request)
-{
-    int result;
-    String object(source);
-    result = object.strnlen(request);
-    return result;
-}

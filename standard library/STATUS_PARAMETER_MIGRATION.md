@@ -63,13 +63,13 @@ value:
 Representational limits in the COBOL implementation are not a second result.
 Define a numeric overflow policy and, where needed, throw `range_error`.
 
-## Remove status from managed String methods
+## Remove status from managed `string` methods
 
 Managed strings own their capacity. They should grow or throw, not report C
 buffer truncation through an integer parameter.
 
 ```cblc
-class String
+class string
 {
     void assign(string source);
     void assign(string source, int count);
@@ -83,7 +83,7 @@ class String
 | --- | --- |
 | `strcpy(source, status)` | `assign(source)` |
 | `strncpy(source, request, status)` | `assign(source, request)` |
-| `strcat(left, right, status)` | Assignment followed by `append`, or a static `concat` returning `String`. |
+| `strcat(left, right, status)` | Assignment followed by `append`, or a static `concat` returning `string`. |
 | `toupper(status)` | `to_upper()` returning `void`. |
 | `tolower(status)` | `to_lower()` returning `void`. |
 
@@ -188,7 +188,7 @@ destination capacity. An integer status does not make that interface safe.
 
 Split the APIs:
 
-- managed `String` methods grow safely and have no status;
+- managed `string` methods grow safely and have no status;
 - raw compatibility functions retain familiar behavior and eventually return
   the destination pointer where pointer returns are supported;
 - checked raw functions take an explicit capacity and return a named result.
@@ -214,7 +214,7 @@ and should be diagnosed before entering the helper where possible.
 | Source unit or family | Action |
 | --- | --- |
 | `fabs`, `sin`, `cos`, `tan`, `min`, `max`, `date_duration` | Delete status immediately; it carries no information. |
-| `toupper`, `tolower` | Character forms return the converted character; String forms mutate and return `void`. |
+| `toupper`, `tolower` | Character forms return the converted character; `string` forms mutate and return `void`. |
 | `floor`, `ceil`, `rounded` | Return the result; throw `range_error` only when required. |
 | `abs` | Return `int`; replace status 1 with `overflow_error`. |
 | `exp`, `log`, `sqrt`, `powerof` | Return `double`; replace domain/range status with typed exceptions. |
@@ -224,7 +224,7 @@ and should be diagnosed before entering the helper where possible.
 | `strcmp`, `memcmp` | Return the comparison result directly; keep raw buffer lengths explicit. |
 | `isalpha`, `isdigit` | Return the classification result directly. |
 | `date_yyyymmdd` | Return `DateParseResult` or `Date`; replace numeric statuses with a named enum. |
-| managed String copy/concatenation | Use assignment and append methods without status. |
+| managed `string` copy/concatenation | Use assignment and append methods without status. |
 | raw `strcpy`, `strncpy`, `strcat` | Keep compatibility separately; add checked APIs returning `CopyResult`. |
 
 ## Implementation plan
@@ -235,7 +235,7 @@ The first migration slice is implemented:
 
 - total numeric helpers now return values directly, including comparisons and
   character predicates;
-- managed String adapters no longer expose helper status parameters;
+- managed `string` class methods no longer expose helper status parameters;
 - direct-return lowering supports integer and double results for functions and
   class methods;
 - `DateParseResult` is a genuine multi-field by-value result. Its generated
@@ -246,7 +246,7 @@ The first migration slice is implemented:
 - `cblc::parse_int` and `cblc::parse_double` now return three-field value
   objects (`value`, `consumed`, and `error`) for callers that need to
   distinguish invalid syntax, trailing characters, and range failures;
-- managed `String` assignment, append, and concatenation now use the dynamic
+- managed `string` assignment, append, and concatenation now use the dynamic
   string value operations, so they grow with the owned value instead of
   silently stopping at a literal 255-byte limit;
 - raw buffer copy status remains at the explicitly unsafe compatibility
@@ -280,12 +280,15 @@ case conversion. Change CBL-C lowering to use a normal return value. Keep old
 Tests must assert public signatures and behavior, not only generated COBOL
 text.
 
-### Phase 3: migrate managed String methods
+### Phase 3: migrate managed `string` class methods
 
 Rename methods to `assign`, `append`, `to_upper`, and `to_lower`, and remove
 status parameters. Test capacity growth and RAII cleanup on normal returns and
-exception paths. Keep old `*_string.cblc` entry programs as thin adapters
-during the ABI compatibility period.
+exception paths. The former fixed-buffer `*_string.cblc` entry programs have
+been removed. Do not restore them; raw character-buffer helpers must use an
+explicit `char[]`/pointer contract rather than infer a representation from the
+source spelling `string`. Any future external ABI adapter must have a distinct,
+versioned name and an explicit raw-buffer contract.
 
 ### Phase 4: add typed failures
 

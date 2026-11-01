@@ -31,24 +31,9 @@ int transpiler_standard_library_generate_strlen(char **out_text)
     return (transpiler_standard_library_generate_native_compat("CBLC-STRLEN", out_text));
 }
 
-int transpiler_standard_library_generate_strlen_string(char **out_text)
-{
-    return (transpiler_standard_library_generate_native_compat("CBLC-STRLEN-STRING", out_text));
-}
-
 int transpiler_standard_library_generate_strnlen(char **out_text)
 {
     return (transpiler_standard_library_generate_native_compat("CBLC-STRNLEN", out_text));
-}
-
-int transpiler_standard_library_generate_strnlen_string(char **out_text)
-{
-    return (transpiler_standard_library_generate_native_compat("CBLC-STRNLEN-STRING", out_text));
-}
-
-int transpiler_standard_library_generate_strcmp_string(char **out_text)
-{
-    return (transpiler_standard_library_generate_native_compat("CBLC-STRCMP-STRING", out_text));
 }
 
 int transpiler_standard_library_generate_toupper(char **out_text)
@@ -71,19 +56,9 @@ int transpiler_standard_library_generate_strcpy(char **out_text)
     return (transpiler_standard_library_generate_native_compat("CBLC-STRCPY", out_text));
 }
 
-int transpiler_standard_library_generate_strcpy_string(char **out_text)
-{
-    return (transpiler_standard_library_generate_native_compat("CBLC-STRCPY-STRING", out_text));
-}
-
 int transpiler_standard_library_generate_strncpy(char **out_text)
 {
     return (transpiler_standard_library_generate_native_compat("CBLC-STRNCPY", out_text));
-}
-
-int transpiler_standard_library_generate_strncpy_string(char **out_text)
-{
-    return (transpiler_standard_library_generate_native_compat("CBLC-STRNCPY-STRING", out_text));
 }
 
 int transpiler_standard_library_generate_memcmp(char **out_text)
@@ -91,29 +66,9 @@ int transpiler_standard_library_generate_memcmp(char **out_text)
     return (transpiler_standard_library_generate_native_compat("CBLC-MEMCMP", out_text));
 }
 
-int transpiler_standard_library_generate_memcmp_string(char **out_text)
-{
-    return (transpiler_standard_library_generate_native_compat("CBLC-MEMCMP-STRING", out_text));
-}
-
 int transpiler_standard_library_generate_strcat(char **out_text)
 {
     return (transpiler_standard_library_generate_native_compat("CBLC-STRCAT", out_text));
-}
-
-int transpiler_standard_library_generate_strcat_string(char **out_text)
-{
-    return (transpiler_standard_library_generate_native_compat("CBLC-STRCAT-STRING", out_text));
-}
-
-int transpiler_standard_library_generate_toupper_string(char **out_text)
-{
-    return (transpiler_standard_library_generate_native_compat("CBLC-TOUPPER-STRING", out_text));
-}
-
-int transpiler_standard_library_generate_tolower_string(char **out_text)
-{
-    return (transpiler_standard_library_generate_native_compat("CBLC-TOLOWER-STRING", out_text));
 }
 
 int transpiler_standard_library_generate_atoi(char **out_text)
@@ -121,29 +76,14 @@ int transpiler_standard_library_generate_atoi(char **out_text)
     return (transpiler_standard_library_generate_native_compat("CBLC-ATOI", out_text));
 }
 
-int transpiler_standard_library_generate_atoi_string(char **out_text)
-{
-    return (transpiler_standard_library_generate_native_compat("CBLC-ATOI-STRING", out_text));
-}
-
 int transpiler_standard_library_generate_atol(char **out_text)
 {
     return (transpiler_standard_library_generate_native_compat("CBLC-ATOL", out_text));
 }
 
-int transpiler_standard_library_generate_atol_string(char **out_text)
-{
-    return (transpiler_standard_library_generate_native_compat("CBLC-ATOL-STRING", out_text));
-}
-
 int transpiler_standard_library_generate_atoll(char **out_text)
 {
     return (transpiler_standard_library_generate_native_compat("CBLC-ATOLL", out_text));
-}
-
-int transpiler_standard_library_generate_atoll_string(char **out_text)
-{
-    return (transpiler_standard_library_generate_native_compat("CBLC-ATOLL-STRING", out_text));
 }
 
 int transpiler_standard_library_generate_fabs(char **out_text)
@@ -244,9 +184,4 @@ int transpiler_standard_library_generate_date_duration(char **out_text)
 int transpiler_standard_library_generate_strtod(char **out_text)
 {
     return (transpiler_standard_library_generate_native_compat("CBLC-STRTOD", out_text));
-}
-
-int transpiler_standard_library_generate_strtod_string(char **out_text)
-{
-    return (transpiler_standard_library_generate_native_compat("CBLC-STRTOD-STRING", out_text));
 }

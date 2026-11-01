@@ -7,10 +7,10 @@
     {
       "kind": "target",
       "id": "MAIN",
-      "path": "tmp_vector_api_probe.cob",
-      "source_hash": "fnv1a64:8728c48eb22627fb",
+      "path": "probe_based_receiver.cob",
+      "source_hash": "fnv1a64:d0a18ee3ead7c113",
       "module_dependencies": [],
-      "hash": "fnv1a64:82301679e14aa9d6",
+      "hash": "fnv1a64:c3e940c714d31f35",
       "dependencies": []
     }
   ]

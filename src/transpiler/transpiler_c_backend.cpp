@@ -129,13 +129,6 @@ static int c_backend_buffer_append_line(t_c_backend_buffer *buffer, const char *
     return (FT_SUCCESS);
 }
 
-static int c_backend_is_builtin_string_type_name(const char *type_name)
-{
-    if (!type_name)
-        return (0);
-    return (std::strncmp(type_name, "string", TRANSPILE_IDENTIFIER_MAX) == 0);
-}
-
 static int c_backend_is_pointer_kind(t_cblc_data_kind kind)
 {
     if (kind == CBLC_DATA_KIND_VOID_POINTER)
@@ -248,38 +241,6 @@ static const t_cblc_data_item *c_backend_find_data_item_by_cobol(const t_cblc_tr
     return (alias_match);
 }
 
-static const t_cblc_data_item *c_backend_find_data_item(const t_cblc_translation_unit *unit,
-    const char *source_name)
-{
-    size_t index;
-    const t_cblc_data_item *alias_match;
-
-    if (!unit || !source_name)
-        return (NULL);
-    alias_match = NULL;
-    index = 0;
-    while (index < unit->data_count)
-    {
-        if (std::strncmp(unit->data_items[index].source_name, source_name,
-                sizeof(unit->data_items[index].source_name)) == 0)
-        {
-            if (!unit->data_items[index].is_active
-                && (!unit->data_items[index].is_function_local
-                    || unit->data_items[index].is_alias))
-            {
-                index += 1;
-                continue ;
-            }
-            if (!unit->data_items[index].is_alias)
-                return (&unit->data_items[index]);
-            if (!alias_match)
-                alias_match = &unit->data_items[index];
-        }
-        index += 1;
-    }
-    return (alias_match);
-}
-
 static const t_cblc_struct_type *c_backend_find_struct_type(const t_cblc_translation_unit *unit,
     const char *identifier)
 {
@@ -328,6 +289,59 @@ static const t_cblc_data_item *c_backend_find_data_item_by_source(
         index += 1;
     }
     return (alias_match);
+}
+
+static const t_cblc_data_item *c_backend_find_statement_argument_item(
+    const t_cblc_translation_unit *unit, const t_cblc_statement *statement,
+    const char *source_name)
+{
+    const t_cblc_data_item *item;
+    const t_cblc_data_item *destination;
+    const t_cblc_data_item *match;
+    size_t index;
+
+    if (!unit || !statement || !source_name)
+        return (NULL);
+    destination = c_backend_find_data_item_by_cobol(unit, statement->target);
+    if (destination && destination->owner_function_name[0] == '\0')
+        for (index = 0; index < unit->data_count; ++index)
+        {
+            const t_cblc_data_item *candidate = &unit->data_items[index];
+
+            if (candidate->is_function_local && !candidate->is_alias
+                && candidate->owner_function_name[0] != '\0'
+                && std::strcmp(candidate->cobol_name,
+                    destination->cobol_name) == 0)
+            {
+                destination = candidate;
+                break;
+            }
+        }
+    if (destination && destination->owner_function_name[0] != '\0')
+    {
+        match = NULL;
+        index = 0;
+        while (index < unit->data_count)
+        {
+            const t_cblc_data_item *candidate = &unit->data_items[index];
+
+            if (candidate->is_function_local && !candidate->is_alias
+                && candidate->local_source_name[0] != '\0'
+                && std::strcmp(candidate->local_source_name, source_name) == 0
+                && std::strcmp(candidate->owner_function_name,
+                    destination->owner_function_name) == 0)
+            {
+                if (match)
+                    return (NULL);
+                match = candidate;
+            }
+            index += 1;
+        }
+        if (match)
+            return (match);
+    }
+    item = c_backend_find_data_item_by_source(unit, source_name);
+    return (item);
 }
 
 static int c_backend_has_function_owner(const t_cblc_translation_unit *unit, const char *owner_name)
@@ -589,6 +603,39 @@ static int c_backend_expression_append(char *buffer, size_t buffer_size, const c
     return (FT_SUCCESS);
 }
 
+static const t_cblc_parameter *c_backend_find_method_parameter_by_cobol(
+    const t_cblc_translation_unit *unit, const char *cobol_name)
+{
+    size_t type_index;
+
+    if (!unit || !cobol_name)
+        return (NULL);
+    type_index = 0;
+    while (type_index < unit->struct_type_count)
+    {
+        const t_cblc_struct_type *type = &unit->struct_types[type_index];
+        size_t method_index = 0;
+
+        while (method_index < type->method_count)
+        {
+            const t_cblc_method *method = &type->methods[method_index];
+            size_t parameter_index = 0;
+
+            while (parameter_index < method->parameter_count)
+            {
+                const t_cblc_parameter *parameter = &method->parameters[parameter_index];
+
+                if (std::strcmp(parameter->cobol_name, cobol_name) == 0)
+                    return (parameter);
+                parameter_index += 1;
+            }
+            method_index += 1;
+        }
+        type_index += 1;
+    }
+    return (NULL);
+}
+
 static int c_backend_map_identifier_to_c(const t_cblc_translation_unit *unit, const char *token,
     char *buffer, size_t buffer_size)
 {
@@ -628,7 +675,7 @@ static int c_backend_map_identifier_to_c(const t_cblc_translation_unit *unit, co
             return (FT_FAILURE);
         if (suffix[0] != '\0')
         {
-            if (item->kind != CBLC_DATA_KIND_STRING)
+            if (item->kind != CBLC_DATA_KIND_CHAR_BUFFER)
                 return (FT_FAILURE);
             if (std::strncmp(suffix, "-LEN", sizeof(suffix)) == 0)
             {
@@ -660,7 +707,7 @@ static int c_backend_map_identifier_to_c(const t_cblc_translation_unit *unit, co
             return (FT_FAILURE);
         if (suffix[0] != '\0')
         {
-            if (item->kind != CBLC_DATA_KIND_STRING)
+            if (item->kind != CBLC_DATA_KIND_CHAR_BUFFER)
                 return (FT_FAILURE);
             if (std::strncmp(suffix, "-LEN", sizeof(suffix)) == 0)
             {
@@ -702,6 +749,18 @@ static int c_backend_map_identifier_to_c(const t_cblc_translation_unit *unit, co
         {
             if (std::snprintf(buffer, buffer_size, "%s[%zu]", item->source_name,
                     one_based_index - 1) < 0)
+                return (FT_FAILURE);
+            return (FT_SUCCESS);
+        }
+    }
+    {
+        const t_cblc_parameter *method_parameter;
+
+        method_parameter = c_backend_find_method_parameter_by_cobol(unit, token);
+        if (method_parameter && method_parameter->actual_source_name[0] != '\0')
+        {
+            if (ft_strlcpy(buffer, method_parameter->actual_source_name, buffer_size)
+                >= buffer_size)
                 return (FT_FAILURE);
             return (FT_SUCCESS);
         }
@@ -794,6 +853,62 @@ static int c_backend_translate_expression(const t_cblc_translation_unit *unit, c
     buffer[0] = '\0';
     if (!unit || !expression)
         return (FT_FAILURE);
+    if (std::strstr(expression, "->") && std::strncmp(expression, "receiver->", 9) != 0)
+    {
+        const char *arrow;
+        const char *field_end;
+        const t_cblc_data_item *pointer_item;
+        const t_cblc_struct_type *type;
+        const t_cblc_struct_field *field;
+        char base_name[TRANSPILE_IDENTIFIER_MAX];
+        char field_name[TRANSPILE_IDENTIFIER_MAX];
+        char pointer_ref[TRANSPILE_STATEMENT_TEXT_MAX];
+        size_t base_length;
+        size_t field_length;
+        size_t field_index;
+
+        arrow = std::strstr(expression, "->");
+        base_length = static_cast<size_t>(arrow - expression);
+        if (base_length == 0 || base_length >= sizeof(base_name))
+            return (FT_FAILURE);
+        std::memcpy(base_name, expression, base_length);
+        base_name[base_length] = '\0';
+        pointer_item = c_backend_find_data_item_by_source(unit, base_name);
+        if (!pointer_item)
+            pointer_item = c_backend_find_data_item_by_cobol(unit, base_name);
+        if (!pointer_item || pointer_item->kind != CBLC_DATA_KIND_STRUCT_POINTER)
+            return (FT_FAILURE);
+        type = c_backend_find_struct_type(unit, pointer_item->struct_type_name);
+        if (!type)
+            return (FT_FAILURE);
+        field_end = arrow + 2;
+        while (*field_end != '\0' && *field_end != '.' && *field_end != '[')
+            field_end += 1;
+        field_length = static_cast<size_t>(field_end - (arrow + 2));
+        if (field_length == 0 || field_length >= sizeof(field_name) || field_end[0] != '\0')
+            return (FT_FAILURE);
+        std::memcpy(field_name, arrow + 2, field_length);
+        field_name[field_length] = '\0';
+        field = NULL;
+        field_index = 0;
+        while (field_index < type->field_count)
+        {
+            if (std::strcmp(type->fields[field_index].source_name, field_name) == 0)
+            {
+                field = &type->fields[field_index];
+                break ;
+            }
+            field_index += 1;
+        }
+        if (!field || (field->kind != CBLC_DATA_KIND_INT && field->kind != CBLC_DATA_KIND_CHAR)
+            || c_backend_map_identifier_to_c(unit, base_name, pointer_ref,
+                sizeof(pointer_ref)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (std::snprintf(buffer, buffer_size, "%s->%s", pointer_ref, field_name) < 0
+            || std::strlen(buffer) >= buffer_size)
+            return (FT_FAILURE);
+        return (FT_SUCCESS);
+    }
     if (expression[0] == '('
         && c_backend_translate_pointer_cast_expression(unit, expression, buffer,
             buffer_size) == FT_SUCCESS)
@@ -1111,7 +1226,7 @@ static int c_backend_emit_assignment(const t_cblc_translation_unit *unit, const 
                 }
                 type_index += 1;
             }
-            if (field && field->kind == CBLC_DATA_KIND_STRING)
+            if (field && field->kind == CBLC_DATA_KIND_CHAR_BUFFER)
             {
                 char buffer_ref[TRANSPILE_STATEMENT_TEXT_MAX];
                 char length_ref[TRANSPILE_STATEMENT_TEXT_MAX];
@@ -1160,7 +1275,7 @@ static int c_backend_emit_assignment(const t_cblc_translation_unit *unit, const 
                     char source_length_ref[TRANSPILE_STATEMENT_TEXT_MAX];
 
                     source_item = c_backend_find_data_item_by_source(unit, statement->source);
-                    if (!source_item || source_item->kind != CBLC_DATA_KIND_STRING
+                    if (!source_item || source_item->kind != CBLC_DATA_KIND_CHAR_BUFFER
                         || c_backend_build_string_buf_ref(source_item, source_buffer_ref,
                             sizeof(source_buffer_ref)) != FT_SUCCESS
                         || c_backend_build_string_len_ref(source_item, source_length_ref,
@@ -1212,7 +1327,7 @@ static int c_backend_emit_assignment(const t_cblc_translation_unit *unit, const 
         char mapped_length[TRANSPILE_STATEMENT_TEXT_MAX];
 
         item = c_backend_find_data_item_by_cobol(unit, base);
-        if (!item || item->kind != CBLC_DATA_KIND_STRING)
+        if (!item || item->kind != CBLC_DATA_KIND_CHAR_BUFFER)
             return (FT_FAILURE);
         if (!statement->is_literal)
             return (FT_FAILURE);
@@ -1299,7 +1414,7 @@ static int c_backend_emit_assignment(const t_cblc_translation_unit *unit, const 
         const t_cblc_data_item *length_item;
 
         length_item = c_backend_find_data_item_by_cobol(unit, base);
-        if (!length_item || length_item->kind != CBLC_DATA_KIND_STRING)
+        if (!length_item || length_item->kind != CBLC_DATA_KIND_CHAR_BUFFER)
             return (FT_FAILURE);
         if (c_backend_translate_expression(unit, statement->source, expression,
                 sizeof(expression)) != FT_SUCCESS)
@@ -1326,7 +1441,7 @@ static int c_backend_emit_assignment(const t_cblc_translation_unit *unit, const 
                 return (FT_FAILURE);
         }
     }
-    if (effective_kind == CBLC_DATA_KIND_STRING)
+    if (effective_kind == CBLC_DATA_KIND_CHAR_BUFFER)
     {
         const t_cblc_data_item *source_item;
         char source_base[TRANSPILE_IDENTIFIER_MAX];
@@ -1347,7 +1462,7 @@ static int c_backend_emit_assignment(const t_cblc_translation_unit *unit, const 
             != FT_SUCCESS || source_suffix[0] != '\0')
             return (FT_FAILURE);
         source_item = c_backend_find_data_item_by_cobol(unit, source_base);
-        if (!source_item || source_item->kind != CBLC_DATA_KIND_STRING)
+        if (!source_item || source_item->kind != CBLC_DATA_KIND_CHAR_BUFFER)
             return (FT_FAILURE);
         if (has_index)
         {
@@ -1605,6 +1720,66 @@ static int c_backend_emit_display(const t_cblc_translation_unit *unit, const t_c
     {
         char value_ref[TRANSPILE_STATEMENT_TEXT_MAX];
 
+        if (std::strstr(statement->source, "->"))
+        {
+            const char *arrow;
+            const char *field_end;
+            const t_cblc_data_item *pointer_item;
+            const t_cblc_struct_type *type;
+            const t_cblc_struct_field *field;
+            char base_name[TRANSPILE_IDENTIFIER_MAX];
+            char field_name[TRANSPILE_IDENTIFIER_MAX];
+            char pointer_ref[TRANSPILE_STATEMENT_TEXT_MAX];
+            size_t base_length;
+            size_t field_length;
+            size_t field_index;
+
+            arrow = std::strstr(statement->source, "->");
+            base_length = static_cast<size_t>(arrow - statement->source);
+            if (base_length == 0 || base_length >= sizeof(base_name))
+                return (FT_FAILURE);
+            std::memcpy(base_name, statement->source, base_length);
+            base_name[base_length] = '\0';
+            pointer_item = c_backend_find_data_item_by_source(unit, base_name);
+            if (!pointer_item)
+                pointer_item = c_backend_find_data_item_by_cobol(unit, base_name);
+            if (!pointer_item || pointer_item->kind != CBLC_DATA_KIND_STRUCT_POINTER)
+                return (FT_FAILURE);
+            type = c_backend_find_struct_type(unit, pointer_item->struct_type_name);
+            if (!type)
+                return (FT_FAILURE);
+            field_end = arrow + 2;
+            while (*field_end != '\0' && *field_end != '.' && *field_end != '[')
+                field_end += 1;
+            field_length = static_cast<size_t>(field_end - (arrow + 2));
+            if (field_length == 0 || field_length >= sizeof(field_name))
+                return (FT_FAILURE);
+            std::memcpy(field_name, arrow + 2, field_length);
+            field_name[field_length] = '\0';
+            field = NULL;
+            field_index = 0;
+            while (field_index < type->field_count)
+            {
+                if (std::strcmp(type->fields[field_index].source_name, field_name) == 0)
+                {
+                    field = &type->fields[field_index];
+                    break ;
+                }
+                field_index += 1;
+            }
+            if (!field || field_end[0] != '\0'
+                || c_backend_map_identifier_to_c(unit, base_name, pointer_ref,
+                    sizeof(pointer_ref)) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (field->kind == CBLC_DATA_KIND_INT)
+                return (c_backend_buffer_append_format_line(buffer,
+                    "    cblc_display_int(%s->%s);", pointer_ref, field_name));
+            if (field->kind == CBLC_DATA_KIND_CHAR)
+                return (c_backend_buffer_append_format_line(buffer,
+                    "    cblc_display_char_buffer(&%s->%s, 1);", pointer_ref, field_name));
+            return (FT_FAILURE);
+        }
+
         if (statement->source[0] == '*')
         {
             const t_cblc_data_item *item;
@@ -1645,7 +1820,7 @@ static int c_backend_emit_display(const t_cblc_translation_unit *unit, const t_c
             item = c_backend_find_data_item_by_cobol(unit, base);
             if (!item)
                 return (FT_FAILURE);
-            if (item->kind == CBLC_DATA_KIND_STRING && suffix[0] == '\0')
+            if (item->kind == CBLC_DATA_KIND_CHAR_BUFFER && suffix[0] == '\0')
             {
                 if (std::snprintf(buffer_token, sizeof(buffer_token), "%s-BUF[%s]", base, value_ref) < 0)
                     return (FT_FAILURE);
@@ -1663,7 +1838,7 @@ static int c_backend_emit_display(const t_cblc_translation_unit *unit, const t_c
                     return (FT_FAILURE);
                 return (FT_SUCCESS);
             }
-            if (item->kind == CBLC_DATA_KIND_STRING
+            if (item->kind == CBLC_DATA_KIND_CHAR_BUFFER
                 && std::strncmp(suffix, "-LEN", sizeof(suffix)) == 0)
             {
                 char length_ref_expr[TRANSPILE_STATEMENT_TEXT_MAX];
@@ -1696,7 +1871,7 @@ static int c_backend_emit_display(const t_cblc_translation_unit *unit, const t_c
             const t_cblc_data_item *item;
 
             item = c_backend_find_data_item_by_cobol(unit, base);
-            if (item && item->kind == CBLC_DATA_KIND_STRING && suffix[0] == '\0')
+            if (item && item->kind == CBLC_DATA_KIND_CHAR_BUFFER && suffix[0] == '\0')
             {
                 char buffer_token[TRANSPILE_STATEMENT_TEXT_MAX];
                 char length_token[TRANSPILE_STATEMENT_TEXT_MAX];
@@ -1731,7 +1906,7 @@ static int c_backend_emit_display(const t_cblc_translation_unit *unit, const t_c
                     return (FT_FAILURE);
                 return (FT_SUCCESS);
             }
-            if (item && item->kind == CBLC_DATA_KIND_STRING
+            if (item && item->kind == CBLC_DATA_KIND_CHAR_BUFFER
                 && std::strncmp(suffix, "-LEN", sizeof(suffix)) == 0)
             {
                 char length_ref[TRANSPILE_STATEMENT_TEXT_MAX];
@@ -1887,7 +2062,7 @@ static int c_backend_emit_parameter_argument_moves(const t_cblc_translation_unit
                     parameters[index].actual_source_name, item->source_name) != FT_SUCCESS)
                 return (FT_FAILURE);
         }
-        else if (parameters[index].kind == TRANSPILE_FUNCTION_PARAMETER_STRING)
+        else if (parameters[index].kind == TRANSPILE_FUNCTION_PARAMETER_CHAR_BUFFER)
         {
             const t_cblc_data_item *item;
             const t_cblc_data_item *target_item;
@@ -1897,10 +2072,10 @@ static int c_backend_emit_parameter_argument_moves(const t_cblc_translation_unit
             char source_length_ref[TRANSPILE_STATEMENT_TEXT_MAX];
 
             item = c_backend_find_data_item_by_source(unit, argument);
-            if (!item || item->kind != CBLC_DATA_KIND_STRING)
+            if (!item || item->kind != CBLC_DATA_KIND_CHAR_BUFFER)
                 return (FT_FAILURE);
             target_item = c_backend_find_data_item_by_source(unit, parameters[index].actual_source_name);
-            if (!target_item || target_item->kind != CBLC_DATA_KIND_STRING)
+            if (!target_item || target_item->kind != CBLC_DATA_KIND_CHAR_BUFFER)
                 return (FT_FAILURE);
             if (c_backend_build_string_buf_ref(target_item, target_buffer_ref,
                     sizeof(target_buffer_ref)) != FT_SUCCESS)
@@ -1972,7 +2147,8 @@ static const t_cblc_constructor *c_backend_find_constructor_for_statement(
             if (constructor->parameters[parameter_index].kind
                 == TRANSPILE_FUNCTION_PARAMETER_STRUCT)
             {
-                item = c_backend_find_data_item_by_source(unit, argument);
+                item = c_backend_find_statement_argument_item(unit, statement,
+                    argument);
                 if (!item || item->kind != CBLC_DATA_KIND_STRUCT
                     || std::strncmp(item->struct_type_name,
                         constructor->parameters[parameter_index].type_name,
@@ -1984,7 +2160,8 @@ static const t_cblc_constructor *c_backend_find_constructor_for_statement(
             }
             else
             {
-                item = c_backend_find_data_item_by_source(unit, argument);
+                item = c_backend_find_statement_argument_item(unit, statement,
+                    argument);
                 if (item && item->kind == CBLC_DATA_KIND_STRUCT)
                 {
                     matches = 0;
@@ -2221,7 +2398,7 @@ static int c_backend_emit_lifecycle_recursive(const t_cblc_translation_unit *uni
         if (std::snprintf(member_target, sizeof(member_target), "%s.%s", target,
                 type->fields[index].source_name) < 0)
             return (FT_FAILURE);
-        if (type->fields[index].kind == CBLC_DATA_KIND_STRING)
+        if (type->fields[index].kind == CBLC_DATA_KIND_CHAR_BUFFER)
         {
             if (type->fields[index].array_count > 0)
             {
@@ -2473,7 +2650,7 @@ static int c_backend_lifecycle_body_is_reusable(const t_cblc_struct_type *type,
                 field_token_length = std::strlen(field_token);
                 if (std::strncmp(statements[index].target, field_token,
                         field_token_length) == 0
-                    && type->fields[field_index].kind == CBLC_DATA_KIND_STRING
+                    && type->fields[field_index].kind == CBLC_DATA_KIND_CHAR_BUFFER
                     && (statements[index].target[field_token_length] == '\0'
                         || std::strncmp(statements[index].target + field_token_length,
                             "-BUF", 4) == 0
@@ -2524,7 +2701,7 @@ static int c_backend_emit_receiver_member_lifecycle(const t_cblc_translation_uni
         }
         field_index += 1;
     }
-    if (!field || field->kind != CBLC_DATA_KIND_STRING
+    if (!field || field->kind != CBLC_DATA_KIND_CHAR_BUFFER
         || std::strchr(field_name, '.') != NULL)
         return (FT_FAILURE);
     if (std::snprintf(field_expression, sizeof(field_expression), "receiver->%s",
@@ -2571,7 +2748,7 @@ static int c_backend_emit_receiver_member_assignment(const t_cblc_translation_un
         }
         field_index += 1;
     }
-    if (!field || field->kind != CBLC_DATA_KIND_STRING
+    if (!field || field->kind != CBLC_DATA_KIND_CHAR_BUFFER
         || std::snprintf(field_expression, sizeof(field_expression), "receiver->%s",
             field->source_name) < 0)
         return (FT_FAILURE);
@@ -2590,7 +2767,7 @@ static int c_backend_emit_receiver_member_assignment(const t_cblc_translation_un
     source_item = c_backend_find_data_item_by_source(unit, statement->source);
     if (!source_item)
         source_item = c_backend_find_data_item_by_cobol(unit, statement->source);
-    if (!source_item || source_item->kind != CBLC_DATA_KIND_STRING
+    if (!source_item || source_item->kind != CBLC_DATA_KIND_CHAR_BUFFER
         || c_backend_build_string_buf_ref(source_item, source_buffer,
             sizeof(source_buffer)) != FT_SUCCESS
         || c_backend_build_string_len_ref(source_item, source_length,
@@ -2677,7 +2854,7 @@ static int c_backend_emit_lifecycle(const t_cblc_translation_unit *unit, const t
     item = c_backend_find_data_item_by_cobol(unit, statement->target);
     if (!item)
         return (FT_FAILURE);
-    if (item->kind == CBLC_DATA_KIND_STRING)
+    if (item->kind == CBLC_DATA_KIND_CHAR_BUFFER)
     {
         t_cblc_statement argument_statement;
         char argument[TRANSPILE_STATEMENT_TEXT_MAX];
@@ -2729,7 +2906,7 @@ static int c_backend_emit_lifecycle(const t_cblc_translation_unit *unit, const t
                     buffer_ref, item->length, length_ref, encoded));
         }
         source_item = c_backend_find_data_item_by_source(unit, argument);
-        if (!source_item || source_item->kind != CBLC_DATA_KIND_STRING)
+        if (!source_item || source_item->kind != CBLC_DATA_KIND_CHAR_BUFFER)
             return (FT_FAILURE);
         {
             char source_buffer_ref[TRANSPILE_STATEMENT_TEXT_MAX];
@@ -2990,7 +3167,8 @@ static int c_backend_emit_method_body(const t_cblc_translation_unit *unit,
                 return (FT_SUCCESS);
             }
 
-            if (method->return_kind == CBLC_FUNCTION_RETURN_INT
+            if (method->return_kind == CBLC_FUNCTION_RETURN_CHAR
+                || method->return_kind == CBLC_FUNCTION_RETURN_INT
                 || method->return_kind == CBLC_FUNCTION_RETURN_STRUCT
                 || method->return_kind == CBLC_FUNCTION_RETURN_VOID_POINTER
                 || method->return_kind == CBLC_FUNCTION_RETURN_CHAR_POINTER
@@ -3152,13 +3330,22 @@ static int c_backend_method_function_name(const t_cblc_translation_unit *unit,
     const t_cblc_struct_type *type, const t_cblc_method *method, char *buffer,
     size_t buffer_size)
 {
+    char overload_suffix[32];
+
     if (!unit || !type || !method || !buffer || buffer_size == 0)
+        return (FT_FAILURE);
+    overload_suffix[0] = '\0';
+    if (method->overload_index > 0
+        && (std::snprintf(overload_suffix, sizeof(overload_suffix),
+                "_overload_%zu", method->overload_index) < 0
+            || std::strlen(overload_suffix) >= sizeof(overload_suffix)))
         return (FT_FAILURE);
     if (unit->program_name[0] == '\0'
         || std::strncmp(unit->program_name, "MAIN", sizeof(unit->program_name)) == 0)
     {
-        if (std::snprintf(buffer, buffer_size, "cblc_method_%s_%s", type->source_name,
-                method->source_name) < 0)
+        if (std::snprintf(buffer, buffer_size, "cblc_method_%s_%s%s", type->source_name,
+                method->source_name, overload_suffix) < 0
+            || std::strlen(buffer) >= buffer_size)
             return (FT_FAILURE);
     }
     else
@@ -3166,8 +3353,9 @@ static int c_backend_method_function_name(const t_cblc_translation_unit *unit,
         size_t length;
         size_t index;
 
-        if (std::snprintf(buffer, buffer_size, "cblc_method_%s_%s_", type->source_name,
-                method->source_name) < 0)
+        if (std::snprintf(buffer, buffer_size, "cblc_method_%s_%s%s_", type->source_name,
+                method->source_name, overload_suffix) < 0
+            || std::strlen(buffer) >= buffer_size)
             return (FT_FAILURE);
         length = std::strlen(buffer);
         index = 0;
@@ -3190,7 +3378,9 @@ static int c_backend_method_return_type(const t_cblc_method *method, char *buffe
 {
     if (!method || !buffer || buffer_size == 0)
         return (FT_FAILURE);
-    if (method->return_kind == CBLC_FUNCTION_RETURN_INT)
+    if (method->return_kind == CBLC_FUNCTION_RETURN_CHAR)
+        ft_strlcpy(buffer, "char", buffer_size);
+    else if (method->return_kind == CBLC_FUNCTION_RETURN_INT)
         ft_strlcpy(buffer, "int", buffer_size);
     else if (method->return_kind == CBLC_FUNCTION_RETURN_STRUCT
         && method->return_type_name[0] != '\0')
@@ -3220,10 +3410,12 @@ static int c_backend_method_parameter_type(const t_cblc_parameter *parameter, ch
 {
     if (!parameter || !buffer || buffer_size == 0)
         return (FT_FAILURE);
-    if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_STRING)
+    if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_CHAR_BUFFER)
         ft_strlcpy(buffer, "char *", buffer_size);
     else if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_INT)
         ft_strlcpy(buffer, "int", buffer_size);
+    else if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_DOUBLE)
+        ft_strlcpy(buffer, "double", buffer_size);
     else if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_STRUCT
         && parameter->type_name[0] != '\0')
     {
@@ -3266,7 +3458,7 @@ static int c_backend_emit_method_parameter_declaration(const t_cblc_parameter *p
     if (c_backend_buffer_append_format(buffer, ", %s %s", parameter_type,
             parameter->actual_source_name) != FT_SUCCESS)
         return (FT_FAILURE);
-    if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_STRING
+    if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_CHAR_BUFFER
         && (c_backend_buffer_append_format(buffer, "_buf, size_t %s_len, size_t %s_capacity",
             parameter->actual_source_name, parameter->actual_source_name) != FT_SUCCESS))
         return (FT_FAILURE);
@@ -3307,8 +3499,30 @@ static int c_backend_emit_method_call_arguments(const t_cblc_translation_unit *u
         size_t current_length;
 
         if (c_backend_extract_call_argument(statement, index, argument,
-                sizeof(argument)) != FT_SUCCESS
-            || c_backend_translate_expression(unit, argument, expression,
+                sizeof(argument)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (method->parameters[index].kind
+                == TRANSPILE_FUNCTION_PARAMETER_STRUCT
+            || method->parameters[index].kind
+                == TRANSPILE_FUNCTION_PARAMETER_STRUCT_POINTER)
+        {
+            const t_cblc_data_item *argument_item =
+                c_backend_find_statement_argument_item(unit, statement,
+                    argument);
+            const t_cblc_data_kind expected_kind =
+                method->parameters[index].kind
+                    == TRANSPILE_FUNCTION_PARAMETER_STRUCT
+                ? CBLC_DATA_KIND_STRUCT : CBLC_DATA_KIND_STRUCT_POINTER;
+
+            if (!argument_item || argument_item->kind != expected_kind
+                || std::strcmp(argument_item->struct_type_name,
+                    method->parameters[index].type_name) != 0
+                || c_backend_map_identifier_to_c(unit,
+                    argument_item->cobol_name, expression,
+                    sizeof(expression)) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        else if (c_backend_translate_expression(unit, argument, expression,
                 sizeof(expression)) != FT_SUCCESS)
             return (FT_FAILURE);
         current_length = std::strlen(buffer);
@@ -3320,14 +3534,14 @@ static int c_backend_emit_method_call_arguments(const t_cblc_translation_unit *u
             buffer[current_length++] = ' ';
             buffer[current_length] = '\0';
         }
-        if (method->parameters[index].kind == TRANSPILE_FUNCTION_PARAMETER_STRING)
+        if (method->parameters[index].kind == TRANSPILE_FUNCTION_PARAMETER_CHAR_BUFFER)
         {
             const t_cblc_data_item *string_item;
             char string_buffer[TRANSPILE_STATEMENT_TEXT_MAX];
             char string_length[TRANSPILE_STATEMENT_TEXT_MAX];
 
             string_item = c_backend_find_data_item_by_source(unit, argument);
-            if (!string_item || string_item->kind != CBLC_DATA_KIND_STRING
+            if (!string_item || string_item->kind != CBLC_DATA_KIND_CHAR_BUFFER
                 || c_backend_build_string_buf_ref(string_item, string_buffer,
                     sizeof(string_buffer)) != FT_SUCCESS
                 || c_backend_build_string_len_ref(string_item, string_length,
@@ -3393,6 +3607,149 @@ static int c_backend_emit_method_function(const t_cblc_translation_unit *unit,
     return (FT_SUCCESS);
 }
 
+static size_t c_backend_method_argument_cost(const t_cblc_translation_unit *unit,
+    const t_cblc_statement *statement, const char *argument,
+    const t_cblc_parameter *parameter)
+{
+    const t_cblc_data_item *item;
+    const char *literal;
+    int integer_literal;
+    int floating_literal;
+
+    if (!unit || !statement || !argument || !parameter)
+        return (static_cast<size_t>(-1));
+    item = c_backend_find_statement_argument_item(unit, statement, argument);
+    if (item)
+    {
+        if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_STRUCT)
+            return (item->kind == CBLC_DATA_KIND_STRUCT
+                && std::strcmp(item->struct_type_name, parameter->type_name) == 0
+                ? 0 : static_cast<size_t>(-1));
+        if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_STRUCT_POINTER)
+            return (item->kind == CBLC_DATA_KIND_STRUCT_POINTER
+                && std::strcmp(item->struct_type_name, parameter->type_name) == 0
+                ? 0 : static_cast<size_t>(-1));
+        if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_INT)
+        {
+            if (item->kind == CBLC_DATA_KIND_INT)
+                return (0);
+            if (item->kind == CBLC_DATA_KIND_CHAR)
+                return (1);
+            if (item->kind == CBLC_DATA_KIND_DOUBLE)
+                return (2);
+            return (static_cast<size_t>(-1));
+        }
+        if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_DOUBLE)
+            return (item->kind == CBLC_DATA_KIND_DOUBLE ? 0
+                : (item->kind == CBLC_DATA_KIND_INT || item->kind == CBLC_DATA_KIND_CHAR)
+                    ? 1 : static_cast<size_t>(-1));
+        if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_CHAR)
+            return (item->kind == CBLC_DATA_KIND_CHAR ? 0
+                : item->kind == CBLC_DATA_KIND_INT ? 2 : static_cast<size_t>(-1));
+        if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_CHAR_POINTER)
+            return (item->kind == CBLC_DATA_KIND_CHAR_POINTER ? 0
+                : static_cast<size_t>(-1));
+        if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_INT_POINTER)
+            return (item->kind == CBLC_DATA_KIND_INT_POINTER ? 0
+                : static_cast<size_t>(-1));
+        if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_VOID_POINTER)
+            return ((item->kind == CBLC_DATA_KIND_VOID_POINTER
+                    || item->kind == CBLC_DATA_KIND_CHAR_POINTER
+                    || item->kind == CBLC_DATA_KIND_INT_POINTER
+                    || item->kind == CBLC_DATA_KIND_STRUCT_POINTER) ? 0
+                : static_cast<size_t>(-1));
+        if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_CHAR_BUFFER)
+            return (item->kind == CBLC_DATA_KIND_CHAR_BUFFER ? 0
+                : static_cast<size_t>(-1));
+        return (static_cast<size_t>(-1));
+    }
+    literal = argument;
+    while (*literal == ' ' || *literal == '\t')
+        literal += 1;
+    integer_literal = std::isdigit(static_cast<unsigned char>(*literal))
+        || ((*literal == '+' || *literal == '-')
+            && std::isdigit(static_cast<unsigned char>(literal[1])));
+    floating_literal = std::strchr(literal, '.') != NULL
+        || std::strchr(literal, 'e') != NULL || std::strchr(literal, 'E') != NULL;
+    if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_INT)
+        return (integer_literal && !floating_literal ? 0
+            : literal[0] == '\'' ? 1
+            : floating_literal ? 2 : static_cast<size_t>(-1));
+    if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_DOUBLE)
+        return (floating_literal ? 0 : integer_literal ? 1
+            : static_cast<size_t>(-1));
+    if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_CHAR)
+        return (literal[0] == '\'' ? 0
+            : integer_literal ? 2 : static_cast<size_t>(-1));
+    if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_CHAR_POINTER
+        && literal[0] == '"')
+        return (0);
+    return (static_cast<size_t>(-1));
+}
+
+static const t_cblc_method *c_backend_find_method_for_statement(
+    const t_cblc_translation_unit *unit, const t_cblc_struct_type *type,
+    const t_cblc_statement *statement)
+{
+    const t_cblc_method *best_method = NULL;
+    size_t best_cost = static_cast<size_t>(-1);
+    size_t method_index;
+    int ambiguous = 0;
+
+    if (!unit || !type || !statement)
+        return (NULL);
+    method_index = 0;
+    while (method_index < type->method_count)
+    {
+        const t_cblc_method *method = &type->methods[method_index];
+        size_t argument_index;
+        size_t total_cost = 0;
+        int matches = 1;
+
+        if (std::strcmp(method->source_name, statement->call_identifier) != 0
+            || method->parameter_count != statement->call_argument_count)
+        {
+            method_index += 1;
+            continue ;
+        }
+        argument_index = 0;
+        while (argument_index < method->parameter_count)
+        {
+            char argument[TRANSPILE_STATEMENT_TEXT_MAX];
+            size_t argument_cost;
+
+            if (c_backend_extract_call_argument(statement, argument_index, argument,
+                    sizeof(argument)) != FT_SUCCESS)
+            {
+                matches = 0;
+                break ;
+            }
+            argument_cost = c_backend_method_argument_cost(unit, statement,
+                argument, &method->parameters[argument_index]);
+            if (argument_cost == static_cast<size_t>(-1))
+            {
+                matches = 0;
+                break ;
+            }
+            total_cost += argument_cost;
+            argument_index += 1;
+        }
+        if (matches)
+        {
+            if (total_cost < best_cost)
+            {
+                best_method = method;
+                best_cost = total_cost;
+                ambiguous = 0;
+            }
+            else if (total_cost == best_cost)
+                ambiguous = 1;
+        }
+        method_index += 1;
+    }
+    return (ambiguous ? NULL : best_method);
+}
+
 static int c_backend_emit_method(const t_cblc_translation_unit *unit,
     const t_cblc_statement *statement, t_c_backend_buffer *buffer)
 {
@@ -3400,7 +3757,6 @@ static int c_backend_emit_method(const t_cblc_translation_unit *unit,
     t_cblc_data_item member_receiver;
     const t_cblc_struct_type *receiver_type;
     const t_cblc_method *method;
-    const t_cblc_intrinsic_entry *intrinsic;
     const char *receiver_name;
     const char *assign_target;
 
@@ -3470,242 +3826,9 @@ static int c_backend_emit_method(const t_cblc_translation_unit *unit,
         receiver_type = c_backend_find_struct_type(unit, receiver->struct_type_name);
     if (!receiver_type)
         return (FT_FAILURE);
-    method = NULL;
-    {
-        size_t index;
-
-        index = 0;
-        while (index < receiver_type->method_count)
-        {
-            if (std::strncmp(receiver_type->methods[index].source_name, statement->call_identifier,
-                    sizeof(receiver_type->methods[index].source_name)) == 0)
-            {
-                method = &receiver_type->methods[index];
-                break ;
-            }
-            index += 1;
-        }
-    }
+    method = c_backend_find_method_for_statement(unit, receiver_type, statement);
     if (!method)
         return (FT_FAILURE);
-    if (receiver_type->is_builtin
-        && std::strncmp(receiver_type->source_name, "string", TRANSPILE_IDENTIFIER_MAX) == 0)
-    {
-        char receiver_buffer_ref[TRANSPILE_STATEMENT_TEXT_MAX];
-        char receiver_length_ref[TRANSPILE_STATEMENT_TEXT_MAX];
-
-        if (c_backend_build_string_buf_ref(receiver, receiver_buffer_ref,
-                sizeof(receiver_buffer_ref)) != FT_SUCCESS)
-            return (FT_FAILURE);
-        if (c_backend_build_string_len_ref(receiver, receiver_length_ref,
-                sizeof(receiver_length_ref)) != FT_SUCCESS)
-            return (FT_FAILURE);
-        intrinsic = cblc_intrinsic_lookup(statement->call_identifier);
-        if (!intrinsic || !cblc_intrinsic_accepts_argument_count(intrinsic,
-                statement->call_argument_count))
-            return (FT_FAILURE);
-        if (std::strncmp(statement->call_identifier, "append",
-                sizeof(statement->call_identifier)) == 0)
-        {
-            if (statement->is_literal)
-            {
-                char decoded[TRANSPILE_STATEMENT_TEXT_MAX];
-                char encoded[TRANSPILE_STATEMENT_TEXT_MAX];
-
-                if (c_backend_decode_cobol_literal(statement->source, decoded, sizeof(decoded))
-                    != FT_SUCCESS)
-                    return (FT_FAILURE);
-                if (c_backend_encode_c_string(decoded, encoded, sizeof(encoded)) != FT_SUCCESS)
-                    return (FT_FAILURE);
-                return (c_backend_buffer_append_format_line(buffer,
-                        "    cblc_string_append_literal(%s, %zu, &%s, \"%s\");",
-                        receiver_buffer_ref, receiver->length, receiver_length_ref, encoded));
-            }
-            else
-            {
-                const t_cblc_data_item *source_item;
-                char source_buffer_ref[TRANSPILE_STATEMENT_TEXT_MAX];
-                char source_length_ref[TRANSPILE_STATEMENT_TEXT_MAX];
-
-                source_item = c_backend_find_data_item_by_cobol(unit, statement->source);
-                if (!source_item || source_item->kind != CBLC_DATA_KIND_STRING)
-                    return (FT_FAILURE);
-                if (c_backend_build_string_buf_ref(source_item, source_buffer_ref,
-                        sizeof(source_buffer_ref)) != FT_SUCCESS)
-                    return (FT_FAILURE);
-                if (c_backend_build_string_len_ref(source_item, source_length_ref,
-                        sizeof(source_length_ref)) != FT_SUCCESS)
-                    return (FT_FAILURE);
-                return (c_backend_buffer_append_format_line(buffer,
-                        "    cblc_string_append(%s, %zu, &%s, %s, %s);",
-                        receiver_buffer_ref, receiver->length, receiver_length_ref,
-                        source_buffer_ref, source_length_ref));
-            }
-        }
-        if (std::strncmp(statement->call_identifier, "len",
-                sizeof(statement->call_identifier)) == 0)
-        {
-            char target[TRANSPILE_IDENTIFIER_MAX];
-
-            if (!assign_target || assign_target[0] == '\0')
-                return (FT_FAILURE);
-            if (c_backend_map_identifier_to_c(unit, assign_target, target, sizeof(target)) != FT_SUCCESS)
-                return (FT_FAILURE);
-            return (c_backend_buffer_append_format_line(buffer, "    %s = (int)%s;",
-                    target, receiver_length_ref));
-        }
-        if (std::strncmp(statement->call_identifier, "capacity",
-                sizeof(statement->call_identifier)) == 0)
-        {
-            char target[TRANSPILE_IDENTIFIER_MAX];
-
-            if (!assign_target || assign_target[0] == '\0')
-                return (FT_FAILURE);
-            if (c_backend_map_identifier_to_c(unit, assign_target, target, sizeof(target))
-                != FT_SUCCESS)
-                return (FT_FAILURE);
-            return (c_backend_buffer_append_format_line(buffer, "    %s = %zu;",
-                    target, receiver->length));
-        }
-        if (std::strncmp(statement->call_identifier, "clear",
-                sizeof(statement->call_identifier)) == 0)
-        {
-            return (c_backend_buffer_append_format_line(buffer,
-                    "    cblc_string_assign_literal(%s, %zu, &%s, \"\");",
-                    receiver_buffer_ref, receiver->length, receiver_length_ref));
-        }
-        if (std::strncmp(statement->call_identifier, "empty",
-                sizeof(statement->call_identifier)) == 0)
-        {
-            char target[TRANSPILE_IDENTIFIER_MAX];
-
-            if (!assign_target || assign_target[0] == '\0')
-                return (FT_FAILURE);
-            if (c_backend_map_identifier_to_c(unit, assign_target, target, sizeof(target)) != FT_SUCCESS)
-                return (FT_FAILURE);
-            return (c_backend_buffer_append_format_line(buffer, "    %s = (%s == 0);",
-                    target, receiver_length_ref));
-        }
-        if (std::strncmp(statement->call_identifier, "equals",
-                sizeof(statement->call_identifier)) == 0)
-        {
-            char target[TRANSPILE_IDENTIFIER_MAX];
-            char argument[TRANSPILE_STATEMENT_TEXT_MAX];
-
-            if (!assign_target || assign_target[0] == '\0'
-                || statement->call_argument_count != 1)
-                return (FT_FAILURE);
-            if (c_backend_map_identifier_to_c(unit, assign_target, target, sizeof(target)) != FT_SUCCESS)
-                return (FT_FAILURE);
-            if (c_backend_extract_call_argument(statement, 0, argument, sizeof(argument)) != FT_SUCCESS)
-                return (FT_FAILURE);
-            if (argument[0] == '"')
-            {
-                char decoded[TRANSPILE_STATEMENT_TEXT_MAX];
-                char encoded[TRANSPILE_STATEMENT_TEXT_MAX];
-
-                if (c_backend_decode_cobol_literal(argument, decoded, sizeof(decoded)) != FT_SUCCESS)
-                    return (FT_FAILURE);
-                if (c_backend_encode_c_string(decoded, encoded, sizeof(encoded)) != FT_SUCCESS)
-                    return (FT_FAILURE);
-                return (c_backend_buffer_append_format_line(buffer,
-                        "    %s = cblc_string_equals(%s, %s, \"%s\", cblc_string_length(\"%s\"));",
-                        target, receiver_buffer_ref, receiver_length_ref, encoded, encoded));
-            }
-            else
-            {
-                const t_cblc_data_item *source_item;
-                char source_buffer_ref[TRANSPILE_STATEMENT_TEXT_MAX];
-                char source_length_ref[TRANSPILE_STATEMENT_TEXT_MAX];
-
-                source_item = c_backend_find_data_item(unit, argument);
-                if (!source_item || source_item->kind != CBLC_DATA_KIND_STRING)
-                    return (FT_FAILURE);
-                if (source_item->is_alias)
-                {
-                    source_item = c_backend_find_data_item_by_cobol(unit, source_item->cobol_name);
-                    if (!source_item || source_item->kind != CBLC_DATA_KIND_STRING)
-                        return (FT_FAILURE);
-                }
-                if (c_backend_build_string_buf_ref(source_item, source_buffer_ref,
-                        sizeof(source_buffer_ref)) != FT_SUCCESS)
-                    return (FT_FAILURE);
-                if (c_backend_build_string_len_ref(source_item, source_length_ref,
-                        sizeof(source_length_ref)) != FT_SUCCESS)
-                    return (FT_FAILURE);
-                return (c_backend_buffer_append_format_line(buffer,
-                        "    %s = cblc_string_equals(%s, %s, %s, %s);",
-                        target, receiver_buffer_ref, receiver_length_ref,
-                        source_buffer_ref, source_length_ref));
-            }
-        }
-        if (std::strncmp(statement->call_identifier, "starts_with",
-                sizeof(statement->call_identifier)) == 0
-            || std::strncmp(statement->call_identifier, "ends_with",
-                sizeof(statement->call_identifier)) == 0
-            || std::strncmp(statement->call_identifier, "compare",
-                sizeof(statement->call_identifier)) == 0
-            || std::strncmp(statement->call_identifier, "contains",
-                sizeof(statement->call_identifier)) == 0)
-        {
-            char target[TRANSPILE_IDENTIFIER_MAX];
-            char argument[TRANSPILE_STATEMENT_TEXT_MAX];
-            const char *helper_name;
-
-            if (!assign_target || assign_target[0] == '\0'
-                || statement->call_argument_count != 1)
-                return (FT_FAILURE);
-            if (c_backend_map_identifier_to_c(unit, assign_target, target, sizeof(target))
-                != FT_SUCCESS)
-                return (FT_FAILURE);
-            if (c_backend_extract_call_argument(statement, 0, argument, sizeof(argument))
-                != FT_SUCCESS)
-                return (FT_FAILURE);
-            helper_name = intrinsic->c_helper_name;
-            if (!helper_name)
-                return (FT_FAILURE);
-            if (argument[0] == '"')
-            {
-                char decoded[TRANSPILE_STATEMENT_TEXT_MAX];
-                char encoded[TRANSPILE_STATEMENT_TEXT_MAX];
-
-                if (c_backend_decode_cobol_literal(argument, decoded, sizeof(decoded)) != FT_SUCCESS)
-                    return (FT_FAILURE);
-                if (c_backend_encode_c_string(decoded, encoded, sizeof(encoded)) != FT_SUCCESS)
-                    return (FT_FAILURE);
-                return (c_backend_buffer_append_format_line(buffer,
-                        "    %s = %s(%s, %s, \"%s\", cblc_string_length(\"%s\"));",
-                        target, helper_name, receiver_buffer_ref, receiver_length_ref,
-                        encoded, encoded));
-            }
-            else
-            {
-                const t_cblc_data_item *source_item;
-                char source_buffer_ref[TRANSPILE_STATEMENT_TEXT_MAX];
-                char source_length_ref[TRANSPILE_STATEMENT_TEXT_MAX];
-
-                source_item = c_backend_find_data_item(unit, argument);
-                if (!source_item || source_item->kind != CBLC_DATA_KIND_STRING)
-                    return (FT_FAILURE);
-                if (source_item->is_alias)
-                {
-                    source_item = c_backend_find_data_item_by_cobol(unit, source_item->cobol_name);
-                    if (!source_item || source_item->kind != CBLC_DATA_KIND_STRING)
-                        return (FT_FAILURE);
-                }
-                if (c_backend_build_string_buf_ref(source_item, source_buffer_ref,
-                        sizeof(source_buffer_ref)) != FT_SUCCESS)
-                    return (FT_FAILURE);
-                if (c_backend_build_string_len_ref(source_item, source_length_ref,
-                        sizeof(source_length_ref)) != FT_SUCCESS)
-                    return (FT_FAILURE);
-                return (c_backend_buffer_append_format_line(buffer,
-                        "    %s = %s(%s, %s, %s, %s);",
-                        target, helper_name, receiver_buffer_ref, receiver_length_ref,
-                        source_buffer_ref, source_length_ref));
-            }
-        }
-    }
     if (c_backend_method_is_callable(method))
     {
         char function_name[TRANSPILE_IDENTIFIER_MAX];
@@ -3846,6 +3969,11 @@ static int c_backend_function_return_type(const t_cblc_function *function, char 
         ft_strlcpy(buffer, "int", buffer_size);
         return (FT_SUCCESS);
     }
+    if (function->return_kind == CBLC_FUNCTION_RETURN_CHAR)
+    {
+        ft_strlcpy(buffer, "char", buffer_size);
+        return (FT_SUCCESS);
+    }
     if (function->return_kind == CBLC_FUNCTION_RETURN_VOID_POINTER)
     {
         ft_strlcpy(buffer, "void *", buffer_size);
@@ -3885,8 +4013,6 @@ static int c_backend_emit_struct_type(const t_cblc_struct_type *type, t_c_backen
 
     if (!type || !buffer)
         return (FT_FAILURE);
-    if (type->is_builtin && c_backend_is_builtin_string_type_name(type->source_name))
-        return (FT_SUCCESS);
     if (c_backend_buffer_append_format_line(buffer, "typedef struct s_%s", type->source_name) != FT_SUCCESS)
         return (FT_FAILURE);
     if (c_backend_buffer_append_line(buffer, "{") != FT_SUCCESS)
@@ -3894,7 +4020,7 @@ static int c_backend_emit_struct_type(const t_cblc_struct_type *type, t_c_backen
     index = 0;
     while (index < type->field_count)
     {
-        if (type->fields[index].kind == CBLC_DATA_KIND_STRING)
+        if (type->fields[index].kind == CBLC_DATA_KIND_CHAR_BUFFER)
         {
             if (type->fields[index].array_count > 0)
             {
@@ -4045,6 +4171,11 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
     index = 0;
     while (index < unit->struct_type_count)
     {
+        if (unit->struct_types[index].is_standard_library)
+        {
+            index += 1;
+            continue ;
+        }
         if (c_backend_emit_struct_type(&unit->struct_types[index], &buffer) != FT_SUCCESS)
             goto cleanup;
         if (c_backend_buffer_append_line(&buffer, "") != FT_SUCCESS)
@@ -4058,6 +4189,11 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
         size_t method_index;
 
         type = &unit->struct_types[index];
+        if (type->is_standard_library)
+        {
+            index += 1;
+            continue ;
+        }
         method_index = 0;
         while (method_index < type->method_count)
         {
@@ -4101,7 +4237,7 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
         size_t constructor_index;
 
         type = &unit->struct_types[index];
-        if (type->is_builtin)
+        if (type->is_builtin || type->is_standard_library)
         {
             index += 1;
             continue ;
@@ -4156,6 +4292,8 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
         item = &unit->data_items[index];
         if (item->is_alias || std::strchr(item->source_name, '.')
             || std::strstr(item->source_name, "->")
+            || std::strncmp(item->source_name, "CBLC-GLOBAL-LIVE-",
+                std::strlen("CBLC-GLOBAL-LIVE-")) == 0
             || c_backend_is_method_parameter_item(unit, item)
             || c_backend_is_reusable_constructor_parameter_item(unit, item))
         {
@@ -4168,7 +4306,7 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
             index += 1;
             continue ;
         }
-        if (item->kind == CBLC_DATA_KIND_STRING)
+        if (item->kind == CBLC_DATA_KIND_CHAR_BUFFER)
         {
             length = item->length;
             if (length == 0)
@@ -4293,6 +4431,11 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
         size_t method_index;
 
         type = &unit->struct_types[index];
+        if (type->is_standard_library)
+        {
+            index += 1;
+            continue ;
+        }
         method_index = 0;
         while (method_index < type->method_count)
         {
@@ -4311,7 +4454,7 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
         size_t constructor_index;
 
         type = &unit->struct_types[index];
-        if (!type->is_builtin)
+        if (!type->is_builtin && !type->is_standard_library)
         {
             constructor_index = 0;
             while (constructor_index < type->constructor_count)
@@ -4449,7 +4592,7 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
                     local_index += 1;
                     continue ;
                 }
-                if (item->kind == CBLC_DATA_KIND_STRING)
+                if (item->kind == CBLC_DATA_KIND_CHAR_BUFFER)
                 {
                     length = item->length == 0 ? 1 : item->length;
                     if (item->array_count > 0)
@@ -4524,6 +4667,16 @@ int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text)
             consumed = 1;
             if (statement_index + 1 < function->statement_count)
                 next_statement = &function->statements[statement_index + 1];
+            /* Global completion flags are a COBOL startup/unwind detail.
+             * The C backend already emits its own native object lifecycle and
+             * must not publish or assign these COBOL-only control slots. */
+            if (statement->type == CBLC_STATEMENT_ASSIGNMENT
+                && std::strncmp(statement->target, "CBLC-GLOBAL-LIVE-",
+                    std::strlen("CBLC-GLOBAL-LIVE-")) == 0)
+            {
+                statement_index += 1;
+                continue ;
+            }
             if (statement->type == CBLC_STATEMENT_ASSIGNMENT)
             {
                 if (c_backend_emit_assignment(unit, statement, next_statement, &buffer, &consumed)

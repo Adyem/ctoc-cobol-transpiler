@@ -1,33 +1,902 @@
-class String
+class string
 {
+    private:
+    char *data;
+    int stored_length;
+    int storage_capacity;
+
+    int is_valid_utf8_bytes(char *source, int source_length)
+    {
+        int index;
+        int first;
+        int second;
+        int remaining;
+        int width;
+        int second_minimum;
+        int second_maximum;
+        int continuation_index;
+        int continuation_end;
+        int second_index;
+        int continuation;
+        char current;
+
+        if (source_length < 0)
+        {
+            return 0;
+        }
+        if (source == NULL && source_length > 0)
+        {
+            return 0;
+        }
+        index = 0;
+        while (index < source_length)
+        {
+            current = source[index];
+            first = std::ord(current) - 1;
+            remaining = source_length - index;
+            width = 0;
+            second_minimum = 128;
+            second_maximum = 191;
+            if (first <= 127)
+            {
+                width = 1;
+            }
+            else
+            {
+                if (first >= 194 && first <= 223)
+                {
+                    width = 2;
+                }
+                else
+                {
+                    if (first >= 224 && first <= 239)
+                    {
+                        width = 3;
+                        if (first == 224)
+                        {
+                            second_minimum = 160;
+                        }
+                        if (first == 237)
+                        {
+                            second_maximum = 159;
+                        }
+                    }
+                    else
+                    {
+                        if (first >= 240 && first <= 244)
+                        {
+                            width = 4;
+                            if (first == 240)
+                            {
+                                second_minimum = 144;
+                            }
+                            if (first == 244)
+                            {
+                                second_maximum = 143;
+                            }
+                        }
+                    }
+                }
+            }
+            if (width == 0)
+            {
+                return 0;
+            }
+            if (remaining < width)
+            {
+                return 0;
+            }
+            continuation_index = index + 1;
+            continuation_end = index + width;
+            second_index = index + 1;
+            while (continuation_index < continuation_end)
+            {
+                current = source[continuation_index];
+                continuation = std::ord(current) - 1;
+                if (continuation < 128)
+                {
+                    return 0;
+                }
+                if (continuation > 191)
+                {
+                    return 0;
+                }
+                if (continuation_index == second_index)
+                {
+                    second = continuation;
+                    if (second < second_minimum)
+                    {
+                        return 0;
+                    }
+                    if (second > second_maximum)
+                    {
+                        return 0;
+                    }
+                }
+                continuation_index = continuation_index + 1;
+            }
+            index = index + width;
+        }
+        return 1;
+    }
+
+    int is_ascii_whitespace_byte(int byte_value)
+    {
+        if (byte_value == 32)
+        {
+            return 1;
+        }
+        if (byte_value == 9)
+        {
+            return 1;
+        }
+        if (byte_value == 10)
+        {
+            return 1;
+        }
+        if (byte_value == 13)
+        {
+            return 1;
+        }
+        if (byte_value == 12)
+        {
+            return 1;
+        }
+        if (byte_value == 11)
+        {
+            return 1;
+        }
+        return 0;
+    }
+
+    void reserve_storage(int requested_capacity)
+    {
+        int new_capacity;
+        int index;
+        char *replacement;
+        if (requested_capacity < 0)
+        {
+            invalid_argument error;
+            error.code = 1;
+            throw error;
+        }
+        if (requested_capacity > 999999999)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        if (requested_capacity <= storage_capacity)
+        {
+            return;
+        }
+        new_capacity = storage_capacity;
+        if (new_capacity < 1)
+        {
+            new_capacity = 1;
+        }
+        while (new_capacity < requested_capacity)
+        {
+            if (new_capacity > 499999999)
+            {
+                new_capacity = requested_capacity;
+            }
+            else
+            {
+                new_capacity = new_capacity * 2;
+            }
+        }
+        replacement = new char[new_capacity];
+        index = 0;
+        while (index < stored_length)
+        {
+            replacement[index] = data[index];
+            index = index + 1;
+        }
+        replacement[stored_length] = '\0';
+        delete[] data;
+        data = replacement;
+        storage_capacity = new_capacity;
+    }
+
     public:
-    string value;
-
-    String(string source)
+    string()
     {
-        value = source;
+        data = new char[1];
+        stored_length = 0;
+        storage_capacity = 1;
+        data[0] = '\0';
     }
 
-    String(String source)
+    string(int requested_capacity)
     {
-        value = source.value;
+        if (requested_capacity < 0)
+        {
+            invalid_argument error;
+            error.code = 1;
+            throw error;
+        }
+        if (requested_capacity > 999999998)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        storage_capacity = requested_capacity + 1;
+        data = new char[storage_capacity];
+        stored_length = 0;
+        data[0] = '\0';
     }
 
-    void operator=(String source)
+    string(char *source)
     {
-        string snapshot;
-        snapshot = source.value;
-        value = snapshot;
+        int index;
+        int source_length;
+        int valid_encoding;
+
+        data = NULL;
+        stored_length = 0;
+        storage_capacity = 0;
+        if (source == NULL)
+        {
+            invalid_argument error;
+            error.code = 1;
+            throw error;
+        }
+        source_length = 0;
+        while (source[source_length] != '\0')
+        {
+            if (source_length >= 999999998)
+            {
+                length_error error;
+                error.code = 1;
+                throw error;
+            }
+            source_length = source_length + 1;
+        }
+        valid_encoding = is_valid_utf8_bytes(source, source_length);
+        if (valid_encoding == 0)
+        {
+            invalid_encoding error;
+            error.code = 1;
+            throw error;
+        }
+        storage_capacity = source_length + 1;
+        data = new char[storage_capacity];
+        index = 0;
+        while (index < source_length)
+        {
+            data[index] = source[index];
+            index = index + 1;
+        }
+        stored_length = source_length;
+        data[stored_length] = '\0';
+    }
+
+    string(char *source, int source_length)
+    {
+        int index;
+        int valid_encoding;
+        data = NULL;
+        stored_length = 0;
+        storage_capacity = 0;
+        if (source_length < 0)
+        {
+            invalid_argument error;
+            error.code = 1;
+            throw error;
+        }
+        if (source == NULL && source_length > 0)
+        {
+            invalid_argument error;
+            error.code = 1;
+            throw error;
+        }
+        if (source_length > 999999998)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        valid_encoding = is_valid_utf8_bytes(source, source_length);
+        if (valid_encoding == 0)
+        {
+            invalid_encoding error;
+            error.code = 1;
+            throw error;
+        }
+        storage_capacity = source_length + 1;
+        data = new char[storage_capacity];
+        stored_length = source_length;
+        index = 0;
+        while (index < stored_length)
+        {
+            data[index] = source[index];
+            index = index + 1;
+        }
+        data[stored_length] = '\0';
+    }
+
+    string(string source)
+    {
+        int index;
+        stored_length = source.stored_length;
+        storage_capacity = stored_length + 1;
+        data = new char[storage_capacity];
+        index = 0;
+        while (index < stored_length)
+        {
+            data[index] = source.data[index];
+            index = index + 1;
+        }
+        data[stored_length] = '\0';
+    }
+
+    string(string *source)
+    {
+        if (source == NULL)
+        {
+            data = new char[1];
+            stored_length = 0;
+            storage_capacity = 1;
+            data[0] = '\0';
+        }
+        else
+        {
+            data = source->data;
+            stored_length = source->stored_length;
+            storage_capacity = source->storage_capacity;
+            source->data = NULL;
+            source->stored_length = 0;
+            source->storage_capacity = 0;
+        }
+    }
+
+    ~string()
+    {
+        delete[] data;
+    }
+
+    void operator=(string source)
+    {
+        char *old_data;
+        int old_length;
+        int old_capacity;
+
+        old_data = data;
+        data = source.data;
+        source.data = old_data;
+        old_length = stored_length;
+        stored_length = source.stored_length;
+        source.stored_length = old_length;
+        old_capacity = storage_capacity;
+        storage_capacity = source.storage_capacity;
+        source.storage_capacity = old_capacity;
+    }
+
+    void swap(string *other)
+    {
+        char *temporary_data;
+        int temporary_length;
+        int temporary_capacity;
+
+        if (other == NULL)
+        {
+            return;
+        }
+        temporary_data = data;
+        data = other->data;
+        other->data = temporary_data;
+        temporary_length = stored_length;
+        stored_length = other->stored_length;
+        other->stored_length = temporary_length;
+        temporary_capacity = storage_capacity;
+        storage_capacity = other->storage_capacity;
+        other->storage_capacity = temporary_capacity;
+    }
+
+    void move_from(string *source)
+    {
+        if (source == NULL || source->data == data)
+        {
+            return;
+        }
+        delete[] data;
+        data = source->data;
+        stored_length = source->stored_length;
+        storage_capacity = source->storage_capacity;
+        source->data = NULL;
+        source->stored_length = 0;
+        source->storage_capacity = 0;
+    }
+
+    void move_assign(string *source)
+    {
+        if (source == NULL || source->data == data)
+        {
+            return;
+        }
+        delete[] data;
+        data = source->data;
+        stored_length = source->stored_length;
+        storage_capacity = source->storage_capacity;
+        source->data = NULL;
+        source->stored_length = 0;
+        source->storage_capacity = 0;
     }
 
     int len()
     {
-        return value.len;
+        return stored_length;
+    }
+
+    int is_valid_utf8()
+    {
+        int valid_encoding;
+
+        if (stored_length < 0 || storage_capacity < 0)
+        {
+            return 0;
+        }
+        if (data == NULL)
+        {
+            if (stored_length == 0 && storage_capacity == 0)
+            {
+                return 1;
+            }
+            return 0;
+        }
+        if (storage_capacity <= stored_length)
+        {
+            return 0;
+        }
+        if (data[stored_length] != '\0')
+        {
+            return 0;
+        }
+        valid_encoding = is_valid_utf8_bytes(data, stored_length);
+        return valid_encoding;
+    }
+
+    int codepoint_length()
+    {
+        int index;
+        int count;
+        int current;
+
+        index = 0;
+        count = 0;
+        while (index < stored_length)
+        {
+            current = std::ord(data[index]) - 1;
+            if (current < 128)
+            {
+                count = count + 1;
+            }
+            else
+            {
+                if (current > 191)
+                {
+                    count = count + 1;
+                }
+            }
+            index = index + 1;
+        }
+        return count;
+    }
+
+    int encode_codepoint(int scalar, char *encoded)
+    {
+        int scalar_div_64;
+        int scalar_div_4096;
+        int scalar_div_262144;
+        int remainder;
+        int byte_value;
+
+        if (scalar < 0)
+        {
+            invalid_encoding error;
+            error.code = 2;
+            throw error;
+        }
+        if (scalar > 1114111)
+        {
+            invalid_encoding error;
+            error.code = 2;
+            throw error;
+        }
+        if (scalar >= 55296)
+        {
+            if (scalar <= 57343)
+            {
+                invalid_encoding error;
+                error.code = 2;
+                throw error;
+            }
+        }
+        if (scalar <= 127)
+        {
+            encoded[0] = std::chr(scalar);
+            return 1;
+        }
+        if (scalar <= 2047)
+        {
+            scalar_div_64 = scalar / 64;
+            byte_value = scalar_div_64 + 192;
+            encoded[0] = std::chr(byte_value);
+            remainder = scalar_div_64 * 64;
+            remainder = scalar - remainder;
+            byte_value = remainder + 128;
+            encoded[1] = std::chr(byte_value);
+            return 2;
+        }
+        if (scalar <= 65535)
+        {
+            scalar_div_4096 = scalar / 4096;
+            byte_value = scalar_div_4096 + 224;
+            encoded[0] = std::chr(byte_value);
+            scalar_div_64 = scalar / 64;
+            remainder = scalar_div_4096 * 64;
+            byte_value = scalar_div_64 - remainder;
+            byte_value = byte_value + 128;
+            encoded[1] = std::chr(byte_value);
+            remainder = scalar_div_64 * 64;
+            remainder = scalar - remainder;
+            byte_value = remainder + 128;
+            encoded[2] = std::chr(byte_value);
+            return 3;
+        }
+        scalar_div_262144 = scalar / 262144;
+        byte_value = scalar_div_262144 + 240;
+        encoded[0] = std::chr(byte_value);
+        scalar_div_4096 = scalar / 4096;
+        remainder = scalar_div_262144 * 64;
+        byte_value = scalar_div_4096 - remainder;
+        byte_value = byte_value + 128;
+        encoded[1] = std::chr(byte_value);
+        scalar_div_64 = scalar / 64;
+        remainder = scalar_div_4096 * 64;
+        byte_value = scalar_div_64 - remainder;
+        byte_value = byte_value + 128;
+        encoded[2] = std::chr(byte_value);
+        remainder = scalar_div_64 * 64;
+        remainder = scalar - remainder;
+        byte_value = remainder + 128;
+        encoded[3] = std::chr(byte_value);
+        return 4;
+    }
+
+    int codepoint_at(int character_index)
+    {
+        int byte_index;
+        int current_index;
+        int first;
+        int second;
+        int third;
+        int fourth;
+        int result;
+
+        if (character_index < 0)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        byte_index = 0;
+        current_index = 0;
+        while (current_index < character_index && byte_index < stored_length)
+        {
+            first = std::ord(data[byte_index]) - 1;
+            if (first < 128)
+            {
+                byte_index = byte_index + 1;
+            }
+            else
+            {
+                if (first < 224)
+                {
+                    byte_index = byte_index + 2;
+                }
+                else
+                {
+                    if (first < 240)
+                    {
+                        byte_index = byte_index + 3;
+                    }
+                    else
+                    {
+                        byte_index = byte_index + 4;
+                    }
+                }
+            }
+            current_index = current_index + 1;
+        }
+        if (byte_index >= stored_length)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        first = std::ord(data[byte_index]) - 1;
+        if (first < 128)
+        {
+            result = first;
+        }
+        else
+        {
+            if (first < 224)
+            {
+                second = std::ord(data[byte_index + 1]) - 1;
+                result = first - 192;
+                result = result * 64;
+                result = result + second;
+                result = result - 128;
+            }
+            else
+            {
+                if (first < 240)
+                {
+                    second = std::ord(data[byte_index + 1]) - 1;
+                    third = std::ord(data[byte_index + 2]) - 1;
+                    result = first - 224;
+                    result = result * 64;
+                    result = result + second;
+                    result = result - 128;
+                    result = result * 64;
+                    result = result + third;
+                    result = result - 128;
+                }
+                else
+                {
+                    second = std::ord(data[byte_index + 1]) - 1;
+                    third = std::ord(data[byte_index + 2]) - 1;
+                    fourth = std::ord(data[byte_index + 3]) - 1;
+                    result = first - 240;
+                    result = result * 64;
+                    result = result + second;
+                    result = result - 128;
+                    result = result * 64;
+                    result = result + third;
+                    result = result - 128;
+                    result = result * 64;
+                    result = result + fourth;
+                    result = result - 128;
+                }
+            }
+        }
+        return result;
+    }
+
+    void set_byte(int byte_index, char replacement_byte)
+    {
+        char *replacement;
+        int index;
+        int valid_encoding;
+
+        if (byte_index < 0 || byte_index >= stored_length)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        replacement = new char[stored_length + 1];
+        index = 0;
+        while (index < stored_length)
+        {
+            if (index == byte_index)
+            {
+                replacement[index] = replacement_byte;
+            }
+            else
+            {
+                replacement[index] = data[index];
+            }
+            index = index + 1;
+        }
+        replacement[stored_length] = '\0';
+        valid_encoding = is_valid_utf8_bytes(replacement, stored_length);
+        if (valid_encoding == 0)
+        {
+            delete[] replacement;
+            invalid_encoding error;
+            error.code = 1;
+            throw error;
+        }
+        if (data != NULL)
+        {
+            delete[] data;
+        }
+        data = replacement;
+        storage_capacity = stored_length + 1;
+    }
+
+    int byte_length()
+    {
+        return stored_length;
+    }
+
+    char *to_c_string()
+    {
+        char *result;
+        int index;
+
+        index = 0;
+        while (index < stored_length)
+        {
+            if (data[index] == '\0')
+            {
+                invalid_argument error;
+                error.code = 2;
+                throw error;
+            }
+            index = index + 1;
+        }
+        result = new char[stored_length + 1];
+        index = 0;
+        while (index < stored_length)
+        {
+            result[index] = data[index];
+            index = index + 1;
+        }
+        result[stored_length] = '\0';
+        return result;
+    }
+
+    int copy_to(char *destination, int destination_capacity)
+    {
+        int index;
+
+        if (destination_capacity < 0
+            || (destination == NULL && stored_length > 0))
+        {
+            invalid_argument error;
+            error.code = 1;
+            throw error;
+        }
+        if (destination_capacity < stored_length)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        if (destination == data)
+        {
+            return stored_length;
+        }
+        index = 0;
+        while (index < stored_length)
+        {
+            destination[index] = data[index];
+            index = index + 1;
+        }
+        return stored_length;
+    }
+
+    string substr(int byte_position, int byte_count)
+    {
+        int end_position;
+        int byte_value;
+        int index;
+
+        if (byte_position < 0)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        if (byte_position > stored_length)
+        {
+            out_of_range error;
+            error.code = 2;
+            throw error;
+        }
+        if (byte_count < 0)
+        {
+            out_of_range error;
+            error.code = 3;
+            throw error;
+        }
+        if (byte_count > stored_length - byte_position)
+        {
+            out_of_range error;
+            error.code = 4;
+            throw error;
+        }
+        end_position = byte_position + byte_count;
+        if (byte_position > 0 && byte_position < stored_length)
+        {
+            byte_value = std::ord(data[byte_position]) - 1;
+            if (byte_value >= 128 && byte_value <= 191)
+            {
+                invalid_argument error;
+                error.code = 1;
+                throw error;
+            }
+        }
+        if (end_position > 0 && end_position < stored_length)
+        {
+            byte_value = std::ord(data[end_position]) - 1;
+            if (byte_value >= 128 && byte_value <= 191)
+            {
+                invalid_argument error;
+                error.code = 2;
+                throw error;
+            }
+        }
+        {
+            string result;
+
+            result.reserve_storage(byte_count + 1);
+            index = 0;
+            while (index < byte_count)
+            {
+                result.data[index] = data[byte_position + index];
+                index = index + 1;
+            }
+            result.data[byte_count] = '\0';
+            result.stored_length = byte_count;
+            return result;
+        }
+    }
+
+    int capacity()
+    {
+        if (storage_capacity <= 0)
+        {
+            return 0;
+        }
+        return storage_capacity - 1;
+    }
+
+    void reserve(int requested_capacity)
+    {
+        if (requested_capacity < 0)
+        {
+            invalid_argument error;
+            error.code = 1;
+            throw error;
+        }
+        if (requested_capacity > 999999998)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        reserve_storage(requested_capacity + 1);
+    }
+
+    void shrink_to_fit()
+    {
+        int requested_capacity;
+        int index;
+        char *replacement;
+
+        requested_capacity = stored_length + 1;
+        if (data != NULL && storage_capacity <= requested_capacity)
+        {
+            return;
+        }
+        replacement = new char[requested_capacity];
+        index = 0;
+        while (index < stored_length)
+        {
+            replacement[index] = data[index];
+            index = index + 1;
+        }
+        replacement[stored_length] = '\0';
+        delete[] data;
+        data = replacement;
+        storage_capacity = requested_capacity;
+    }
+
+    int max_size()
+    {
+        return 999999998;
     }
 
     int empty()
     {
-        if (value.len == 0)
+        if (stored_length == 0)
         {
             return 1;
         }
@@ -36,25 +905,873 @@ class String
 
     void clear()
     {
-        value = "";
+        stored_length = 0;
+        if (data != NULL)
+        {
+            data[0] = '\0';
+        }
+    }
+
+    void resize(int requested)
+    {
+        int index;
+        char boundary;
+
+        if (requested < 0)
+        {
+            invalid_argument error;
+            error.code = 1;
+            throw error;
+        }
+        if (requested > 999999998)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        if (requested < stored_length)
+        {
+            if (requested > 0)
+            {
+                boundary = data[requested];
+                if (std::ord(boundary) - 1 >= 128)
+                {
+                    if (std::ord(boundary) - 1 <= 191)
+                    {
+                        invalid_argument error;
+                        error.code = 2;
+                        throw error;
+                    }
+                }
+            }
+            stored_length = requested;
+            data[stored_length] = '\0';
+            return;
+        }
+        if (requested == stored_length)
+        {
+            return;
+        }
+        reserve_storage(requested + 1);
+        index = stored_length;
+        while (index < requested)
+        {
+            data[index] = '\0';
+            index = index + 1;
+        }
+        stored_length = requested;
+        data[stored_length] = '\0';
+    }
+
+    void resize(int requested, char fill)
+    {
+        int index;
+        int fill_value;
+        char boundary;
+
+        if (requested < 0)
+        {
+            invalid_argument error;
+            error.code = 1;
+            throw error;
+        }
+        if (requested > 999999998)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        if (requested < stored_length)
+        {
+            if (requested > 0)
+            {
+                boundary = data[requested];
+                fill_value = std::ord(boundary) - 1;
+                if (fill_value >= 128)
+                {
+                    if (fill_value <= 191)
+                    {
+                        invalid_argument error;
+                        error.code = 2;
+                        throw error;
+                    }
+                }
+            }
+            stored_length = requested;
+            data[stored_length] = '\0';
+            return;
+        }
+        if (requested == stored_length)
+        {
+            return;
+        }
+        fill_value = std::ord(fill) - 1;
+        if (fill_value > 127)
+        {
+            invalid_encoding error;
+            error.code = 1;
+            throw error;
+        }
+        reserve_storage(requested + 1);
+        index = stored_length;
+        while (index < requested)
+        {
+            data[index] = fill;
+            index = index + 1;
+        }
+        stored_length = requested;
+        data[stored_length] = '\0';
+    }
+
+    void push_back(char value)
+    {
+        int byte_value;
+
+        if (stored_length >= 999999998)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        byte_value = std::ord(value) - 1;
+        if (byte_value > 127)
+        {
+            invalid_encoding error;
+            error.code = 1;
+            throw error;
+        }
+        reserve_storage(stored_length + 2);
+        data[stored_length] = value;
+        stored_length = stored_length + 1;
+        data[stored_length] = '\0';
+    }
+
+    void push_codepoint(int scalar)
+    {
+        char encoded[4];
+        int encoded_length;
+        int new_length;
+        int index;
+
+        encoded_length = encode_codepoint(scalar, encoded);
+        if (encoded_length > 999999998 - stored_length)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        new_length = stored_length + encoded_length;
+        reserve_storage(new_length + 1);
+        index = 0;
+        while (index < encoded_length)
+        {
+            data[stored_length + index] = encoded[index];
+            index = index + 1;
+        }
+        stored_length = new_length;
+        data[stored_length] = '\0';
+    }
+
+    void set_codepoint(int character_index, int scalar)
+    {
+        int byte_index;
+        int current_index;
+        int first;
+        int old_width;
+        int replacement_length;
+        int encoded_length;
+        int source_index;
+        int target_index;
+        char encoded[4];
+        char *replacement;
+
+        if (character_index < 0)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        byte_index = 0;
+        current_index = 0;
+        while (current_index < character_index && byte_index < stored_length)
+        {
+            first = std::ord(data[byte_index]) - 1;
+            if (first < 128)
+            {
+                byte_index = byte_index + 1;
+            }
+            else
+            {
+                if (first < 224)
+                {
+                    byte_index = byte_index + 2;
+                }
+                else
+                {
+                    if (first < 240)
+                    {
+                        byte_index = byte_index + 3;
+                    }
+                    else
+                    {
+                        byte_index = byte_index + 4;
+                    }
+                }
+            }
+            current_index = current_index + 1;
+        }
+        if (byte_index >= stored_length)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        encoded_length = encode_codepoint(scalar, encoded);
+        first = std::ord(data[byte_index]) - 1;
+        if (first < 128)
+        {
+            old_width = 1;
+        }
+        else
+        {
+            if (first < 224)
+            {
+                old_width = 2;
+            }
+            else
+            {
+                if (first < 240)
+                {
+                    old_width = 3;
+                }
+                else
+                {
+                    old_width = 4;
+                }
+            }
+        }
+        replacement_length = stored_length - old_width + encoded_length;
+        if (replacement_length > 999999998)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        replacement = new char[replacement_length + 1];
+        source_index = 0;
+        target_index = 0;
+        while (source_index < byte_index)
+        {
+            replacement[target_index] = data[source_index];
+            source_index = source_index + 1;
+            target_index = target_index + 1;
+        }
+        source_index = 0;
+        while (source_index < encoded_length)
+        {
+            replacement[target_index] = encoded[source_index];
+            source_index = source_index + 1;
+            target_index = target_index + 1;
+        }
+        source_index = byte_index + old_width;
+        while (source_index < stored_length)
+        {
+            replacement[target_index] = data[source_index];
+            source_index = source_index + 1;
+            target_index = target_index + 1;
+        }
+        replacement[replacement_length] = '\0';
+        delete[] data;
+        data = replacement;
+        stored_length = replacement_length;
+        storage_capacity = replacement_length + 1;
+    }
+
+    void pop_back()
+    {
+        int index;
+        int byte_value;
+        char current;
+
+        if (stored_length <= 0)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        index = stored_length - 1;
+        current = data[index];
+        byte_value = std::ord(current) - 1;
+        while (index > 0 && byte_value >= 128 && byte_value <= 191)
+        {
+            index = index - 1;
+            current = data[index];
+            byte_value = std::ord(current) - 1;
+        }
+        stored_length = index;
+        data[stored_length] = '\0';
     }
 
     void append(string source)
     {
-        value.append(source);
+        int old_length;
+        int index;
+        int source_length;
+        char current;
+        old_length = stored_length;
+        source_length = source.stored_length;
+        if (source_length > 999999998 - old_length)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        reserve_storage(stored_length + source_length + 1);
+        index = 0;
+        while (index < source_length)
+        {
+            current = source.data[index];
+            data[old_length + index] = current;
+            index = index + 1;
+        }
+        stored_length = old_length + source_length;
+        data[stored_length] = '\0';
+    }
+
+    void operator+=(string source)
+    {
+        append(source);
+    }
+
+    string operator+(string source)
+    {
+        string result;
+        int result_length;
+        int source_length;
+        int index;
+
+        source_length = source.stored_length;
+        if (source_length > 999999998 - stored_length)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        result_length = stored_length + source_length;
+        result.data = new char[result_length + 1];
+        result.storage_capacity = result_length + 1;
+        index = 0;
+        while (index < stored_length)
+        {
+            result.data[index] = data[index];
+            index = index + 1;
+        }
+        index = 0;
+        while (index < source_length)
+        {
+            result.data[stored_length + index] = source.data[index];
+            index = index + 1;
+        }
+        result.stored_length = result_length;
+        result.data[result_length] = '\0';
+        return result;
+    }
+
+    void assign(string source)
+    {
+        int source_length;
+        int index;
+        char *replacement;
+
+        source_length = source.stored_length;
+        if (source_length > 999999998)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        replacement = new char[source_length + 1];
+        index = 0;
+        while (index < source_length)
+        {
+            replacement[index] = source.data[index];
+            index = index + 1;
+        }
+        replacement[source_length] = '\0';
+        delete[] data;
+        data = replacement;
+        stored_length = source_length;
+        storage_capacity = source_length + 1;
+    }
+
+    void assign(char *source, int source_length)
+    {
+        int index;
+        int valid_encoding;
+        char *replacement;
+
+        if (source_length < 0)
+        {
+            invalid_argument error;
+            error.code = 1;
+            throw error;
+        }
+        if (source == NULL && source_length > 0)
+        {
+            invalid_argument error;
+            error.code = 1;
+            throw error;
+        }
+        if (source_length > 999999998)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        valid_encoding = is_valid_utf8_bytes(source, source_length);
+        if (valid_encoding == 0)
+        {
+            invalid_encoding error;
+            error.code = 1;
+            throw error;
+        }
+        replacement = new char[source_length + 1];
+        index = 0;
+        while (index < source_length)
+        {
+            replacement[index] = source[index];
+            index = index + 1;
+        }
+        replacement[source_length] = '\0';
+        delete[] data;
+        data = replacement;
+        stored_length = source_length;
+        storage_capacity = source_length + 1;
+    }
+
+    void insert(int byte_position, string source)
+    {
+        int source_length;
+        int result_length;
+        int index;
+        int byte_value;
+        char *replacement;
+
+        if (byte_position < 0 || byte_position > stored_length)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        if (byte_position > 0 && byte_position < stored_length)
+        {
+            byte_value = std::ord(data[byte_position]) - 1;
+            if (byte_value >= 128 && byte_value <= 191)
+            {
+                invalid_argument error;
+                error.code = 1;
+                throw error;
+            }
+        }
+        source_length = source.stored_length;
+        if (source_length == 0)
+        {
+            return;
+        }
+        if (source_length > 999999998 - stored_length)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        result_length = stored_length + source_length;
+        replacement = new char[result_length + 1];
+        index = 0;
+        while (index < byte_position)
+        {
+            replacement[index] = data[index];
+            index = index + 1;
+        }
+        index = 0;
+        while (index < source_length)
+        {
+            replacement[byte_position + index] = source.data[index];
+            index = index + 1;
+        }
+        index = byte_position;
+        while (index < stored_length)
+        {
+            replacement[source_length + index] = data[index];
+            index = index + 1;
+        }
+        replacement[result_length] = '\0';
+        delete[] data;
+        data = replacement;
+        stored_length = result_length;
+        storage_capacity = result_length + 1;
+    }
+
+    void erase(int byte_position, int byte_count)
+    {
+        int source_index;
+        int target_index;
+        int new_length;
+        int end_position;
+        int byte_value;
+
+        if (byte_position < 0 || byte_position > stored_length)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        if (byte_count < 0 || byte_count > stored_length - byte_position)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        if (byte_position > 0 && byte_position < stored_length)
+        {
+            byte_value = std::ord(data[byte_position]) - 1;
+            if (byte_value >= 128 && byte_value <= 191)
+            {
+                invalid_argument error;
+                error.code = 1;
+                throw error;
+            }
+        }
+        end_position = byte_position + byte_count;
+        if (end_position > 0 && end_position < stored_length)
+        {
+            byte_value = std::ord(data[end_position]) - 1;
+            if (byte_value >= 128 && byte_value <= 191)
+            {
+                invalid_argument error;
+                error.code = 1;
+                throw error;
+            }
+        }
+        if (byte_count == 0)
+        {
+            return;
+        }
+        source_index = end_position;
+        target_index = byte_position;
+        while (source_index < stored_length)
+        {
+            data[target_index] = data[source_index];
+            source_index = source_index + 1;
+            target_index = target_index + 1;
+        }
+        new_length = stored_length - byte_count;
+        data[new_length] = '\0';
+        stored_length = new_length;
+    }
+
+    void replace(int byte_position, int byte_count, string source)
+    {
+        int source_length;
+        int retained_length;
+        int result_length;
+        int suffix_index;
+        int target_index;
+        int copy_index;
+        int end_position;
+        int byte_value;
+        char *replacement;
+
+        if (byte_position < 0 || byte_position > stored_length)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        if (byte_count < 0 || byte_count > stored_length - byte_position)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        if (byte_position > 0 && byte_position < stored_length)
+        {
+            byte_value = std::ord(data[byte_position]) - 1;
+            if (byte_value >= 128 && byte_value <= 191)
+            {
+                invalid_argument error;
+                error.code = 1;
+                throw error;
+            }
+        }
+        end_position = byte_position + byte_count;
+        if (end_position > 0 && end_position < stored_length)
+        {
+            byte_value = std::ord(data[end_position]) - 1;
+            if (byte_value >= 128 && byte_value <= 191)
+            {
+                invalid_argument error;
+                error.code = 1;
+                throw error;
+            }
+        }
+        source_length = source.stored_length;
+        retained_length = stored_length - byte_count;
+        if (byte_count == 0 && source_length == 0)
+        {
+            return;
+        }
+        if (source_length > 999999998 - retained_length)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        result_length = retained_length + source_length;
+        replacement = new char[result_length + 1];
+        copy_index = 0;
+        while (copy_index < byte_position)
+        {
+            replacement[copy_index] = data[copy_index];
+            copy_index = copy_index + 1;
+        }
+        copy_index = 0;
+        while (copy_index < source_length)
+        {
+            replacement[byte_position + copy_index] = source.data[copy_index];
+            copy_index = copy_index + 1;
+        }
+        suffix_index = end_position;
+        target_index = byte_position + source_length;
+        while (suffix_index < stored_length)
+        {
+            replacement[target_index] = data[suffix_index];
+            suffix_index = suffix_index + 1;
+            target_index = target_index + 1;
+        }
+        replacement[result_length] = '\0';
+        delete[] data;
+        data = replacement;
+        stored_length = result_length;
+        storage_capacity = result_length + 1;
+    }
+
+    void replace_all(string old_text, string new_text)
+    {
+        int old_length;
+        int new_length;
+        int search_index;
+        int probe_index;
+        int match_index;
+        int matched;
+        int replacement_count;
+        int growth_per_match;
+        int available_growth;
+        int result_length;
+        int read_index;
+        int write_index;
+        int source_index;
+        char input_byte;
+        char pattern_byte;
+        char *replacement;
+
+        old_length = old_text.stored_length;
+        new_length = new_text.stored_length;
+        if (old_length == 0)
+        {
+            invalid_argument error;
+            error.code = 1;
+            throw error;
+        }
+        replacement_count = 0;
+        search_index = 0;
+        while (search_index <= stored_length - old_length)
+        {
+            matched = 1;
+            match_index = 0;
+            probe_index = search_index;
+            while (match_index < old_length && matched == 1)
+            {
+                input_byte = data[probe_index];
+                pattern_byte = old_text.data[match_index];
+                if (input_byte != pattern_byte)
+                {
+                    matched = 0;
+                }
+                else
+                {
+                    probe_index = probe_index + 1;
+                    match_index = match_index + 1;
+                }
+            }
+            if (matched == 1)
+            {
+                replacement_count = replacement_count + 1;
+                search_index = search_index + old_length;
+            }
+            else
+            {
+                search_index = search_index + 1;
+            }
+        }
+        if (replacement_count == 0)
+        {
+            return;
+        }
+        result_length = stored_length;
+        if (new_length > old_length)
+        {
+            growth_per_match = new_length - old_length;
+            available_growth = 999999998 - stored_length;
+            if (replacement_count > available_growth / growth_per_match)
+            {
+                length_error error;
+                error.code = 1;
+                throw error;
+            }
+            result_length = stored_length + replacement_count * growth_per_match;
+        }
+        else
+        {
+            if (new_length < old_length)
+            {
+                growth_per_match = old_length - new_length;
+                result_length = stored_length - replacement_count * growth_per_match;
+            }
+        }
+        replacement = new char[result_length + 1];
+        read_index = 0;
+        write_index = 0;
+        while (read_index < stored_length)
+        {
+            matched = 0;
+            if (read_index <= stored_length - old_length)
+            {
+                matched = 1;
+                match_index = 0;
+                probe_index = read_index;
+                while (match_index < old_length && matched == 1)
+                {
+                    input_byte = data[probe_index];
+                    pattern_byte = old_text.data[match_index];
+                    if (input_byte != pattern_byte)
+                    {
+                        matched = 0;
+                    }
+                    else
+                    {
+                        probe_index = probe_index + 1;
+                        match_index = match_index + 1;
+                    }
+                }
+            }
+            if (matched == 1)
+            {
+                source_index = 0;
+                while (source_index < new_length)
+                {
+                    replacement[write_index] = new_text.data[source_index];
+                    write_index = write_index + 1;
+                    source_index = source_index + 1;
+                }
+                read_index = read_index + old_length;
+            }
+            else
+            {
+                replacement[write_index] = data[read_index];
+                write_index = write_index + 1;
+                read_index = read_index + 1;
+            }
+        }
+        replacement[result_length] = '\0';
+        delete[] data;
+        data = replacement;
+        stored_length = result_length;
+        storage_capacity = result_length + 1;
+    }
+
+    void remove_prefix(int byte_count)
+    {
+        int byte_value;
+        int source_index;
+        int target_index;
+
+        if (byte_count < 0 || byte_count > stored_length)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        if (byte_count == 0)
+        {
+            return;
+        }
+        if (byte_count < stored_length)
+        {
+            byte_value = std::ord(data[byte_count]) - 1;
+            if (byte_value >= 128 && byte_value <= 191)
+            {
+                invalid_argument error;
+                error.code = 1;
+                throw error;
+            }
+        }
+        source_index = byte_count;
+        target_index = 0;
+        while (source_index < stored_length)
+        {
+            data[target_index] = data[source_index];
+            source_index = source_index + 1;
+            target_index = target_index + 1;
+        }
+        stored_length = stored_length - byte_count;
+        data[stored_length] = '\0';
+    }
+
+    void remove_suffix(int byte_count)
+    {
+        int new_length;
+        int byte_value;
+
+        if (byte_count < 0 || byte_count > stored_length)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        if (byte_count == 0)
+        {
+            return;
+        }
+        new_length = stored_length - byte_count;
+        if (new_length > 0)
+        {
+            byte_value = std::ord(data[new_length]) - 1;
+            if (byte_value >= 128 && byte_value <= 191)
+            {
+                invalid_argument error;
+                error.code = 1;
+                throw error;
+            }
+        }
+        data[new_length] = '\0';
+        stored_length = new_length;
     }
 
     int equals(string source)
     {
         int index;
-        if (value.len != source.len)
+        int source_length;
+        char current;
+        source_length = source.stored_length;
+        if (stored_length != source_length)
         {
             return 0;
         }
         index = 0;
-        while (index < value.len)
+        while (index < stored_length)
         {
-            if (value[index] != source[index])
+            current = source.data[index];
+            if (data[index] != current)
             {
                 return 0;
             }
@@ -63,17 +1780,133 @@ class String
         return 1;
     }
 
-    int starts_with(string source)
+    int equals_ignore_case_ascii(string source)
     {
         int index;
-        if (source.len > value.len)
+        int left_byte;
+        int right_byte;
+        int source_length;
+
+        source_length = source.stored_length;
+        if (stored_length != source_length)
         {
             return 0;
         }
         index = 0;
-        while (index < source.len)
+        while (index < stored_length)
         {
-            if (value[index] != source[index])
+            left_byte = std::ord(data[index]) - 1;
+            right_byte = std::ord(source.data[index]) - 1;
+            if (left_byte >= 65 && left_byte <= 90)
+            {
+                left_byte = left_byte + 32;
+            }
+            if (right_byte >= 65 && right_byte <= 90)
+            {
+                right_byte = right_byte + 32;
+            }
+            if (left_byte != right_byte)
+            {
+                return 0;
+            }
+            index = index + 1;
+        }
+        return 1;
+    }
+
+    void trim_start_ascii()
+    {
+        int byte_value;
+        int is_trimming;
+        int is_whitespace;
+        int source_index;
+        int target_index;
+        char current;
+
+        source_index = 0;
+        is_trimming = 1;
+        while (source_index < stored_length && is_trimming == 1)
+        {
+            current = data[source_index];
+            byte_value = std::ord(current) - 1;
+            is_whitespace = is_ascii_whitespace_byte(byte_value);
+            if (is_whitespace == 1)
+            {
+                source_index = source_index + 1;
+            }
+            else
+            {
+                is_trimming = 0;
+            }
+        }
+        if (source_index == 0)
+        {
+            return;
+        }
+        target_index = 0;
+        while (source_index < stored_length)
+        {
+            data[target_index] = data[source_index];
+            target_index = target_index + 1;
+            source_index = source_index + 1;
+        }
+        stored_length = target_index;
+        data[stored_length] = '\0';
+    }
+
+    void trim_end_ascii()
+    {
+        int byte_value;
+        int is_trimming;
+        int is_whitespace;
+        int new_length;
+        char current;
+
+        if (data == NULL)
+        {
+            return;
+        }
+        new_length = stored_length;
+        is_trimming = 1;
+        while (new_length > 0 && is_trimming == 1)
+        {
+            current = data[new_length - 1];
+            byte_value = std::ord(current) - 1;
+            is_whitespace = is_ascii_whitespace_byte(byte_value);
+            if (is_whitespace == 1)
+            {
+                new_length = new_length - 1;
+            }
+            else
+            {
+                is_trimming = 0;
+            }
+        }
+        stored_length = new_length;
+        data[stored_length] = '\0';
+    }
+
+    void trim_ascii()
+    {
+        trim_start_ascii();
+        trim_end_ascii();
+    }
+
+    int starts_with(string source)
+    {
+        int index;
+        int source_length;
+        char current;
+        source_length = source.stored_length;
+        if (source_length > stored_length)
+        {
+            return 0;
+        }
+        index = 0;
+        while (index < source_length)
+        {
+            current = source.data[index];
+            if (data[index] != current)
             {
                 return 0;
             }
@@ -86,15 +1919,19 @@ class String
     {
         int index;
         int offset;
-        if (source.len > value.len)
+        int source_length;
+        char current;
+        source_length = source.stored_length;
+        if (source_length > stored_length)
         {
             return 0;
         }
         index = 0;
-        offset = value.len - source.len;
-        while (index < source.len)
+        offset = stored_length - source_length;
+        while (index < source_length)
         {
-            if (value[offset + index] != source[index])
+            current = source.data[index];
+            if (data[offset + index] != current)
             {
                 return 0;
             }
@@ -108,23 +1945,29 @@ class String
         int index;
         int limit;
         int result;
+        int source_length;
+        int left_byte;
+        int right_byte;
         result = 0;
         index = 0;
-        limit = value.len;
-        if (source.len < limit)
+        limit = stored_length;
+        source_length = source.stored_length;
+        if (source_length < limit)
         {
-            limit = source.len;
+            limit = source_length;
         }
         while (index < limit)
         {
-            if (value[index] < source[index])
+            left_byte = std::ord(data[index]) - 1;
+            right_byte = std::ord(source.data[index]) - 1;
+            if (left_byte < right_byte)
             {
                 result = -1;
                 index = limit;
             }
             else
             {
-                if (value[index] > source[index])
+                if (left_byte > right_byte)
                 {
                     result = 1;
                     index = limit;
@@ -137,13 +1980,13 @@ class String
         }
         if (result == 0)
         {
-            if (value.len < source.len)
+            if (stored_length < source_length)
             {
                 result = -1;
             }
             else
             {
-                if (value.len > source.len)
+                if (stored_length > source_length)
                 {
                     result = 1;
                 }
@@ -157,21 +2000,25 @@ class String
         int start;
         int index;
         int matched;
-        if (source.len == 0)
+        int source_length;
+        char current;
+        source_length = source.stored_length;
+        if (source_length == 0)
         {
             return 1;
         }
         start = 0;
-        while (start <= value.len - source.len)
+        while (start <= stored_length - source_length)
         {
             index = 0;
             matched = 1;
-            while (index < source.len)
+            while (index < source_length)
             {
-                if (value[start + index] != source[index])
+                current = source.data[index];
+                if (data[start + index] != current)
                 {
                     matched = 0;
-                    index = source.len;
+                    index = source_length;
                 }
                 else
                 {
@@ -187,184 +2034,148 @@ class String
         return 0;
     }
 
-    int atoi()
+    int parse_int()
     {
         int result;
         int index;
+        int end;
         int negative;
         int digit;
+        int maximum_magnitude;
         char current;
-        result = 0;
+
         index = 0;
-        negative = 0;
-        while (index < value.len)
+        end = stored_length;
+        while (index < end
+            && is_ascii_whitespace_byte(std::ord(data[index]) - 1) == 1)
         {
-            if (value[index] == ' ')
-            {
-                index = index + 1;
-            }
-            else
-            {
-                index = value.len;
-            }
+            index = index + 1;
         }
-        if (index < value.len && value[index] == '-')
+        while (end > index
+            && is_ascii_whitespace_byte(std::ord(data[end - 1]) - 1) == 1)
+        {
+            end = end - 1;
+        }
+        negative = 0;
+        if (index < end && data[index] == '-')
         {
             negative = 1;
             index = index + 1;
         }
         else
         {
-            if (index < value.len && value[index] == '+')
+            if (index < end && data[index] == '+')
             {
                 index = index + 1;
             }
         }
-        while (index < value.len)
+        if (index >= end)
         {
-            if (value[index] < '0' || value[index] > '9')
+            parse_error error;
+            error.code = 1;
+            throw error;
+        }
+
+        result = 0;
+        maximum_magnitude = 999999999;
+        while (index < end)
+        {
+            current = data[index];
+            digit = std::ord(current) - std::ord('0');
+            if (digit < 0 || digit > 9)
             {
-                index = value.len;
+                parse_error error;
+                error.code = 2;
+                throw error;
             }
-            else
+            if (result > (maximum_magnitude - digit) / 10)
             {
-                current = value[index];
-                digit = std::ord(current) - std::ord('0');
-                result = result * 10 + digit;
-                index = index + 1;
+                range_error error;
+                error.code = 1;
+                throw error;
             }
+            result = result * 10 + digit;
+            index = index + 1;
         }
         if (negative == 1)
         {
             result = 0 - result;
         }
+        return result;
+    }
+
+    int atoi()
+    {
+        int result;
+        result = parse_int();
         return result;
     }
 
     int atol()
     {
         int result;
-        int index;
-        int negative;
-        int digit;
-        char current;
-        result = 0;
-        index = 0;
-        negative = 0;
-        while (index < value.len)
-        {
-            if (value[index] == ' ')
-            {
-                index = index + 1;
-            }
-            else
-            {
-                index = value.len;
-            }
-        }
-        if (index < value.len && value[index] == '-')
-        {
-            negative = 1;
-            index = index + 1;
-        }
-        else
-        {
-            if (index < value.len && value[index] == '+')
-            {
-                index = index + 1;
-            }
-        }
-        while (index < value.len)
-        {
-            if (value[index] < '0' || value[index] > '9')
-            {
-                index = value.len;
-            }
-            else
-            {
-                current = value[index];
-                digit = std::ord(current) - std::ord('0');
-                result = result * 10 + digit;
-                index = index + 1;
-            }
-        }
-        if (negative == 1)
-        {
-            result = 0 - result;
-        }
+        result = parse_int();
         return result;
     }
 
     int atoll()
     {
         int result;
-        int index;
-        int negative;
-        int digit;
-        char current;
-        result = 0;
-        index = 0;
-        negative = 0;
-        while (index < value.len)
-        {
-            if (value[index] == ' ')
-            {
-                index = index + 1;
-            }
-            else
-            {
-                index = value.len;
-            }
-        }
-        if (index < value.len && value[index] == '-')
-        {
-            negative = 1;
-            index = index + 1;
-        }
-        else
-        {
-            if (index < value.len && value[index] == '+')
-            {
-                index = index + 1;
-            }
-        }
-        while (index < value.len)
-        {
-            if (value[index] < '0' || value[index] > '9')
-            {
-                index = value.len;
-            }
-            else
-            {
-                current = value[index];
-                digit = std::ord(current) - std::ord('0');
-                result = result * 10 + digit;
-                index = index + 1;
-            }
-        }
-        if (negative == 1)
-        {
-            result = 0 - result;
-        }
+        result = parse_int();
         return result;
     }
 
     int strlen()
     {
-        return value.len;
+        return stored_length;
+    }
+
+    char at(int byte_index)
+    {
+        if (byte_index < 0 || byte_index >= stored_length)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        return data[byte_index];
+    }
+
+    char front()
+    {
+        if (stored_length <= 0)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        return data[0];
+    }
+
+    char back()
+    {
+        if (stored_length <= 0)
+        {
+            out_of_range error;
+            error.code = 1;
+            throw error;
+        }
+        return data[stored_length - 1];
     }
 
     int strnlen(int request)
     {
         int result;
-        result = value.len;
+        if (request < 0)
+        {
+            invalid_argument error;
+            error.code = 2;
+            throw error;
+        }
+        result = stored_length;
         if (request < result)
         {
             result = request;
-        }
-        if (result < 0)
-        {
-            result = 0;
         }
         return result;
     }
@@ -374,23 +2185,29 @@ class String
         int index;
         int limit;
         int result;
+        int source_length;
+        int left_byte;
+        int right_byte;
         result = 0;
         index = 0;
-        limit = value.len;
-        if (source.len < limit)
+        limit = stored_length;
+        source_length = source.stored_length;
+        if (source_length < limit)
         {
-            limit = source.len;
+            limit = source_length;
         }
         while (index < limit)
         {
-            if (value[index] < source[index])
+            left_byte = std::ord(data[index]) - 1;
+            right_byte = std::ord(source.data[index]) - 1;
+            if (left_byte < right_byte)
             {
                 result = -1;
                 index = limit;
             }
             else
             {
-                if (value[index] > source[index])
+                if (left_byte > right_byte)
                 {
                     result = 1;
                     index = limit;
@@ -403,13 +2220,13 @@ class String
         }
         if (result == 0)
         {
-            if (value.len < source.len)
+            if (stored_length < source_length)
             {
                 result = -1;
             }
             else
             {
-                if (value.len > source.len)
+                if (stored_length > source_length)
                 {
                     result = 1;
                 }
@@ -420,29 +2237,64 @@ class String
 
     void strcpy(string source)
     {
-        value = source;
+        int index;
+        int source_length;
+        char current;
+        source_length = source.stored_length;
+        reserve_storage(source_length + 1);
+        index = 0;
+        while (index < source_length)
+        {
+            current = source.data[index];
+            data[index] = current;
+            index = index + 1;
+        }
+        stored_length = source_length;
+        data[stored_length] = '\0';
     }
 
     void strncpy(string source, int request)
     {
         int index;
         int copy_limit;
+        int source_length;
+        char current;
+        source_length = source.stored_length;
         copy_limit = request;
         if (copy_limit < 0)
         {
-            copy_limit = 0;
+            invalid_argument error;
+            error.code = 2;
+            throw error;
         }
-        if (copy_limit > source.len)
+        if (copy_limit > source_length)
         {
-            copy_limit = source.len;
+            copy_limit = source_length;
         }
-        value = "";
+        if (copy_limit < source_length && copy_limit > 0)
+        {
+            current = source.data[copy_limit];
+            if (std::ord(current) - 1 >= 128)
+            {
+                if (std::ord(current) - 1 <= 191)
+                {
+                    invalid_argument error;
+                    error.code = 2;
+                    throw error;
+                }
+            }
+        }
+        reserve_storage(copy_limit + 1);
+        clear();
         index = 0;
         while (index < copy_limit)
         {
-            value[index] = source[index];
+            current = source.data[index];
+            data[index] = current;
             index = index + 1;
         }
+        stored_length = copy_limit;
+        data[stored_length] = '\0';
     }
 
     int memcmp(string source, int count)
@@ -450,31 +2302,29 @@ class String
         int index;
         int limit;
         int result;
+        int source_length;
+        char current;
         result = 0;
+        source_length = source.stored_length;
+        if (count < 0 || count > stored_length || count > source_length)
+        {
+            invalid_argument error;
+            error.code = 2;
+            throw error;
+        }
         limit = count;
-        if (limit < 0)
-        {
-            limit = 0;
-        }
-        if (limit > value.len)
-        {
-            limit = value.len;
-        }
-        if (limit > source.len)
-        {
-            limit = source.len;
-        }
         index = 0;
         while (index < limit)
         {
-            if (value[index] < source[index])
+            current = source.data[index];
+            if (data[index] < current)
             {
                 result = -1;
                 index = limit;
             }
             else
             {
-                if (value[index] > source[index])
+                if (data[index] > current)
                 {
                     result = 1;
                     index = limit;
@@ -490,58 +2340,92 @@ class String
 
     void strcat(string left, string right)
     {
-        value = left;
-        value.append(right);
+        int left_length;
+        int right_length;
+        int index;
+        int write_offset;
+        char current;
+        left_length = left.stored_length;
+        right_length = right.stored_length;
+        if (right_length > 999999998 - left_length)
+        {
+            length_error error;
+            error.code = 1;
+            throw error;
+        }
+        reserve_storage(left_length + right_length + 1);
+        clear();
+        index = 0;
+        while (index < left_length)
+        {
+            current = left.data[index];
+            data[index] = current;
+            index = index + 1;
+        }
+        write_offset = index;
+        index = 0;
+        while (index < right_length)
+        {
+            current = right.data[index];
+            data[write_offset + index] = current;
+            index = index + 1;
+        }
+        stored_length = left_length + right_length;
+        data[stored_length] = '\0';
     }
 
-    double strtod()
+    double parse_double()
     {
         double result;
         int index;
+        int end;
         int negative;
         int seen_digit;
         int seen_dot;
         int decimal_places;
         int digit;
-        int invalid;
         char current;
         result = 0;
         index = 0;
+        end = stored_length;
         negative = 0;
         seen_digit = 0;
         seen_dot = 0;
         decimal_places = 0;
-        invalid = 0;
-        while (index < value.len)
+        while (index < end
+            && is_ascii_whitespace_byte(std::ord(data[index]) - 1) == 1)
         {
-            current = value[index];
-            if (current == ' ' && seen_digit == 0)
-            {
-                index = index + 1;
-            }
-            else
-            {
-                index = value.len;
-            }
+            index = index + 1;
         }
-        if (index < value.len && value[index] == '-')
+        while (end > index
+            && is_ascii_whitespace_byte(std::ord(data[end - 1]) - 1) == 1)
+        {
+            end = end - 1;
+        }
+        if (index < end && data[index] == '-')
         {
             negative = 1;
             index = index + 1;
         }
         else
         {
-            if (index < value.len && value[index] == '+')
+            if (index < end && data[index] == '+')
             {
                 index = index + 1;
             }
         }
-        while (index < value.len)
+        if (index >= end)
         {
-            current = value[index];
-            if (current >= '0' && current <= '9')
+            parse_error error;
+            error.code = 1;
+            throw error;
+        }
+        while (index < end)
+        {
+            current = data[index];
+            digit = std::ord(current) - std::ord('0');
+            if (digit >= 0 && digit <= 9)
             {
-                digit = std::ord(current) - std::ord('0');
                 result = result * 10 + digit;
                 if (seen_dot == 1)
                 {
@@ -557,22 +2441,18 @@ class String
                 }
                 else
                 {
-                    if (current == ' ')
-                    {
-                        index = value.len;
-                    }
-                    else
-                    {
-                        invalid = 1;
-                        index = value.len;
-                    }
+                    parse_error error;
+                    error.code = 2;
+                    throw error;
                 }
             }
             index = index + 1;
         }
-        if (invalid == 1 || seen_digit == 0)
+        if (seen_digit == 0)
         {
-            result = 0;
+            parse_error error;
+            error.code = 1;
+            throw error;
         }
         while (decimal_places > 0)
         {
@@ -589,14 +2469,16 @@ class String
     void toupper()
     {
         int index;
+        int byte_value;
         char current;
         index = 0;
-        while (index < value.len)
+        while (index < stored_length)
         {
-            current = value[index];
-            if (current >= 'a' && current <= 'z')
+            current = data[index];
+            byte_value = std::ord(current) - 1;
+            if (byte_value >= 97 && byte_value <= 122)
             {
-                value[index] = current - 32;
+                data[index] = current - 32;
             }
             index = index + 1;
         }
@@ -605,14 +2487,16 @@ class String
     void tolower()
     {
         int index;
+        int byte_value;
         char current;
         index = 0;
-        while (index < value.len)
+        while (index < stored_length)
         {
-            current = value[index];
-            if (current >= 'A' && current <= 'Z')
+            current = data[index];
+            byte_value = std::ord(current) - 1;
+            if (byte_value >= 65 && byte_value <= 90)
             {
-                value[index] = current + 32;
+                data[index] = current + 32;
             }
             index = index + 1;
         }

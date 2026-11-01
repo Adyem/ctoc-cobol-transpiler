@@ -323,7 +323,7 @@ static unsigned long long cblc_struct_layout_fingerprint(
     size_t index;
 
     if (!unit || !type || depth > CBLC_TEMPLATE_PARAMETER_MAX)
-        return (0);
+        return (CBLC_EXCEPTION_PAYLOAD_MAX + 1);
     hash = 1469598103934665603ULL;
     hash = cblc_layout_hash_text(hash, "CBLC-LAYOUT@1");
     hash = cblc_layout_hash_u64(hash, static_cast<unsigned long long>(type->is_class));
@@ -378,7 +378,7 @@ static size_t cblc_exception_payload_size(const t_cblc_translation_unit *unit,
             element_size = sizeof(int);
         else if (field->kind == CBLC_DATA_KIND_CHAR)
             element_size = field->length == 0 ? 1 : field->length;
-        else if (field->kind == CBLC_DATA_KIND_STRING)
+        else if (field->kind == CBLC_DATA_KIND_CHAR_BUFFER)
             element_size = (field->length == 0 ? 1 : field->length) +
                 sizeof(size_t) * 2;
         else if (field->kind == CBLC_DATA_KIND_STRUCT)
@@ -388,12 +388,14 @@ static size_t cblc_exception_payload_size(const t_cblc_translation_unit *unit,
             nested_type = cblc_find_struct_type(unit, field->struct_type_name);
             if (!nested_type && field->is_template_parameter)
                 element_size = sizeof(int);
+            else if (!nested_type)
+                element_size = CBLC_EXCEPTION_PAYLOAD_MAX + 1;
             else
                 element_size = cblc_exception_payload_size(unit, nested_type, depth + 1);
         }
         else
             element_size = sizeof(void *);
-        if (element_size == 0 || element_count > CBLC_EXCEPTION_PAYLOAD_MAX
+        if (element_count > CBLC_EXCEPTION_PAYLOAD_MAX
             || element_size > CBLC_EXCEPTION_PAYLOAD_MAX / element_count)
             return (CBLC_EXCEPTION_PAYLOAD_MAX + 1);
         field_size = element_size * element_count;
@@ -533,255 +535,6 @@ static int cblc_translation_unit_ensure_function_instantiation_capacity(
     }
     unit->function_instantiations = instantiations;
     unit->function_instantiation_capacity = desired_capacity;
-    return (FT_SUCCESS);
-}
-
-static int cblc_register_string_class_method(t_cblc_struct_type *type,
-    const char *name, t_cblc_function_return_kind return_kind,
-    const char *return_type_name, const char *program_name,
-    const t_transpiler_function_parameter_kind *parameter_kinds,
-    const char *const *parameter_type_names, size_t parameter_count)
-{
-    t_cblc_method *method;
-    size_t index;
-
-    if (!type || !name || !program_name || parameter_count > TRANSPILE_FUNCTION_PARAMETER_MAX
-        || (parameter_count > 0 && (!parameter_kinds || !parameter_type_names)))
-        return (FT_FAILURE);
-    if (type->method_count >= type->method_capacity)
-        return (FT_FAILURE);
-    method = &type->methods[type->method_count];
-    std::memset(method, 0, sizeof(*method));
-    ft_strlcpy(method->source_name, name, sizeof(method->source_name));
-    cblc_identifier_to_cobol(name, method->cobol_name, sizeof(method->cobol_name));
-    method->return_kind = return_kind;
-    if (return_type_name)
-        ft_strlcpy(method->return_type_name, return_type_name,
-            sizeof(method->return_type_name));
-    ft_strlcpy(method->implementation_program_name, program_name,
-        sizeof(method->implementation_program_name));
-    method->visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
-    method->has_definition = 0;
-    index = 0;
-    while (index < parameter_count)
-    {
-        method->parameters[index].kind = parameter_kinds[index];
-        if (parameter_type_names[index])
-            ft_strlcpy(method->parameters[index].type_name, parameter_type_names[index],
-                sizeof(method->parameters[index].type_name));
-        index += 1;
-    }
-    method->parameter_count = parameter_count;
-    type->method_count += 1;
-    return (FT_SUCCESS);
-}
-
-static int cblc_register_builtin_string_type(t_cblc_translation_unit *unit)
-{
-    t_cblc_struct_type *type;
-    t_cblc_method *method;
-    t_cblc_constructor *constructor;
-
-    if (!unit)
-        return (FT_FAILURE);
-    if (unit->struct_type_count >= unit->struct_type_capacity)
-    {
-        if (cblc_translation_unit_ensure_struct_capacity(unit,
-                unit->struct_type_capacity == 0 ? 2 : unit->struct_type_capacity * 2) != FT_SUCCESS)
-            return (FT_FAILURE);
-    }
-    type = &unit->struct_types[unit->struct_type_count];
-    std::memset(type, 0, sizeof(*type));
-    ft_strlcpy(type->source_name, "string", sizeof(type->source_name));
-    cblc_identifier_to_cobol(type->source_name, type->cobol_name, sizeof(type->cobol_name));
-    type->is_class = 1;
-    type->is_builtin = 1;
-    type->has_default_constructor = 1;
-    type->has_destructor = 1;
-    if (cblc_struct_type_ensure_constructor_capacity(type, 2) != FT_SUCCESS)
-        return (FT_FAILURE);
-    constructor = &type->constructors[type->constructor_count];
-    std::memset(constructor, 0, sizeof(*constructor));
-    constructor->parameters[0].kind = TRANSPILE_FUNCTION_PARAMETER_INT;
-    ft_strlcpy(constructor->parameters[0].type_name, "int",
-        sizeof(constructor->parameters[0].type_name));
-    constructor->parameter_count = 1;
-    constructor->has_definition = 0;
-    type->constructor_count += 1;
-    constructor = &type->constructors[type->constructor_count];
-    std::memset(constructor, 0, sizeof(*constructor));
-    ft_strlcpy(constructor->parameters[0].type_name, "string",
-        sizeof(constructor->parameters[0].type_name));
-    constructor->parameters[0].kind = TRANSPILE_FUNCTION_PARAMETER_STRING;
-    constructor->parameter_count = 1;
-    constructor->has_definition = 0;
-    type->constructor_count += 1;
-    if (cblc_struct_type_ensure_method_capacity(type, 24) != FT_SUCCESS)
-        return (FT_FAILURE);
-    method = &type->methods[type->method_count];
-    std::memset(method, 0, sizeof(*method));
-    ft_strlcpy(method->source_name, "append", sizeof(method->source_name));
-    cblc_identifier_to_cobol(method->source_name, method->cobol_name, sizeof(method->cobol_name));
-    method->return_kind = CBLC_FUNCTION_RETURN_VOID;
-    method->visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
-    method->parameters[0].kind = TRANSPILE_FUNCTION_PARAMETER_STRING;
-    ft_strlcpy(method->parameters[0].type_name, "string",
-        sizeof(method->parameters[0].type_name));
-    method->parameter_count = 1;
-    method->has_definition = 0;
-    type->method_count += 1;
-    method = &type->methods[type->method_count];
-    std::memset(method, 0, sizeof(*method));
-    ft_strlcpy(method->source_name, "len", sizeof(method->source_name));
-    cblc_identifier_to_cobol(method->source_name, method->cobol_name, sizeof(method->cobol_name));
-    method->return_kind = CBLC_FUNCTION_RETURN_INT;
-    method->visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
-    method->has_definition = 0;
-    type->method_count += 1;
-    method = &type->methods[type->method_count];
-    std::memset(method, 0, sizeof(*method));
-    ft_strlcpy(method->source_name, "clear", sizeof(method->source_name));
-    cblc_identifier_to_cobol(method->source_name, method->cobol_name, sizeof(method->cobol_name));
-    method->return_kind = CBLC_FUNCTION_RETURN_VOID;
-    method->visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
-    method->has_definition = 0;
-    type->method_count += 1;
-    method = &type->methods[type->method_count];
-    std::memset(method, 0, sizeof(*method));
-    ft_strlcpy(method->source_name, "empty", sizeof(method->source_name));
-    cblc_identifier_to_cobol(method->source_name, method->cobol_name, sizeof(method->cobol_name));
-    method->return_kind = CBLC_FUNCTION_RETURN_INT;
-    method->visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
-    method->has_definition = 0;
-    type->method_count += 1;
-    method = &type->methods[type->method_count];
-    std::memset(method, 0, sizeof(*method));
-    ft_strlcpy(method->source_name, "equals", sizeof(method->source_name));
-    cblc_identifier_to_cobol(method->source_name, method->cobol_name, sizeof(method->cobol_name));
-    method->return_kind = CBLC_FUNCTION_RETURN_INT;
-    method->visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
-    method->parameters[0].kind = TRANSPILE_FUNCTION_PARAMETER_STRING;
-    ft_strlcpy(method->parameters[0].type_name, "string",
-        sizeof(method->parameters[0].type_name));
-    method->parameter_count = 1;
-    method->has_definition = 0;
-    type->method_count += 1;
-    method = &type->methods[type->method_count];
-    std::memset(method, 0, sizeof(*method));
-    ft_strlcpy(method->source_name, "capacity", sizeof(method->source_name));
-    cblc_identifier_to_cobol(method->source_name, method->cobol_name, sizeof(method->cobol_name));
-    method->return_kind = CBLC_FUNCTION_RETURN_INT;
-    method->visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
-    method->has_definition = 0;
-    type->method_count += 1;
-    method = &type->methods[type->method_count];
-    std::memset(method, 0, sizeof(*method));
-    ft_strlcpy(method->source_name, "starts_with", sizeof(method->source_name));
-    cblc_identifier_to_cobol(method->source_name, method->cobol_name, sizeof(method->cobol_name));
-    method->return_kind = CBLC_FUNCTION_RETURN_INT;
-    method->visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
-    method->parameters[0].kind = TRANSPILE_FUNCTION_PARAMETER_STRING;
-    ft_strlcpy(method->parameters[0].type_name, "string",
-        sizeof(method->parameters[0].type_name));
-    method->parameter_count = 1;
-    method->has_definition = 0;
-    type->method_count += 1;
-    method = &type->methods[type->method_count];
-    std::memset(method, 0, sizeof(*method));
-    ft_strlcpy(method->source_name, "ends_with", sizeof(method->source_name));
-    cblc_identifier_to_cobol(method->source_name, method->cobol_name, sizeof(method->cobol_name));
-    method->return_kind = CBLC_FUNCTION_RETURN_INT;
-    method->visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
-    method->parameters[0].kind = TRANSPILE_FUNCTION_PARAMETER_STRING;
-    ft_strlcpy(method->parameters[0].type_name, "string",
-        sizeof(method->parameters[0].type_name));
-    method->parameter_count = 1;
-    method->has_definition = 0;
-    type->method_count += 1;
-    method = &type->methods[type->method_count];
-    std::memset(method, 0, sizeof(*method));
-    ft_strlcpy(method->source_name, "compare", sizeof(method->source_name));
-    cblc_identifier_to_cobol(method->source_name, method->cobol_name, sizeof(method->cobol_name));
-    method->return_kind = CBLC_FUNCTION_RETURN_INT;
-    method->visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
-    method->parameters[0].kind = TRANSPILE_FUNCTION_PARAMETER_STRING;
-    ft_strlcpy(method->parameters[0].type_name, "string",
-        sizeof(method->parameters[0].type_name));
-    method->parameter_count = 1;
-    method->has_definition = 0;
-    type->method_count += 1;
-    method = &type->methods[type->method_count];
-    std::memset(method, 0, sizeof(*method));
-    ft_strlcpy(method->source_name, "contains", sizeof(method->source_name));
-    cblc_identifier_to_cobol(method->source_name, method->cobol_name, sizeof(method->cobol_name));
-    method->return_kind = CBLC_FUNCTION_RETURN_INT;
-    method->visibility = CBLC_MEMBER_VISIBILITY_PUBLIC;
-    method->parameters[0].kind = TRANSPILE_FUNCTION_PARAMETER_STRING;
-    ft_strlcpy(method->parameters[0].type_name, "string",
-        sizeof(method->parameters[0].type_name));
-    method->parameter_count = 1;
-    method->has_definition = 0;
-    type->method_count += 1;
-    {
-        const t_transpiler_function_parameter_kind string_parameter[] = {
-            TRANSPILE_FUNCTION_PARAMETER_STRING
-        };
-        const t_transpiler_function_parameter_kind string_string_parameters[] = {
-            TRANSPILE_FUNCTION_PARAMETER_STRING, TRANSPILE_FUNCTION_PARAMETER_STRING
-        };
-        const t_transpiler_function_parameter_kind string_int_parameters[] = {
-            TRANSPILE_FUNCTION_PARAMETER_STRING, TRANSPILE_FUNCTION_PARAMETER_INT
-        };
-        const t_transpiler_function_parameter_kind int_parameter[] = {
-            TRANSPILE_FUNCTION_PARAMETER_INT
-        };
-        const char *string_type[] = {"string"};
-        const char *string_string_types[] = {"string", "string"};
-        const char *string_int_types[] = {"string", "int"};
-        const char *int_type[] = {"int"};
-
-        if (cblc_register_string_class_method(type, "atoi",
-                CBLC_FUNCTION_RETURN_INT, "int", "CBLC-ATOI-STRING",
-                NULL, NULL, 0) != FT_SUCCESS
-            || cblc_register_string_class_method(type, "atol",
-                CBLC_FUNCTION_RETURN_INT, "int", "CBLC-ATOL-STRING",
-                NULL, NULL, 0) != FT_SUCCESS
-            || cblc_register_string_class_method(type, "atoll",
-                CBLC_FUNCTION_RETURN_INT, "int", "CBLC-ATOLL-STRING",
-                NULL, NULL, 0) != FT_SUCCESS
-            || cblc_register_string_class_method(type, "strlen",
-                CBLC_FUNCTION_RETURN_INT, "int", "CBLC-STRLEN-STRING",
-                NULL, NULL, 0) != FT_SUCCESS
-            || cblc_register_string_class_method(type, "strnlen",
-                CBLC_FUNCTION_RETURN_INT, "int", "CBLC-STRNLEN-STRING",
-                int_parameter, int_type, 1) != FT_SUCCESS
-            || cblc_register_string_class_method(type, "strcmp",
-                CBLC_FUNCTION_RETURN_INT, "int", "CBLC-STRCMP-STRING",
-                string_parameter, string_type, 1) != FT_SUCCESS
-            || cblc_register_string_class_method(type, "strcpy",
-                CBLC_FUNCTION_RETURN_VOID, NULL, "CBLC-STRCPY-STRING",
-                string_parameter, string_type, 1) != FT_SUCCESS
-            || cblc_register_string_class_method(type, "strncpy",
-                CBLC_FUNCTION_RETURN_VOID, NULL, "CBLC-STRNCPY-STRING",
-                string_int_parameters, string_int_types, 2) != FT_SUCCESS
-            || cblc_register_string_class_method(type, "memcmp",
-                CBLC_FUNCTION_RETURN_INT, "int", "CBLC-MEMCMP-STRING",
-                string_int_parameters, string_int_types, 2) != FT_SUCCESS
-            || cblc_register_string_class_method(type, "strcat",
-                CBLC_FUNCTION_RETURN_VOID, NULL, "CBLC-STRCAT-STRING",
-                string_string_parameters, string_string_types, 2) != FT_SUCCESS
-            || cblc_register_string_class_method(type, "strtod",
-                CBLC_FUNCTION_RETURN_DOUBLE, "double", "CBLC-STRTOD-STRING",
-                NULL, NULL, 0) != FT_SUCCESS
-            || cblc_register_string_class_method(type, "toupper",
-                CBLC_FUNCTION_RETURN_VOID, NULL, "CBLC-TOUPPER-STRING",
-                NULL, NULL, 0) != FT_SUCCESS
-            || cblc_register_string_class_method(type, "tolower",
-                CBLC_FUNCTION_RETURN_VOID, NULL, "CBLC-TOLOWER-STRING",
-                NULL, NULL, 0) != FT_SUCCESS)
-            return (FT_FAILURE);
-    }
-    unit->struct_type_count += 1;
     return (FT_SUCCESS);
 }
 

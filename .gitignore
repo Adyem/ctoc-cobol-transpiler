@@ -1,4 +1,5 @@
 build_logs/
+.ctoc_test_tmp/
 automated_tests
 ctoc_cobol_transpiler
 ctoc_cobol_transpiler_debug

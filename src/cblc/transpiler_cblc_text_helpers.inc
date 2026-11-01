@@ -6,6 +6,42 @@ static void cobol_text_builder_init(t_cobol_text_builder *builder)
     builder->length = 0;
     builder->capacity = 0;
     builder->free_format = 0;
+    builder->control_flow_depth = 0;
+    builder->based_name_slots = NULL;
+    builder->based_name_capacity = 0;
+    builder->based_name_count = 0;
+    builder->deferred_procedure_text = NULL;
+    builder->deferred_procedure_length = 0;
+    builder->deferred_procedure_capacity = 0;
+    builder->emitted_method_paragraphs = NULL;
+    builder->known_paragraph_definitions = NULL;
+    builder->lifecycle_constructor_requests.clear();
+    builder->active_function_name = NULL;
+    builder->active_method = NULL;
+    builder->active_constructor = NULL;
+    builder->active_statement = NULL;
+    builder->active_statement_index = static_cast<size_t>(-1);
+    builder->diagnostic_code = 0;
+    builder->diagnostic_message[0] = '\0';
+}
+
+static void cobol_text_builder_set_diagnostic(t_cobol_text_builder *builder,
+    int code, const char *message)
+{
+    if (!builder || builder->diagnostic_code != 0
+        || builder->diagnostic_message[0] != '\0' || !message)
+        return ;
+    builder->diagnostic_code = code;
+    ft_strlcpy(builder->diagnostic_message, message,
+        sizeof(builder->diagnostic_message));
+}
+
+static void cobol_text_builder_set_control_flow_depth(
+    t_cobol_text_builder *builder, int control_flow_depth)
+{
+    if (!builder)
+        return ;
+    builder->control_flow_depth = control_flow_depth > 0 ? control_flow_depth : 0;
 }
 
 static void cobol_text_builder_dispose(t_cobol_text_builder *builder)
@@ -14,23 +50,180 @@ static void cobol_text_builder_dispose(t_cobol_text_builder *builder)
         return ;
     if (builder->data)
         cma_free(builder->data);
+    if (builder->deferred_procedure_text)
+        cma_free(builder->deferred_procedure_text);
+    if (builder->based_name_slots)
+    {
+        size_t index;
+
+        index = 0;
+        while (index < builder->based_name_capacity)
+        {
+            if (builder->based_name_slots[index])
+                cma_free(builder->based_name_slots[index]);
+            index += 1;
+        }
+        cma_free(builder->based_name_slots);
+    }
     builder->data = NULL;
     builder->length = 0;
     builder->capacity = 0;
     builder->free_format = 0;
+    builder->control_flow_depth = 0;
+    builder->based_name_slots = NULL;
+    builder->based_name_capacity = 0;
+    builder->based_name_count = 0;
+    builder->deferred_procedure_text = NULL;
+    builder->deferred_procedure_length = 0;
+    builder->deferred_procedure_capacity = 0;
+    builder->diagnostic_code = 0;
+    builder->diagnostic_message[0] = '\0';
+}
+
+static uint64_t cobol_text_builder_based_name_hash(const char *name)
+{
+    uint64_t hash;
+
+    hash = UINT64_C(1469598103934665603);
+    while (*name)
+    {
+        hash ^= static_cast<unsigned char>(*name);
+        hash *= UINT64_C(1099511628211);
+        name += 1;
+    }
+    return (hash);
+}
+
+static int cobol_text_builder_rehash_based_names(
+    t_cobol_text_builder *builder, size_t new_capacity)
+{
+    char **new_slots;
+    size_t index;
+
+    new_slots = static_cast<char **>(cma_calloc(new_capacity, sizeof(char *)));
+    if (!new_slots)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < builder->based_name_capacity)
+    {
+        char *name;
+        size_t slot;
+
+        name = builder->based_name_slots[index];
+        if (name)
+        {
+            slot = cobol_text_builder_based_name_hash(name) % new_capacity;
+            while (new_slots[slot])
+                slot = (slot + 1) % new_capacity;
+            new_slots[slot] = name;
+        }
+        index += 1;
+    }
+    if (builder->based_name_slots)
+        cma_free(builder->based_name_slots);
+    builder->based_name_slots = new_slots;
+    builder->based_name_capacity = new_capacity;
+    return (FT_SUCCESS);
+}
+
+static int cobol_text_builder_has_based_name(
+    const t_cobol_text_builder *builder, const char *name)
+{
+    size_t slot;
+
+    if (!builder || !name || builder->based_name_capacity == 0)
+        return (0);
+    slot = cobol_text_builder_based_name_hash(name) % builder->based_name_capacity;
+    while (builder->based_name_slots[slot])
+    {
+        if (std::strcmp(builder->based_name_slots[slot], name) == 0)
+            return (1);
+        slot = (slot + 1) % builder->based_name_capacity;
+    }
+    return (0);
+}
+
+static int cobol_text_builder_register_based_name(
+    t_cobol_text_builder *builder, const char *name)
+{
+    size_t slot;
+    char *copy;
+
+    if (!builder || !name || name[0] == '\0')
+        return (FT_FAILURE);
+    if (cobol_text_builder_has_based_name(builder, name))
+        return (FT_SUCCESS);
+    if (builder->based_name_capacity == 0
+        || (builder->based_name_count + 1) * 10
+            >= builder->based_name_capacity * 7)
+    {
+        size_t capacity;
+
+        capacity = builder->based_name_capacity == 0
+            ? 64 : builder->based_name_capacity * 2;
+        if (cobol_text_builder_rehash_based_names(builder, capacity)
+            != FT_SUCCESS)
+            return (FT_FAILURE);
+    }
+    copy = static_cast<char *>(cma_calloc(std::strlen(name) + 1, sizeof(char)));
+    if (!copy)
+        return (FT_FAILURE);
+    std::strcpy(copy, name);
+    slot = cobol_text_builder_based_name_hash(name) % builder->based_name_capacity;
+    while (builder->based_name_slots[slot])
+        slot = (slot + 1) % builder->based_name_capacity;
+    builder->based_name_slots[slot] = copy;
+    builder->based_name_count += 1;
+    return (FT_SUCCESS);
+}
+
+static int cobol_text_builder_track_based_declaration(
+    t_cobol_text_builder *builder, const char *line)
+{
+    static const char prefix[] = "       01 ";
+    const char *name_start;
+    const char *suffix;
+    size_t name_length;
+    char *name;
+    int status;
+
+    if (!builder || !line || std::strncmp(line, prefix, sizeof(prefix) - 1) != 0)
+        return (FT_SUCCESS);
+    name_start = line + sizeof(prefix) - 1;
+    suffix = std::strstr(name_start, " BASED.");
+    if (!suffix || suffix[7] != '\0' || suffix == name_start)
+        return (FT_SUCCESS);
+    name_length = static_cast<size_t>(suffix - name_start);
+    name = static_cast<char *>(cma_calloc(name_length + 1, sizeof(char)));
+    if (!name)
+        return (FT_FAILURE);
+    std::memcpy(name, name_start, name_length);
+    status = cobol_text_builder_register_based_name(builder, name);
+    cma_free(name);
+    return (status);
 }
 
 static int cobol_text_builder_reserve(t_cobol_text_builder *builder, size_t desired_capacity)
 {
     char *new_data;
+    size_t new_capacity;
+    const size_t maximum_capacity = static_cast<size_t>(-1);
 
     if (!builder)
         return (FT_FAILURE);
     if (builder->capacity >= desired_capacity)
         return (FT_SUCCESS);
-    if (desired_capacity < 128)
-        desired_capacity = 128;
-    new_data = static_cast<char *>(cma_calloc(desired_capacity, sizeof(char)));
+    new_capacity = builder->capacity < 128 ? 128 : builder->capacity;
+    while (new_capacity < desired_capacity)
+    {
+        if (new_capacity > maximum_capacity / 2)
+        {
+            new_capacity = desired_capacity;
+            break ;
+        }
+        new_capacity *= 2;
+    }
+    new_data = static_cast<char *>(cma_calloc(new_capacity, sizeof(char)));
     if (!new_data)
         return (FT_FAILURE);
     if (builder->data && builder->length > 0)
@@ -38,7 +231,7 @@ static int cobol_text_builder_reserve(t_cobol_text_builder *builder, size_t desi
     if (builder->data)
         cma_free(builder->data);
     builder->data = new_data;
-    builder->capacity = desired_capacity;
+    builder->capacity = new_capacity;
     return (FT_SUCCESS);
 }
 
@@ -50,11 +243,58 @@ static int cobol_text_builder_append_span(t_cobol_text_builder *builder, const c
         return (FT_FAILURE);
     if (length == 0)
         return (FT_SUCCESS);
+    if (builder->length >= static_cast<size_t>(-1)
+        || length > static_cast<size_t>(-1) - builder->length - 1)
+        return (FT_FAILURE);
     if (cobol_text_builder_reserve(builder, builder->length + length + 1) != FT_SUCCESS)
         return (FT_FAILURE);
     std::memcpy(builder->data + builder->length, text, length);
     builder->length += length;
     builder->data[builder->length] = '\0';
+    return (FT_SUCCESS);
+}
+
+static int cobol_text_builder_append_deferred(t_cobol_text_builder *builder,
+    const char *text, size_t length)
+{
+    char *new_text;
+    size_t new_capacity;
+
+    if (!builder || (!text && length > 0)
+        || length > static_cast<size_t>(-1) - builder->deferred_procedure_length - 1)
+        return (FT_FAILURE);
+    if (length == 0)
+        return (FT_SUCCESS);
+    if (builder->deferred_procedure_capacity
+        < builder->deferred_procedure_length + length + 1)
+    {
+        new_capacity = builder->deferred_procedure_capacity < 256
+            ? 256 : builder->deferred_procedure_capacity;
+        while (new_capacity < builder->deferred_procedure_length + length + 1)
+        {
+            if (new_capacity > static_cast<size_t>(-1) / 2)
+            {
+                new_capacity = builder->deferred_procedure_length + length + 1;
+                break ;
+            }
+            new_capacity *= 2;
+        }
+        new_text = static_cast<char *>(cma_calloc(new_capacity, sizeof(char)));
+        if (!new_text)
+            return (FT_FAILURE);
+        if (builder->deferred_procedure_text
+            && builder->deferred_procedure_length > 0)
+            std::memcpy(new_text, builder->deferred_procedure_text,
+                builder->deferred_procedure_length);
+        if (builder->deferred_procedure_text)
+            cma_free(builder->deferred_procedure_text);
+        builder->deferred_procedure_text = new_text;
+        builder->deferred_procedure_capacity = new_capacity;
+    }
+    std::memcpy(builder->deferred_procedure_text
+            + builder->deferred_procedure_length, text, length);
+    builder->deferred_procedure_length += length;
+    builder->deferred_procedure_text[builder->deferred_procedure_length] = '\0';
     return (FT_SUCCESS);
 }
 
@@ -70,17 +310,52 @@ static int cobol_text_builder_append_line(t_cobol_text_builder *builder, const c
     const char *to_clause;
     const char *break_cursor;
     size_t text_length;
+    size_t label_end;
+    int is_paragraph_header;
 
     if (!builder)
         return (FT_FAILURE);
     if (!text)
         return (FT_SUCCESS);
     text_length = std::strlen(text);
+    is_paragraph_header = 0;
+    if (text_length > 8 && std::strncmp(text, "       ", 7) == 0
+        && !std::isspace(static_cast<unsigned char>(text[7])))
+    {
+        label_end = 7;
+        while (label_end < text_length && text[label_end] != '.')
+        {
+            if (std::isspace(static_cast<unsigned char>(text[label_end])))
+                break ;
+            label_end += 1;
+        }
+        if (label_end == text_length - 1 && text[label_end] == '.')
+            is_paragraph_header = 1;
+    }
+    if (builder->control_flow_depth > 0 && text_length > 0
+        && text[text_length - 1] == '.' && !is_paragraph_header)
+    {
+        char *periodless_line;
+        int status;
+
+        periodless_line = static_cast<char *>(cma_calloc(text_length, sizeof(char)));
+        if (!periodless_line)
+            return (FT_FAILURE);
+        std::memcpy(periodless_line, text, text_length - 1);
+        status = cobol_text_builder_append_line(builder, periodless_line);
+        cma_free(periodless_line);
+        return (status);
+    }
+    if (cobol_text_builder_track_based_declaration(builder, text) != FT_SUCCESS)
+        return (FT_FAILURE);
     if (builder->free_format)
     {
         if (cobol_text_builder_append_string(builder, text) != FT_SUCCESS
             || cobol_text_builder_append_string(builder, "\n") != FT_SUCCESS)
             return (FT_FAILURE);
+        if (is_paragraph_header && builder->known_paragraph_definitions)
+            builder->known_paragraph_definitions->insert(std::string(text + 7,
+                label_end - 7));
         return (FT_SUCCESS);
     }
     to_clause = std::strstr(text, "TO ");
@@ -89,7 +364,7 @@ static int cobol_text_builder_append_line(t_cobol_text_builder *builder, const c
         if (cobol_text_builder_append_span(builder, text,
                 static_cast<size_t>(to_clause - text)) != FT_SUCCESS
             || cobol_text_builder_append_string(builder, " \n") != FT_SUCCESS
-            || cobol_text_builder_append_string(builder, "      -    ") != FT_SUCCESS
+            || cobol_text_builder_append_string(builder, "           ") != FT_SUCCESS
             || cobol_text_builder_append_string(builder, to_clause) != FT_SUCCESS
             || cobol_text_builder_append_string(builder, "\n") != FT_SUCCESS)
             return (FT_FAILURE);
@@ -110,7 +385,7 @@ static int cobol_text_builder_append_line(t_cobol_text_builder *builder, const c
             if (cobol_text_builder_append_span(builder, text,
                     static_cast<size_t>(break_cursor - text)) != FT_SUCCESS
                 || cobol_text_builder_append_string(builder, " \n") != FT_SUCCESS
-                || cobol_text_builder_append_string(builder, "      -    ") != FT_SUCCESS
+                || cobol_text_builder_append_string(builder, "           ") != FT_SUCCESS
                 || cobol_text_builder_append_string(builder, break_cursor + 1) != FT_SUCCESS
                 || cobol_text_builder_append_string(builder, "\n") != FT_SUCCESS)
                 return (FT_FAILURE);
@@ -121,6 +396,9 @@ static int cobol_text_builder_append_line(t_cobol_text_builder *builder, const c
         return (FT_FAILURE);
     if (cobol_text_builder_append_string(builder, "\n") != FT_SUCCESS)
         return (FT_FAILURE);
+    if (is_paragraph_header && builder->known_paragraph_definitions)
+        builder->known_paragraph_definitions->insert(std::string(text + 7,
+            label_end - 7));
     return (FT_SUCCESS);
 }
 
@@ -221,17 +499,66 @@ static void cblc_identifier_to_cobol(const char *identifier, char *buffer, size_
 {
     size_t index;
     size_t output_index;
+    static const char operator_plus_assignment[] = "operator+=";
+    static const char operator_plus_assignment_upper[] = "OPERATOR+=";
+    static const char operator_plus_assignment_cobol[] = "OPERATOR-PLUS-ASSIGN";
+    static const char operator_plus[] = "operator+";
+    static const char operator_plus_upper[] = "OPERATOR+";
+    static const char operator_plus_cobol[] = "OPERATOR-PLUS";
     static const char operator_assignment[] = "operator=";
     static const char operator_assignment_cobol[] = "OPERATOR-ASSIGN";
 
     if (!identifier || !buffer || buffer_size == 0)
         return ;
+    if (std::strcmp(identifier, "NULL") == 0
+        || std::strcmp(identifier, "null") == 0)
+    {
+        ft_strlcpy(buffer, "NULL", buffer_size);
+        return ;
+    }
     index = 0;
     output_index = 0;
     while (identifier[index] != '\0' && output_index + 1 < buffer_size)
     {
         char character;
 
+        if (std::strncmp(identifier + index, operator_plus_assignment,
+                sizeof(operator_plus_assignment) - 1) == 0
+            || std::strncmp(identifier + index, operator_plus_assignment_upper,
+                sizeof(operator_plus_assignment_upper) - 1) == 0)
+        {
+            size_t replacement_index;
+
+            replacement_index = 0;
+            while (operator_plus_assignment_cobol[replacement_index] != '\0'
+                && output_index + 1 < buffer_size)
+            {
+                buffer[output_index] =
+                    operator_plus_assignment_cobol[replacement_index];
+                output_index += 1;
+                replacement_index += 1;
+            }
+            index += sizeof(operator_plus_assignment) - 1;
+            continue ;
+        }
+        if (std::strncmp(identifier + index, operator_plus,
+                sizeof(operator_plus) - 1) == 0
+            || std::strncmp(identifier + index, operator_plus_upper,
+                sizeof(operator_plus_upper) - 1) == 0)
+        {
+            size_t replacement_index;
+
+            replacement_index = 0;
+            while (operator_plus_cobol[replacement_index] != '\0'
+                && output_index + 1 < buffer_size)
+            {
+                buffer[output_index] = operator_plus_cobol[replacement_index];
+                output_index += 1;
+                replacement_index += 1;
+            }
+            index += sizeof(operator_plus) - 1;
+            continue ;
+        }
         if (std::strncmp(identifier + index, operator_assignment,
                 sizeof(operator_assignment) - 1) == 0
             || std::strncmp(identifier + index, "OPERATOR=",
@@ -320,7 +647,7 @@ static void cblc_build_string_component_name(const char *base, const char *suffi
 
 static int cblc_string_item_uses_dynamic_storage(const t_cblc_data_item *item)
 {
-    if (!item || item->kind != CBLC_DATA_KIND_STRING)
+    if (!item || item->kind != CBLC_DATA_KIND_CHAR_BUFFER)
         return (0);
     if (cblc_native_standard_library_expression_mode_enabled())
         return (0);
@@ -336,7 +663,7 @@ static int cblc_string_item_uses_dynamic_storage(const t_cblc_data_item *item)
 
 static int cblc_string_field_uses_dynamic_storage(const t_cblc_struct_field *field)
 {
-    if (!field || field->kind != CBLC_DATA_KIND_STRING)
+    if (!field || field->kind != CBLC_DATA_KIND_CHAR_BUFFER)
         return (0);
     if (field->is_const)
         return (0);
@@ -345,7 +672,7 @@ static int cblc_string_field_uses_dynamic_storage(const t_cblc_struct_field *fie
 
 static int cblc_string_item_array_uses_dynamic_storage(const t_cblc_data_item *item)
 {
-    if (!item || item->kind != CBLC_DATA_KIND_STRING)
+    if (!item || item->kind != CBLC_DATA_KIND_CHAR_BUFFER)
         return (0);
     if (item->is_const || item->array_count == 0 || item->is_alias)
         return (0);
@@ -356,7 +683,7 @@ static int cblc_string_item_array_uses_dynamic_storage(const t_cblc_data_item *i
 
 static int cblc_string_item_is_member_storage(const t_cblc_data_item *item)
 {
-    if (!item || item->kind != CBLC_DATA_KIND_STRING)
+    if (!item || item->kind != CBLC_DATA_KIND_CHAR_BUFFER)
         return (0);
     if (!std::strchr(item->source_name, '.'))
         return (0);
@@ -484,7 +811,7 @@ static int cblc_parse_dynamic_string_buffer_reference(const t_cblc_translation_u
     base_name[base_length] = '\0';
     suffix += std::strlen("-BUF");
     item = cblc_find_data_item_by_cobol(unit, base_name);
-    if (!item || item->kind != CBLC_DATA_KIND_STRING)
+    if (!item || item->kind != CBLC_DATA_KIND_CHAR_BUFFER)
         return (FT_FAILURE);
     if (*suffix == '\0')
     {

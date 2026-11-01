@@ -28,7 +28,25 @@ class length_error
     int code;
 };
 
+class bad_alloc
+{
+    public:
+    int code;
+};
+
 class out_of_range
+{
+    public:
+    int code;
+};
+
+class invalid_encoding
+{
+    public:
+    int code;
+};
+
+class parse_error
 {
     public:
     int code;

@@ -30,7 +30,6 @@ static const t_cblc_completion_keyword g_cblc_completion_keywords[] = {
     {"void"},
     {"int"},
     {"char"},
-    {"string"},
     {"struct"},
     {"class"},
     {"public"},
@@ -1102,8 +1101,8 @@ static const char *cblc_frontend_data_kind_name(const t_cblc_data_item *item)
         return ("char");
     if (item->kind == CBLC_DATA_KIND_INT)
         return ("int");
-    if (item->kind == CBLC_DATA_KIND_STRING)
-        return ("string");
+    if (item->kind == CBLC_DATA_KIND_CHAR_BUFFER)
+        return ("char[]");
     if (item->kind == CBLC_DATA_KIND_STRUCT)
         return (item->struct_type_name);
     return ("unknown");
@@ -1119,8 +1118,8 @@ static const char *cblc_frontend_data_declaration_token(const t_cblc_data_item *
         return ("char");
     if (item->kind == CBLC_DATA_KIND_INT)
         return ("int");
-    if (item->kind == CBLC_DATA_KIND_STRING)
-        return ("string");
+    if (item->kind == CBLC_DATA_KIND_CHAR_BUFFER)
+        return ("char[]");
     if (item->kind == CBLC_DATA_KIND_STRUCT)
         return (item->struct_type_name);
     return ("");
@@ -1221,11 +1220,6 @@ static int cblc_frontend_is_keyword(const char *identifier)
     return (0);
 }
 
-static int cblc_frontend_is_builtin_method_name(const char *identifier)
-{
-    return (cblc_intrinsic_lookup(identifier) != NULL);
-}
-
 static t_cblc_semantic_token_kind cblc_frontend_identifier_token_kind(
     const t_cblc_frontend_analysis *analysis, const char *identifier)
 {
@@ -1240,16 +1234,13 @@ static t_cblc_semantic_token_kind cblc_frontend_identifier_token_kind(
         return (CBLC_SEMANTIC_TOKEN_KEYWORD);
     if (std::strncmp(identifier, "void", TRANSPILE_IDENTIFIER_MAX) == 0
         || std::strncmp(identifier, "int", TRANSPILE_IDENTIFIER_MAX) == 0
-        || std::strncmp(identifier, "char", TRANSPILE_IDENTIFIER_MAX) == 0
-        || std::strncmp(identifier, "string", TRANSPILE_IDENTIFIER_MAX) == 0)
+        || std::strncmp(identifier, "char", TRANSPILE_IDENTIFIER_MAX) == 0)
         return (CBLC_SEMANTIC_TOKEN_TYPE);
     transpiler_source_span_reset(&span);
     if (cblc_frontend_find_type_definition(analysis, identifier, &span) == FT_SUCCESS)
         return (CBLC_SEMANTIC_TOKEN_TYPE);
     transpiler_source_span_reset(&span);
     if (cblc_frontend_find_function_definition(analysis, identifier, &span) == FT_SUCCESS)
-        return (CBLC_SEMANTIC_TOKEN_FUNCTION);
-    if (cblc_frontend_is_builtin_method_name(identifier))
         return (CBLC_SEMANTIC_TOKEN_FUNCTION);
     entries = transpiler_standard_library_get_entries(&entry_count);
     index = 0;
@@ -1840,26 +1831,6 @@ static int cblc_frontend_append_stdlib_completions(t_cblc_completion_list *compl
     return (FT_SUCCESS);
 }
 
-static int cblc_frontend_append_string_member_completions(t_cblc_completion_list *completions,
-    const char *prefix)
-{
-    const t_cblc_intrinsic_entry *entries;
-    size_t count;
-    size_t index;
-
-    entries = cblc_intrinsic_get_entries(&count);
-    index = 0;
-    while (index < count)
-    {
-        if (cblc_completion_matches_prefix(entries[index].name, prefix)
-            && cblc_completion_list_append(completions, CBLC_COMPLETION_ITEM_FUNCTION,
-                entries[index].name) != FT_SUCCESS)
-            return (FT_FAILURE);
-        index += 1;
-    }
-    return (FT_SUCCESS);
-}
-
 static int cblc_frontend_append_struct_member_completions(
     const t_cblc_struct_type *type, t_cblc_completion_list *completions, const char *prefix,
     int allow_private)
@@ -1907,8 +1878,6 @@ static int cblc_frontend_append_member_completions(const t_cblc_frontend_analysi
 
     if (!analysis || !completions || !context)
         return (FT_FAILURE);
-    if (std::strncmp(context->receiver, "string", sizeof(context->receiver)) == 0)
-        return (cblc_frontend_append_string_member_completions(completions, context->prefix));
     if (std::strncmp(context->receiver, "this", sizeof(context->receiver)) == 0)
     {
         type = cblc_frontend_find_struct_type(analysis, current_type_name);
@@ -1921,8 +1890,6 @@ static int cblc_frontend_append_member_completions(const t_cblc_frontend_analysi
             function_name);
     if (!receiver_item)
         return (FT_SUCCESS);
-    if (receiver_item->kind == CBLC_DATA_KIND_STRING)
-        return (cblc_frontend_append_string_member_completions(completions, context->prefix));
     if (receiver_item->kind != CBLC_DATA_KIND_STRUCT)
         return (FT_SUCCESS);
     type = cblc_frontend_find_struct_type(analysis, receiver_item->struct_type_name);

@@ -115,6 +115,8 @@ static int cblc_parse_function(const char **cursor, t_cblc_translation_unit *uni
     parameter_scope_base = unit->data_count;
     if (cblc_parse_function_parameters(cursor, unit, function) != FT_SUCCESS)
         return (FT_FAILURE);
+    if (cblc_register_parameter_destructors(unit, function) != FT_SUCCESS)
+        return (FT_FAILURE);
     if (**cursor != ')')
         return (FT_FAILURE);
     *cursor += 1;
@@ -128,6 +130,10 @@ static int cblc_parse_function(const char **cursor, t_cblc_translation_unit *uni
         return (FT_FAILURE);
     function = &unit->functions[index];
     if (cblc_parse_statement_block(cursor, unit, function, 1) != FT_SUCCESS)
+        return (FT_FAILURE);
+    if (!function->saw_return
+        && cblc_append_parameter_destructor_statements(unit, function)
+            != FT_SUCCESS)
         return (FT_FAILURE);
     unit->active_scope_id = saved_scope_id;
     while (parameter_scope_base < unit->data_count)
@@ -375,8 +381,11 @@ void cblc_translation_unit_init(t_cblc_translation_unit *unit)
     unit->template_error_arguments[0] = '\0';
     unit->template_error_definition_offset = static_cast<size_t>(-1);
     unit->template_error_use_offset = static_cast<size_t>(-1);
-    unit->template_max_instantiations = 1024;
-    unit->template_max_instantiation_depth = 32;
+    unit->template_max_instantiations =
+        TRANSPILE_DEFAULT_MAX_TEMPLATE_INSTANTIATIONS;
+    unit->template_max_instantiation_depth = CBLC_TEMPLATE_DEFAULT_MAX_DEPTH;
+    unit->max_lifetime_edge_transfers =
+        TRANSPILE_DEFAULT_MAX_LIFETIME_EDGE_TRANSFERS;
     unit->template_instantiation_depth = 0;
     unit->imports = NULL;
     unit->import_count = 0;
@@ -396,7 +405,6 @@ void cblc_translation_unit_init(t_cblc_translation_unit *unit)
     unit->is_native_standard_library = 0;
     unit->program_name[0] = '\0';
     unit->active_scope_id = 0;
-    cblc_register_builtin_string_type(unit);
 }
 
 void cblc_translation_unit_dispose(t_cblc_translation_unit *unit)
@@ -524,8 +532,9 @@ void cblc_translation_unit_dispose(t_cblc_translation_unit *unit)
     unit->template_error_arguments[0] = '\0';
     unit->template_error_definition_offset = static_cast<size_t>(-1);
     unit->template_error_use_offset = static_cast<size_t>(-1);
-    unit->template_max_instantiations = 1024;
-    unit->template_max_instantiation_depth = 32;
+    unit->template_max_instantiations =
+        TRANSPILE_DEFAULT_MAX_TEMPLATE_INSTANTIATIONS;
+    unit->template_max_instantiation_depth = CBLC_TEMPLATE_DEFAULT_MAX_DEPTH;
     unit->template_instantiation_depth = 0;
     unit->imports = NULL;
     unit->import_count = 0;
@@ -564,19 +573,212 @@ static size_t cblc_source_file_id(const char *text)
     return (static_cast<size_t>(hash));
 }
 
-int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit)
+static void cblc_scan_string_class_references(const char *text,
+    int *out_uses_string, int *out_declares_string_class,
+    int *out_uses_bad_alloc, int *out_declares_bad_alloc,
+    int *out_uses_new, int *out_uses_overflow_error,
+    int *out_uses_range_error)
 {
     const char *cursor;
+    int previous_was_class;
+
+    if (!out_uses_string || !out_declares_string_class || !out_uses_bad_alloc
+        || !out_declares_bad_alloc || !out_uses_new
+        || !out_uses_overflow_error || !out_uses_range_error)
+        return ;
+    *out_uses_string = 0;
+    *out_declares_string_class = 0;
+    *out_uses_bad_alloc = 0;
+    *out_declares_bad_alloc = 0;
+    *out_uses_new = 0;
+    *out_uses_overflow_error = 0;
+    *out_uses_range_error = 0;
+    if (!text)
+        return ;
+    cursor = text;
+    previous_was_class = 0;
+    while (*cursor != '\0')
+    {
+        if (std::isspace(static_cast<unsigned char>(*cursor)))
+        {
+            cursor += 1;
+            continue ;
+        }
+        if (cursor[0] == '/' && cursor[1] == '/')
+        {
+            cursor += 2;
+            while (*cursor != '\0' && *cursor != '\n')
+                cursor += 1;
+            continue ;
+        }
+        if (cursor[0] == '/' && cursor[1] == '*')
+        {
+            cursor += 2;
+            while (*cursor != '\0' && !(cursor[0] == '*' && cursor[1] == '/'))
+                cursor += 1;
+            if (*cursor != '\0')
+                cursor += 2;
+            continue ;
+        }
+        if (*cursor == '"' || *cursor == '\'')
+        {
+            char quote;
+
+            quote = *cursor++;
+            previous_was_class = 0;
+            while (*cursor != '\0' && *cursor != quote)
+            {
+                if (*cursor == '\\' && cursor[1] != '\0')
+                    cursor += 1;
+                cursor += 1;
+            }
+            if (*cursor != '\0')
+                cursor += 1;
+            continue ;
+        }
+        if (std::isalpha(static_cast<unsigned char>(*cursor)) || *cursor == '_')
+        {
+            const char *identifier_start;
+            size_t identifier_length;
+            int is_string;
+            int is_class;
+            int is_bad_alloc;
+            int is_new;
+            int is_overflow_error;
+            int is_range_error;
+
+            identifier_start = cursor;
+            while (std::isalnum(static_cast<unsigned char>(*cursor)) || *cursor == '_')
+                cursor += 1;
+            identifier_length = static_cast<size_t>(cursor - identifier_start);
+            is_string = identifier_length == std::strlen("string")
+                && std::strncmp(identifier_start, "string", identifier_length) == 0;
+            is_class = identifier_length == std::strlen("class")
+                && std::strncmp(identifier_start, "class", identifier_length) == 0;
+            is_bad_alloc = identifier_length == std::strlen("bad_alloc")
+                && std::strncmp(identifier_start, "bad_alloc", identifier_length) == 0;
+            is_new = identifier_length == std::strlen("new")
+                && std::strncmp(identifier_start, "new", identifier_length) == 0;
+            is_overflow_error = identifier_length == std::strlen("overflow_error")
+                && std::strncmp(identifier_start, "overflow_error", identifier_length) == 0;
+            is_range_error = identifier_length == std::strlen("range_error")
+                && std::strncmp(identifier_start, "range_error", identifier_length) == 0;
+            if (is_string)
+            {
+                *out_uses_string = 1;
+                if (previous_was_class)
+                    *out_declares_string_class = 1;
+            }
+            if (is_bad_alloc)
+            {
+                *out_uses_bad_alloc = 1;
+                if (previous_was_class)
+                    *out_declares_bad_alloc = 1;
+            }
+            if (is_new)
+                *out_uses_new = 1;
+            if (is_overflow_error)
+                *out_uses_overflow_error = 1;
+            if (is_range_error)
+                *out_uses_range_error = 1;
+            previous_was_class = is_class;
+            continue ;
+        }
+        previous_was_class = 0;
+        cursor += 1;
+    }
+}
+
+static void cblc_mark_standard_library_types(t_cblc_translation_unit *unit,
+    size_t first_type_index)
+{
+    if (!unit || first_type_index > unit->struct_type_count)
+        return ;
+    while (first_type_index < unit->struct_type_count)
+    {
+        unit->struct_types[first_type_index].is_standard_library = 1;
+        first_type_index += 1;
+    }
+}
+
+static int cblc_parse_translation_unit_impl(const char *text,
+    t_cblc_translation_unit *unit)
+{
+    const char *cursor;
+    const char *error_source;
+    size_t error_source_length;
+    size_t first_standard_error_type;
+    size_t first_standard_string_type;
+    int source_uses_string;
+    int source_declares_string_class;
+    int source_uses_bad_alloc;
+    int source_declares_bad_alloc;
+    int source_uses_new;
+    int source_uses_overflow_error;
+    int source_uses_range_error;
+    int source_has_error_prefix;
+    int skip_error_source_prefix;
+    size_t parse_error_line;
+    size_t parse_error_column;
+    const char *diagnostic_cursor;
 
     if (!text || !unit)
         return (FT_FAILURE);
+    cblc_scan_string_class_references(text, &source_uses_string,
+        &source_declares_string_class, &source_uses_bad_alloc,
+        &source_declares_bad_alloc, &source_uses_new,
+        &source_uses_overflow_error, &source_uses_range_error);
+    error_source = transpiler_standard_library_get_native_source("CBLC-ERRORS");
+    if (!error_source)
+        return (FT_FAILURE);
+    error_source_length = std::strlen(error_source);
+    first_standard_error_type = unit->struct_type_count;
+    first_standard_string_type = unit->struct_type_count;
+    source_has_error_prefix = std::strncmp(text, error_source,
+        error_source_length) == 0;
+    skip_error_source_prefix = 0;
+    if (((source_uses_overflow_error
+            && !cblc_find_struct_type(unit, "overflow_error"))
+            || (source_uses_range_error
+                && !cblc_find_struct_type(unit, "range_error"))
+            || (source_uses_new && !cblc_find_struct_type(unit, "bad_alloc"))
+            || (source_uses_bad_alloc && !source_declares_bad_alloc
+                && !cblc_find_struct_type(unit, "bad_alloc")))
+        && !source_has_error_prefix)
+    {
+        first_standard_error_type = unit->struct_type_count;
+        if (cblc_parse_translation_unit(error_source, unit) != FT_SUCCESS)
+            return (FT_FAILURE);
+        cblc_mark_standard_library_types(unit, first_standard_error_type);
+    }
+    if (!cblc_find_struct_type(unit, "string")
+        && source_uses_string && !source_declares_string_class)
+    {
+        const char *string_class_source;
+        if (!cblc_find_struct_type(unit, "length_error"))
+        {
+            first_standard_error_type = unit->struct_type_count;
+            if (cblc_parse_translation_unit(error_source, unit) != FT_SUCCESS)
+                return (FT_FAILURE);
+            cblc_mark_standard_library_types(unit, first_standard_error_type);
+        }
+        string_class_source = transpiler_standard_library_get_native_source("CBLC-STRING");
+        if (!string_class_source)
+            return (FT_FAILURE);
+        first_standard_string_type = unit->struct_type_count;
+        if (cblc_parse_translation_unit(string_class_source, unit) != FT_SUCCESS)
+            return (FT_FAILURE);
+        cblc_mark_standard_library_types(unit, first_standard_string_type);
+    }
+    if (source_has_error_prefix && cblc_find_struct_type(unit, "length_error"))
+        skip_error_source_prefix = 1;
     unit->source_text = text;
     unit->source_file_id = cblc_source_file_id(text);
     g_cblc_constructor_parse_state.type = NULL;
     g_cblc_constructor_parse_state.initialized_fields = NULL;
     g_cblc_constructor_parse_state.active = 0;
     g_cblc_member_access_type = NULL;
-    cursor = text;
+    cursor = skip_error_source_prefix ? text + error_source_length : text;
     while (cursor && *cursor != '\0')
     {
         cblc_skip_whitespace(&cursor);
@@ -609,9 +811,10 @@ int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit)
             if (cblc_parse_template_struct_definition(&cursor, unit) != FT_SUCCESS
                 && cblc_parse_template_function_definition(&cursor, unit) != FT_SUCCESS)
             {
-                cblc_record_template_parse_error(unit,
-                    TRANSPILE_ERROR_TEMPLATE_INVALID_DECLARATION,
-                    "invalid template declaration");
+                if (unit->parse_error_message[0] == '\0')
+                    cblc_record_template_parse_error(unit,
+                        TRANSPILE_ERROR_TEMPLATE_INVALID_DECLARATION,
+                        "invalid template declaration");
                 return (FT_FAILURE);
             }
             continue ;
@@ -642,17 +845,13 @@ int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit)
         }
         if (cblc_match_keyword(&cursor, "const"))
         {
+            size_t const_instance_start;
+            size_t const_instance_index;
+
             cursor -= std::strlen("const");
             if (!cblc_match_keyword(&cursor, "const"))
                 return (FT_FAILURE);
             cblc_skip_whitespace(&cursor);
-            if (cblc_match_keyword(&cursor, "string"))
-            {
-                cursor -= std::strlen("string");
-                if (cblc_parse_string_declaration(&cursor, unit, 1) != FT_SUCCESS)
-                    return (FT_FAILURE);
-                continue ;
-            }
             if (cblc_match_keyword(&cursor, "char"))
             {
                 cursor -= std::strlen("char");
@@ -667,19 +866,21 @@ int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit)
                     return (FT_FAILURE);
                 continue ;
             }
-            return (FT_FAILURE);
+            const_instance_start = unit->data_count;
+            if (cblc_parse_struct_instance_declaration(&cursor, unit) != FT_SUCCESS)
+                return (FT_FAILURE);
+            const_instance_index = const_instance_start;
+            while (const_instance_index < unit->data_count)
+            {
+                unit->data_items[const_instance_index].is_const = 1;
+                const_instance_index += 1;
+            }
+            continue ;
         }
         if (cblc_match_keyword(&cursor, "void"))
         {
             cursor -= std::strlen("void");
             if (cblc_parse_pointer_declaration(&cursor, unit, 0) != FT_SUCCESS)
-                return (FT_FAILURE);
-            continue ;
-        }
-        if (cblc_match_keyword(&cursor, "string"))
-        {
-            cursor -= std::strlen("string");
-            if (cblc_parse_string_declaration(&cursor, unit, 0) != FT_SUCCESS)
                 return (FT_FAILURE);
             continue ;
         }
@@ -705,6 +906,27 @@ int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit)
             continue ;
         if (cblc_parse_struct_instance_declaration(&cursor, unit) == FT_SUCCESS)
             continue ;
+        if (unit->parse_error_message[0] == '\0')
+        {
+            parse_error_line = 1;
+            parse_error_column = 1;
+            diagnostic_cursor = text;
+            while (diagnostic_cursor < cursor && *diagnostic_cursor != '\0')
+            {
+                if (*diagnostic_cursor == '\n')
+                {
+                    parse_error_line += 1;
+                    parse_error_column = 1;
+                }
+                else
+                    parse_error_column += 1;
+                diagnostic_cursor += 1;
+            }
+            std::snprintf(unit->parse_error_message,
+                sizeof(unit->parse_error_message),
+                "unable to parse CBL-C declaration at %zu:%zu near '%.80s'",
+                parse_error_line, parse_error_column, cursor);
+        }
         return (FT_FAILURE);
     }
     if (unit->function_count > 0)
@@ -726,5 +948,27 @@ int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit)
     if (cblc_inject_entry_lifecycle(unit) != FT_SUCCESS)
         return (FT_FAILURE);
     cblc_resolve_local_function_calls(unit);
+    if (cblc_propagate_local_exception_summaries(unit) != FT_SUCCESS)
+        return (FT_FAILURE);
     return (FT_SUCCESS);
+}
+
+int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit)
+{
+    size_t allocation_failures_before;
+    int status;
+
+    allocation_failures_before = cma_allocation_failure_count();
+    status = cblc_parse_translation_unit_impl(text, unit);
+    if (status != FT_SUCCESS && unit
+        && cma_allocation_failure_count() != allocation_failures_before)
+    {
+        if (unit->parse_error_code == 0)
+            unit->parse_error_code = TRANSPILE_ERROR_ALLOCATION_FAILURE;
+        if (unit->parse_error_message[0] == '\0')
+            std::snprintf(unit->parse_error_message,
+                sizeof(unit->parse_error_message),
+                "allocation failed while parsing CBL-C translation unit");
+    }
+    return (status);
 }

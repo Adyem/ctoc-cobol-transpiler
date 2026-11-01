@@ -13,6 +13,8 @@
 static t_transpiler_incremental_cache g_incremental_cache;
 static int g_incremental_cache_ready = 0;
 
+static const int PIPELINE_READ_LIMIT_EXCEEDED = -2;
+
 static int pipeline_emit_error(t_transpiler_context *context, const char *message)
 {
     if (!context || !message)
@@ -20,6 +22,24 @@ static int pipeline_emit_error(t_transpiler_context *context, const char *messag
     if (transpiler_logging_emit(context, TRANSPILE_SEVERITY_ERROR, FT_FAILURE, message) != FT_SUCCESS)
         return (FT_FAILURE);
     transpiler_context_record_error(context, FT_FAILURE);
+    return (FT_FAILURE);
+}
+
+static int pipeline_emit_source_limit_error(t_transpiler_context *context,
+    const char *path, size_t configured_limit, size_t observed)
+{
+    char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+
+    if (!context || !path)
+        return (FT_FAILURE);
+    if (std::snprintf(message, sizeof(message),
+            "resource_limit_exceeded phase=source_read dimension=source_bytes configured_limit=%zu observed=%zu source='%s'",
+            configured_limit, observed, path) < 0)
+        return (FT_FAILURE);
+    if (transpiler_logging_emit(context, TRANSPILE_SEVERITY_ERROR,
+            TRANSPILE_ERROR_RESOURCE_LIMIT_EXCEEDED, message) != FT_SUCCESS)
+        return (FT_FAILURE);
+    transpiler_context_record_error(context, TRANSPILE_ERROR_RESOURCE_LIMIT_EXCEEDED);
     return (FT_FAILURE);
 }
 
@@ -205,7 +225,8 @@ static void pipeline_finalize_incremental_cache(t_transpiler_context *context)
     g_incremental_cache_ready = 0;
 }
 
-static int pipeline_read_file(const char *path, char **out_text)
+static int pipeline_read_file_limited(const char *path, char **out_text,
+    size_t max_bytes, int enforce_limit, size_t *out_observed_bytes)
 {
     t_runtime_file file;
     char stack_buffer[1024];
@@ -218,6 +239,8 @@ static int pipeline_read_file(const char *path, char **out_text)
     if (!path || !out_text)
         return (FT_FAILURE);
     *out_text = NULL;
+    if (out_observed_bytes)
+        *out_observed_bytes = 0;
     runtime_file_init(&file);
     if (runtime_file_open_read(&file, path) != FT_SUCCESS)
         return (FT_FAILURE);
@@ -238,6 +261,15 @@ static int pipeline_read_file(const char *path, char **out_text)
         {
             status = FT_SUCCESS;
             break ;
+        }
+        if (bytes_read > SIZE_MAX - length - 1)
+            goto cleanup;
+        if (out_observed_bytes)
+            *out_observed_bytes = length + bytes_read;
+        if (enforce_limit && length + bytes_read > max_bytes)
+        {
+            status = PIPELINE_READ_LIMIT_EXCEEDED;
+            goto cleanup;
         }
         while (length + bytes_read + 1 > capacity)
         {
@@ -273,6 +305,11 @@ cleanup:
     if (buffer)
         cma_free(buffer);
     return (status);
+}
+
+static int pipeline_read_file(const char *path, char **out_text)
+{
+    return (pipeline_read_file_limited(path, out_text, 0, 0, NULL));
 }
 
 static int pipeline_prepare_output_directory(const char *path)
@@ -877,6 +914,8 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
     char message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
     unsigned long long copybook_signature;
     const t_transpiler_standard_library_entry *stdlib_entry;
+    size_t source_observed_bytes;
+    int source_read_status;
 
     if (!context || !input_path || !output_path)
         return (FT_FAILURE);
@@ -939,7 +978,17 @@ static int pipeline_convert_cobol_to_cblc(t_transpiler_context *context, const c
             goto cleanup;
         }
     }
-    if (pipeline_read_file(input_path, &source_text) != FT_SUCCESS)
+    source_observed_bytes = 0;
+    source_read_status = pipeline_read_file_limited(input_path, &source_text,
+        context->max_source_bytes, context->max_source_bytes > 0,
+        &source_observed_bytes);
+    if (source_read_status == PIPELINE_READ_LIMIT_EXCEEDED)
+    {
+        (void)pipeline_emit_source_limit_error(context, input_path,
+            context->max_source_bytes, source_observed_bytes);
+        goto cleanup;
+    }
+    if (source_read_status != FT_SUCCESS)
     {
         if (std::snprintf(message, sizeof(message), "Unable to read input file '%s'", input_path) >= 0)
             (void)pipeline_emit_error(context, message);
@@ -1417,6 +1466,11 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
     size_t order_count;
     size_t file_count;
     size_t index;
+    size_t aggregate_source_bytes;
+    size_t source_observed_bytes;
+    size_t remaining_source_bytes;
+    size_t source_length;
+    int source_read_status;
     std::string manifest;
     int manifest_has_artifact;
     int status;
@@ -1450,6 +1504,7 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
     parallel_results = NULL;
     generation_status = FT_SUCCESS;
     order_count = 0;
+    aggregate_source_bytes = 0;
     index = 0;
     while (index < file_count)
     {
@@ -1459,7 +1514,32 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
         module_indices[index] = static_cast<size_t>(-1);
         unit = &units[index];
         cblc_translation_unit_init(unit);
-        if (pipeline_read_file(context->source_paths[index], &sources[index]) != FT_SUCCESS)
+        unit->max_lifetime_edge_transfers =
+            context->max_lifetime_edge_transfers;
+        unit->template_max_instantiations =
+            context->max_template_instantiations;
+        unit->template_max_instantiation_depth =
+            context->max_template_instantiation_depth;
+        remaining_source_bytes = context->max_source_bytes > 0
+            ? context->max_source_bytes - aggregate_source_bytes : 0;
+        source_observed_bytes = 0;
+        source_read_status = pipeline_read_file_limited(
+            context->source_paths[index], &sources[index], remaining_source_bytes,
+            context->max_source_bytes > 0, &source_observed_bytes);
+        if (source_read_status == PIPELINE_READ_LIMIT_EXCEEDED)
+        {
+            size_t total_observed_bytes;
+
+            total_observed_bytes = source_observed_bytes
+                    > SIZE_MAX - aggregate_source_bytes
+                ? SIZE_MAX : aggregate_source_bytes + source_observed_bytes;
+            (void)pipeline_emit_source_limit_error(context,
+                context->source_paths[index], context->max_source_bytes,
+                total_observed_bytes);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        if (source_read_status != FT_SUCCESS)
         {
             if (std::snprintf(message, sizeof(message), "Unable to read input file '%s'",
                     context->source_paths[index]) >= 0)
@@ -1476,6 +1556,29 @@ static int pipeline_stage_cblc_to_cobol(t_transpiler_context *context, void *use
             status = FT_FAILURE;
             goto cleanup;
         }
+        source_length = std::strlen(sources[index]);
+        if (context->max_source_bytes > 0
+            && (source_length > SIZE_MAX - aggregate_source_bytes
+                || source_length > remaining_source_bytes))
+        {
+            size_t total_observed_bytes;
+
+            total_observed_bytes = source_length > SIZE_MAX - aggregate_source_bytes
+                ? SIZE_MAX : aggregate_source_bytes + source_length;
+            (void)pipeline_emit_source_limit_error(context,
+                context->source_paths[index], context->max_source_bytes,
+                total_observed_bytes);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        if (source_length > SIZE_MAX - aggregate_source_bytes)
+        {
+            (void)pipeline_emit_source_limit_error(context,
+                context->source_paths[index], context->max_source_bytes, SIZE_MAX);
+            status = FT_FAILURE;
+            goto cleanup;
+        }
+        aggregate_source_bytes += source_length;
         pipeline_choose_module_name(context->source_paths[index], unit, module_name,
             sizeof(module_name));
         ft_strlcpy(module_names[index], module_name, TRANSPILE_MODULE_NAME_MAX);

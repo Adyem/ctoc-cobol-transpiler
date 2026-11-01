@@ -7,6 +7,9 @@
 #include "compatibility/libft_compat.hpp"
 
 #define CBLC_TEMPLATE_PARAMETER_MAX 4
+#define CBLC_TEMPLATE_DEFAULT_MAX_DEPTH 16
+#define TRANSPILE_DEFAULT_MAX_TEMPLATE_INSTANTIATIONS 1024U
+#define TRANSPILE_DEFAULT_MAX_SOURCE_BYTES (64U * 1024U * 1024U)
 #define CBLC_EXCEPTION_THROW_SET_MAX 64
 
 // ===============================
@@ -177,7 +180,7 @@ int runtime_collation_compare(const char *left, size_t left_length, const char *
 // ===============================
 // Context management and helpers
 // ===============================
-#define TRANSPILE_DIAGNOSTIC_MESSAGE_MAX 256
+#define TRANSPILE_DIAGNOSTIC_MESSAGE_MAX 512
 #define TRANSPILE_DIAGNOSTIC_SNIPPET_MAX 256
 
 typedef enum e_transpiler_severity
@@ -299,7 +302,7 @@ typedef enum e_transpiler_function_parameter_kind
     TRANSPILE_FUNCTION_PARAMETER_INT,
     TRANSPILE_FUNCTION_PARAMETER_DOUBLE,
     TRANSPILE_FUNCTION_PARAMETER_CHAR,
-    TRANSPILE_FUNCTION_PARAMETER_STRING,
+    TRANSPILE_FUNCTION_PARAMETER_CHAR_BUFFER,
     TRANSPILE_FUNCTION_PARAMETER_STRUCT,
     TRANSPILE_FUNCTION_PARAMETER_VOID_POINTER,
     TRANSPILE_FUNCTION_PARAMETER_CHAR_POINTER,
@@ -488,6 +491,11 @@ typedef struct s_transpiler_data_signature
 #define TRANSPILE_ERROR_EXCEPTION_PAYLOAD_OVERFLOW 1031
 #define TRANSPILE_ERROR_EXCEPTION_DESTRUCTOR_THROW 1032
 #define TRANSPILE_ERROR_EXCEPTION_POLICY_MISMATCH 1033
+#define TRANSPILE_ERROR_VECTOR_THROWING_MOVE_RELOCATION 1034
+#define TRANSPILE_ERROR_BACKEND_IR_VERIFICATION 1035
+#define TRANSPILE_ERROR_ALLOCATION_FAILURE 1036
+#define TRANSPILE_ERROR_RESOURCE_LIMIT_EXCEEDED 1037
+#define TRANSPILE_DEFAULT_MAX_LIFETIME_EDGE_TRANSFERS 1000000U
 
 typedef enum e_transpiler_file_role
 {
@@ -686,6 +694,10 @@ typedef struct s_transpiler_context
     t_transpiler_diagnostic_level diagnostic_level;
     int warnings_as_errors;
     t_transpiler_warning_settings warning_settings;
+    size_t max_source_bytes;
+    size_t max_lifetime_edge_transfers;
+    size_t max_template_instantiations;
+    size_t max_template_instantiation_depth;
     int ast_dump_enabled;
     int copybook_graph_enabled;
     int semantic_diff_enabled;
@@ -940,7 +952,21 @@ typedef enum e_lexer_token_kind
     LEXER_TOKEN_KEYWORD_AFTER,
     LEXER_TOKEN_KEYWORD_ERROR,
     LEXER_TOKEN_KEYWORD_ON,
-    LEXER_TOKEN_KEYWORD_DECLARATIVES
+    LEXER_TOKEN_KEYWORD_DECLARATIVES,
+    LEXER_TOKEN_KEYWORD_ALLOCATE,
+    LEXER_TOKEN_KEYWORD_FREE,
+    LEXER_TOKEN_KEYWORD_CHARACTERS,
+    LEXER_TOKEN_KEYWORD_RETURNING,
+    LEXER_TOKEN_KEYWORD_SET,
+    LEXER_TOKEN_KEYWORD_ADDRESS,
+    LEXER_TOKEN_KEYWORD_THRU,
+    LEXER_TOKEN_KEYWORD_INSPECT,
+    LEXER_TOKEN_KEYWORD_TALLYING,
+    LEXER_TOKEN_KEYWORD_ALL,
+    LEXER_TOKEN_KEYWORD_SIZE,
+    LEXER_TOKEN_KEYWORD_END_COMPUTE,
+    LEXER_TOKEN_KEYWORD_END_CALL,
+    LEXER_TOKEN_KEYWORD_EXIT
 }   t_lexer_token_kind;
 
 typedef enum e_lexer_trivia_kind
@@ -1020,7 +1046,15 @@ typedef enum e_ast_node_kind
     AST_NODE_LITERAL,
     AST_NODE_DECLARATIVES,
     AST_NODE_DECLARATIVE_SECTION,
-    AST_NODE_USE_AFTER_ERROR_PROCEDURE
+    AST_NODE_USE_AFTER_ERROR_PROCEDURE,
+    AST_NODE_ALLOCATE_STATEMENT,
+    AST_NODE_FREE_STATEMENT,
+    AST_NODE_SET_STATEMENT,
+    AST_NODE_PERFORM_PARAGRAPH_STATEMENT,
+    AST_NODE_REFERENCE_MODIFICATION,
+    AST_NODE_INSPECT_STATEMENT,
+    AST_NODE_GO_TO_STATEMENT,
+    AST_NODE_EXIT_STATEMENT
 }   t_ast_node_kind;
 
 typedef struct s_ast_node
@@ -1039,6 +1073,8 @@ typedef struct s_ast_node
 #define AST_NODE_FLAG_COPYBOOK_TEXT_HAS_OF 0x00000004u
 #define AST_NODE_FLAG_COPYBOOK_PAIR_LEADING 0x00000001u
 #define AST_NODE_FLAG_COPYBOOK_PAIR_TRAILING 0x00000002u
+#define AST_NODE_FLAG_SET_ADDRESS 0x00000004u
+#define AST_NODE_FLAG_SET_ADDRESS_SOURCE 0x00000008u
 
 int ast_node_init(t_ast_node *node, t_ast_node_kind kind);
 void ast_node_dispose(t_ast_node *node);
@@ -1255,6 +1291,8 @@ int transpiler_semantics_analyze_program(t_transpiler_context *context, const t_
 
 int transpiler_validate_generated_cblc(const char *text);
 int transpiler_validate_generated_cobol(const char *text);
+int transpiler_validate_generated_cobol_with_diagnostic(const char *text,
+    char *out_diagnostic, size_t diagnostic_size);
 int transpiler_ast_visualize_program(const t_ast_node *program, const char *path);
 void transpiler_copybook_normalize_name(const char *source, char *destination, size_t destination_size);
 int transpiler_copybook_graph_emit(const t_transpiler_context *context, const t_ast_node *program, const char *root_label, const char *path);
@@ -1267,7 +1305,7 @@ typedef enum e_cblc_data_kind
     CBLC_DATA_KIND_CHAR = 0,
     CBLC_DATA_KIND_INT,
     CBLC_DATA_KIND_DOUBLE,
-    CBLC_DATA_KIND_STRING,
+    CBLC_DATA_KIND_CHAR_BUFFER,
     CBLC_DATA_KIND_STRUCT,
     CBLC_DATA_KIND_VOID_POINTER,
     CBLC_DATA_KIND_CHAR_POINTER,
@@ -1300,22 +1338,6 @@ typedef struct s_cblc_type_ref
     size_t argument_ids[CBLC_TYPE_REF_ARGUMENT_MAX];
 }   t_cblc_type_ref;
 
-typedef struct s_cblc_intrinsic_entry
-{
-    const char *name;
-    const char *c_helper_name;
-    const char *cobol_program_name;
-    size_t minimum_arguments;
-    size_t maximum_arguments;
-    int returns_value;
-    int mutates_receiver;
-}   t_cblc_intrinsic_entry;
-
-const t_cblc_intrinsic_entry *cblc_intrinsic_get_entries(size_t *count);
-const t_cblc_intrinsic_entry *cblc_intrinsic_lookup(const char *name);
-int cblc_intrinsic_accepts_argument_count(const t_cblc_intrinsic_entry *entry,
-    size_t argument_count);
-
 typedef enum e_cblc_function_return_kind
 {
     CBLC_FUNCTION_RETURN_VOID = 0,
@@ -1325,7 +1347,8 @@ typedef enum e_cblc_function_return_kind
     CBLC_FUNCTION_RETURN_VOID_POINTER,
     CBLC_FUNCTION_RETURN_CHAR_POINTER,
     CBLC_FUNCTION_RETURN_INT_POINTER,
-    CBLC_FUNCTION_RETURN_STRUCT_POINTER
+    CBLC_FUNCTION_RETURN_STRUCT_POINTER,
+    CBLC_FUNCTION_RETURN_CHAR
 }   t_cblc_function_return_kind;
 
 typedef enum e_cblc_member_visibility
@@ -1339,12 +1362,13 @@ typedef enum e_cblc_member_visibility
 #define CBLC_EXCEPTION_CLEANUP_MAX 64
 #define CBLC_EXCEPTION_ABI_VERSION 1
 #define CBLC_EXCEPTION_RUNTIME_POLICY_FINGERPRINT 0x43424C43504F4C31ULL
-#define CBLC_EXCEPTION_STRING_PAYLOAD_MAX 256
+#define CBLC_EXCEPTION_MESSAGE_MAX 256
 #define CBLC_EXCEPTION_PAYLOAD_MAX 65536
 
 typedef struct s_cblc_data_item
 {
     char source_name[TRANSPILE_IDENTIFIER_MAX];
+    char local_source_name[TRANSPILE_IDENTIFIER_MAX];
     char cobol_name[TRANSPILE_IDENTIFIER_MAX];
     char declared_type_name[TRANSPILE_IDENTIFIER_MAX];
     char struct_type_name[TRANSPILE_IDENTIFIER_MAX];
@@ -1367,6 +1391,7 @@ typedef struct s_cblc_data_item
     size_t constructor_argument_count;
     size_t scope_id;
     size_t scope_depth;
+    int is_borrowed;
 }   t_cblc_data_item;
 
 typedef struct s_cblc_scope
@@ -1411,6 +1436,10 @@ typedef struct s_cblc_method
     char cobol_name[TRANSPILE_IDENTIFIER_MAX];
     t_cblc_parameter parameters[TRANSPILE_FUNCTION_PARAMETER_MAX];
     size_t parameter_count;
+    size_t template_storage_data_start;
+    size_t template_storage_data_count;
+    size_t overload_index;
+    char scope_source_name[TRANSPILE_IDENTIFIER_MAX];
     t_cblc_function_return_kind return_kind;
     char return_type_name[TRANSPILE_IDENTIFIER_MAX];
     size_t template_return_pointer_depth;
@@ -1428,6 +1457,9 @@ typedef struct s_cblc_method
 
 typedef struct s_cblc_constructor
 {
+    char scope_source_name[TRANSPILE_IDENTIFIER_MAX];
+    size_t template_storage_data_start;
+    size_t template_storage_data_count;
     t_cblc_parameter parameters[TRANSPILE_FUNCTION_PARAMETER_MAX];
     size_t parameter_count;
     t_cblc_statement *statements;
@@ -1435,6 +1467,7 @@ typedef struct s_cblc_constructor
     size_t statement_capacity;
     int has_definition;
     int is_copy_constructor;
+    int is_move_constructor;
     size_t exception_type_count;
     size_t exception_type_ids[CBLC_EXCEPTION_THROW_SET_MAX];
     int exception_types_unknown;
@@ -1459,6 +1492,7 @@ typedef struct s_cblc_struct_type
     int is_class;
     int is_builtin;
     int is_imported;
+    int is_standard_library;
     int is_template;
     int is_template_instantiation;
     size_t template_parameter_count;
@@ -1577,6 +1611,10 @@ typedef enum e_cblc_statement_type
 struct s_cblc_statement
 {
     t_cblc_statement_type type;
+    size_t source_offset;
+    size_t source_length;
+    size_t source_line;
+    size_t source_column;
     char target[TRANSPILE_STATEMENT_TEXT_MAX];
     char source[TRANSPILE_STATEMENT_TEXT_MAX];
     int is_literal;
@@ -1584,7 +1622,13 @@ struct s_cblc_statement
     int call_is_external;
     char call_arguments[TRANSPILE_STATEMENT_TEXT_MAX];
     size_t call_argument_count;
+    int is_move_construct;
+    int is_relocate_construct;
+    char lifecycle_completion_flag[TRANSPILE_IDENTIFIER_MAX];
+    char lifecycle_cleanup_paragraph[TRANSPILE_IDENTIFIER_MAX];
     size_t exception_region_id;
+    size_t exception_parent_region_id;
+    int exception_has_parent_region;
     size_t exception_type_id;
     char exception_type_name[TRANSPILE_IDENTIFIER_MAX];
     int exception_is_catch_all;
@@ -1594,7 +1638,7 @@ struct s_cblc_statement
     int exception_to_outer_region;
     int exception_payload_is_struct;
     int exception_payload_requires_copy;
-    int exception_payload_is_string;
+    int exception_payload_is_message;
     char exception_payload_struct_type[TRANSPILE_IDENTIFIER_MAX];
     char exception_payload_cobol_name[TRANSPILE_IDENTIFIER_MAX];
     size_t exception_source_line;
@@ -1644,6 +1688,13 @@ typedef struct s_cblc_function
     size_t active_catch_region_id;
     size_t active_catch_cleanup_base;
     int exception_in_catch;
+    int returns_to_paragraph;
+    int is_exception_helper;
+    size_t helper_exception_region_id;
+    char helper_parent_return_label[TRANSPILE_IDENTIFIER_MAX];
+    char paragraph_return_label[TRANSPILE_IDENTIFIER_MAX];
+    size_t active_source_line;
+    size_t active_source_column;
 }   t_cblc_function;
 
 struct s_cblc_translation_unit
@@ -1679,6 +1730,7 @@ struct s_cblc_translation_unit
     size_t template_error_use_offset;
     size_t template_max_instantiations;
     size_t template_max_instantiation_depth;
+    size_t max_lifetime_edge_transfers;
     size_t template_instantiation_depth;
     t_cblc_import *imports;
     size_t import_count;
@@ -1703,7 +1755,13 @@ struct s_cblc_translation_unit
 void cblc_translation_unit_init(t_cblc_translation_unit *unit);
 void cblc_translation_unit_dispose(t_cblc_translation_unit *unit);
 int cblc_parse_translation_unit(const char *text, t_cblc_translation_unit *unit);
+const t_cblc_constructor *cblc_find_constructor_for_arguments(
+    const t_cblc_translation_unit *unit, const t_cblc_struct_type *type,
+    const char *call_arguments, size_t call_argument_count);
 int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text);
+int cblc_generate_cobol_with_diagnostic(const t_cblc_translation_unit *unit,
+    char **out_text, int *out_diagnostic_code, char *out_diagnostic_message,
+    size_t diagnostic_message_size);
 void cblc_set_native_standard_library_expression_mode(int enabled);
 int cblc_native_standard_library_expression_mode_enabled(void);
 int cblc_generate_c(const t_cblc_translation_unit *unit, char **out_text);
@@ -1949,8 +2007,7 @@ int transpiler_cblc_apply_layout(const char *input, t_transpiler_layout_mode lay
 typedef enum e_transpiler_standard_library_buffer_kind
 {
     TRANSPILE_STANDARD_LIBRARY_BUFFER_NONE = 0,
-    TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR,
-    TRANSPILE_STANDARD_LIBRARY_BUFFER_STRING
+    TRANSPILE_STANDARD_LIBRARY_BUFFER_CHAR
 }   t_transpiler_standard_library_buffer_kind;
 
 typedef enum e_transpiler_standard_library_return_kind
@@ -1959,9 +2016,8 @@ typedef enum e_transpiler_standard_library_return_kind
     TRANSPILE_STANDARD_LIBRARY_RETURN_INT,
     TRANSPILE_STANDARD_LIBRARY_RETURN_DOUBLE,
     TRANSPILE_STANDARD_LIBRARY_RETURN_CHAR_POINTER,
-    TRANSPILE_STANDARD_LIBRARY_RETURN_STRING_OBJECT,
-    TRANSPILE_STANDARD_LIBRARY_RETURN_RESULT_OBJECT,
-    TRANSPILE_STANDARD_LIBRARY_RETURN_MULTI_OUTPUT
+    TRANSPILE_STANDARD_LIBRARY_RETURN_RESULT_OBJECT = 5,
+    TRANSPILE_STANDARD_LIBRARY_RETURN_MULTI_OUTPUT = 6
 }   t_transpiler_standard_library_return_kind;
 
 typedef enum e_transpiler_standard_library_failure_policy
@@ -1971,6 +2027,9 @@ typedef enum e_transpiler_standard_library_failure_policy
     TRANSPILE_STANDARD_LIBRARY_FAILURE_RESULT_OBJECT,
     TRANSPILE_STANDARD_LIBRARY_FAILURE_COMPATIBILITY
 }   t_transpiler_standard_library_failure_policy;
+
+#define TRANSPILE_STANDARD_LIBRARY_INTERFACE_VERSION_CURRENT 1u
+#define TRANSPILE_STANDARD_LIBRARY_ABI_VERSION_CURRENT 2u
 
 typedef struct s_transpiler_standard_library_entry
 {
@@ -1982,6 +2041,9 @@ typedef struct s_transpiler_standard_library_entry
     const char *public_parameters;
     const char *hidden_abi_outputs;
     t_transpiler_standard_library_failure_policy failure_policy;
+    /* Source-level signature, failure, and ownership contract version. */
+    unsigned int interface_version;
+    /* Generated COBOL name, linkage layout, and hidden-slot contract version. */
     unsigned int abi_version;
     int (*generator)(char **out_text);
 }   t_transpiler_standard_library_entry;
@@ -2002,29 +2064,19 @@ typedef enum e_transpiler_standard_library_status
 void transpiler_standard_library_reset_usage(void);
 void transpiler_standard_library_note_strlen_usage(size_t declared_length);
 size_t transpiler_standard_library_get_strlen_limit(void);
-void transpiler_standard_library_note_strlen_string_usage(size_t declared_length);
-size_t transpiler_standard_library_get_strlen_string_limit(void);
 int transpiler_standard_library_generate_date_duration(char **out_text);
 int transpiler_standard_library_generate_date_yyyymmdd(char **out_text);
 int transpiler_standard_library_generate_date_parse_result(char **out_text);
 int transpiler_standard_library_generate_parse_int_result(char **out_text);
 int transpiler_standard_library_generate_parse_double_result(char **out_text);
 int transpiler_standard_library_generate_strlen(char **out_text);
-int transpiler_standard_library_generate_strlen_string(char **out_text);
-int transpiler_standard_library_generate_strnlen_string(char **out_text);
 int transpiler_standard_library_generate_strnlen(char **out_text);
 int transpiler_standard_library_generate_strcmp(char **out_text);
-int transpiler_standard_library_generate_strcmp_string(char **out_text);
 int transpiler_standard_library_generate_strcpy(char **out_text);
-int transpiler_standard_library_generate_strcpy_string(char **out_text);
 int transpiler_standard_library_generate_strncpy(char **out_text);
-int transpiler_standard_library_generate_strncpy_string(char **out_text);
 int transpiler_standard_library_generate_memcmp(char **out_text);
-int transpiler_standard_library_generate_memcmp_string(char **out_text);
 int transpiler_standard_library_generate_strcat(char **out_text);
-int transpiler_standard_library_generate_strcat_string(char **out_text);
 int transpiler_standard_library_generate_strtod(char **out_text);
-int transpiler_standard_library_generate_strtod_string(char **out_text);
 int transpiler_standard_library_generate_abs(char **out_text);
 int transpiler_standard_library_generate_fabs(char **out_text);
 int transpiler_standard_library_generate_floor(char **out_text);
@@ -2037,19 +2089,14 @@ int transpiler_standard_library_generate_tan(char **out_text);
 int transpiler_standard_library_generate_rounded(char **out_text);
 int transpiler_standard_library_generate_banker_round(char **out_text);
 int transpiler_standard_library_generate_atoi(char **out_text);
-int transpiler_standard_library_generate_atoi_string(char **out_text);
 int transpiler_standard_library_generate_atol(char **out_text);
-int transpiler_standard_library_generate_atol_string(char **out_text);
 int transpiler_standard_library_generate_atoll(char **out_text);
-int transpiler_standard_library_generate_atoll_string(char **out_text);
 int transpiler_standard_library_generate_powerof(char **out_text);
 int transpiler_standard_library_generate_sqrt(char **out_text);
 int transpiler_standard_library_generate_min(char **out_text);
 int transpiler_standard_library_generate_max(char **out_text);
 int transpiler_standard_library_generate_toupper(char **out_text);
-int transpiler_standard_library_generate_toupper_string(char **out_text);
 int transpiler_standard_library_generate_tolower(char **out_text);
-int transpiler_standard_library_generate_tolower_string(char **out_text);
 int transpiler_standard_library_generate_isdigit(char **out_text);
 int transpiler_standard_library_generate_isalpha(char **out_text);
 
@@ -2057,7 +2104,11 @@ const t_transpiler_standard_library_entry *transpiler_standard_library_get_entri
 const t_transpiler_standard_library_entry *transpiler_standard_library_lookup(const char *qualified_name);
 const t_transpiler_standard_library_entry *transpiler_standard_library_lookup_with_buffer_kind(
     const char *qualified_name, t_transpiler_standard_library_buffer_kind buffer_kind);
+const t_transpiler_standard_library_entry *transpiler_standard_library_lookup_versioned(
+    const char *qualified_name, t_transpiler_standard_library_buffer_kind buffer_kind,
+    unsigned int interface_version, unsigned int abi_version);
 const char *transpiler_standard_library_get_native_source(const char *program_name);
+const char *transpiler_standard_library_get_native_source_path(const char *program_name);
 int transpiler_standard_library_generate_native(const char *program_name, char **out_text);
 
 typedef struct s_transpiler_runtime_helper_entry
@@ -2092,6 +2143,10 @@ typedef struct s_transpiler_cli_options
     t_transpiler_diagnostic_level diagnostic_level;
     int warnings_as_errors;
     t_transpiler_warning_settings warning_settings;
+    size_t max_source_bytes;
+    size_t max_lifetime_edge_transfers;
+    size_t max_template_instantiations;
+    size_t max_template_instantiation_depth;
     int show_help;
     int emit_standard_library;
     int emit_all_standard_library;
