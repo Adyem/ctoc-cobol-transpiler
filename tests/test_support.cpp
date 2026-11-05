@@ -201,7 +201,7 @@ static int test_capture_stream_end(t_test_output_capture *capture, int fd, char 
         std::streamsize read_length = stream.gcount();
         buffer[read_length] = '\0';
         if (length)
-            *length = static_cast<std::ptrdiff_t>(read_length);
+            *length = read_length;
     }
     if (test_restore_fd(capture->saved_fd, fd) != 0)
         return (FT_FAILURE);

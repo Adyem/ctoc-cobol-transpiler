@@ -23,6 +23,107 @@ static int cblc_string_item_is_array_member(const t_cblc_translation_unit *unit,
     return (owner && owner->array_count > 0);
 }
 
+static unsigned char *cblc_alias_method_selection(const t_cblc_translation_unit *unit,
+    const t_cblc_data_item *receiver, const t_cblc_struct_type *type)
+{
+    unsigned char *selected;
+    size_t *queue;
+    size_t head;
+    size_t tail;
+    const char *pointer_name;
+    size_t function_index;
+
+    if (!unit || !receiver || !type || !receiver->is_alias
+        || std::strncmp(receiver->cobol_name, "CBLC-SPTR-",
+            sizeof("CBLC-SPTR-") - 1) != 0)
+        return (NULL);
+    selected = static_cast<unsigned char *>(cma_calloc(type->method_count == 0
+            ? 1 : type->method_count, sizeof(*selected)));
+    queue = static_cast<size_t *>(cma_calloc(type->method_count == 0
+            ? 1 : type->method_count, sizeof(*queue)));
+    if (!selected || !queue)
+    {
+        cma_free(selected);
+        cma_free(queue);
+        return (NULL);
+    }
+    pointer_name = receiver->cobol_name + sizeof("CBLC-SPTR-") - 1;
+    head = 0;
+    tail = 0;
+    function_index = 0;
+    while (function_index < unit->function_count)
+    {
+        const t_cblc_function *function;
+        size_t statement_index;
+
+        function = &unit->functions[function_index];
+        statement_index = 0;
+        while (statement_index < function->statement_count)
+        {
+            const t_cblc_statement *statement;
+            size_t method_index;
+
+            statement = &function->statements[statement_index];
+            if ((statement->type == CBLC_STATEMENT_METHOD_CALL
+                    || statement->type == CBLC_STATEMENT_METHOD_CALL_ASSIGN)
+                && (std::strcmp(statement->source, pointer_name) == 0
+                    || std::strcmp(statement->target, pointer_name) == 0))
+            {
+                method_index = 0;
+                while (method_index < type->method_count)
+                {
+                    if (!selected[method_index]
+                        && std::strcmp(type->methods[method_index].source_name,
+                            statement->call_identifier) == 0)
+                    {
+                        selected[method_index] = 1;
+                        queue[tail++] = method_index;
+                        break ;
+                    }
+                    method_index += 1;
+                }
+            }
+            statement_index += 1;
+        }
+        function_index += 1;
+    }
+    while (head < tail)
+    {
+        const t_cblc_method *method;
+        size_t statement_index;
+
+        method = &type->methods[queue[head++]];
+        statement_index = 0;
+        while (statement_index < method->statement_count)
+        {
+            const t_cblc_statement *statement;
+            size_t method_index;
+
+            statement = &method->statements[statement_index];
+            if (statement->type == CBLC_STATEMENT_METHOD_CALL
+                || statement->type == CBLC_STATEMENT_METHOD_CALL_ASSIGN)
+            {
+                method_index = 0;
+                while (method_index < type->method_count)
+                {
+                    if (!selected[method_index]
+                        && std::strcmp(type->methods[method_index].source_name,
+                            statement->call_identifier) == 0)
+                    {
+                        selected[method_index] = 1;
+                        queue[tail++] = method_index;
+                        break ;
+                    }
+                    method_index += 1;
+                }
+            }
+            statement_index += 1;
+        }
+    }
+    cma_free(queue);
+    return (selected);
+}
+
 static int cblc_emit_reusable_method_paragraphs(const t_cblc_translation_unit *unit,
     t_cobol_text_builder *builder)
 {
@@ -35,10 +136,15 @@ static int cblc_emit_reusable_method_paragraphs(const t_cblc_translation_unit *u
     {
         const t_cblc_data_item *receiver;
         const t_cblc_struct_type *type;
+        unsigned char *alias_methods;
         size_t method_index;
 
         receiver = &unit->data_items[data_index];
-        if (receiver->is_alias || receiver->kind != CBLC_DATA_KIND_STRUCT
+        if ((receiver->is_alias
+                && (receiver->kind != CBLC_DATA_KIND_STRUCT
+                    || std::strncmp(receiver->cobol_name, "CBLC-SPTR-",
+                        sizeof("CBLC-SPTR-") - 1) != 0))
+            || receiver->kind != CBLC_DATA_KIND_STRUCT
             || receiver->array_count > 0
             || (!receiver->is_function_local && receiver->owner_function_name[0] != '\0'))
         {
@@ -51,6 +157,9 @@ static int cblc_emit_reusable_method_paragraphs(const t_cblc_translation_unit *u
             data_index += 1;
             continue ;
         }
+        alias_methods = cblc_alias_method_selection(unit, receiver, type);
+        if (receiver->is_alias && !alias_methods)
+            return (FT_FAILURE);
         method_index = 0;
         while (method_index < type->method_count)
         {
@@ -59,7 +168,8 @@ static int cblc_emit_reusable_method_paragraphs(const t_cblc_translation_unit *u
             char line[TRANSPILE_STATEMENT_TEXT_MAX];
 
             method = &type->methods[method_index];
-            if (!cblc_method_is_reusable(method))
+            if ((alias_methods && !alias_methods[method_index])
+                || !cblc_method_is_reusable(method))
             {
                 method_index += 1;
                 continue ;
@@ -91,7 +201,7 @@ static int cblc_emit_reusable_method_paragraphs(const t_cblc_translation_unit *u
                         || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
                         return (FT_FAILURE);
                     if (cblc_emit_method_body(unit, receiver, method, assign_target,
-                            builder) != FT_SUCCESS)
+                            NULL, builder) != FT_SUCCESS)
                     {
                         return (FT_FAILURE);
                     }
@@ -105,6 +215,7 @@ static int cblc_emit_reusable_method_paragraphs(const t_cblc_translation_unit *u
                 return (FT_FAILURE);
             method_index += 1;
         }
+        cma_free(alias_methods);
         data_index += 1;
     }
     return (FT_SUCCESS);
@@ -215,8 +326,9 @@ static int cblc_emit_reusable_lifecycle_paragraphs(const t_cblc_translation_unit
             size_t statement_index;
 
             constructor = &type->constructors[constructor_index];
-            if (constructor->is_copy_constructor
-                || !constructor->has_definition || constructor->statement_count == 0)
+            if (!constructor->has_definition || constructor->statement_count == 0
+                || (constructor->is_copy_constructor
+                    && !cblc_constructor_has_exception_control(constructor)))
             {
                 constructor_index += 1;
                 continue ;
@@ -297,10 +409,15 @@ static int cblc_emit_reusable_method_results(const t_cblc_translation_unit *unit
     {
         const t_cblc_data_item *receiver;
         const t_cblc_struct_type *type;
+        unsigned char *alias_methods;
         size_t method_index;
 
         receiver = &unit->data_items[data_index];
-        if (receiver->is_alias || receiver->kind != CBLC_DATA_KIND_STRUCT
+        if ((receiver->is_alias
+                && (receiver->kind != CBLC_DATA_KIND_STRUCT
+                    || std::strncmp(receiver->cobol_name, "CBLC-SPTR-",
+                        sizeof("CBLC-SPTR-") - 1) != 0))
+            || receiver->kind != CBLC_DATA_KIND_STRUCT
             || (!receiver->is_function_local && receiver->owner_function_name[0] != '\0'))
         {
             data_index += 1;
@@ -312,6 +429,9 @@ static int cblc_emit_reusable_method_results(const t_cblc_translation_unit *unit
             data_index += 1;
             continue ;
         }
+        alias_methods = cblc_alias_method_selection(unit, receiver, type);
+        if (receiver->is_alias && !alias_methods)
+            return (FT_FAILURE);
         method_index = 0;
         while (method_index < type->method_count)
         {
@@ -320,7 +440,8 @@ static int cblc_emit_reusable_method_results(const t_cblc_translation_unit *unit
             char line[256];
 
             method = &type->methods[method_index];
-            if (!cblc_method_is_reusable(method)
+            if ((alias_methods && !alias_methods[method_index])
+                || !cblc_method_is_reusable(method)
                 || method->return_kind == CBLC_FUNCTION_RETURN_VOID)
             {
                 method_index += 1;
@@ -368,6 +489,7 @@ static int cblc_emit_reusable_method_results(const t_cblc_translation_unit *unit
             }
             method_index += 1;
         }
+        cma_free(alias_methods);
         data_index += 1;
     }
     return (FT_SUCCESS);
@@ -1013,9 +1135,7 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
         return (FT_FAILURE);
     *out_text = NULL;
     if (cblc_translation_unit_calls_are_resolved(unit) != FT_SUCCESS)
-    {
         return (FT_FAILURE);
-    }
     entry_index = unit->entry_function_index;
     if (entry_index == static_cast<size_t>(-1) || entry_index >= unit->function_count)
         entry_index = 0;
@@ -1731,9 +1851,7 @@ int cblc_generate_cobol(const t_cblc_translation_unit *unit, char **out_text)
     if (unit->function_count > 0)
     {
         if (cblc_emit_function(unit, &unit->functions[entry_index], &builder, 1) != FT_SUCCESS)
-        {
             goto cleanup;
-        }
         index = 0;
         while (index < unit->function_count)
         {

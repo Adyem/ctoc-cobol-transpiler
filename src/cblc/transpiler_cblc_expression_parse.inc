@@ -902,6 +902,37 @@ static int cblc_reference_return_matches_value_target(const t_cblc_method *metho
     return (0);
 }
 
+static int cblc_method_result_matches_target(const t_cblc_method *method,
+    const t_cblc_data_item *target_item)
+{
+    if (!method || !target_item)
+        return (0);
+    if (cblc_reference_return_matches_value_target(method, target_item))
+        return (1);
+    if (method->return_kind == CBLC_FUNCTION_RETURN_INT)
+        return (target_item->kind == CBLC_DATA_KIND_INT);
+    if (method->return_kind == CBLC_FUNCTION_RETURN_DOUBLE)
+        return (target_item->kind == CBLC_DATA_KIND_DOUBLE);
+    if (method->return_kind == CBLC_FUNCTION_RETURN_STRUCT)
+        return (target_item->kind == CBLC_DATA_KIND_STRUCT
+            && std::strncmp(target_item->struct_type_name, method->return_type_name,
+                sizeof(target_item->struct_type_name)) == 0);
+    if (method->return_kind == CBLC_FUNCTION_RETURN_VOID_POINTER)
+        return (cblc_pointer_assignment_is_compatible(target_item->kind,
+            CBLC_DATA_KIND_VOID_POINTER));
+    if (method->return_kind == CBLC_FUNCTION_RETURN_CHAR_POINTER)
+        return (cblc_pointer_assignment_is_compatible(target_item->kind,
+            CBLC_DATA_KIND_CHAR_POINTER));
+    if (method->return_kind == CBLC_FUNCTION_RETURN_INT_POINTER)
+        return (cblc_pointer_assignment_is_compatible(target_item->kind,
+            CBLC_DATA_KIND_INT_POINTER));
+    if (method->return_kind == CBLC_FUNCTION_RETURN_STRUCT_POINTER)
+        return (target_item->kind == CBLC_DATA_KIND_STRUCT_POINTER
+            && std::strncmp(target_item->struct_type_name, method->return_type_name,
+                sizeof(target_item->struct_type_name)) == 0);
+    return (0);
+}
+
 static int cblc_parse_method_call_assignment(const char **cursor,
     t_cblc_translation_unit *unit, t_cblc_function *function,
     t_cblc_data_item *target_item)
@@ -913,12 +944,16 @@ static int cblc_parse_method_call_assignment(const char **cursor,
     char call_arguments[TRANSPILE_STATEMENT_TEXT_MAX];
     char normalized_call_arguments[TRANSPILE_STATEMENT_TEXT_MAX];
     char method_name[TRANSPILE_IDENTIFIER_MAX];
+    char temporary_source_name[TRANSPILE_IDENTIFIER_MAX];
+    char temporary_cobol_name[TRANSPILE_IDENTIFIER_MAX];
     t_cblc_statement *statement;
     size_t argument_count;
 
     if (!cursor || !*cursor || !unit || !function || !target_item)
         return (FT_FAILURE);
     start = *cursor;
+    temporary_source_name[0] = '\0';
+    temporary_cobol_name[0] = '\0';
     call_arguments[0] = '\0';
     normalized_call_arguments[0] = '\0';
     argument_count = 0;
@@ -932,145 +967,176 @@ static int cblc_parse_method_call_assignment(const char **cursor,
         *cursor = start;
         return (FT_FAILURE);
     }
-    if (cblc_reference_return_matches_value_target(method, target_item))
-    {
-        /* A reference result may be copied into a value target. */
-    }
-    else if (method->return_kind == CBLC_FUNCTION_RETURN_INT)
-    {
-        if (target_item->kind != CBLC_DATA_KIND_INT)
-        {
-            *cursor = start;
-            return (FT_FAILURE);
-        }
-    }
-    else if (method->return_kind == CBLC_FUNCTION_RETURN_DOUBLE)
-    {
-        if (target_item->kind != CBLC_DATA_KIND_DOUBLE)
-        {
-            *cursor = start;
-            return (FT_FAILURE);
-        }
-    }
-    else if (method->return_kind == CBLC_FUNCTION_RETURN_STRUCT)
-    {
-        if (target_item->kind != CBLC_DATA_KIND_STRUCT
-            || std::strncmp(target_item->struct_type_name, method->return_type_name,
-                sizeof(target_item->struct_type_name)) != 0)
-        {
-            *cursor = start;
-            return (FT_FAILURE);
-        }
-    }
-    else if (method->return_kind == CBLC_FUNCTION_RETURN_VOID_POINTER)
-    {
-        if (!cblc_pointer_assignment_is_compatible(target_item->kind,
-                CBLC_DATA_KIND_VOID_POINTER))
-        {
-            *cursor = start;
-            return (FT_FAILURE);
-        }
-    }
-    else if (method->return_kind == CBLC_FUNCTION_RETURN_CHAR_POINTER)
-    {
-        if (!cblc_pointer_assignment_is_compatible(target_item->kind,
-                CBLC_DATA_KIND_CHAR_POINTER))
-        {
-            *cursor = start;
-            return (FT_FAILURE);
-        }
-    }
-    else if (method->return_kind == CBLC_FUNCTION_RETURN_INT_POINTER)
-    {
-        if (!cblc_pointer_assignment_is_compatible(target_item->kind,
-                CBLC_DATA_KIND_INT_POINTER))
-        {
-            *cursor = start;
-            return (FT_FAILURE);
-        }
-    }
-    else if (method->return_kind == CBLC_FUNCTION_RETURN_STRUCT_POINTER)
-    {
-        if (target_item->kind != CBLC_DATA_KIND_STRUCT_POINTER
-            || std::strncmp(target_item->struct_type_name, method->return_type_name,
-                sizeof(target_item->struct_type_name)) != 0)
-        {
-            *cursor = start;
-            return (FT_FAILURE);
-        }
-    }
-    else
+    if (!method)
     {
         *cursor = start;
         return (FT_FAILURE);
     }
-    cblc_skip_whitespace(cursor);
-    if (**cursor != '(')
+    while (1)
     {
-        *cursor = start;
-        return (FT_FAILURE);
-    }
-    *cursor += 1;
-    if (cblc_parse_call_argument_list(cursor, unit, call_arguments,
-            sizeof(call_arguments), &argument_count) != FT_SUCCESS)
-    {
-        *cursor = start;
-        return (FT_FAILURE);
-    }
-    if (method->parameter_count != argument_count)
-    {
-        *cursor = start;
-        return (FT_FAILURE);
-    }
-    {
-        size_t index;
-        t_cblc_statement probe_statement;
+        const char *after_call;
 
-        std::memset(&probe_statement, 0, sizeof(probe_statement));
-        ft_strlcpy(probe_statement.call_arguments, call_arguments,
-            sizeof(probe_statement.call_arguments));
-        probe_statement.call_argument_count = argument_count;
-        index = 0;
-        while (index < argument_count)
+        call_arguments[0] = '\0';
+        normalized_call_arguments[0] = '\0';
+        argument_count = 0;
+        cblc_skip_whitespace(cursor);
+        if (**cursor != '(')
         {
-            char argument[TRANSPILE_STATEMENT_TEXT_MAX];
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        *cursor += 1;
+        if (cblc_parse_call_argument_list(cursor, unit, call_arguments,
+                sizeof(call_arguments), &argument_count) != FT_SUCCESS
+            || method->parameter_count != argument_count)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        cblc_skip_whitespace(cursor);
+        if (**cursor != ')')
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        *cursor += 1;
+        {
+            size_t index;
+            t_cblc_statement probe_statement;
 
-            if (cblc_extract_call_argument(&probe_statement, index, argument,
-                    sizeof(argument)) != FT_SUCCESS
-                || !cblc_argument_matches_parameter(unit, argument, &method->parameters[index]))
+            std::memset(&probe_statement, 0, sizeof(probe_statement));
+            ft_strlcpy(probe_statement.call_arguments, call_arguments,
+                sizeof(probe_statement.call_arguments));
+            probe_statement.call_argument_count = argument_count;
+            index = 0;
+            while (index < argument_count)
+            {
+                char argument[TRANSPILE_STATEMENT_TEXT_MAX];
+
+                if (cblc_extract_call_argument(&probe_statement, index, argument,
+                        sizeof(argument)) != FT_SUCCESS
+                    || !cblc_argument_matches_parameter(unit, argument,
+                        &method->parameters[index]))
+                {
+                    *cursor = start;
+                    return (FT_FAILURE);
+                }
+                index += 1;
+            }
+        }
+        if (cblc_normalize_call_arguments(unit, call_arguments, argument_count,
+                normalized_call_arguments, sizeof(normalized_call_arguments)) != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        after_call = *cursor;
+        cblc_skip_whitespace(cursor);
+        if (**cursor == '.')
+        {
+            t_cblc_data_kind temporary_kind;
+            const char *temporary_type_name;
+            t_cblc_data_item *temporary_item;
+            char receiver_alias_source_name[TRANSPILE_IDENTIFIER_MAX];
+            char receiver_alias_cobol_name[TRANSPILE_IDENTIFIER_MAX];
+            char ordinal[24];
+            size_t temporary_index;
+
+
+            if (method->return_reference_kind == CBLC_REFERENCE_NONE
+                || method->return_kind != CBLC_FUNCTION_RETURN_STRUCT_POINTER
+                || method->return_type_name[0] == '\0'
+                || cblc_find_struct_type(unit, method->return_type_name) == NULL)
             {
                 *cursor = start;
                 return (FT_FAILURE);
             }
-            index += 1;
+            temporary_kind = CBLC_DATA_KIND_STRUCT_POINTER;
+            temporary_type_name = method->return_type_name;
+            temporary_index = unit->data_count;
+            do
+            {
+                std::snprintf(ordinal, sizeof(ordinal), "%zu", temporary_index);
+                if (std::snprintf(temporary_source_name, sizeof(temporary_source_name),
+                        "__CBLC_METHOD_RESULT_%s", ordinal) < 0
+                    || std::snprintf(temporary_cobol_name, sizeof(temporary_cobol_name),
+                        "CBLC-METHOD-RESULT-%s", ordinal) < 0)
+                {
+                    *cursor = start;
+                    return (FT_FAILURE);
+                }
+                temporary_index += 1;
+            }
+            while (cblc_find_data_item(unit, temporary_source_name));
+            if (cblc_add_named_data_item(unit, temporary_source_name,
+                    temporary_cobol_name, temporary_kind, 0, 0, temporary_type_name,
+                    function->cobol_name, 1, 0, 0) != FT_SUCCESS)
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+            temporary_item = cblc_find_data_item(unit, temporary_source_name);
+            if (!temporary_item
+                || !cblc_method_result_matches_target(method, temporary_item)
+                || std::snprintf(receiver_alias_source_name,
+                    sizeof(receiver_alias_source_name),
+                    "__CBLC_METHOD_RECEIVER_%s", ordinal) < 0
+                || std::snprintf(receiver_alias_cobol_name,
+                    sizeof(receiver_alias_cobol_name), "CBLC-SPTR-%s",
+                    temporary_cobol_name) < 0
+                || cblc_add_named_data_item(unit, receiver_alias_source_name,
+                    receiver_alias_cobol_name, CBLC_DATA_KIND_STRUCT, 0, 0,
+                    temporary_type_name, function->cobol_name, 1, 1, 0) != FT_SUCCESS
+                || cblc_append_statement(function, CBLC_STATEMENT_METHOD_CALL_ASSIGN,
+                    temporary_item->cobol_name, receiver_item->cobol_name, 0) != FT_SUCCESS)
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+            statement = &function->statements[function->statement_count - 1];
+            ft_strlcpy(statement->call_identifier, method_name,
+                sizeof(statement->call_identifier));
+            ft_strlcpy(statement->call_arguments, normalized_call_arguments,
+                sizeof(statement->call_arguments));
+            statement->call_argument_count = argument_count;
+            receiver_item = temporary_item;
+            receiver_type = cblc_find_receiver_type(unit, receiver_item);
+            *cursor += 1;
+            if (!receiver_type
+                || cblc_parse_identifier(cursor, method_name, sizeof(method_name)) != FT_SUCCESS
+                || !(method = cblc_find_method_on_type(receiver_type, method_name)))
+            {
+                *cursor = start;
+                return (FT_FAILURE);
+            }
+            continue ;
         }
+        *cursor = after_call;
+        if (!cblc_method_result_matches_target(method, target_item))
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        cblc_skip_whitespace(cursor);
+        if (**cursor != ';')
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        *cursor += 1;
+        if (cblc_append_statement(function, CBLC_STATEMENT_METHOD_CALL_ASSIGN,
+                target_item->cobol_name, receiver_item->cobol_name, 0) != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        statement = &function->statements[function->statement_count - 1];
+        ft_strlcpy(statement->call_identifier, method_name, sizeof(statement->call_identifier));
+        ft_strlcpy(statement->call_arguments, normalized_call_arguments,
+            sizeof(statement->call_arguments));
+        statement->call_argument_count = argument_count;
+        return (FT_SUCCESS);
     }
-    if (cblc_normalize_call_arguments(unit, call_arguments, argument_count,
-            normalized_call_arguments, sizeof(normalized_call_arguments)) != FT_SUCCESS)
-    {
-        *cursor = start;
-        return (FT_FAILURE);
-    }
-    *cursor += 1;
-    cblc_skip_whitespace(cursor);
-    if (**cursor != ';')
-    {
-        *cursor = start;
-        return (FT_FAILURE);
-    }
-    *cursor += 1;
-    if (cblc_append_statement(function, CBLC_STATEMENT_METHOD_CALL_ASSIGN,
-            target_item->cobol_name, receiver_item->cobol_name, 0) != FT_SUCCESS)
-    {
-        *cursor = start;
-        return (FT_FAILURE);
-    }
-    statement = &function->statements[function->statement_count - 1];
-    ft_strlcpy(statement->call_identifier, method_name, sizeof(statement->call_identifier));
-    ft_strlcpy(statement->call_arguments, normalized_call_arguments,
-        sizeof(statement->call_arguments));
-    statement->call_argument_count = argument_count;
-    return (FT_SUCCESS);
 }
 
 static int cblc_parse_pointer_allocation_assignment(const char **cursor,

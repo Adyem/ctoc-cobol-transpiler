@@ -763,8 +763,15 @@ int cblc_frontend_analyze_document(t_cblc_frontend_analysis *analysis, const cha
         span.start_column = 1;
         span.end_line = 1;
         span.end_column = 1;
-        if (analysis->unit->parse_error_code >= TRANSPILE_ERROR_TEMPLATE_INVALID_DECLARATION
-            && analysis->unit->parse_error_code <= TRANSPILE_ERROR_TEMPLATE_INSTANTIATION_FAILED)
+        int is_template_diagnostic;
+
+        is_template_diagnostic =
+            (analysis->unit->parse_error_code >= TRANSPILE_ERROR_TEMPLATE_INVALID_DECLARATION
+                && analysis->unit->parse_error_code
+                    <= TRANSPILE_ERROR_TEMPLATE_INSTANTIATION_FAILED)
+            || analysis->unit->parse_error_code == TRANSPILE_ERROR_TEMPLATE_NAME_COLLISION
+            || analysis->unit->parse_error_code == TRANSPILE_ERROR_TEMPLATE_DEPTH_EXCEEDED;
+        if (is_template_diagnostic)
         {
             size_t template_offset;
 

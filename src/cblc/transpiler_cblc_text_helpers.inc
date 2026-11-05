@@ -84,12 +84,13 @@ static int cobol_text_builder_append_line(t_cobol_text_builder *builder, const c
         return (FT_SUCCESS);
     }
     to_clause = std::strstr(text, "TO ");
-    if (text_length > 72 && to_clause && to_clause > text)
+    if (text_length > 72 && to_clause && to_clause > text
+        && static_cast<size_t>(to_clause - text) <= 72)
     {
         if (cobol_text_builder_append_span(builder, text,
                 static_cast<size_t>(to_clause - text)) != FT_SUCCESS
             || cobol_text_builder_append_string(builder, " \n") != FT_SUCCESS
-            || cobol_text_builder_append_string(builder, "      -    ") != FT_SUCCESS
+            || cobol_text_builder_append_string(builder, "           ") != FT_SUCCESS
             || cobol_text_builder_append_string(builder, to_clause) != FT_SUCCESS
             || cobol_text_builder_append_string(builder, "\n") != FT_SUCCESS)
             return (FT_FAILURE);
@@ -99,7 +100,7 @@ static int cobol_text_builder_append_line(t_cobol_text_builder *builder, const c
     {
         size_t break_limit;
 
-        break_limit = 65;
+        break_limit = 72;
         if (break_limit >= text_length)
             break_limit = text_length - 1;
         break_cursor = text + break_limit;
@@ -110,7 +111,7 @@ static int cobol_text_builder_append_line(t_cobol_text_builder *builder, const c
             if (cobol_text_builder_append_span(builder, text,
                     static_cast<size_t>(break_cursor - text)) != FT_SUCCESS
                 || cobol_text_builder_append_string(builder, " \n") != FT_SUCCESS
-                || cobol_text_builder_append_string(builder, "      -    ") != FT_SUCCESS
+                || cobol_text_builder_append_string(builder, "           ") != FT_SUCCESS
                 || cobol_text_builder_append_string(builder, break_cursor + 1) != FT_SUCCESS
                 || cobol_text_builder_append_string(builder, "\n") != FT_SUCCESS)
                 return (FT_FAILURE);
@@ -226,6 +227,11 @@ static void cblc_identifier_to_cobol(const char *identifier, char *buffer, size_
 
     if (!identifier || !buffer || buffer_size == 0)
         return ;
+    if (std::strcmp(identifier, "NULL") == 0 || std::strcmp(identifier, "null") == 0)
+    {
+        ft_strlcpy(buffer, "NULL", buffer_size);
+        return ;
+    }
     index = 0;
     output_index = 0;
     while (identifier[index] != '\0' && output_index + 1 < buffer_size)

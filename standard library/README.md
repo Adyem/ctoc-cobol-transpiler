@@ -37,12 +37,18 @@ The CBL-C vector contract is intentionally similar to, but not identical to,
 
 - `count` is the number of logically active elements.
 - `reserved` is the number of allocated and constructed capacity slots.
+- Vector storage fields are private; callers use the public methods below.
 - Only the first `count` slots are members of the vector's logical sequence.
 - Capacity slots may already contain default-constructed values before they
   become logically active.
 - `push_back`, `emplace_back`, `insert`, `reserve`, `resize`, and `assign`
   preserve active values by copying them into newly allocated storage when
   growth is required.
+- `reserve`, `shrink_to_fit`, and vector copy assignment free staged storage
+  and preserve the previous allocation if element copying throws. The vector
+  copy constructor stages its allocation and element copies, freeing the staged
+  block if copying throws. This behavior has generated-output coverage; COBOL
+  compile-and-run proof is still required.
 - `pop_back`, `erase`, `clear`, and shrinking `resize` reduce logical
   membership but do not run per-element destructors.
 
@@ -58,6 +64,13 @@ for non-trivial elements remain planned extensions.
 bounds and throw `out_of_range` when the requested element does not exist.
 `at`, `front`, and `back` return `T&`; `operator->` requires a non-empty vector
 and refers to its first active element.
+
+`insert` accepts positions from zero through `count`; an invalid position
+throws `out_of_range`. `erase` requires an active element and throws
+`out_of_range` for an invalid index. `pop_back` throws `out_of_range` when the
+vector is empty. Negative `reserve`, `resize`, and `assign` requests throw
+`invalid_argument` before changing the vector's logical size or elements.
+
 Growth overflow raises `length_error`; allocation failure is handled by the
 configured runtime. The current API does not promise exact C++ object-lifetime
 behavior.

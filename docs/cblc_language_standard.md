@@ -317,15 +317,24 @@ The standard-library `vector<T>` is a CBL-C-native container with familiar
 C++-style operations. It is not required to reproduce the complete C++
 `std::vector` object-lifetime, allocator, iterator, or move-semantics model.
 
-The basic vector storage model is:
+The prototype's internal vector storage model is:
 
 - `count` is the number of logically active elements.
 - `reserved` is the number of allocated, constructed capacity slots.
+- These fields and the backing/relocation pointers are private implementation
+  state; CBL-C callers access them through the public vector methods.
 - Only the first `count` slots are members of the vector's logical sequence.
 - Capacity slots may already contain default-constructed values before they
   become logically active.
 - Growth copies active elements into a new block before the old block is
   released.
+- `reserve`, `shrink_to_fit`, and vector copy assignment clean up a staged
+  block and rethrow if allocation or element copying fails; the old block is
+  retained until staging completes. Vector copy construction now stages its
+  allocation and copies in a catch-protected constructor paragraph, releases
+  the staged block on failure, and publishes it only after successful copying.
+  This has generated-output coverage; COBOL compile-and-run proof is still
+  required.
 - `pop_back`, `erase`, `clear`, and shrinking `resize` reduce logical
   membership but do not run per-element destructors.
 
@@ -351,12 +360,16 @@ The current access contract is intentionally CBL-C-specific:
   returns from `operator[]` remain future extensions described in
   [`reference_lowering_design.md`](reference_lowering_design.md).
 
-Negative size-changing requests are treated as zero. Growth beyond the
-representable vector limit raises `length_error`. The representable limit is
-not a promise that the target machine can allocate that many elements;
-allocation failure remains a runtime/target resource failure. Invalid indexing
-and empty access follow these CBL-C rules rather than implicitly inheriting all
-C++ `std::vector` behavior.
+Negative `reserve`, `resize`, and `assign` requests throw `invalid_argument`
+before changing vector state. `insert` accepts positions in `[0, count]`; other
+positions throw `out_of_range`. `erase` requires an active element and throws
+`out_of_range` for an invalid index. `pop_back` throws `out_of_range` when the
+vector is empty. Growth beyond the representable vector limit raises
+`length_error`. The representable limit is not a promise that the target
+machine can allocate that many elements; allocation failure remains a
+runtime/target resource failure. Invalid indexing and empty access follow
+these CBL-C rules rather than implicitly inheriting all C++ `std::vector`
+behavior.
 
 ### 6.5 Classes
 

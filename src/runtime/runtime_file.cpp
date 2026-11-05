@@ -85,7 +85,7 @@ int runtime_file_write(t_runtime_file *file, const char *buffer, size_t length)
         result = std::fwrite(buffer + offset, sizeof(char), length - offset, file->stream);
         if (result == 0)
             return (FT_FAILURE);
-        offset += static_cast<size_t>(result);
+        offset += result;
     }
     return (FT_SUCCESS);
 }

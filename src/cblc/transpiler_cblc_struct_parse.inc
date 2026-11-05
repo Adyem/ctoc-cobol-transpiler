@@ -2,9 +2,15 @@ static int cblc_parse_template_header(const char **cursor,
     char parameter_names[][TRANSPILE_IDENTIFIER_MAX], size_t *out_count);
 static int cblc_template_argument_mangle_key(const char *argument,
     char *key, size_t key_size);
+static int cblc_template_arguments_hash_key(
+    const char arguments[][TRANSPILE_IDENTIFIER_MAX], size_t argument_count,
+    char *key, size_t key_size);
 static int cblc_template_arguments_to_key(
     const char arguments[][TRANSPILE_IDENTIFIER_MAX], size_t argument_count,
     char *key, size_t key_size);
+static int cblc_template_instance_names_available(
+    const t_cblc_translation_unit *unit, const char *source_name,
+    const char *cobol_name);
 static void cblc_record_template_instantiation_error(
     t_cblc_translation_unit *unit, int code, const char *message,
     const char *template_name, const char *argument_key,
@@ -729,6 +735,8 @@ static int cblc_capture_method_body(const char **cursor, t_cblc_translation_unit
     t_cblc_statement **out_statements, size_t *out_count, size_t *out_capacity)
 {
     size_t saved_data_count;
+    size_t retained_data_count;
+    size_t data_index;
     const t_cblc_struct_type *saved_access_type;
     int status;
 
@@ -749,7 +757,110 @@ static int cblc_capture_method_body(const char **cursor, t_cblc_translation_unit
     }
     g_cblc_member_access_type = type;
     status = cblc_parse_statement_block(cursor, unit, method_function, 1);
-    cblc_unbind_lifecycle_scope(unit, saved_data_count);
+    retained_data_count = saved_data_count;
+    if (status == FT_SUCCESS)
+    {
+        data_index = saved_data_count;
+        while (data_index < unit->data_count)
+        {
+            t_cblc_data_item *data_item;
+
+            data_item = &unit->data_items[data_index];
+            if ((data_item->is_function_local
+                    && std::strcmp(data_item->owner_function_name,
+                        method_function->source_name) == 0)
+                || std::strncmp(data_item->source_name,
+                    "__cblc_exception_payload_",
+                    sizeof("__cblc_exception_payload_") - 1) == 0)
+            {
+                if (!data_item->is_function_local)
+                {
+                    if (retained_data_count != data_index)
+                        unit->data_items[retained_data_count] = *data_item;
+                    retained_data_count += 1;
+                    data_index += 1;
+                    continue ;
+                }
+                const char *local_suffix;
+                size_t alias_index;
+
+                local_suffix = data_item->source_name
+                    + std::strlen(method_function->source_name);
+                if (local_suffix[0] == '_' && local_suffix[1] == '_')
+                    local_suffix += 2;
+                alias_index = saved_data_count;
+                while (alias_index < unit->data_count)
+                {
+                    const t_cblc_data_item *alias_item;
+
+                    alias_item = &unit->data_items[alias_index];
+                    if (alias_item->is_alias
+                        && std::strcmp(alias_item->source_name, local_suffix) == 0)
+                    {
+                        size_t statement_index;
+
+                        statement_index = 0;
+                        while (statement_index < method_function->statement_count)
+                        {
+                            cblc_replace_template_text(
+                                method_function->statements[statement_index].target,
+                                sizeof(method_function->statements[statement_index].target),
+                                alias_item->cobol_name, data_item->cobol_name);
+                            cblc_replace_template_text(
+                                method_function->statements[statement_index].target,
+                                sizeof(method_function->statements[statement_index].target),
+                                alias_item->source_name, data_item->cobol_name);
+                            cblc_replace_template_text(
+                                method_function->statements[statement_index].source,
+                                sizeof(method_function->statements[statement_index].source),
+                                alias_item->cobol_name, data_item->cobol_name);
+                            cblc_replace_template_text(
+                                method_function->statements[statement_index].source,
+                                sizeof(method_function->statements[statement_index].source),
+                                alias_item->source_name, data_item->cobol_name);
+                            cblc_replace_template_text(
+                                method_function->statements[statement_index].call_arguments,
+                                sizeof(method_function->statements[statement_index].call_arguments),
+                                alias_item->cobol_name, data_item->cobol_name);
+                            cblc_replace_template_text(
+                                method_function->statements[statement_index].call_arguments,
+                                sizeof(method_function->statements[statement_index].call_arguments),
+                                alias_item->source_name, data_item->cobol_name);
+                            {
+                                size_t cleanup_index;
+
+                                cleanup_index = 0;
+                                while (cleanup_index < method_function->statements[
+                                        statement_index].exception_cleanup_count)
+                                {
+                                    cblc_replace_template_text(
+                                        method_function->statements[statement_index]
+                                            .exception_cleanup_targets[cleanup_index],
+                                        sizeof(method_function->statements[statement_index]
+                                            .exception_cleanup_targets[cleanup_index]),
+                                        alias_item->cobol_name, data_item->cobol_name);
+                                    cblc_replace_template_text(
+                                        method_function->statements[statement_index]
+                                            .exception_cleanup_targets[cleanup_index],
+                                        sizeof(method_function->statements[statement_index]
+                                            .exception_cleanup_targets[cleanup_index]),
+                                        alias_item->source_name, data_item->cobol_name);
+                                    cleanup_index += 1;
+                                }
+                            }
+                            statement_index += 1;
+                        }
+                    }
+                    alias_index += 1;
+                }
+                if (retained_data_count != data_index)
+                    unit->data_items[retained_data_count] = *data_item;
+                retained_data_count += 1;
+            }
+            data_index += 1;
+        }
+    }
+    cblc_unbind_lifecycle_scope(unit, retained_data_count);
     g_cblc_member_access_type = saved_access_type;
     if (status != FT_SUCCESS
         || (method_function->return_kind != CBLC_FUNCTION_RETURN_VOID
@@ -1479,8 +1590,13 @@ static int cblc_parse_template_struct_definition(const char **cursor,
         goto fail;
     while (data_scope_base < unit->data_count)
     {
-        unit->data_items[data_scope_base].is_active = 0;
-        unit->data_items[data_scope_base].is_template_item = 1;
+        if (std::strncmp(unit->data_items[data_scope_base].source_name,
+                "__cblc_exception_payload_",
+                sizeof("__cblc_exception_payload_") - 1) != 0)
+        {
+            unit->data_items[data_scope_base].is_active = 0;
+            unit->data_items[data_scope_base].is_template_item = 1;
+        }
         data_scope_base += 1;
     }
     struct_type_index = unit->struct_type_count - 1;
@@ -2128,6 +2244,37 @@ static int cblc_materialize_template_method_storage(t_cblc_translation_unit *uni
                 cblc_replace_template_text(method->statements[statement_index].call_arguments,
                     sizeof(method->statements[statement_index].call_arguments), old_cobol,
                     actual_cobol);
+                cblc_replace_template_text(method->statements[statement_index].target,
+                    sizeof(method->statements[statement_index].target),
+                    method->parameters[index].source_name, actual_cobol);
+                cblc_replace_template_text(method->statements[statement_index].source,
+                    sizeof(method->statements[statement_index].source),
+                    method->parameters[index].source_name, actual_cobol);
+                cblc_replace_template_text(method->statements[statement_index].call_arguments,
+                    sizeof(method->statements[statement_index].call_arguments),
+                    method->parameters[index].source_name, actual_cobol);
+                {
+                    size_t cleanup_index;
+
+                    cleanup_index = 0;
+                    while (cleanup_index < method->statements[statement_index]
+                            .exception_cleanup_count)
+                    {
+                        cblc_replace_template_text(
+                            method->statements[statement_index]
+                                .exception_cleanup_targets[cleanup_index],
+                            sizeof(method->statements[statement_index]
+                                .exception_cleanup_targets[cleanup_index]),
+                            old_cobol, actual_cobol);
+                        cblc_replace_template_text(
+                            method->statements[statement_index]
+                                .exception_cleanup_targets[cleanup_index],
+                            sizeof(method->statements[statement_index]
+                                .exception_cleanup_targets[cleanup_index]),
+                            method->parameters[index].source_name, actual_cobol);
+                        cleanup_index += 1;
+                    }
+                }
                 statement_index += 1;
             }
         }
@@ -2180,9 +2327,18 @@ static int cblc_materialize_template_method_storage(t_cblc_translation_unit *uni
                     cblc_replace_template_text(method->statements[statement_index].source,
                         sizeof(method->statements[statement_index].source),
                         source_item->source_name, actual_source);
+                    cblc_replace_template_text(method->statements[statement_index].target,
+                        sizeof(method->statements[statement_index].target),
+                        source_item->cobol_name, actual_cobol);
+                    cblc_replace_template_text(method->statements[statement_index].source,
+                        sizeof(method->statements[statement_index].source),
+                        source_item->cobol_name, actual_cobol);
                     cblc_replace_template_text(method->statements[statement_index].call_arguments,
                         sizeof(method->statements[statement_index].call_arguments),
                         source_item->source_name, actual_source);
+                    cblc_replace_template_text(method->statements[statement_index].call_arguments,
+                        sizeof(method->statements[statement_index].call_arguments),
+                        source_item->cobol_name, actual_cobol);
                     statement_index += 1;
                 }
             }
@@ -2204,6 +2360,7 @@ static int cblc_materialize_template_constructor_storage(
     while (index < constructor->parameter_count)
     {
         char old_cobol[TRANSPILE_IDENTIFIER_MAX];
+        char old_source[TRANSPILE_IDENTIFIER_MAX];
         char actual_source[TRANSPILE_IDENTIFIER_MAX];
         char actual_cobol[TRANSPILE_IDENTIFIER_MAX];
         char normalized_cobol[TRANSPILE_IDENTIFIER_MAX];
@@ -2211,6 +2368,8 @@ static int cblc_materialize_template_constructor_storage(
 
         ft_strlcpy(old_cobol, constructor->parameters[index].cobol_name,
             sizeof(old_cobol));
+        ft_strlcpy(old_source, constructor->parameters[index].source_name,
+            sizeof(old_source));
         if (std::snprintf(actual_source, sizeof(actual_source), "%s__ctor__%s",
                 concrete_type->source_name,
                 constructor->parameters[index].source_name) < 0
@@ -2261,6 +2420,15 @@ static int cblc_materialize_template_constructor_storage(
                 cblc_replace_template_text(constructor->statements[statement_index].call_arguments,
                     sizeof(constructor->statements[statement_index].call_arguments), old_cobol,
                     actual_cobol);
+                cblc_replace_template_text(constructor->statements[statement_index].target,
+                    sizeof(constructor->statements[statement_index].target), old_source,
+                    actual_source);
+                cblc_replace_template_text(constructor->statements[statement_index].source,
+                    sizeof(constructor->statements[statement_index].source), old_source,
+                    actual_source);
+                cblc_replace_template_text(constructor->statements[statement_index].call_arguments,
+                    sizeof(constructor->statements[statement_index].call_arguments), old_source,
+                    actual_source);
                 statement_index += 1;
             }
         }
@@ -2288,7 +2456,7 @@ struct s_cblc_template_depth_guard
                 >= unit->template_max_instantiation_depth)
         {
             cblc_record_template_parse_error(unit,
-                TRANSPILE_ERROR_TEMPLATE_INSTANTIATION_FAILED,
+                TRANSPILE_ERROR_TEMPLATE_DEPTH_EXCEEDED,
                 "template instantiation depth exceeded");
             return ;
         }
@@ -2384,6 +2552,16 @@ static const t_cblc_struct_type *cblc_instantiate_template_struct_arguments(
             concrete_source_name, sizeof(concrete_source_name), concrete_cobol_name,
             sizeof(concrete_cobol_name)) != FT_SUCCESS)
         return (NULL);
+    if (cblc_template_instance_names_available(unit, concrete_source_name,
+            concrete_cobol_name) != FT_SUCCESS)
+    {
+        cblc_record_template_instantiation_error(unit,
+            TRANSPILE_ERROR_TEMPLATE_NAME_COLLISION,
+            "template specialization name collision", template_name,
+            argument_key, cblc_template_definition_offset(unit, template_name, 1),
+            static_cast<size_t>(-1));
+        return (NULL);
+    }
     if (unit->struct_type_count >= unit->struct_type_capacity
         && cblc_translation_unit_ensure_struct_capacity(unit,
             unit->struct_type_capacity == 0 ? 2 : unit->struct_type_capacity * 2) != FT_SUCCESS)
@@ -2725,9 +2903,72 @@ static int cblc_template_arguments_to_key(
             ft_strlcat(key, "__", key_size);
         if (cblc_template_argument_mangle_key(arguments[index], component,
                 sizeof(component)) != FT_SUCCESS)
-            return (FT_FAILURE);
+            return (cblc_template_arguments_hash_key(arguments, argument_count,
+                key, key_size));
         ft_strlcat(key, component, key_size);
         if (std::strlen(key) >= key_size - 1)
+            return (cblc_template_arguments_hash_key(arguments, argument_count,
+                key, key_size));
+        index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+static int cblc_template_arguments_hash_key(
+    const char arguments[][TRANSPILE_IDENTIFIER_MAX], size_t argument_count,
+    char *key, size_t key_size)
+{
+    const unsigned long long offset_basis = 14695981039346656037ULL;
+    const unsigned long long prime = 1099511628211ULL;
+    unsigned long long hash;
+    size_t index;
+    const char *cursor;
+
+    if (!arguments || argument_count == 0 || !key || key_size == 0)
+        return (FT_FAILURE);
+    hash = offset_basis;
+    index = 0;
+    while (index < argument_count)
+    {
+        cursor = arguments[index];
+        while (*cursor != '\0')
+        {
+            hash ^= static_cast<unsigned char>(*cursor);
+            hash *= prime;
+            cursor += 1;
+        }
+        /* Delimit adjacent arguments so different tuples do not share the input. */
+        hash ^= 0xFFU;
+        hash *= prime;
+        index += 1;
+    }
+    if (std::snprintf(key, key_size, "H%016llX", hash) < 0
+        || std::strlen(key) >= key_size)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int cblc_template_instance_names_available(
+    const t_cblc_translation_unit *unit, const char *source_name,
+    const char *cobol_name)
+{
+    size_t index;
+
+    if (!unit || !source_name || !cobol_name)
+        return (FT_FAILURE);
+    index = 0;
+    while (index < unit->struct_type_count)
+    {
+        if (std::strcmp(unit->struct_types[index].source_name, source_name) == 0
+            || std::strcmp(unit->struct_types[index].cobol_name, cobol_name) == 0)
+            return (FT_FAILURE);
+        index += 1;
+    }
+    index = 0;
+    while (index < unit->function_count)
+    {
+        if (std::strcmp(unit->functions[index].source_name, source_name) == 0
+            || std::strcmp(unit->functions[index].cobol_name, cobol_name) == 0)
             return (FT_FAILURE);
         index += 1;
     }
@@ -3999,8 +4240,13 @@ static int cblc_parse_template_function_definition(const char **cursor,
     function_index = unit->function_count - 1;
     while (data_scope_base < unit->data_count)
     {
-        unit->data_items[data_scope_base].is_active = 0;
-        unit->data_items[data_scope_base].is_template_item = 1;
+        if (std::strncmp(unit->data_items[data_scope_base].source_name,
+                "__cblc_exception_payload_",
+                sizeof("__cblc_exception_payload_") - 1) != 0)
+        {
+            unit->data_items[data_scope_base].is_active = 0;
+            unit->data_items[data_scope_base].is_template_item = 1;
+        }
         data_scope_base += 1;
     }
     unit->functions[function_index].is_template = 1;
@@ -4259,6 +4505,16 @@ static const t_cblc_function *cblc_instantiate_template_function_arguments(
             concrete_source_name, sizeof(concrete_source_name), concrete_cobol_name,
             sizeof(concrete_cobol_name)) != FT_SUCCESS)
         return (NULL);
+    if (cblc_template_instance_names_available(unit, concrete_source_name,
+            concrete_cobol_name) != FT_SUCCESS)
+    {
+        cblc_record_template_instantiation_error(unit,
+            TRANSPILE_ERROR_TEMPLATE_NAME_COLLISION,
+            "template specialization name collision", template_name,
+            argument_key, cblc_template_definition_offset(unit, template_name, 2),
+            static_cast<size_t>(-1));
+        return (NULL);
+    }
     if (unit->function_count >= unit->function_capacity
         && cblc_translation_unit_ensure_function_capacity(unit,
             unit->function_capacity == 0 ? 2 : unit->function_capacity * 2) != FT_SUCCESS)

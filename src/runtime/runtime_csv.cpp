@@ -55,7 +55,7 @@ int runtime_line_read_fixed(t_runtime_file *file, size_t record_length, t_runtim
             }
             break ;
         }
-        total_read += static_cast<size_t>(chunk);
+        total_read += chunk;
     }
     buffer[total_read] = '\0';
     if (runtime_string_assign(destination, buffer) != FT_SUCCESS)

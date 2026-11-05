@@ -1,13 +1,14 @@
 template <typename T>
 class vector
 {
-    public:
+    private:
     T *data;
     T *relocation;
     int count;
     int reserved;
     int relocation_index;
 
+    public:
     vector()
     {
         data = NULL;
@@ -26,12 +27,28 @@ class vector
         relocation_index = 0;
         if (reserved > 0)
         {
-            data = new T[reserved];
-            while (relocation_index < count)
+            try
             {
-                data[relocation_index] = source.data[relocation_index];
-                relocation_index = relocation_index + 1;
+                relocation = new T[reserved];
+                while (relocation_index < count)
+                {
+                    relocation[relocation_index] = source.data[relocation_index];
+                    relocation_index = relocation_index + 1;
+                }
             }
+            catch (...)
+            {
+                if (relocation != NULL)
+                {
+                    delete[] relocation;
+                }
+                relocation = NULL;
+                relocation_index = 0;
+                throw;
+            }
+            data = relocation;
+            relocation = NULL;
+            relocation_index = 0;
         }
     }
 
@@ -41,11 +58,24 @@ class vector
         relocation_index = 0;
         if (source.reserved > 0)
         {
-            relocation = new T[source.reserved];
-            while (relocation_index < source.count)
+            try
             {
-                relocation[relocation_index] = source.data[relocation_index];
-                relocation_index = relocation_index + 1;
+                relocation = new T[source.reserved];
+                while (relocation_index < source.count)
+                {
+                    relocation[relocation_index] = source.data[relocation_index];
+                    relocation_index = relocation_index + 1;
+                }
+            }
+            catch (...)
+            {
+                if (relocation != NULL)
+                {
+                    delete[] relocation;
+                }
+                relocation = NULL;
+                relocation_index = 0;
+                throw;
             }
         }
         if (data != NULL)
@@ -91,14 +121,34 @@ class vector
 
     void reserve(int requested)
     {
+        if (requested < 0)
+        {
+            invalid_argument error;
+            error.code = 1;
+            throw error;
+        }
         if (requested > reserved && requested > 0)
         {
-            relocation = new T[requested];
+            relocation = NULL;
             relocation_index = 0;
-            while (relocation_index < count)
+            try
             {
-                relocation[relocation_index] = data[relocation_index];
-                relocation_index = relocation_index + 1;
+                relocation = new T[requested];
+                while (relocation_index < count)
+                {
+                    relocation[relocation_index] = data[relocation_index];
+                    relocation_index = relocation_index + 1;
+                }
+            }
+            catch (...)
+            {
+                if (relocation != NULL)
+                {
+                    delete[] relocation;
+                }
+                relocation = NULL;
+                relocation_index = 0;
+                throw;
             }
             delete[] data;
             data = relocation;
@@ -152,12 +202,26 @@ class vector
             }
             else
             {
-                relocation = new T[count];
+                relocation = NULL;
                 relocation_index = 0;
-                while (relocation_index < count)
+                try
                 {
-                    relocation[relocation_index] = data[relocation_index];
-                    relocation_index = relocation_index + 1;
+                    relocation = new T[count];
+                    while (relocation_index < count)
+                    {
+                        relocation[relocation_index] = data[relocation_index];
+                        relocation_index = relocation_index + 1;
+                    }
+                }
+                catch (...)
+                {
+                    if (relocation != NULL)
+                    {
+                        delete[] relocation;
+                    }
+                    relocation = NULL;
+                    relocation_index = 0;
+                    throw;
                 }
                 delete[] data;
                 data = relocation;
@@ -179,10 +243,13 @@ class vector
 
     void pop_back()
     {
-        if (count > 0)
+        if (count <= 0)
         {
-            count = count - 1;
+            out_of_range error;
+            error.code = 1;
+            throw error;
         }
+        count = count - 1;
     }
 
     T& at(int index)
@@ -229,13 +296,11 @@ class vector
     {
         int shift;
 
-        if (index < 0)
+        if (index < 0 || index > count)
         {
-            index = 0;
-        }
-        if (index > count)
-        {
-            index = count;
+            out_of_range error;
+            error.code = 1;
+            throw error;
         }
         if (count >= reserved)
         {
@@ -255,16 +320,19 @@ class vector
     {
         int shift;
 
-        if (index >= 0 && index < count)
+        if (index < 0 || index >= count)
         {
-            shift = index;
-            while (shift < count - 1)
-            {
-                data[shift] = data[shift + 1];
-                shift = shift + 1;
-            }
-            count = count - 1;
+            out_of_range error;
+            error.code = 1;
+            throw error;
         }
+        shift = index;
+        while (shift < count - 1)
+        {
+            data[shift] = data[shift + 1];
+            shift = shift + 1;
+        }
+        count = count - 1;
     }
 
 
@@ -277,7 +345,9 @@ class vector
     {
         if (requested < 0)
         {
-            requested = 0;
+            invalid_argument error;
+            error.code = 1;
+            throw error;
         }
         if (requested > reserved)
         {
@@ -295,7 +365,9 @@ class vector
     {
         if (requested < 0)
         {
-            requested = 0;
+            invalid_argument error;
+            error.code = 1;
+            throw error;
         }
         if (requested > reserved)
         {

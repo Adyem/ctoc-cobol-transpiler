@@ -2,6 +2,8 @@
 
 #include "compatibility/memory_compat.hpp"
 
+#include <string>
+
 FT_TEST(test_standard_library_migrated_helpers_use_direct_returns)
 {
     static const char *program_names[] = {
@@ -1558,6 +1560,185 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_custom_template_reference_return_emits_cobol)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "template <typename T> class box { public: T value; T& get() { return value; } };\n"
+        "box<int> item; box<box<int>> nested; int result;\n"
+        "void main() { result = item.get(); result = nested.get().get(); return; }\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: custom template reference-return fixture should parse (%s)\n",
+            unit.parse_error_message);
+        goto cleanup;
+    }
+    if (cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS || !generated_cobol)
+    {
+        std::printf("Assertion failed: custom template reference-return method should emit COBOL\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "COMPUTE RESULT = ITEM-VALUE.",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: reference-return lowering should read the concrete template field\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "CBLC-SPTR-CBLC-METHOD-RESULT",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: chained class-reference calls should materialize their intermediate receiver\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_vector_custom_template_reference_chain_emits_cobol)
+{
+    t_cblc_translation_unit unit;
+    const char *errors_source;
+    const char *vector_source;
+    std::string source;
+    char *generated_cobol;
+    int status;
+
+    errors_source = transpiler_standard_library_get_native_source("CBLC-ERRORS");
+    vector_source = transpiler_standard_library_get_native_source("CBLC-VECTOR");
+    if (!errors_source || !vector_source)
+        return (FT_FAILURE);
+    source = errors_source;
+    source += "\n";
+    source += vector_source;
+    source += "\ntemplate <typename T> class box { public: T value; T& get() { return value; } };\n";
+    source += "vector<box<vector<box<int>>>> items; int result;\n";
+    source += "void main() { result = items.at(0).get().at(0).get(); return; }\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source.c_str(), &unit) != FT_SUCCESS
+        || cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
+        || !generated_cobol)
+    {
+        std::printf("Assertion failed: vector-to-custom-template reference chain should emit COBOL (%s)\n",
+            unit.parse_error_message);
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "CBLC-METHOD-RESULT", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: vector-to-custom-template chain should materialize the element reference\n");
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "CBLC-METHOD-CBLC-SPTR-CBLC-METHOD-RESULT",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "CHECK-INDEX", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: nested checked access should dispatch through the based receiver method\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_vector_bounds_errors_emit_catch_paths)
+{
+    t_cblc_translation_unit unit;
+    const char *errors_source;
+    const char *vector_source;
+    std::string source;
+    char *generated_cobol;
+    int status;
+
+    errors_source = transpiler_standard_library_get_native_source("CBLC-ERRORS");
+    vector_source = transpiler_standard_library_get_native_source("CBLC-VECTOR");
+    if (!errors_source || !vector_source)
+        return (FT_FAILURE);
+    source = errors_source;
+    source += "\n";
+    source += vector_source;
+    source += "\nvector<int> values; int result;\n";
+    source += "void main() {\n"
+        "    values.push_back(7);\n"
+        "    try { values.insert(-1, 9); }\n"
+        "    catch (out_of_range error) { result = 1; }\n"
+        "    try { values.resize(-1); }\n"
+        "    catch (invalid_argument error) { result = 2; }\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source.c_str(), &unit) != FT_SUCCESS
+        || cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
+        || !generated_cobol)
+    {
+        std::printf("Assertion failed: vector bounds exceptions should lower through catch paths (%s)\n",
+            unit.parse_error_message);
+        goto cleanup;
+    }
+    if (!ft_strnstr(generated_cobol, "CBLC-TRY-MAIN-0-CATCH-0.",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "CBLC-EX-PAYLOAD-OUT-OF-RANGE",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "CBLC-EX-PAYLOAD-INVALID-ARGUMENT",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: invalid vector positions and sizes should retain their typed error payloads\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_vector_representation_fields_are_private)
+{
+    t_cblc_translation_unit unit;
+    const char *errors_source;
+    const char *vector_source;
+    std::string source;
+    int status;
+
+    errors_source = transpiler_standard_library_get_native_source("CBLC-ERRORS");
+    vector_source = transpiler_standard_library_get_native_source("CBLC-VECTOR");
+    if (!errors_source || !vector_source)
+        return (FT_FAILURE);
+    source = errors_source;
+    source += "\n";
+    source += vector_source;
+    source += "\nvector<int> values; int result;\n"
+        "void main() { result = values.count; return; }\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source.c_str(), &unit) != FT_FAILURE
+        || unit.parse_error_message[0] == '\0')
+    {
+        std::printf("Assertion failed: user code must not access vector representation fields\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_template_instantiation_limit_is_deterministic)
 {
     const char *source;
@@ -1679,6 +1860,369 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_mixed_standard_and_user_template_nesting_reaches_depth_16)
+{
+    static const char *template_names[] = {"box", "wrap", "cell", "vector"};
+    t_cblc_translation_unit unit;
+    std::string nested_type;
+    std::string nested_types[17];
+    std::string source;
+    const char *errors_source;
+    const char *vector_source;
+    t_cblc_function *entry_function;
+    int seen_templates[4];
+    size_t layer;
+    size_t statement_index;
+    size_t method_call_count;
+    size_t chain_count;
+    size_t chain_statement_index;
+    size_t chain_layer;
+    char variable_suffix[32];
+    char receiver_cobol_name[TRANSPILE_IDENTIFIER_MAX];
+    int found_call;
+    int status;
+
+    nested_types[0] = "int";
+    nested_type = nested_types[0];
+    layer = 0;
+    while (layer < 16)
+    {
+        nested_type = std::string(template_names[layer % 4]) + "<" + nested_type + ">";
+        layer += 1;
+        nested_types[layer] = nested_type;
+    }
+    errors_source = transpiler_standard_library_get_native_source("CBLC-ERRORS");
+    vector_source = transpiler_standard_library_get_native_source("CBLC-VECTOR");
+    if (!errors_source || !vector_source)
+    {
+        std::printf("Assertion failed: standard template fixtures should be embedded\n");
+        return (FT_FAILURE);
+    }
+    source = errors_source;
+    source += "\n";
+    source += vector_source;
+    source += "\ntemplate <typename T> class box { public: T value; T& get() { return value; } };\n";
+    source += "template <typename T> class wrap { public: T value; T& get() { return value; } };\n";
+    source += "template <typename T> class cell { public: T value; T& get() { return value; } };\n";
+    layer = 1;
+    while (layer <= 16)
+    {
+        std::snprintf(variable_suffix, sizeof(variable_suffix), "%zu", layer);
+        source += nested_types[layer] + " receiver_" + variable_suffix + ";\n";
+        source += nested_types[layer - 1] + " result_" + variable_suffix + ";\n";
+        layer += 1;
+    }
+    source += nested_type + " nested_again;\n";
+    source += "void main() {\n";
+    layer = 1;
+    while (layer <= 16)
+    {
+        std::snprintf(variable_suffix, sizeof(variable_suffix), "%zu", layer);
+        source += "    result_";
+        source += variable_suffix;
+        source += " = receiver_";
+        source += variable_suffix;
+        source += std::strcmp(template_names[(layer - 1) % 4], "vector") == 0
+            ? ".at(0);\n" : ".get();\n";
+        layer += 1;
+    }
+    source += "    result_1 = receiver_16.at(0)";
+    layer = 15;
+    while (layer > 0)
+    {
+        source += std::strcmp(template_names[(layer - 1) % 4], "vector") == 0
+            ? ".at(0)" : ".get()";
+        layer -= 1;
+    }
+    source += ";\n";
+    source += "    result_1 = receiver_16.at(0)";
+    layer = 15;
+    while (layer > 0)
+    {
+        source += std::strcmp(template_names[(layer - 1) % 4], "vector") == 0
+            ? ".at(0)" : ".get()";
+        layer -= 1;
+    }
+    source += ";\n";
+    source += "    return;\n}\n";
+    cblc_translation_unit_init(&unit);
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source.c_str(), &unit) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: mixed standard/user template chain should instantiate at depth 16 (%s)\n",
+            unit.parse_error_message);
+        goto cleanup;
+    }
+    if (unit.template_instantiation_count != 16)
+    {
+        std::printf("Assertion failed: depth-16 chain should retain all 16 specializations\n");
+        goto cleanup;
+    }
+    layer = 0;
+    seen_templates[0] = 0;
+    seen_templates[1] = 0;
+    seen_templates[2] = 0;
+    seen_templates[3] = 0;
+    while (layer < unit.template_instantiation_count)
+    {
+        const t_cblc_template_instantiation *instantiation;
+        size_t template_index;
+
+        instantiation = &unit.template_instantiations[layer];
+        if (instantiation->applied_ref_id >= unit.type_ref_count
+            || unit.type_refs[instantiation->applied_ref_id].kind != CBLC_TYPE_REF_APPLIED
+            || !std::memchr(instantiation->argument_name, '\0',
+                sizeof(instantiation->argument_name)))
+        {
+            std::printf("Assertion failed: every depth-16 specialization needs a bounded applied type identity\n");
+            goto cleanup;
+        }
+        template_index = 0;
+        while (template_index < sizeof(template_names) / sizeof(template_names[0]))
+        {
+            if (std::strcmp(instantiation->template_source_name,
+                    template_names[template_index]) == 0)
+                seen_templates[template_index] = 1;
+            template_index += 1;
+        }
+        if (layer + 1 < unit.template_instantiation_count
+            && unit.template_instantiations[layer + 1].argument_ref_id
+                != instantiation->applied_ref_id)
+        {
+            std::printf("Assertion failed: adjacent nested specializations should preserve structural argument IDs\n");
+            goto cleanup;
+        }
+        layer += 1;
+    }
+    if (!seen_templates[0] || !seen_templates[1] || !seen_templates[2]
+        || !seen_templates[3])
+    {
+        std::printf("Assertion failed: depth-16 chain should instantiate vector and all three custom class templates\n");
+        goto cleanup;
+    }
+    if (unit.entry_function_index >= unit.function_count)
+    {
+        std::printf("Assertion failed: depth-16 dispatch fixture should have an entry function\n");
+        goto cleanup;
+    }
+    entry_function = &unit.functions[unit.entry_function_index];
+    method_call_count = 0;
+    layer = 1;
+    while (layer <= 16)
+    {
+        const char *expected_method;
+
+        std::snprintf(variable_suffix, sizeof(variable_suffix), "%zu", layer);
+        std::snprintf(receiver_cobol_name, sizeof(receiver_cobol_name), "RECEIVER-%s",
+            variable_suffix);
+        expected_method = std::strcmp(template_names[(layer - 1) % 4],
+                "vector") == 0 ? "at" : "get";
+        found_call = 0;
+        statement_index = 0;
+        while (statement_index < entry_function->statement_count)
+        {
+            const t_cblc_statement *statement;
+
+            statement = &entry_function->statements[statement_index];
+            if (statement->type == CBLC_STATEMENT_METHOD_CALL_ASSIGN
+                && std::strcmp(statement->source, receiver_cobol_name) == 0)
+            {
+                if (std::strcmp(statement->call_identifier, expected_method) != 0)
+                {
+                    std::printf("Assertion failed: receiver at layer %zu resolved '%s', expected '%s'\n",
+                        layer, statement->call_identifier, expected_method);
+                    goto cleanup;
+                }
+                found_call = 1;
+            }
+            statement_index += 1;
+        }
+        if (!found_call)
+        {
+            std::printf("Assertion failed: receiver at layer %zu should resolve its concrete accessor call\n",
+                layer);
+            goto cleanup;
+        }
+        method_call_count += 1;
+        layer += 1;
+    }
+    if (method_call_count != 16)
+    {
+        std::printf("Assertion failed: every depth should resolve exactly one concrete accessor call\n");
+        goto cleanup;
+    }
+    method_call_count = 0;
+    statement_index = 0;
+    while (statement_index < entry_function->statement_count)
+    {
+        if (entry_function->statements[statement_index].type
+            == CBLC_STATEMENT_METHOD_CALL_ASSIGN)
+            method_call_count += 1;
+        statement_index += 1;
+    }
+    if (method_call_count != 48)
+    {
+        std::printf("Assertion failed: direct and repeated chained accessors should preserve all 48 dispatch steps\n");
+        goto cleanup;
+    }
+    method_call_count = 0;
+    statement_index = 0;
+    while (statement_index < unit.data_count)
+    {
+        size_t duplicate_index;
+
+        if (std::strncmp(unit.data_items[statement_index].source_name,
+                "__CBLC_METHOD_RESULT_", sizeof("__CBLC_METHOD_RESULT_") - 1) == 0)
+        {
+            duplicate_index = statement_index + 1;
+            while (duplicate_index < unit.data_count)
+            {
+                if (std::strcmp(unit.data_items[statement_index].source_name,
+                        unit.data_items[duplicate_index].source_name) == 0)
+                {
+                    std::printf("Assertion failed: separate chains need distinct intermediate result storage\n");
+                    goto cleanup;
+                }
+                duplicate_index += 1;
+            }
+            method_call_count += 1;
+        }
+        statement_index += 1;
+    }
+    if (method_call_count != 30)
+    {
+        std::printf("Assertion failed: two depth-16 chains should allocate 30 distinct intermediate result slots\n");
+        goto cleanup;
+    }
+    chain_count = 0;
+    statement_index = 0;
+    while (statement_index < entry_function->statement_count)
+    {
+        const t_cblc_statement *first_call;
+
+        first_call = &entry_function->statements[statement_index];
+        if (first_call->type == CBLC_STATEMENT_METHOD_CALL_ASSIGN
+            && std::strcmp(first_call->source, "RECEIVER-16") == 0
+            && std::strcmp(first_call->target, "RESULT-16") != 0)
+        {
+            chain_layer = 16;
+            chain_statement_index = statement_index;
+            while (chain_layer > 0)
+            {
+                const t_cblc_statement *chain_call;
+                const char *expected_method;
+
+                if (chain_statement_index >= entry_function->statement_count)
+                {
+                    std::printf("Assertion failed: every chained dispatch step should have a statement\n");
+                    goto cleanup;
+                }
+                chain_call = &entry_function->statements[chain_statement_index];
+                expected_method = std::strcmp(template_names[(chain_layer - 1) % 4],
+                        "vector") == 0 ? "at" : "get";
+                if (chain_call->type != CBLC_STATEMENT_METHOD_CALL_ASSIGN
+                    || std::strcmp(chain_call->call_identifier, expected_method) != 0
+                    || (chain_layer > 1
+                        && (chain_statement_index + 1 >= entry_function->statement_count
+                            || std::strcmp(chain_call->target,
+                                entry_function->statements[chain_statement_index + 1].source) != 0)))
+                {
+                    std::printf("Assertion failed: chained dispatch should follow concrete receiver types in order\n");
+                    goto cleanup;
+                }
+                chain_statement_index += 1;
+                chain_layer -= 1;
+            }
+            if (std::strcmp(entry_function->statements[chain_statement_index - 1].target,
+                    "RESULT-1") != 0)
+            {
+                std::printf("Assertion failed: deepest chained accessor should assign the requested leaf result\n");
+                goto cleanup;
+            }
+            chain_count += 1;
+            statement_index = chain_statement_index;
+        }
+        else
+            statement_index += 1;
+    }
+    if (chain_count != 2)
+    {
+        std::printf("Assertion failed: both repeated depth-16 chains should retain their complete call order\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_cblc_mixed_standard_and_user_template_nesting_emits_cobol)
+{
+    static const char *template_names[] = {"box", "wrap", "cell", "vector"};
+    t_cblc_translation_unit unit;
+    std::string nested_type;
+    std::string source;
+    const char *errors_source;
+    const char *vector_source;
+    char *generated_cobol;
+    size_t layer;
+    int status;
+
+    nested_type = "int";
+    layer = 0;
+    while (layer < 16)
+    {
+        nested_type = std::string(template_names[layer % 4]) + "<" + nested_type + ">";
+        layer += 1;
+    }
+    errors_source = transpiler_standard_library_get_native_source("CBLC-ERRORS");
+    vector_source = transpiler_standard_library_get_native_source("CBLC-VECTOR");
+    if (!errors_source || !vector_source)
+    {
+        std::printf("Assertion failed: standard template fixtures should be embedded\n");
+        return (FT_FAILURE);
+    }
+    source = errors_source;
+    source += "\n";
+    source += vector_source;
+    source += "\ntemplate <typename T> class box { public: T value; T& get() { return value; } };\n";
+    source += "template <typename T> class wrap { public: T value; T& get() { return value; } };\n";
+    source += "template <typename T> class cell { public: T value; T& get() { return value; } };\n";
+    source += nested_type + " nested; int result;\nvoid main() { result = nested";
+    layer = 16;
+    while (layer > 0)
+    {
+        source += std::strcmp(template_names[(layer - 1) % 4], "vector") == 0
+            ? ".at(0)" : ".get()";
+        layer -= 1;
+    }
+    source += "; return; }\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source.c_str(), &unit) != FT_SUCCESS
+        || unit.template_instantiation_count != 16)
+    {
+        std::printf("Assertion failed: mixed depth-16 layout should instantiate every layer (%s)\n",
+            unit.parse_error_message);
+        goto cleanup;
+    }
+    if (cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
+        || !generated_cobol
+        || !ft_strnstr(generated_cobol, "NESTED", std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "CHECK-INDEX", std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: mixed depth-16 layout should emit COBOL\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_template_instantiation_depth_is_deterministic)
 {
     const char *source;
@@ -1694,6 +2238,7 @@ FT_TEST(test_cblc_template_instantiation_depth_is_deterministic)
     unit.template_instantiation_depth = 1;
     status = FT_FAILURE;
     if (cblc_parse_translation_unit(source, &unit) == FT_SUCCESS
+        || unit.parse_error_code != TRANSPILE_ERROR_TEMPLATE_DEPTH_EXCEEDED
         || std::strcmp(unit.parse_error_message,
             "template instantiation depth exceeded") != 0)
     {
@@ -7966,12 +8511,24 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_template_class_instantiates_members},
         {"cblc_template_method_pointer_return_is_concrete",
             test_cblc_template_method_pointer_return_is_concrete},
+        {"cblc_custom_template_reference_return_emits_cobol",
+            test_cblc_custom_template_reference_return_emits_cobol},
+        {"cblc_vector_custom_template_reference_chain_emits_cobol",
+            test_cblc_vector_custom_template_reference_chain_emits_cobol},
+        {"cblc_vector_bounds_errors_emit_catch_paths",
+            test_cblc_vector_bounds_errors_emit_catch_paths},
+        {"cblc_vector_representation_fields_are_private",
+            test_cblc_vector_representation_fields_are_private},
         {"cblc_template_instantiation_limit_is_deterministic",
             test_cblc_template_instantiation_limit_is_deterministic},
         {"cblc_template_names_are_bounded_and_deterministic",
             test_cblc_template_names_are_bounded_and_deterministic},
         {"cblc_nested_template_type_application",
             test_cblc_nested_template_type_application},
+        {"cblc_mixed_standard_and_user_template_nesting_reaches_depth_16",
+            test_cblc_mixed_standard_and_user_template_nesting_reaches_depth_16},
+        {"cblc_mixed_standard_and_user_template_nesting_emits_cobol",
+            test_cblc_mixed_standard_and_user_template_nesting_emits_cobol},
         {"cblc_template_instantiation_depth_is_deterministic",
             test_cblc_template_instantiation_depth_is_deterministic},
         {"cblc_template_class_constructor_is_concrete",

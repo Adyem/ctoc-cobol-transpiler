@@ -929,15 +929,21 @@ static int cblc_translate_expression_for_cobol(const char *expression, char *buf
             {
                 size_t mapped_index;
 
-                mapped_index = 0;
-                while (token[mapped_index] != '\0'
-                    && mapped_index + 1 < sizeof(mapped))
+                if (std::strcmp(token, "NULL") == 0
+                    || std::strcmp(token, "null") == 0)
+                    ft_strlcpy(mapped, "NULL", sizeof(mapped));
+                else
                 {
-                    mapped[mapped_index] = token[mapped_index] == '_'
-                        ? '-' : token[mapped_index];
-                    mapped_index += 1;
+                    mapped_index = 0;
+                    while (token[mapped_index] != '\0'
+                        && mapped_index + 1 < sizeof(mapped))
+                    {
+                        mapped[mapped_index] = token[mapped_index] == '_'
+                            ? '-' : token[mapped_index];
+                        mapped_index += 1;
+                    }
+                    mapped[mapped_index] = '\0';
                 }
-                mapped[mapped_index] = '\0';
             }
             if (cblc_expression_append(buffer, buffer_size, mapped) != FT_SUCCESS)
                 return (FT_FAILURE);

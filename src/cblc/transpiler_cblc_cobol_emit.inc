@@ -1494,7 +1494,6 @@ static int cblc_emit_method_reference_result(const t_cblc_translation_unit *unit
 {
     const t_cblc_data_item *target_item;
     t_cblc_data_item result_item;
-    t_cblc_statement return_statement;
     char prepared_source[TRANSPILE_STATEMENT_TEXT_MAX];
     char translated_source[TRANSPILE_STATEMENT_TEXT_MAX];
     char line[TRANSPILE_STATEMENT_TEXT_MAX];
@@ -1522,14 +1521,41 @@ static int cblc_emit_method_reference_result(const t_cblc_translation_unit *unit
     }
     if (!target_item)
         return (FT_FAILURE);
-    std::memset(&return_statement, 0, sizeof(return_statement));
-    return_statement.type = CBLC_STATEMENT_RETURN;
-    ft_strlcpy(return_statement.target, assign_target, sizeof(return_statement.target));
-    ft_strlcpy(return_statement.source, source, sizeof(return_statement.source));
     if (cblc_data_kind_is_pointer(target_item->kind))
     {
-        if (cblc_emit_pointer_assignment_statement(unit, &return_statement, builder,
-                line, sizeof(line)) != FT_SUCCESS)
+        if (std::strncmp(source, "CBLC-RESULT-", sizeof("CBLC-RESULT-") - 1) == 0)
+        {
+            if (std::snprintf(line, sizeof(line), "           SET %s TO %s",
+                    assign_target, source) < 0)
+                return (FT_FAILURE);
+            return (cobol_text_builder_append_line(builder, line));
+        }
+        if (cblc_emit_prepare_pointer_element(unit, source, builder, prepared_source,
+                sizeof(prepared_source)) == FT_SUCCESS)
+        {
+            if (std::snprintf(line, sizeof(line),
+                    "           SET %s TO ADDRESS OF %s", assign_target,
+                    prepared_source) < 0)
+                return (FT_FAILURE);
+            return (cobol_text_builder_append_line(builder, line));
+        }
+        {
+            const t_cblc_data_item *source_item;
+
+            source_item = cblc_find_data_item_by_cobol(unit, source);
+            if (source_item && cblc_data_kind_is_pointer(source_item->kind))
+            {
+                if (std::snprintf(line, sizeof(line), "           SET %s TO %s",
+                        assign_target, source_item->cobol_name) < 0)
+                    return (FT_FAILURE);
+                return (cobol_text_builder_append_line(builder, line));
+            }
+        }
+        if (cblc_translate_expression_for_cobol(source, translated_source,
+                sizeof(translated_source)) != FT_SUCCESS
+            || std::snprintf(line, sizeof(line),
+                "           SET %s TO ADDRESS OF %s", assign_target,
+                translated_source) < 0)
             return (FT_FAILURE);
         return (cobol_text_builder_append_line(builder, line));
     }
@@ -1567,7 +1593,8 @@ static int cblc_emit_method_reference_result(const t_cblc_translation_unit *unit
 }
 
 static int cblc_emit_method_body(const t_cblc_translation_unit *unit, const t_cblc_data_item *receiver,
-    const t_cblc_method *method, const char *assign_target, t_cobol_text_builder *builder)
+    const t_cblc_method *method, const char *assign_target,
+    const t_cblc_function *caller, t_cobol_text_builder *builder)
 {
     size_t index;
     int control_flow_depth;
@@ -1684,6 +1711,30 @@ static int cblc_emit_method_body(const t_cblc_translation_unit *unit, const t_cb
         ft_strlcpy(substituted.source, mapped_source, sizeof(substituted.source));
         ft_strlcpy(substituted.call_arguments, mapped_call_arguments,
             sizeof(substituted.call_arguments));
+        {
+            size_t cleanup_index;
+
+            cleanup_index = 0;
+            while (cleanup_index < substituted.exception_cleanup_count)
+            {
+                char cleanup_reference[TRANSPILE_STATEMENT_TEXT_MAX];
+
+                if (cblc_replace_this_prefix(
+                        substituted.exception_cleanup_targets[cleanup_index],
+                        receiver->cobol_name, cleanup_reference,
+                        sizeof(cleanup_reference)) != FT_SUCCESS
+                    || cblc_rewrite_method_parameter_references(method,
+                        cleanup_reference, mapped_target, sizeof(mapped_target))
+                        != FT_SUCCESS
+                    || cblc_rewrite_method_data_references(unit, mapped_target,
+                        cleanup_reference, sizeof(cleanup_reference)) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                ft_strlcpy(substituted.exception_cleanup_targets[cleanup_index],
+                    cleanup_reference,
+                    sizeof(substituted.exception_cleanup_targets[cleanup_index]));
+                cleanup_index += 1;
+            }
+        }
         if (substituted.type == CBLC_STATEMENT_CALL
             || substituted.type == CBLC_STATEMENT_CALL_ASSIGN)
         {
@@ -1821,8 +1872,18 @@ static int cblc_emit_method_body(const t_cblc_translation_unit *unit, const t_cb
             }
             return (FT_SUCCESS);
         }
-        if (cblc_emit_substituted_statement(unit, NULL, &substituted, receiver->cobol_name, builder)
-            != FT_SUCCESS)
+        if ((substituted.type == CBLC_STATEMENT_METHOD_CALL
+            || substituted.type == CBLC_STATEMENT_METHOD_CALL_ASSIGN)
+            && receiver->is_alias
+            && std::strncmp(receiver->cobol_name, "CBLC-SPTR-",
+                sizeof("CBLC-SPTR-") - 1) == 0)
+        {
+            if (cblc_emit_substituted_statement(unit, caller, &substituted,
+                    receiver->cobol_name, builder) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
+        else if (cblc_emit_substituted_statement(unit, NULL, &substituted,
+                receiver->cobol_name, builder) != FT_SUCCESS)
         {
             return (FT_FAILURE);
         }
@@ -1845,12 +1906,18 @@ static int cblc_method_paragraph_name(const t_cblc_data_item *receiver,
 static int cblc_method_is_reusable(const t_cblc_method *method)
 {
     if (!method || !method->has_definition
-        || method->is_copy_assignment
-        || (method->return_reference_kind == CBLC_REFERENCE_NONE
-            && method->return_kind != CBLC_FUNCTION_RETURN_VOID
-            && method->return_kind != CBLC_FUNCTION_RETURN_INT
-            && method->return_kind != CBLC_FUNCTION_RETURN_DOUBLE
-            && method->return_kind != CBLC_FUNCTION_RETURN_STRUCT))
+        || method->is_copy_assignment)
+        return (0);
+    if (method->return_reference_kind != CBLC_REFERENCE_NONE
+        && method->statement_count == 1
+        && method->statements
+        && method->statements[0].type == CBLC_STATEMENT_RETURN)
+        return (0);
+    if (method->return_reference_kind == CBLC_REFERENCE_NONE
+        && method->return_kind != CBLC_FUNCTION_RETURN_VOID
+        && method->return_kind != CBLC_FUNCTION_RETURN_INT
+        && method->return_kind != CBLC_FUNCTION_RETURN_DOUBLE
+        && method->return_kind != CBLC_FUNCTION_RETURN_STRUCT)
         return (0);
     return (1);
 }
@@ -2317,7 +2384,9 @@ static int cblc_emit_method_statement(const t_cblc_translation_unit *unit,
     const char *assign_target;
     t_cblc_data_item prepared_receiver;
     char prepared_receiver_name[TRANSPILE_STATEMENT_TEXT_MAX];
+    char pointer_receiver_reference[TRANSPILE_STATEMENT_TEXT_MAX];
     int prepared_indexed_string;
+    int prepared_struct_pointer_receiver;
 
     if (!unit || !statement || !builder)
         return (FT_FAILURE);
@@ -2334,6 +2403,7 @@ static int cblc_emit_method_statement(const t_cblc_translation_unit *unit,
     else
         return (FT_FAILURE);
     prepared_indexed_string = 0;
+    prepared_struct_pointer_receiver = 0;
     receiver = cblc_find_data_item_by_cobol(unit, receiver_name);
     if (!receiver)
     {
@@ -2918,7 +2988,34 @@ static int cblc_emit_method_statement(const t_cblc_translation_unit *unit,
             return (cobol_text_builder_append_line(builder, "           END-IF."));
         }
     }
-    if (cblc_method_is_reusable(method) && receiver->kind == CBLC_DATA_KIND_STRUCT)
+    if (receiver->kind == CBLC_DATA_KIND_STRUCT_POINTER)
+    {
+        const t_cblc_data_item *based_receiver;
+
+        if (std::snprintf(pointer_receiver_reference, sizeof(pointer_receiver_reference), "*%s",
+                receiver->cobol_name) < 0
+            || cblc_emit_prepare_struct_pointer_value(unit, pointer_receiver_reference, builder,
+                prepared_receiver_name, sizeof(prepared_receiver_name)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        based_receiver = cblc_find_data_item_by_cobol(unit, prepared_receiver_name);
+        if (based_receiver && based_receiver->is_alias
+            && based_receiver->kind == CBLC_DATA_KIND_STRUCT
+            && std::strncmp(based_receiver->struct_type_name,
+                receiver->struct_type_name, sizeof(receiver->struct_type_name)) == 0)
+            receiver = based_receiver;
+        else
+        {
+            prepared_receiver = *receiver;
+            prepared_receiver.kind = CBLC_DATA_KIND_STRUCT;
+            prepared_receiver.is_alias = 1;
+            ft_strlcpy(prepared_receiver.cobol_name, prepared_receiver_name,
+                sizeof(prepared_receiver.cobol_name));
+            receiver = &prepared_receiver;
+            prepared_struct_pointer_receiver = 1;
+        }
+    }
+    if (cblc_method_is_reusable(method) && receiver->kind == CBLC_DATA_KIND_STRUCT
+        && !prepared_struct_pointer_receiver)
     {
         char paragraph_name[TRANSPILE_IDENTIFIER_MAX];
         char result_name[TRANSPILE_IDENTIFIER_MAX];
@@ -2975,7 +3072,8 @@ static int cblc_emit_method_statement(const t_cblc_translation_unit *unit,
     {
         int method_status;
 
-        method_status = cblc_emit_method_body(unit, receiver, method, assign_target, builder);
+        method_status = cblc_emit_method_body(unit, receiver, method, assign_target,
+            caller, builder);
         if (method_status != FT_SUCCESS)
             return (method_status);
         return (method_status);
@@ -3025,7 +3123,8 @@ static int cblc_emit_copy_assignment(const t_cblc_translation_unit *unit,
     {
         int method_status;
 
-        method_status = cblc_emit_method_body(unit, target_item, method, NULL, builder);
+        method_status = cblc_emit_method_body(unit, target_item, method, NULL, NULL,
+            builder);
         return (method_status);
     }
 }
@@ -3175,7 +3274,10 @@ static int cblc_emit_constructor_exception_body(const t_cblc_translation_unit *u
                 sizeof(exception_function.statements[index].target)) != FT_SUCCESS
             || cblc_replace_this_prefix(constructor->statements[index].source,
                 receiver->cobol_name, exception_function.statements[index].source,
-                sizeof(exception_function.statements[index].source)) != FT_SUCCESS)
+                sizeof(exception_function.statements[index].source)) != FT_SUCCESS
+            || cblc_replace_this_prefix(constructor->statements[index].call_arguments,
+                receiver->cobol_name, exception_function.statements[index].call_arguments,
+                sizeof(exception_function.statements[index].call_arguments)) != FT_SUCCESS)
         {
             cma_free(exception_function.statements);
             return (FT_FAILURE);
@@ -3487,6 +3589,29 @@ static int cblc_emit_lifecycle_statement(const t_cblc_translation_unit *unit,
             {
                 return (FT_FAILURE);
             }
+            if (cblc_constructor_has_exception_control(constructor))
+            {
+                char paragraph_name[TRANSPILE_IDENTIFIER_MAX];
+
+                if (cblc_constructor_paragraph_name(item,
+                        static_cast<size_t>(constructor - type->constructors),
+                        paragraph_name, sizeof(paragraph_name)) != FT_SUCCESS
+                    || std::snprintf(line, sizeof(line), "           PERFORM %s.",
+                        paragraph_name) < 0
+                    || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                if (caller)
+                {
+                    t_cblc_statement transfer_statement;
+
+                    transfer_statement = *statement;
+                    transfer_statement.exception_may_throw = 1;
+                    if (cblc_emit_exception_transfer(unit, caller, &transfer_statement,
+                            statement_index, builder) != FT_SUCCESS)
+                        return (FT_FAILURE);
+                }
+                return (FT_SUCCESS);
+            }
             index = 0;
             while (index < constructor->statement_count)
             {
@@ -3731,11 +3856,60 @@ static int cblc_find_enclosing_exception_region(const t_cblc_function *function,
 static int cblc_build_exception_cleanup_paragraph_name(const t_cblc_function *function,
     size_t statement_index, char *buffer, size_t buffer_size)
 {
+    int length;
+
     if (!function || !buffer || buffer_size == 0)
         return (FT_FAILURE);
-    if (std::snprintf(buffer, buffer_size, "CBLC-EX-CLEANUP-%s-%zu",
-            function->cobol_name, statement_index) < 0)
+    length = std::snprintf(buffer, buffer_size, "CBLC-EX-CLEANUP-%s-%zu",
+        function->cobol_name, statement_index);
+    if (length < 0)
         return (FT_FAILURE);
+    if (static_cast<size_t>(length) > 55)
+    {
+        unsigned long long function_hash;
+
+        function_hash = cblc_intrinsic_name_hash(function->cobol_name);
+        length = std::snprintf(buffer, buffer_size, "CBLC-EX-CLEANUP-%016llX-%zu",
+            function_hash, statement_index);
+        if (length < 0 || static_cast<size_t>(length) > 55
+            || static_cast<size_t>(length) >= buffer_size)
+            return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
+static int cblc_build_exception_region_paragraph_name(const t_cblc_function *function,
+    size_t region_id, size_t catch_index, int is_catch, char *buffer,
+    size_t buffer_size)
+{
+    int length;
+
+    if (!function || !buffer || buffer_size == 0)
+        return (FT_FAILURE);
+    if (is_catch)
+        length = std::snprintf(buffer, buffer_size, "CBLC-TRY-%s-%zu-CATCH-%zu",
+            function->cobol_name, region_id, catch_index);
+    else
+        length = std::snprintf(buffer, buffer_size, "CBLC-TRY-%s-%zu-DONE",
+            function->cobol_name, region_id);
+    if (length < 0)
+        return (FT_FAILURE);
+    if (static_cast<size_t>(length) > 55)
+    {
+        unsigned long long function_hash;
+
+        function_hash = cblc_intrinsic_name_hash(function->cobol_name);
+        if (is_catch)
+            length = std::snprintf(buffer, buffer_size,
+                "CBLC-TRY-%016llX-%zu-CATCH-%zu", function_hash,
+                region_id, catch_index);
+        else
+            length = std::snprintf(buffer, buffer_size,
+                "CBLC-TRY-%016llX-%zu-DONE", function_hash, region_id);
+        if (length < 0 || static_cast<size_t>(length) > 55
+            || static_cast<size_t>(length) >= buffer_size)
+            return (FT_FAILURE);
+    }
     return (FT_SUCCESS);
 }
 
@@ -3745,9 +3919,26 @@ static int cblc_emit_exception_transfer(const t_cblc_translation_unit *unit,
 {
     char line[TRANSPILE_STATEMENT_TEXT_MAX];
     char cleanup_name[TRANSPILE_IDENTIFIER_MAX];
+    char region_name[TRANSPILE_IDENTIFIER_MAX];
+    size_t control_depth;
+    size_t scan_index;
 
     if (!unit || !function || !statement || !builder)
         return (FT_FAILURE);
+    control_depth = 0;
+    scan_index = 0;
+    while (scan_index < statement_index && scan_index < function->statement_count)
+    {
+        t_cblc_statement_type type;
+
+        type = function->statements[scan_index].type;
+        if (type == CBLC_STATEMENT_IF_BEGIN || type == CBLC_STATEMENT_WHILE_BEGIN)
+            control_depth += 1;
+        else if ((type == CBLC_STATEMENT_IF_END || type == CBLC_STATEMENT_WHILE_END)
+            && control_depth > 0)
+            control_depth -= 1;
+        scan_index += 1;
+    }
     if (cobol_text_builder_append_line(builder,
             "           IF CBLC-EX-ACTIVE = 'Y'") != FT_SUCCESS)
         return (FT_FAILURE);
@@ -3772,23 +3963,29 @@ static int cblc_emit_exception_transfer(const t_cblc_translation_unit *unit,
     }
     else if (statement->exception_from_catch)
     {
-        if ((statement->exception_to_outer_region
-                ? std::snprintf(line, sizeof(line),
-                    "               GO TO CBLC-TRY-%s-%zu-CATCH-0",
-                    function->cobol_name, statement->exception_region_id)
-                : std::snprintf(line, sizeof(line),
-                    "               GO TO CBLC-TRY-%s-%zu-DONE",
-                    function->cobol_name, statement->exception_region_id)) < 0)
+        if (cblc_build_exception_region_paragraph_name(function,
+                statement->exception_region_id, 0,
+                statement->exception_to_outer_region, region_name,
+                sizeof(region_name)) != FT_SUCCESS
+            || std::snprintf(line, sizeof(line), "               GO TO %s",
+                region_name) < 0)
             return (FT_FAILURE);
     }
-    else if (std::snprintf(line, sizeof(line), "               GO TO CBLC-TRY-%s-%zu-CATCH-0",
-            function->cobol_name, statement->exception_region_id) < 0)
-        return (FT_FAILURE);
+    else
+    {
+        if (cblc_build_exception_region_paragraph_name(function,
+                statement->exception_region_id, 0, 1, region_name,
+                sizeof(region_name)) != FT_SUCCESS
+            || std::snprintf(line, sizeof(line), "               GO TO %s",
+                region_name) < 0)
+            return (FT_FAILURE);
+    }
     if (statement->exception_has_region
         && cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
         return (FT_FAILURE);
     return (cobol_text_builder_append_line(builder,
-        statement->exception_from_catch ? "           END-IF" : "           END-IF."));
+        statement->exception_from_catch || control_depth > 0
+            ? "           END-IF" : "           END-IF."));
 }
 
 static int cblc_emit_file_status_exception(const t_cblc_translation_unit *unit,
@@ -3980,6 +4177,43 @@ static int cblc_emit_allocation_exception(const t_cblc_translation_unit *unit,
     return (FT_SUCCESS);
 }
 
+static int cblc_exception_cleanup_receiver(const t_cblc_translation_unit *unit,
+    const t_cblc_function *function, char *receiver_name, size_t receiver_name_size)
+{
+    static const char *const owner_prefixes[] = {
+        "CBLC-METHOD-", "CBLC-CONSTRUCTOR-"
+    };
+    size_t item_index;
+
+    if (!unit || !function || !receiver_name || receiver_name_size == 0)
+        return (FT_FAILURE);
+    receiver_name[0] = '\0';
+    item_index = 0;
+    while (item_index < unit->data_count)
+    {
+        size_t prefix_index;
+
+        prefix_index = 0;
+        while (prefix_index < sizeof(owner_prefixes) / sizeof(owner_prefixes[0]))
+        {
+            char owner_fragment[TRANSPILE_IDENTIFIER_MAX];
+
+            if (std::snprintf(owner_fragment, sizeof(owner_fragment), "%s%s-",
+                    owner_prefixes[prefix_index],
+                    unit->data_items[item_index].cobol_name) >= 0
+                && std::strstr(function->cobol_name, owner_fragment))
+            {
+                ft_strlcpy(receiver_name, unit->data_items[item_index].cobol_name,
+                    receiver_name_size);
+                return (FT_SUCCESS);
+            }
+            prefix_index += 1;
+        }
+        item_index += 1;
+    }
+    return (FT_FAILURE);
+}
+
 static int cblc_emit_exception_cleanup_paragraphs(const t_cblc_translation_unit *unit,
     const t_cblc_function *function, t_cobol_text_builder *builder)
 {
@@ -3993,6 +4227,7 @@ static int cblc_emit_exception_cleanup_paragraphs(const t_cblc_translation_unit 
         const t_cblc_statement *statement;
         char paragraph_name[TRANSPILE_IDENTIFIER_MAX];
         char line[TRANSPILE_STATEMENT_TEXT_MAX];
+        char receiver_name[TRANSPILE_IDENTIFIER_MAX];
         size_t cleanup_index;
 
         statement = &function->statements[index];
@@ -4019,11 +4254,27 @@ static int cblc_emit_exception_cleanup_paragraphs(const t_cblc_translation_unit 
         while (cleanup_index < statement->exception_cleanup_count)
         {
             t_cblc_statement cleanup_statement;
+            char cleanup_target[TRANSPILE_IDENTIFIER_MAX];
 
             std::memset(&cleanup_statement, 0, sizeof(cleanup_statement));
             cleanup_statement.type = CBLC_STATEMENT_DESTRUCT;
-            ft_strlcpy(cleanup_statement.target,
+            ft_strlcpy(cleanup_target,
                 statement->exception_cleanup_targets[cleanup_index],
+                sizeof(cleanup_target));
+            if (std::strncmp(cleanup_target, "CBLC-THIS",
+                    sizeof("CBLC-THIS") - 1) == 0
+                && cblc_exception_cleanup_receiver(unit, function, receiver_name,
+                    sizeof(receiver_name)) == FT_SUCCESS)
+            {
+                char resolved_target[TRANSPILE_IDENTIFIER_MAX];
+
+                if (cblc_replace_this_prefix(cleanup_target, receiver_name,
+                        resolved_target, sizeof(resolved_target)) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                ft_strlcpy(cleanup_target, resolved_target, sizeof(cleanup_target));
+            }
+            ft_strlcpy(cleanup_statement.target,
+                cleanup_target,
                 sizeof(cleanup_statement.target));
             if (cblc_emit_lifecycle_statement(unit, &cleanup_statement, builder,
                     NULL, static_cast<size_t>(-1))
@@ -4310,11 +4561,11 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
     t_cobol_text_builder *builder, int append_stop_run)
 {
     char line[256];
+    char exception_region_name[TRANSPILE_IDENTIFIER_MAX];
     size_t index;
     int exception_handler_depth;
     int control_flow_depth;
     int emit_return_exit;
-
     if (!unit || !function || !builder)
         return (FT_FAILURE);
     if (std::snprintf(line, sizeof(line), "       %s.", function->cobol_name) < 0)
@@ -4328,8 +4579,10 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
     {
         const t_cblc_statement *statement;
         int skip_append;
+        size_t statement_output_start;
 
         statement = &function->statements[index];
+        statement_output_start = builder->length;
         skip_append = 0;
         emit_return_exit = 0;
         if (statement->type == CBLC_STATEMENT_ASSIGNMENT)
@@ -4634,18 +4887,20 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
         else if (statement->type == CBLC_STATEMENT_TRY_BEGIN)
         {
             if (std::snprintf(line, sizeof(line),
-                    "           MOVE 'N' TO CBLC-EX-ACTIVE.") < 0
+                    "           MOVE 'N' TO CBLC-EX-ACTIVE") < 0
                 || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
                 || cobol_text_builder_append_line(builder,
-                    "           MOVE 'N' TO CBLC-EX-MATCHED.") != FT_SUCCESS)
+                    "           MOVE 'N' TO CBLC-EX-MATCHED") != FT_SUCCESS)
                 return (FT_FAILURE);
             skip_append = 1;
         }
         else if (statement->type == CBLC_STATEMENT_TRY_BODY_END)
         {
-            if (std::snprintf(line, sizeof(line),
-                    "           GO TO CBLC-TRY-%s-%zu-DONE.", function->cobol_name,
-                    statement->exception_region_id) < 0
+            if (cblc_build_exception_region_paragraph_name(function,
+                    statement->exception_region_id, 0, 0,
+                    exception_region_name, sizeof(exception_region_name)) != FT_SUCCESS
+                || std::snprintf(line, sizeof(line), "           GO TO %s.",
+                    exception_region_name) < 0
                 || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
                 return (FT_FAILURE);
             skip_append = 1;
@@ -4667,8 +4922,11 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
                     catch_index += 1;
                 scan_index += 1;
             }
-            if (std::snprintf(line, sizeof(line), "       CBLC-TRY-%s-%zu-CATCH-%zu.",
-                    function->cobol_name, statement->exception_region_id, catch_index) < 0
+            if (cblc_build_exception_region_paragraph_name(function,
+                    statement->exception_region_id, catch_index, 1,
+                    exception_region_name, sizeof(exception_region_name)) != FT_SUCCESS
+                || std::snprintf(line, sizeof(line), "       %s.",
+                    exception_region_name) < 0
                 || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
                 || cobol_text_builder_append_line(builder,
                     "           MOVE 'N' TO CBLC-EX-MATCHED.") != FT_SUCCESS)
@@ -4769,8 +5027,11 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
         }
         else if (statement->type == CBLC_STATEMENT_TRY_END)
         {
-            if (std::snprintf(line, sizeof(line), "       CBLC-TRY-%s-%zu-DONE.",
-                    function->cobol_name, statement->exception_region_id) < 0
+            if (cblc_build_exception_region_paragraph_name(function,
+                    statement->exception_region_id, 0, 0,
+                    exception_region_name, sizeof(exception_region_name)) != FT_SUCCESS
+                || std::snprintf(line, sizeof(line), "       %s.",
+                    exception_region_name) < 0
                 || cobol_text_builder_append_line(builder, line) != FT_SUCCESS
                 || cobol_text_builder_append_line(builder,
                     "           IF CBLC-EX-ACTIVE = 'Y'") != FT_SUCCESS
@@ -4811,19 +5072,25 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
             {
                 if (statement->exception_from_catch)
                 {
-                    if ((statement->exception_to_outer_region
-                            ? std::snprintf(line, sizeof(line),
-                                "           GO TO CBLC-TRY-%s-%zu-CATCH-0",
-                                function->cobol_name, statement->exception_region_id)
-                            : std::snprintf(line, sizeof(line),
-                                "           GO TO CBLC-TRY-%s-%zu-DONE",
-                                function->cobol_name, statement->exception_region_id)) < 0)
+                    if (cblc_build_exception_region_paragraph_name(function,
+                            statement->exception_region_id, 0,
+                            statement->exception_to_outer_region,
+                            exception_region_name,
+                            sizeof(exception_region_name)) != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line), "           GO TO %s",
+                            exception_region_name) < 0)
                         return (FT_FAILURE);
                 }
-                else if (std::snprintf(line, sizeof(line),
-                        "           GO TO CBLC-TRY-%s-%zu-DONE.", function->cobol_name,
-                        statement->exception_region_id) < 0)
-                    return (FT_FAILURE);
+                else
+                {
+                    if (cblc_build_exception_region_paragraph_name(function,
+                            statement->exception_region_id, 0, 0,
+                            exception_region_name,
+                            sizeof(exception_region_name)) != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line), "           GO TO %s.",
+                            exception_region_name) < 0)
+                        return (FT_FAILURE);
+                }
                 if (cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
                     return (FT_FAILURE);
                 skip_append = 1;
@@ -5091,17 +5358,15 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
                 }
                 else
                 {
-                    if ((keep_exception_sentence
-                            ? (statement->exception_to_outer_region
-                                ? std::snprintf(line, sizeof(line),
-                                    "           GO TO CBLC-TRY-%s-%zu-CATCH-0",
-                                    function->cobol_name, statement->exception_region_id)
-                                : std::snprintf(line, sizeof(line),
-                                    "           GO TO CBLC-TRY-%s-%zu-DONE",
-                                    function->cobol_name, statement->exception_region_id))
-                            : std::snprintf(line, sizeof(line),
-                                "           GO TO CBLC-TRY-%s-%zu-CATCH-0.",
-                                function->cobol_name, statement->exception_region_id)) < 0
+                    if (cblc_build_exception_region_paragraph_name(function,
+                            statement->exception_region_id, 0,
+                            statement->exception_from_catch
+                                ? statement->exception_to_outer_region : 1,
+                            exception_region_name,
+                            sizeof(exception_region_name)) != FT_SUCCESS
+                        || std::snprintf(line, sizeof(line), "           GO TO %s%s",
+                            exception_region_name,
+                            keep_exception_sentence ? "" : ".") < 0
                         || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
                         return (FT_FAILURE);
                 }
@@ -5264,7 +5529,9 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
                     || cobol_text_builder_append_line(builder,
                         "                   MOVE 'Y' TO CBLC-EX-ACTIVE") != FT_SUCCESS
                     || cobol_text_builder_append_line(builder,
-                        "           END-COMPUTE.") != FT_SUCCESS
+                        control_flow_depth > 0
+                            ? "           END-COMPUTE"
+                            : "           END-COMPUTE.") != FT_SUCCESS
                     || cblc_emit_exception_transfer(unit, function, &transfer_statement, index,
                         builder)
                         != FT_SUCCESS)
@@ -5743,9 +6010,7 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
             lifecycle_status = cblc_emit_lifecycle_statement(unit, statement, builder,
                 function, index);
             if (lifecycle_status != FT_SUCCESS)
-            {
                 return (FT_FAILURE);
-            }
             skip_append = 1;
         }
         else if (statement->type == CBLC_STATEMENT_METHOD_CALL
@@ -5753,9 +6018,7 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
         {
             if (cblc_emit_method_statement(unit, statement, builder, function, index)
                 != FT_SUCCESS)
-            {
                 return (FT_FAILURE);
-            }
             skip_append = 1;
         }
         else
@@ -5793,6 +6056,39 @@ static int cblc_emit_function(const t_cblc_translation_unit *unit, const t_cblc_
                     ? "           GOBACK" : "           GOBACK.", sizeof(line));
             if (cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
                 return (FT_FAILURE);
+        }
+        if ((control_flow_depth > 0 || exception_handler_depth > 0)
+            && (statement->type == CBLC_STATEMENT_ASSIGNMENT
+                || statement->type == CBLC_STATEMENT_DEFAULT_CONSTRUCT
+                || statement->type == CBLC_STATEMENT_DESTRUCT)
+            && statement->type != CBLC_STATEMENT_TRY_BEGIN
+            && statement->type != CBLC_STATEMENT_TRY_BODY_END
+            && statement->type != CBLC_STATEMENT_TRY_END
+            && statement->type != CBLC_STATEMENT_CATCH_BEGIN
+            && statement->type != CBLC_STATEMENT_CATCH_END
+            && builder->data)
+        {
+            size_t line_start;
+
+            line_start = statement_output_start;
+            while (line_start < builder->length)
+            {
+                size_t line_end;
+                int removed_period;
+
+                line_end = line_start;
+                while (line_end < builder->length && builder->data[line_end] != '\n')
+                    line_end += 1;
+                removed_period = line_end > line_start
+                    && builder->data[line_end - 1] == '.';
+                if (removed_period)
+                {
+                    std::memmove(builder->data + line_end - 1,
+                        builder->data + line_end, builder->length - line_end + 1);
+                    builder->length -= 1;
+                }
+                line_start = line_end + (removed_period ? 0 : 1);
+            }
         }
         index += 1;
     }
@@ -6035,10 +6331,39 @@ static int cblc_emit_method_exception_body(const t_cblc_translation_unit *unit,
                 sizeof(exception_function.statements[index].target)) != FT_SUCCESS
             || cblc_replace_this_prefix(method->statements[index].source,
                 receiver->cobol_name, exception_function.statements[index].source,
-                sizeof(exception_function.statements[index].source)) != FT_SUCCESS)
+                sizeof(exception_function.statements[index].source)) != FT_SUCCESS
+            || cblc_replace_this_prefix(method->statements[index].call_arguments,
+                receiver->cobol_name, exception_function.statements[index].call_arguments,
+                sizeof(exception_function.statements[index].call_arguments)) != FT_SUCCESS)
         {
             cma_free(exception_function.statements);
             return (FT_FAILURE);
+        }
+        {
+            size_t cleanup_index;
+
+            cleanup_index = 0;
+            while (cleanup_index < exception_function.statements[index]
+                    .exception_cleanup_count)
+            {
+                char resolved_target[TRANSPILE_IDENTIFIER_MAX];
+
+                if (cblc_replace_this_prefix(
+                        method->statements[index]
+                            .exception_cleanup_targets[cleanup_index],
+                        receiver->cobol_name, resolved_target,
+                        sizeof(resolved_target)) != FT_SUCCESS)
+                {
+                    cma_free(exception_function.statements);
+                    return (FT_FAILURE);
+                }
+                ft_strlcpy(exception_function.statements[index]
+                        .exception_cleanup_targets[cleanup_index],
+                    resolved_target,
+                    sizeof(exception_function.statements[index]
+                        .exception_cleanup_targets[cleanup_index]));
+                cleanup_index += 1;
+            }
         }
         if (exception_function.statements[index].type == CBLC_STATEMENT_CALL
             || exception_function.statements[index].type == CBLC_STATEMENT_CALL_ASSIGN)
