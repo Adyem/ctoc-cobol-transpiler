@@ -100,6 +100,19 @@ static const t_cblc_data_item *cblc_find_data_item_const(
 
     if (!unit || !identifier)
         return (NULL);
+    /* Lowered statements may deliberately carry an exact COBOL storage name
+     * from typed IR. Resolve that identity before source spelling, which can
+     * be shadowed by constructor/method parameters elsewhere in the unit. */
+    index = unit->data_count;
+    while (index > 0)
+    {
+        index -= 1;
+        if (!unit->data_items[index].is_active
+            || !cblc_scope_is_visible(unit, unit->data_items[index].scope_id))
+            continue ;
+        if (std::strcmp(unit->data_items[index].cobol_name, identifier) == 0)
+            return (&unit->data_items[index]);
+    }
     index = unit->data_count;
     while (index > 0)
     {
@@ -114,6 +127,27 @@ static const t_cblc_data_item *cblc_find_data_item_const(
     return (NULL);
 }
 
+
+static t_cblc_data_item *cblc_find_data_item_by_source_and_cobol(
+    t_cblc_translation_unit *unit, const char *source_name,
+    const char *cobol_name)
+{
+    size_t index;
+
+    if (!unit || !source_name || !cobol_name)
+        return (NULL);
+    index = unit->data_count;
+    while (index > 0)
+    {
+        t_cblc_data_item *item = &unit->data_items[--index];
+
+        if (item->is_alias
+            && std::strcmp(item->source_name, source_name) == 0
+            && std::strcmp(item->cobol_name, cobol_name) == 0)
+            return (item);
+    }
+    return (NULL);
+}
 
 #include "src/cblc/transpiler_cblc_references.inc"
 #include "src/cblc/transpiler_cblc_struct_parse.inc"
@@ -194,8 +228,18 @@ static int cblc_parse_call_argument_list(const char **cursor,
                     argument_length = static_cast<size_t>(argument_end - argument_start);
                     if (argument_length + 1 > sizeof(expression))
                         return (FT_FAILURE);
-                    std::memcpy(expression, argument_start, argument_length);
-                    expression[argument_length] = '\0';
+                    if (argument_item->is_alias && !is_length_reference
+                        && !std::memchr(argument_start, '[', argument_length))
+                    {
+                        if (ft_strlcpy(expression, argument_item->source_name,
+                                sizeof(expression)) >= sizeof(expression))
+                            return (FT_FAILURE);
+                    }
+                    else
+                    {
+                        std::memcpy(expression, argument_start, argument_length);
+                        expression[argument_length] = '\0';
+                    }
                 }
             }
             else
@@ -491,8 +535,17 @@ static int cblc_add_temp_alias_item(t_cblc_translation_unit *unit, const char *s
 
     if (!unit || !source_name || !cobol_name)
         return (FT_FAILURE);
-    if (cblc_find_data_item(unit, source_name))
+    item = cblc_find_data_item_by_source_and_cobol(unit, source_name,
+        cobol_name);
+    if (item)
+    {
+        item->is_active = 1;
+        item->scope_id = unit->active_scope_id;
+        item->scope_depth = unit->scopes
+                && unit->active_scope_id < unit->scope_count
+            ? unit->scopes[unit->active_scope_id].depth : 0;
         return (FT_SUCCESS);
+    }
     if (unit->data_count >= unit->data_capacity)
     {
         if (cblc_translation_unit_ensure_data_capacity(unit,

@@ -91,7 +91,7 @@ static int STANDARD_LIBRARY_TEST_UNUSED test_expect_transcript_double_line(const
 static int STANDARD_LIBRARY_TEST_UNUSED test_expect_transcript_status_line(const char *buffer, size_t *offset,
     const char *expected, const char *message)
 {
-    char line_buffer[32];
+    char line_buffer[128];
 
     if (test_read_transcript_line(buffer, offset, line_buffer, sizeof(line_buffer)) != FT_SUCCESS)
     {

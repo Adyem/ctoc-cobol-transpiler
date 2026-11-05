@@ -75,9 +75,113 @@ static const t_cblc_data_item *cblc_find_method_parameter_storage_by_cobol(
                         return (item);
                 }
             }
+            for (size_t constructor_index = 0;
+                constructor_index < type->constructor_count;
+                ++constructor_index)
+            {
+                const t_cblc_constructor *constructor =
+                    &type->constructors[constructor_index];
+                size_t parameter_index;
+
+                if (!constructor->has_definition)
+                    continue;
+                for (parameter_index = 0;
+                    parameter_index < constructor->parameter_count;
+                    ++parameter_index)
+                {
+                    const t_cblc_parameter *parameter =
+                        &constructor->parameters[parameter_index];
+                    if (parameter->kind
+                            == TRANSPILE_FUNCTION_PARAMETER_STRUCT
+                        && std::strcmp(parameter->cobol_name, cobol_name) == 0
+                        && std::strcmp(parameter->type_name,
+                            item->struct_type_name) == 0
+                        && (parameter->actual_source_name[0] == '\0'
+                            || std::strcmp(parameter->actual_source_name,
+                                item->source_name) == 0))
+                        return (item);
+                }
+            }
+        }
+        /* By-value class parameters of free functions have owned storage too.
+         * They need the same reusable lifecycle/method paragraphs as method
+         * parameters; otherwise calls from the function body reference
+         * paragraphs that were never emitted. */
+        for (size_t function_index = 0;
+            function_index < unit->function_count; ++function_index)
+        {
+            const t_cblc_function *function = &unit->functions[function_index];
+            for (size_t parameter_index = 0;
+                parameter_index < function->parameter_count; ++parameter_index)
+            {
+                const t_cblc_parameter *parameter =
+                    &function->parameters[parameter_index];
+                if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_STRUCT
+                    && std::strcmp(parameter->cobol_name, cobol_name) == 0
+                    && std::strcmp(parameter->type_name,
+                        item->struct_type_name) == 0
+                    && (parameter->actual_source_name[0] == '\0'
+                        || std::strcmp(parameter->actual_source_name,
+                            item->source_name) == 0))
+                    return (item);
+            }
         }
     }
     return (NULL);
+}
+
+static int cblc_is_owned_method_parameter_storage(
+    const t_cblc_translation_unit *unit, const t_cblc_data_item *item)
+{
+    if (!unit || !item || !item->is_alias
+        || item->kind != CBLC_DATA_KIND_STRUCT
+        || std::strchr(item->source_name, '.')
+        || std::strstr(item->source_name, "->"))
+        return (0);
+    for (size_t type_index = 0; type_index < unit->struct_type_count;
+        ++type_index)
+    {
+        const t_cblc_struct_type *type = &unit->struct_types[type_index];
+
+        for (size_t method_index = 0; method_index < type->method_count;
+            ++method_index)
+        {
+            const t_cblc_method *method = &type->methods[method_index];
+
+            for (size_t parameter_index = 0;
+                parameter_index < method->parameter_count; ++parameter_index)
+            {
+                const t_cblc_parameter *parameter =
+                    &method->parameters[parameter_index];
+
+                if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_STRUCT
+                    && std::strcmp(parameter->cobol_name, item->cobol_name) == 0
+                    && std::strcmp(parameter->type_name,
+                        item->struct_type_name) == 0)
+                    return (1);
+            }
+        }
+        for (size_t constructor_index = 0;
+            constructor_index < type->constructor_count; ++constructor_index)
+        {
+            const t_cblc_constructor *constructor =
+                &type->constructors[constructor_index];
+
+            for (size_t parameter_index = 0;
+                parameter_index < constructor->parameter_count; ++parameter_index)
+            {
+                const t_cblc_parameter *parameter =
+                    &constructor->parameters[parameter_index];
+
+                if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_STRUCT
+                    && std::strcmp(parameter->cobol_name, item->cobol_name) == 0
+                    && std::strcmp(parameter->type_name,
+                        item->struct_type_name) == 0)
+                    return (1);
+            }
+        }
+    }
+    return (0);
 }
 
 static const t_cblc_data_item *cblc_find_data_item_for_emit_by_source(
@@ -88,6 +192,16 @@ static const t_cblc_data_item *cblc_find_data_item_for_emit_by_source(
 
     if (!unit || !identifier)
         return (NULL);
+    index = unit->data_count;
+    while (index > 0)
+    {
+        index -= 1;
+        if (std::strcmp(unit->data_items[index].cobol_name, identifier) == 0
+            && (unit->data_items[index].is_active
+                || (unit->data_items[index].is_function_local
+                    && !unit->data_items[index].is_alias)))
+            return (&unit->data_items[index]);
+    }
     inactive_alias = NULL;
     index = unit->data_count;
     while (index > 0)
@@ -1414,7 +1528,8 @@ static int cblc_parse_data_reference_text(const char **cursor, t_cblc_translatio
             if (std::snprintf(reference_text, sizeof(reference_text), "%s->%s",
                     item->cobol_name, member_identifier) < 0)
                 return (FT_FAILURE);
-            if (!cblc_find_data_item(unit, field_source_name))
+            if (!cblc_find_data_item_by_source_and_cobol(unit,
+                    field_source_name, reference_text))
             {
                 const char *field_struct_type;
                 const t_cblc_struct_type *nested_type;
@@ -1436,7 +1551,8 @@ static int cblc_parse_data_reference_text(const char **cursor, t_cblc_translatio
                         return (FT_FAILURE);
                 }
             }
-            item = cblc_find_data_item(unit, field_source_name);
+            item = cblc_find_data_item_by_source_and_cobol(unit,
+                field_source_name, reference_text);
             if (!item)
                 return (FT_FAILURE);
             has_index = 0;
@@ -1495,7 +1611,8 @@ static int cblc_parse_data_reference_text(const char **cursor, t_cblc_translatio
                 if (std::snprintf(field_cobol_name, sizeof(field_cobol_name), "%s.%s",
                         reference_text, member_identifier) < 0)
                     return (FT_FAILURE);
-                if (!cblc_find_data_item(unit, field_source_name))
+                if (!cblc_find_data_item_by_source_and_cobol(unit,
+                        field_source_name, field_cobol_name))
                 {
                     field_struct_type = NULL;
                     if (field->struct_type_name[0] != '\0')
@@ -1514,7 +1631,8 @@ static int cblc_parse_data_reference_text(const char **cursor, t_cblc_translatio
                             return (FT_FAILURE);
                     }
                 }
-                item = cblc_find_data_item(unit, field_source_name);
+                item = cblc_find_data_item_by_source_and_cobol(unit,
+                    field_source_name, field_cobol_name);
                 if (!item)
                     return (FT_FAILURE);
                 ft_strlcpy(reference_text, item->cobol_name, sizeof(reference_text));

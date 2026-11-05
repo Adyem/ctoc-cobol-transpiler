@@ -130,9 +130,16 @@ static int cblc_parse_char_const_initializer(const char **cursor, char *buffer, 
 static int cblc_parse_int_const_initializer(const char **cursor, char *buffer, size_t buffer_size)
 {
     size_t literal_value;
+    int boolean_value;
 
     if (!cursor || !*cursor || !buffer || buffer_size == 0)
         return (FT_FAILURE);
+    if (cblc_parse_boolean_literal(cursor, &boolean_value) == FT_SUCCESS)
+    {
+        if (std::snprintf(buffer, buffer_size, "%d", boolean_value) < 0)
+            return (FT_FAILURE);
+        return (FT_SUCCESS);
+    }
     if (cblc_parse_numeric_literal(cursor, &literal_value) != FT_SUCCESS)
         return (FT_FAILURE);
     if (std::snprintf(buffer, buffer_size, "%zu", literal_value) < 0)

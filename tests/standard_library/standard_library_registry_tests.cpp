@@ -1,5 +1,7 @@
 #include "standard_library_test_support.hpp"
 
+#include "../compiler/cobol/round_trip_pipeline_helpers.hpp"
+
 FT_TEST(test_standard_library_lookup_enforces_std_prefix)
 {
     const t_transpiler_standard_library_entry *entry;
@@ -259,7 +261,9 @@ FT_TEST(test_standard_library_string_class_generates_from_cblc)
         "int parse_int()",
         "double parse_double()",
         "void toupper()",
-        "void tolower()"
+        "void tolower()",
+        "void to_upper_ascii()",
+        "void to_lower_ascii()"
     };
     const char *string_source;
     const char *errors_source;
@@ -658,6 +662,62 @@ FT_TEST(test_standard_library_string_ascii_case_insensitive_compare)
         || !std::strstr(generated, "CBLC-EX-RAISING"))
     {
         std::printf("Assertion failed: equals_ignore_case_ascii should lower as a native byte-wise string method\n");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated)
+        cma_free(generated);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_standard_library_string_ascii_named_mutators_resolve)
+{
+    const char *source =
+        "void main() {\n"
+        "    string original(\"MiXeD\");\n"
+        "    original.to_upper_ascii();\n"
+        "    original.to_lower_ascii();\n"
+        "}\n";
+    t_cblc_translation_unit unit;
+    char *generated = NULL;
+    const char *string_native =
+        transpiler_standard_library_get_native_source("CBLC-STRING");
+    const char *upper_mutator = string_native
+        ? std::strstr(string_native, "void to_upper_ascii()") : NULL;
+    const char *lower_mutator = string_native
+        ? std::strstr(string_native, "void to_lower_ascii()") : NULL;
+    int status = FT_FAILURE;
+    int diagnostic_code = 0;
+    char diagnostic_message[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX] = {};
+
+    if (!upper_mutator || !lower_mutator
+        || !std::strstr(upper_mutator, "toupper();")
+        || !std::strstr(lower_mutator, "tolower();"))
+    {
+        std::printf("ASCII-named mutators must delegate to the established ASCII implementation\n");
+        return (FT_FAILURE);
+    }
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("ASCII case-mutator source parse diagnostic: %s\n",
+            unit.parse_error_message);
+        goto cleanup;
+    }
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated,
+            &diagnostic_code, diagnostic_message,
+            sizeof(diagnostic_message)) != FT_SUCCESS || !generated)
+    {
+        std::printf("ASCII case-mutator COBOL generation failed (%d): %s\n",
+            diagnostic_code, diagnostic_message);
+        goto cleanup;
+    }
+    if (!std::strstr(generated, "TO-UPPER-ASCII")
+        || !std::strstr(generated, "TO-LOWER-ASCII"))
+    {
+        std::printf("ASCII case mutators were not emitted as resolved native class calls\n");
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -1633,6 +1693,99 @@ cleanup:
     if (generated)
         cma_free(generated);
     cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
+FT_TEST(test_standard_library_string_push_codepoint_compiles_and_executes)
+{
+    t_cblc_translation_unit unit;
+    char directory[256];
+    char source_path[256];
+    char binary_path[256];
+    char output_path[256];
+    char compile_log_path[256];
+    char output[256];
+    char *generated;
+    const char *source;
+    size_t output_offset;
+    int status;
+
+    FT_REQUIRE_COBC();
+    source = "int scalar;\nint byte_count;\nint codepoint_value;\n"
+        "void main() {\n"
+        "    string text(1);\n"
+        "    scalar = 233;\n"
+        "    text.push_codepoint(scalar);\n"
+        "    byte_count = text.byte_length();\n"
+        "    codepoint_value = text.codepoint_at(0);\n"
+        "    display(byte_count);\n"
+        "    display(codepoint_value);\n"
+        "    display(\"STRING CODEPOINT PASS\");\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated = NULL;
+    directory[0] = '\0';
+    source_path[0] = '\0';
+    binary_path[0] = '\0';
+    output_path[0] = '\0';
+    compile_log_path[0] = '\0';
+    status = FT_FAILURE;
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("string push_codepoint parse failed: %s\n",
+            unit.parse_error_message);
+        goto cleanup;
+    }
+    if (cblc_generate_cobol(&unit, &generated) != FT_SUCCESS)
+    {
+        std::printf("string push_codepoint COBOL emission failed\n");
+        goto cleanup;
+    }
+    if (transpiler_validate_generated_cobol(generated) != FT_SUCCESS)
+    {
+        std::printf("string push_codepoint generated COBOL failed structural validation\n");
+        goto cleanup;
+    }
+    if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS
+        || test_join_path(directory, "string_codepoint.cob", source_path,
+            sizeof(source_path)) != FT_SUCCESS
+        || test_join_path(directory, "string_codepoint.bin", binary_path,
+            sizeof(binary_path)) != FT_SUCCESS
+        || test_join_path(directory, "string_codepoint.txt", output_path,
+            sizeof(output_path)) != FT_SUCCESS
+        || test_join_path(directory, "string_codepoint_compile.txt",
+            compile_log_path, sizeof(compile_log_path)) != FT_SUCCESS
+        || test_write_text_file(source_path, generated) != FT_SUCCESS)
+        goto cleanup;
+    if (compile_generated_cobol(binary_path, source_path, compile_log_path,
+            "GnuCOBOL should compile string push_codepoint lowering")
+        != FT_SUCCESS
+        || execute_binary(directory, "string_codepoint.bin",
+            "string_codepoint.txt",
+            "string push_codepoint program should execute") != FT_SUCCESS
+        || test_read_text_file(output_path, output, sizeof(output)) != FT_SUCCESS)
+        goto cleanup;
+    output_offset = 0;
+    if (test_expect_transcript_double_line(output, &output_offset, 2,
+            g_default_float_tolerance,
+            "UTF-8 push_codepoint should append two bytes") != FT_SUCCESS
+        || test_expect_transcript_double_line(output, &output_offset, 233,
+            g_default_float_tolerance,
+            "UTF-8 push_codepoint should preserve its scalar") != FT_SUCCESS
+        || test_expect_transcript_status_line(output, &output_offset,
+            "STRING CODEPOINT PASS",
+            "string codepoint runtime marker") != FT_SUCCESS
+        || test_expect_transcript_complete(output, output_offset,
+            "string codepoint runtime should have no trailing output")
+            != FT_SUCCESS)
+        goto cleanup;
+    status = FT_SUCCESS;
+cleanup:
+    if (generated)
+        cma_free(generated);
+    cblc_translation_unit_dispose(&unit);
+    if (directory[0] != '\0')
+        test_remove_directory(directory);
     return (status);
 }
 

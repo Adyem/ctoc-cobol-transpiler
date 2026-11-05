@@ -6,6 +6,7 @@
 
 #include "round_trip_pipeline_helpers.hpp"
 
+#include <cstdlib>
 #include <string>
 
 static int run_inline_cblc_to_cobol_execution_test(const char *source,
@@ -21,10 +22,13 @@ static int run_inline_cblc_to_cobol_execution_test(const char *source,
     char compile_log_path[256];
     char output_path[256];
     char output_buffer[512];
+    char validation_diagnostic[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    char generation_diagnostic[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
     char *generated_cobol;
     const char *log_path;
     int status;
     int directory_created;
+    int generation_diagnostic_code;
 
     FT_REQUIRE_COBC();
     FT_REQUIRE_FORWARD_TRANSLATION();
@@ -37,20 +41,102 @@ static int run_inline_cblc_to_cobol_execution_test(const char *source,
     output_path[0] = '\0';
     log_path = NULL;
     directory_created = 0;
+    validation_diagnostic[0] = '\0';
+    generation_diagnostic[0] = '\0';
+    generation_diagnostic_code = 0;
     status = FT_FAILURE;
     if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
     {
-        if (unit.parse_error_message[0] != '\0')
-            std::printf("CBL-C parser diagnostic: %s\n", unit.parse_error_message);
+        std::printf("CBL-C parser diagnostic (%d): %s\n",
+            unit.parse_error_code, unit.parse_error_message);
         test_expect_success(FT_FAILURE, "inline CBL-C sample should parse");
         goto cleanup;
     }
-    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
-            "inline CBL-C sample should convert to COBOL") != FT_SUCCESS)
-        goto cleanup;
-    if (transpiler_validate_generated_cobol(generated_cobol) != FT_SUCCESS)
+    if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &generation_diagnostic_code, generation_diagnostic,
+            sizeof(generation_diagnostic)) != FT_SUCCESS)
     {
-        std::printf("Assertion failed: inline generated COBOL should validate\n");
+        std::printf("COBOL generation diagnostic (%d): %s\n",
+            generation_diagnostic_code, generation_diagnostic);
+        test_expect_success(FT_FAILURE,
+            "inline CBL-C sample should convert to COBOL");
+        goto cleanup;
+    }
+    if (transpiler_validate_generated_cobol_with_diagnostic(generated_cobol,
+            validation_diagnostic, sizeof(validation_diagnostic)) != FT_SUCCESS)
+    {
+        std::printf("Assertion failed: inline generated COBOL should validate: %s\n",
+            validation_diagnostic[0] != '\0' ? validation_diagnostic
+                : "validator returned no diagnostic");
+        if (std::strncmp(validation_diagnostic, "duplicate paragraph '",
+                std::strlen("duplicate paragraph '") - 1) == 0)
+        {
+            const char *name_start = std::strchr(validation_diagnostic, '\'');
+            const char *name_end = name_start ? std::strchr(name_start + 1, '\'') : NULL;
+            char duplicate_name[TRANSPILE_IDENTIFIER_MAX];
+
+            if (name_start && name_end
+                && static_cast<size_t>(name_end - name_start - 1)
+                    < sizeof(duplicate_name))
+            {
+                size_t name_length = static_cast<size_t>(name_end - name_start - 1);
+                std::memcpy(duplicate_name, name_start + 1, name_length);
+                duplicate_name[name_length] = '\0';
+                size_t generated_line = 1;
+                for (const char *cursor = generated_cobol;
+                    cursor && *cursor != '\0'; ++cursor)
+                {
+                    if (cursor == generated_cobol || cursor[-1] == '\n')
+                    {
+                        const char *line_content = cursor;
+
+                        while (*line_content == ' ' || *line_content == '\t')
+                            ++line_content;
+                        if (std::strncmp(line_content, duplicate_name,
+                                name_length) == 0
+                            && (line_content[name_length] == '.'
+                                || line_content[name_length] == ' '))
+                            std::printf("Duplicate paragraph occurrence at generated line %zu\n",
+                                generated_line);
+                        ++generated_line;
+                    }
+                }
+            }
+        }
+        if (std::strncmp(validation_diagnostic, "unresolved PERFORM target '",
+                std::strlen("unresolved PERFORM target '") - 1) == 0)
+        {
+            const char *name_start = std::strchr(validation_diagnostic, '\'');
+            const char *name_end = name_start ? std::strchr(name_start + 1, '\'') : NULL;
+            char missing_target[TRANSPILE_IDENTIFIER_MAX];
+
+            if (name_start && name_end
+                && static_cast<size_t>(name_end - name_start - 1)
+                    < sizeof(missing_target))
+            {
+                size_t name_length = static_cast<size_t>(name_end - name_start - 1);
+                std::memcpy(missing_target, name_start + 1, name_length);
+                missing_target[name_length] = '\0';
+                size_t generated_line = 1;
+                for (const char *cursor = generated_cobol;
+                    cursor && *cursor != '\0'; ++cursor)
+                {
+                    if (cursor == generated_cobol || cursor[-1] == '\n')
+                    {
+                        const char *line_end = std::strchr(cursor, '\n');
+                        const size_t line_length = line_end
+                            ? static_cast<size_t>(line_end - cursor)
+                            : std::strlen(cursor);
+
+                        if (std::strstr(cursor, missing_target)
+                            && std::strstr(cursor, missing_target) < cursor + line_length)
+                            std::printf("Missing-target reference at generated line %zu: %.*s\n",
+                                generated_line, static_cast<int>(line_length), cursor);
+                        ++generated_line;
+                    }
+                }
+            }
+        }
         {
             t_parser diagnostic_parser;
             t_ast_node *diagnostic_program;
@@ -132,14 +218,27 @@ static int run_inline_cblc_to_cobol_execution_test(const char *source,
             std::strlen(expected_output) + 1) != 0)
     {
         std::printf("Assertion failed: generated inline COBOL binary should emit expected output\n");
+        std::printf("Expected output: %sObserved output: %s\n",
+            expected_output, output_buffer);
         goto cleanup;
     }
     status = FT_SUCCESS;
 cleanup:
     if (directory_created)
     {
-        test_cleanup_example_artifacts_with_log(source_path, binary_path, output_path, log_path);
-        test_remove_directory(directory);
+        const char *preserve_failed_artifacts =
+            std::getenv("CTOC_KEEP_FAILED_TEST_ARTIFACTS");
+
+        if (status == FT_SUCCESS || !preserve_failed_artifacts
+            || preserve_failed_artifacts[0] == '\0'
+            || std::strcmp(preserve_failed_artifacts, "0") == 0)
+        {
+            test_cleanup_example_artifacts_with_log(source_path, binary_path,
+                output_path, log_path);
+            test_remove_directory(directory);
+        }
+        else
+            std::printf("Inline CBL-C artifacts retained at %s\n", directory);
     }
     if (generated_cobol)
         cma_free(generated_cobol);
@@ -680,6 +779,51 @@ FT_TEST(test_cblc_nested_string_class_field_constructs_and_destroys_in_cobol)
         "}\n";
     return (run_inline_cblc_to_cobol_execution_test(source,
         "nested_string_class_lifecycle", "NESTED STRING CLASS LIFETIME OK\n"));
+}
+
+FT_TEST(test_cblc_string_owning_exception_payload_copies_and_cleans_up_in_cobol)
+{
+    const char *source;
+
+    source = "int error_value_destructions;\n"
+        "class ErrorValue {\n"
+        "    public:\n"
+        "    string message;\n"
+        "    int code;\n"
+        "    void operator=(ErrorValue source) {\n"
+        "        message = source.message;\n"
+        "        code = source.code;\n"
+        "    }\n"
+        "    ~ErrorValue() { error_value_destructions = error_value_destructions + 1; }\n"
+        "};\n"
+        "void exercise_error_payload() {\n"
+        "    int observed;\n"
+        "    ErrorValue original;\n"
+        "    string initial_message(\"7\");\n"
+        "    string suffix(\"8\");\n"
+        "    original.message = initial_message;\n"
+        "    original.code = 23;\n"
+        "    try { throw original; }\n"
+        "    catch (ErrorValue caught) {\n"
+        "        caught.message.append(suffix);\n"
+        "        observed = caught.message.parse_int();\n"
+        "        display(observed);\n"
+        "        display(caught.code);\n"
+        "    }\n"
+        "    observed = original.message.parse_int();\n"
+        "    display(observed);\n"
+        // At this point the caught copy and owned thrown payload are gone;
+        // the original is destroyed when this function returns.
+        "    display(error_value_destructions);\n"
+        "}\n"
+        "void main() {\n"
+        "    exercise_error_payload();\n"
+        "    display(error_value_destructions);\n"
+        "}\n";
+
+    return (run_inline_cblc_to_cobol_execution_test(source,
+        "string_exception_payload_lifecycle",
+        "+000000078\n+000000023\n+000000007\n+000000002\n+000000003\n"));
 }
 
 FT_TEST(test_cblc_class_member_array_constructs_and_destroys_each_element)

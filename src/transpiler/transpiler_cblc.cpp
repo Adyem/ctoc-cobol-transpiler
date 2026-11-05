@@ -35,6 +35,7 @@ typedef struct s_cobol_text_builder
     size_t deferred_procedure_length;
     size_t deferred_procedure_capacity;
     std::unordered_set<std::string> *emitted_method_paragraphs;
+    std::unordered_map<std::string, std::string> *method_paragraph_return_targets;
     std::unordered_set<std::string> *known_paragraph_definitions;
     std::vector<t_cblc_lifecycle_constructor_request> lifecycle_constructor_requests;
     const char *active_function_name;
@@ -51,16 +52,22 @@ typedef struct s_cobol_text_builder_lifecycle_scope
     t_cobol_text_builder *builder;
     const t_cblc_method *saved_method;
     const t_cblc_constructor *saved_constructor;
+    const char *saved_function_name;
 
     s_cobol_text_builder_lifecycle_scope(t_cobol_text_builder *value,
         const t_cblc_method *method, const t_cblc_constructor *constructor)
         : builder(value), saved_method(value ? value->active_method : NULL),
-          saved_constructor(value ? value->active_constructor : NULL)
+          saved_constructor(value ? value->active_constructor : NULL),
+          saved_function_name(value ? value->active_function_name : NULL)
     {
         if (builder)
         {
             builder->active_method = method;
             builder->active_constructor = constructor;
+            if (method && method->scope_source_name[0] != '\0')
+                builder->active_function_name = method->scope_source_name;
+            else if (constructor && constructor->scope_source_name[0] != '\0')
+                builder->active_function_name = constructor->scope_source_name;
         }
     }
 
@@ -70,6 +77,7 @@ typedef struct s_cobol_text_builder_lifecycle_scope
         {
             builder->active_method = saved_method;
             builder->active_constructor = saved_constructor;
+            builder->active_function_name = saved_function_name;
         }
     }
 }   t_cobol_text_builder_lifecycle_scope;
@@ -162,7 +170,8 @@ static int cblc_build_template_instance_names(const char *template_name,
     const char *argument, char *source_name, size_t source_size,
     char *cobol_name, size_t cobol_size);
 static int cblc_normalize_call_arguments(const t_cblc_translation_unit *unit,
-    const char *call_arguments, size_t call_argument_count, char *buffer,
+    const t_cblc_function *function, const char *call_arguments,
+    size_t call_argument_count, char *buffer,
     size_t buffer_size);
 static int cblc_expression_append(char *buffer, size_t buffer_size, const char *token);
 static int cblc_starts_with_function_declaration(const t_cblc_translation_unit *unit,
@@ -301,7 +310,8 @@ static int cblc_build_external_call_arguments(const t_cblc_translation_unit *uni
     const t_cblc_statement *statement, char *buffer, size_t buffer_size);
 static int cblc_emit_pointer_assignment_statement(const t_cblc_translation_unit *unit,
     const t_cblc_statement *statement, t_cobol_text_builder *builder, char *line,
-    size_t line_size, const t_cblc_data_item *receiver_context = NULL);
+    size_t line_size, const t_cblc_data_item *receiver_context = NULL,
+    const t_cblc_function *function_context = NULL);
 static int cblc_emit_struct_pointer_element_copy_assignment(
     const t_cblc_translation_unit *unit, const t_cblc_statement *statement,
     t_cobol_text_builder *builder,
@@ -319,7 +329,8 @@ static int cblc_emit_prepare_struct_pointer_field(const t_cblc_translation_unit 
 static int cblc_emit_prepare_struct_pointer_value(
     const t_cblc_translation_unit *unit, const char *reference,
     t_cobol_text_builder *builder, char *based_name, size_t based_name_size,
-    const t_cblc_data_item *receiver_context = NULL);
+    const t_cblc_data_item *receiver_context = NULL,
+    const t_cblc_function *function_context = NULL);
 static int cblc_parse_pointer_element_reference(const t_cblc_translation_unit *unit,
     const char *reference, const t_cblc_data_item **out_pointer_item,
     t_cblc_data_kind *out_element_kind, char *index_expression,
@@ -334,7 +345,8 @@ static int cblc_emit_parameter_argument_moves(
     const t_cblc_translation_unit *unit, const char *call_arguments,
     size_t call_argument_count, const t_cblc_parameter *parameters,
     size_t parameter_count, t_cobol_text_builder *builder,
-    const t_cblc_parameter *source_parameters, size_t source_parameter_count);
+    const t_cblc_parameter *source_parameters = NULL,
+    size_t source_parameter_count = 0, int borrow_struct_arguments = 0);
 static int cblc_method_may_throw(const t_cblc_translation_unit *unit,
     const t_cblc_struct_type *owner_type, const t_cblc_method *method,
     size_t depth);

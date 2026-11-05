@@ -7,10 +7,10 @@
     {
       "kind": "target",
       "id": "MAIN",
-      "path": "probe_based_receiver.cob",
-      "source_hash": "fnv1a64:d0a18ee3ead7c113",
+      "path": ".\\.probe_based_receiver.cob",
+      "source_hash": "fnv1a64:9967d01867938896",
       "module_dependencies": [],
-      "hash": "fnv1a64:c3e940c714d31f35",
+      "hash": "fnv1a64:ed1865a50c414a43",
       "dependencies": []
     }
   ]

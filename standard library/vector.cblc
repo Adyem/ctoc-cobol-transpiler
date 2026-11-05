@@ -24,7 +24,7 @@ class vector
         int relocation_index;
         int maximum_size;
 
-        maximum_size = max_size();
+        maximum_size = 999999999 / sizeof(T);
         if (requested > maximum_size)
         {
             length_error error;
@@ -79,7 +79,7 @@ class vector
         elements = NULL;
         count = 0;
         reserved = 0;
-        maximum_size = max_size();
+        maximum_size = 999999999 / sizeof(T);
         if (requested < 0)
         {
             invalid_argument error;
@@ -124,7 +124,7 @@ class vector
         elements = NULL;
         count = 0;
         reserved = 0;
-        maximum_size = max_size();
+        maximum_size = 999999999 / sizeof(T);
         if (requested < 0)
         {
             invalid_argument error;
@@ -217,46 +217,19 @@ class vector
 
     void operator=(vector source)
     {
-        T *relocation;
-        int relocation_index;
+        T *temporary_data;
+        int temporary_count;
+        int temporary_reserved;
 
-        relocation = NULL;
-        relocation_index = 0;
-        try
-        {
-            if (source.reserved > 0)
-            {
-                relocation = new T[source.reserved];
-                while (relocation_index < source.count)
-                {
-                    cblc_construct_at(relocation[relocation_index], source.elements[relocation_index]);
-                    relocation_index = relocation_index + 1;
-                }
-            }
-        }
-        catch (...)
-        {
-            while (relocation_index > 0)
-            {
-                relocation_index = relocation_index - 1;
-                cblc_destroy_at(relocation[relocation_index]);
-            }
-            delete[] relocation;
-            relocation = NULL;
-            relocation_index = 0;
-            throw;
-        }
-        if (elements != NULL)
-        {
-            destroy_current_elements();
-            delete[] elements;
-        }
-        elements = NULL;
+        temporary_data = elements;
+        elements = source.elements;
+        source.elements = temporary_data;
+        temporary_count = count;
         count = source.count;
+        source.count = temporary_count;
+        temporary_reserved = reserved;
         reserved = source.reserved;
-        elements = relocation;
-        relocation = NULL;
-        relocation_index = 0;
+        source.reserved = temporary_reserved;
     }
 
     ~vector()
@@ -330,14 +303,9 @@ class vector
 
     int max_size()
     {
-        int element_size;
-
-        element_size = sizeof(T);
-        if (element_size <= 0)
-        {
-            return 999999999;
-        }
-        return 999999999 / element_size;
+        int result;
+        result = 999999999 / sizeof(T);
+        return result;
     }
 
     int empty()
@@ -411,11 +379,11 @@ class vector
     {
         T *relocation;
         int requested_capacity;
-        int relocation_index;
+        int append_relocation_cursor;
         int appended_constructed;
         int maximum_size;
 
-        maximum_size = max_size();
+        maximum_size = 999999999 / sizeof(T);
         if (count >= reserved)
         {
             if (count >= maximum_size)
@@ -437,26 +405,26 @@ class vector
                 }
             }
             relocation = NULL;
-            relocation_index = 0;
+            append_relocation_cursor = 0;
             appended_constructed = 0;
             try
             {
                 relocation = new T[requested_capacity];
                 cblc_construct_at(relocation[count], value);
                 appended_constructed = 1;
-                while (relocation_index < count)
+                while (append_relocation_cursor < count)
                 {
-                    cblc_relocate_at(relocation[relocation_index],
-                        elements[relocation_index]);
-                    relocation_index = relocation_index + 1;
+                    cblc_relocate_at(relocation[append_relocation_cursor],
+                        elements[append_relocation_cursor]);
+                    append_relocation_cursor = append_relocation_cursor + 1;
                 }
             }
             catch (...)
             {
-                while (relocation_index > 0)
+                while (append_relocation_cursor > 0)
                 {
-                    relocation_index = relocation_index - 1;
-                    cblc_destroy_at(relocation[relocation_index]);
+                    append_relocation_cursor = append_relocation_cursor - 1;
+                    cblc_destroy_at(relocation[append_relocation_cursor]);
                 }
                 if (appended_constructed == 1)
                 {
@@ -486,6 +454,8 @@ class vector
         {
             out_of_range error;
             error.code = 1;
+            error.requested = -1;
+            error.extent = count;
             throw error;
         }
         cblc_destroy_at(elements[count - 1]);
@@ -498,6 +468,8 @@ class vector
         {
             out_of_range error;
             error.code = 1;
+            error.requested = index;
+            error.extent = count;
             throw error;
         }
         return elements[index];
@@ -509,6 +481,8 @@ class vector
         {
             out_of_range error;
             error.code = 1;
+            error.requested = index;
+            error.extent = count;
             throw error;
         }
         return elements[index];
@@ -520,6 +494,8 @@ class vector
         {
             out_of_range error;
             error.code = 1;
+            error.requested = 0;
+            error.extent = count;
             throw error;
         }
         return elements[0];
@@ -531,6 +507,8 @@ class vector
         {
             out_of_range error;
             error.code = 1;
+            error.requested = 0;
+            error.extent = count;
             throw error;
         }
         return elements[0];
@@ -542,6 +520,8 @@ class vector
         {
             out_of_range error;
             error.code = 1;
+            error.requested = count - 1;
+            error.extent = count;
             throw error;
         }
         return elements[count - 1];
@@ -553,6 +533,8 @@ class vector
         {
             out_of_range error;
             error.code = 1;
+            error.requested = count - 1;
+            error.extent = count;
             throw error;
         }
         return elements[count - 1];
@@ -564,6 +546,8 @@ class vector
         {
             out_of_range error;
             error.code = 1;
+            error.requested = index;
+            error.extent = count;
             throw error;
         }
         return elements[index];
@@ -575,6 +559,8 @@ class vector
         {
             out_of_range error;
             error.code = 1;
+            error.requested = 0;
+            error.extent = count;
             throw error;
         }
         return elements[0];
@@ -588,7 +574,7 @@ class vector
         int appended_constructed;
         int maximum_size;
 
-        maximum_size = max_size();
+        maximum_size = 999999999 / sizeof(T);
         if (count >= reserved)
         {
             if (count >= maximum_size)
@@ -661,7 +647,7 @@ class vector
         int appended_constructed;
         int maximum_size;
 
-        maximum_size = max_size();
+        maximum_size = 999999999 / sizeof(T);
         if (count >= reserved)
         {
             if (count >= maximum_size)
@@ -735,11 +721,13 @@ class vector
         int inserted_constructed;
         int maximum_size;
 
-        maximum_size = max_size();
+        maximum_size = 999999999 / sizeof(T);
         if (index < 0 || index > count)
         {
             out_of_range error;
             error.code = 1;
+            error.requested = index;
+            error.extent = count;
             throw error;
         }
         if (count >= maximum_size)
@@ -747,6 +735,12 @@ class vector
             length_error error;
             error.code = 1;
             throw error;
+        }
+        if (index == count && count < reserved)
+        {
+            cblc_construct_at(elements[count], value);
+            count = count + 1;
+            return;
         }
         requested_capacity = reserved;
         if (requested_capacity <= count)
@@ -821,16 +815,24 @@ class vector
     {
         T *relocation;
         int source_index;
-        int relocation_index;
+        int erase_destination_index;
 
         if (index < 0 || index >= count)
         {
             out_of_range error;
             error.code = 1;
+            error.requested = index;
+            error.extent = count;
             throw error;
         }
+        if (index == count - 1)
+        {
+            cblc_destroy_at(elements[index]);
+            count = count - 1;
+            return;
+        }
         relocation = NULL;
-        relocation_index = 0;
+        erase_destination_index = 0;
         try
         {
             relocation = new T[reserved];
@@ -839,23 +841,23 @@ class vector
             {
                 if (source_index != index)
                 {
-                    cblc_relocate_at(relocation[relocation_index],
+                    cblc_relocate_at(relocation[erase_destination_index],
                         elements[source_index]);
-                    relocation_index = relocation_index + 1;
+                    erase_destination_index = erase_destination_index + 1;
                 }
                 source_index = source_index + 1;
             }
         }
         catch (...)
         {
-            while (relocation_index > 0)
+            while (erase_destination_index > 0)
             {
-                relocation_index = relocation_index - 1;
-                cblc_destroy_at(relocation[relocation_index]);
+                erase_destination_index = erase_destination_index - 1;
+                cblc_destroy_at(relocation[erase_destination_index]);
             }
             delete[] relocation;
             relocation = NULL;
-            relocation_index = 0;
+            erase_destination_index = 0;
             throw;
         }
         destroy_current_elements();
@@ -863,7 +865,7 @@ class vector
         elements = relocation;
         relocation = NULL;
         count = count - 1;
-        relocation_index = 0;
+        erase_destination_index = 0;
     }
 
 
@@ -880,7 +882,7 @@ class vector
         int relocation_index;
         int maximum_size;
 
-        maximum_size = max_size();
+        maximum_size = 999999999 / sizeof(T);
         if (requested < 0)
         {
             invalid_argument error;
@@ -892,6 +894,12 @@ class vector
             length_error error;
             error.code = 1;
             throw error;
+        }
+        if (requested == 0)
+        {
+            destroy_current_elements();
+            count = 0;
+            return;
         }
         replacement_capacity = reserved;
         if (requested > replacement_capacity)
@@ -940,7 +948,7 @@ class vector
         int appended_index;
         int maximum_size;
 
-        maximum_size = max_size();
+        maximum_size = 999999999 / sizeof(T);
         if (requested < 0)
         {
             invalid_argument error;
@@ -1044,7 +1052,7 @@ class vector
         int appended_index;
         int maximum_size;
 
-        maximum_size = max_size();
+        maximum_size = 999999999 / sizeof(T);
         if (requested < 0)
         {
             invalid_argument error;

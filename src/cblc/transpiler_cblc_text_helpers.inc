@@ -14,6 +14,7 @@ static void cobol_text_builder_init(t_cobol_text_builder *builder)
     builder->deferred_procedure_length = 0;
     builder->deferred_procedure_capacity = 0;
     builder->emitted_method_paragraphs = NULL;
+    builder->method_paragraph_return_targets = NULL;
     builder->known_paragraph_definitions = NULL;
     builder->lifecycle_constructor_requests.clear();
     builder->active_function_name = NULL;
@@ -318,6 +319,9 @@ static int cobol_text_builder_append_line(t_cobol_text_builder *builder, const c
     if (!text)
         return (FT_SUCCESS);
     text_length = std::strlen(text);
+    break_cursor = text;
+    while (*break_cursor == ' ' || *break_cursor == '\t')
+        break_cursor += 1;
     is_paragraph_header = 0;
     if (text_length > 8 && std::strncmp(text, "       ", 7) == 0
         && !std::isspace(static_cast<unsigned char>(text[7])))
@@ -402,6 +406,114 @@ static int cobol_text_builder_append_line(t_cobol_text_builder *builder, const c
     return (FT_SUCCESS);
 }
 
+static void cobol_text_builder_normalize_procedure_scope_periods(
+    t_cobol_text_builder *builder)
+{
+    size_t read_offset;
+    size_t write_offset;
+    size_t scope_depth;
+    int in_procedure;
+
+    if (!builder || !builder->data)
+        return ;
+    read_offset = 0;
+    write_offset = 0;
+    scope_depth = 0;
+    in_procedure = 0;
+    while (read_offset < builder->length)
+    {
+        size_t line_end = read_offset;
+        size_t trimmed = read_offset;
+        size_t content_length;
+        int procedure_header;
+        int paragraph_header;
+        int scope_close;
+        int scope_open;
+        int omit_period;
+
+        while (line_end < builder->length && builder->data[line_end] != '\n')
+            line_end += 1;
+        content_length = line_end - read_offset;
+        while (trimmed < line_end
+            && (builder->data[trimmed] == ' '
+                || builder->data[trimmed] == '\t'))
+            trimmed += 1;
+        procedure_header = content_length >= sizeof("       PROCEDURE DIVISION") - 1
+            && std::strncmp(builder->data + read_offset,
+                "       PROCEDURE DIVISION",
+                sizeof("       PROCEDURE DIVISION") - 1) == 0;
+        paragraph_header = content_length > 8
+            && std::strncmp(builder->data + read_offset, "       ", 7) == 0
+            && !std::isspace(static_cast<unsigned char>(
+                builder->data[read_offset + 7]));
+        if (paragraph_header)
+        {
+            size_t token_end = read_offset + 7;
+
+            while (token_end < line_end && builder->data[token_end] != '.')
+            {
+                if (std::isspace(static_cast<unsigned char>(
+                        builder->data[token_end])))
+                {
+                    paragraph_header = 0;
+                    break ;
+                }
+                token_end += 1;
+            }
+            if (token_end != line_end - 1 || builder->data[token_end] != '.')
+                paragraph_header = 0;
+        }
+        if (procedure_header)
+            in_procedure = 1;
+        scope_close = 0;
+        scope_open = 0;
+        if (in_procedure && !procedure_header && !paragraph_header)
+        {
+            if ((line_end - trimmed >= sizeof("END-IF") - 1
+                    && std::strncmp(builder->data + trimmed, "END-IF",
+                        sizeof("END-IF") - 1) == 0)
+                || (line_end - trimmed >= sizeof("END-PERFORM") - 1
+                    && std::strncmp(builder->data + trimmed, "END-PERFORM",
+                        sizeof("END-PERFORM") - 1) == 0))
+            {
+                if (scope_depth > 0)
+                    scope_depth -= 1;
+                scope_close = 1;
+            }
+            else if ((line_end - trimmed >= sizeof("IF ") - 1
+                    && std::strncmp(builder->data + trimmed, "IF ",
+                        sizeof("IF ") - 1) == 0)
+                || (line_end - trimmed >= sizeof("PERFORM UNTIL ") - 1
+                    && std::strncmp(builder->data + trimmed, "PERFORM UNTIL ",
+                        sizeof("PERFORM UNTIL ") - 1) == 0))
+            {
+                scope_depth += 1;
+                scope_open = 1;
+            }
+        }
+        omit_period = in_procedure && !procedure_header && !paragraph_header
+            && scope_depth > 0 && content_length > 0
+            && builder->data[line_end - 1] == '.';
+        if (content_length > static_cast<size_t>(omit_period))
+        {
+            size_t copy_length = content_length
+                - static_cast<size_t>(omit_period);
+
+            std::memmove(builder->data + write_offset,
+                builder->data + read_offset, copy_length);
+            write_offset += copy_length;
+        }
+        if (line_end < builder->length)
+            builder->data[write_offset++] = '\n';
+        read_offset = line_end
+            + static_cast<size_t>(line_end < builder->length);
+        (void)scope_close;
+        (void)scope_open;
+    }
+    builder->length = write_offset;
+    builder->data[write_offset] = '\0';
+}
+
 static int cblc_match_keyword(const char **cursor, const char *keyword)
 {
     size_t length;
@@ -418,6 +530,111 @@ static int cblc_match_keyword(const char **cursor, const char *keyword)
         return (0);
     *cursor += length;
     return (1);
+}
+
+static int cblc_parse_boolean_literal(const char **cursor, int *out_value)
+{
+    const char *start;
+
+    if (!cursor || !*cursor || !out_value)
+        return (FT_FAILURE);
+    start = *cursor;
+    if (cblc_match_keyword(cursor, "true"))
+    {
+        *out_value = 1;
+        return (FT_SUCCESS);
+    }
+    *cursor = start;
+    if (cblc_match_keyword(cursor, "false"))
+    {
+        *out_value = 0;
+        return (FT_SUCCESS);
+    }
+    *cursor = start;
+    return (FT_FAILURE);
+}
+
+static int cblc_normalize_boolean_literals(const char *source, char *destination,
+    size_t destination_size)
+{
+    size_t read_index;
+    size_t write_index;
+    char quote;
+    int escaped;
+
+    if (!source || !destination || destination_size == 0)
+        return (FT_FAILURE);
+    read_index = 0;
+    write_index = 0;
+    quote = '\0';
+    escaped = 0;
+    while (source[read_index] != '\0')
+    {
+        if (quote != '\0')
+        {
+            if (write_index + 1 >= destination_size)
+                return (FT_FAILURE);
+            destination[write_index++] = source[read_index];
+            if (escaped)
+                escaped = 0;
+            else if (source[read_index] == '\\')
+                escaped = 1;
+            else if (source[read_index] == quote)
+                quote = '\0';
+            read_index += 1;
+            continue ;
+        }
+        if (source[read_index] == '\'' || source[read_index] == '"')
+        {
+            quote = source[read_index];
+            if (write_index + 1 >= destination_size)
+                return (FT_FAILURE);
+            destination[write_index++] = source[read_index++];
+            continue ;
+        }
+        if ((source[read_index] >= 'a' && source[read_index] <= 'z')
+            || (source[read_index] >= 'A' && source[read_index] <= 'Z')
+            || source[read_index] == '_')
+        {
+            size_t token_start = read_index;
+            size_t token_length;
+            const char *replacement;
+
+            while ((source[read_index] >= 'a' && source[read_index] <= 'z')
+                || (source[read_index] >= 'A' && source[read_index] <= 'Z')
+                || (source[read_index] >= '0' && source[read_index] <= '9')
+                || source[read_index] == '_')
+                read_index += 1;
+            token_length = read_index - token_start;
+            replacement = NULL;
+            if (token_length == 4
+                && std::strncmp(source + token_start, "true", 4) == 0)
+                replacement = "1";
+            else if (token_length == 5
+                && std::strncmp(source + token_start, "false", 5) == 0)
+                replacement = "0";
+            if (replacement)
+            {
+                if (write_index + 1 >= destination_size)
+                    return (FT_FAILURE);
+                destination[write_index++] = replacement[0];
+            }
+            else
+            {
+                if (token_length >= destination_size - write_index)
+                    return (FT_FAILURE);
+                std::memcpy(destination + write_index, source + token_start,
+                    token_length);
+                write_index += token_length;
+            }
+            continue ;
+        }
+        if (write_index + 1 >= destination_size)
+            return (FT_FAILURE);
+        destination[write_index++] = source[read_index++];
+    }
+    destination[write_index] = '\0';
+    return (FT_SUCCESS);
 }
 
 static void cblc_skip_whitespace(const char **cursor)

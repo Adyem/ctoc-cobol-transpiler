@@ -483,16 +483,46 @@ FT_TEST(test_cblc_move_construct_at_dispatches_to_pointer_constructor)
             diagnostic_code, diagnostic_message);
         goto cleanup;
     }
-    if (!std::strstr(generated_cobol,
-            "PERFORM CBLC-CONSTRUCTOR-CBLC-SPTR-MOVE-ITEM-STORAGE-1 ")
-        || !std::strstr(generated_cobol,
-            "CBLC-SPTR-TRANSFER-CTOR-1-SOURCE-CBLC-USER-VALUE")
-        || !std::strstr(generated_cobol,
-            "CBLC-SPTR-MOVE-ITEM-STORAGE-CBLC-USER-VALUE = 0")
-        || std::strstr(generated_cobol, "->") != NULL)
     {
-        std::printf("Assertion failed: move construction must invoke the pointer-taking constructor\n");
-        goto cleanup;
+        const char *parameter_layout = std::strstr(generated_cobol,
+            "01 CBLC-SPTR-C");
+        const char *destination_layout = std::strstr(generated_cobol,
+            "01 CBLC-SPTR-H");
+        const char *parameter_layout_end = parameter_layout
+            ? std::strstr(parameter_layout, " BASED.") : NULL;
+        const char *destination_layout_end = destination_layout
+            ? std::strstr(destination_layout, " BASED.") : NULL;
+        std::string parameter_view;
+        std::string destination_view;
+        std::string parameter_field;
+        std::string destination_field;
+        std::string moved_from_write;
+
+        if (parameter_layout && parameter_layout_end
+            && destination_layout && destination_layout_end)
+        {
+            parameter_view.assign(parameter_layout + 3,
+                static_cast<size_t>(parameter_layout_end - parameter_layout - 3));
+            destination_view.assign(destination_layout + 3,
+                static_cast<size_t>(destination_layout_end - destination_layout - 3));
+        }
+        parameter_field = parameter_view + "-CBLC-USER-VALUE";
+        destination_field = destination_view + "-CBLC-USER-VALUE";
+        moved_from_write = "COMPUTE " + parameter_field + " = 0";
+        if (parameter_view.empty() || destination_view.empty()
+            || parameter_view == destination_view
+            || !std::strstr(generated_cobol,
+                "PERFORM CBLC-CONSTRUCTOR-CBLC-SPTR-H")
+            || !std::strstr(generated_cobol,
+                "TO TRANSFER-CTOR-1-SOURCE")
+            || !std::strstr(generated_cobol, destination_field.c_str())
+            || !std::strstr(generated_cobol, parameter_field.c_str())
+            || !std::strstr(generated_cobol, moved_from_write.c_str())
+            || std::strstr(generated_cobol, "->") != NULL)
+        {
+            std::printf("Assertion failed: move construction must bind a distinct source view, copy its field into the destination, and leave the source moved-from\n");
+            goto cleanup;
+        }
     }
     status = FT_SUCCESS;
 cleanup:
@@ -574,15 +604,18 @@ FT_TEST(test_cblc_relocate_construct_at_emits_typed_copy_fallback)
         goto cleanup;
     }
     copy_dispatch = std::strstr(generated_cobol,
-        "CBLC-CONSTRUCTOR-CBLC-SPTR-RELOCATE-COPY-STORAGE-2 THRU");
+        "PERFORM CBLC-CONSTRUCTOR-CBLC-SPTR-H");
     exception_transfer = copy_dispatch
         ? std::strstr(copy_dispatch, "IF CBLC-EX-ACTIVE = 'Y'") : NULL;
     cleanup_dispatch = exception_transfer
         ? std::strstr(exception_transfer, "PERFORM CBLC-EX-CLEANUP-") : NULL;
-    if (!copy_dispatch || !exception_transfer || !cleanup_dispatch
+    if (!copy_dispatch || !std::strstr(copy_dispatch, "-2 ")
+        || !exception_transfer || !cleanup_dispatch
         || std::strstr(generated_cobol,
-            "CBLC-CONSTRUCTOR-CBLC-SPTR-RELOCATE-COPY-STORAGE-1 THRU")
-            != NULL)
+            "PERFORM CBLC-CONSTRUCTOR-CBLC-SPTR-H")
+            != copy_dispatch
+        || !std::strstr(generated_cobol,
+            "MOVE RELOCATE-COPY-SOURCE TO TRANSFER-CTOR-2-SOURCE"))
     {
         std::printf("Assertion failed: throwing relocation move must dispatch to the typed copy constructor\n");
         goto cleanup;
@@ -4585,9 +4618,15 @@ FT_TEST(test_cblc_vector_string_template_specialization_emits)
     program_source = "void main() {\n"
         "vector<string> words;\n"
         "string *borrowed;\n"
+        "string probe;\n"
         "int length;\n"
+        "char byte_value;\n"
         "words.emplace_back(); borrowed = words.at(0); "
-        "length = borrowed->len(); return; }\n";
+        "length = borrowed->len(); "
+        "byte_value = probe.at(0); "
+        "try { borrowed = words.at(1); } "
+        "catch (const out_of_range& error) { length = error.requested; } "
+        "return; }\n";
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
     diagnostic_code = 0;
@@ -4619,7 +4658,11 @@ FT_TEST(test_cblc_vector_string_template_specialization_emits)
         || !std::strstr(generated_cobol,
             "COMPUTE MAIN-WORDS-COUNT = MAIN-WORDS-COUNT + 1")
         || !std::strstr(generated_cobol, "STORED-LENGTH")
-        || !std::strstr(generated_cobol, "STORAGE-CAPACITY"))
+        || !std::strstr(generated_cobol, "STORAGE-CAPACITY")
+        || !std::strstr(generated_cobol,
+            "CBLC-EX-PAYLOAD-OUT-OF-RANGE-REQUESTED")
+        || !std::strstr(generated_cobol,
+            "CBLC-EX-PAYLOAD-OUT-OF-RANGE-EXTENT"))
     {
         std::printf("Assertion failed: vector<string> inline specialization should update the vector count and emit concrete string lifecycle storage (relocation=%d count-update=%d string=%d)\n",
             generated_cobol && std::strstr(generated_cobol,
@@ -6640,15 +6683,36 @@ FT_TEST(test_cblc_generate_cobol_reuses_identical_exception_cleanup_sequences)
     }
     if (!generated_cobol
         || validation_count_text_occurrences(generated_cobol,
-            "       CBLC-EX-CLEANUP-MAIN-TIR-") != 1
+            "       CBLC-EX-CLEANUP-MAIN-EXH-") != 1
         || validation_count_text_occurrences(generated_cobol,
-            "PERFORM CBLC-EX-CLEANUP-MAIN-TIR-") != 2)
+            "PERFORM CBLC-EX-CLEANUP-MAIN-EXH-") != 2)
     {
         std::printf("Assertion failed: typed cleanup sharing expected one paragraph/two calls; found %zu paragraph markers and %zu calls\n",
             generated_cobol ? validation_count_text_occurrences(generated_cobol,
-                "       CBLC-EX-CLEANUP-MAIN-TIR-") : 0,
+                "       CBLC-EX-CLEANUP-MAIN-EXH-") : 0,
             generated_cobol ? validation_count_text_occurrences(generated_cobol,
-                "PERFORM CBLC-EX-CLEANUP-MAIN-TIR-") : 0);
+                "PERFORM CBLC-EX-CLEANUP-MAIN-EXH-") : 0);
+        if (generated_cobol)
+        {
+            const char *line_start = generated_cobol;
+
+            while (*line_start)
+            {
+                const char *line_end = std::strchr(line_start, '\n');
+                const size_t line_length = line_end
+                    ? static_cast<size_t>(line_end - line_start)
+                    : std::strlen(line_start);
+
+                if (std::strstr(line_start, "CBLC-EX-CLEANUP")
+                    && static_cast<size_t>(std::strstr(line_start,
+                        "CBLC-EX-CLEANUP") - line_start) < line_length)
+                    std::printf("Cleanup COBOL: %.*s\n",
+                        static_cast<int>(line_length), line_start);
+                if (!line_end)
+                    break ;
+                line_start = line_end + 1;
+            }
+        }
         goto cleanup;
     }
     status = FT_SUCCESS;
@@ -6669,6 +6733,8 @@ FT_TEST(test_cblc_generate_cobol_materializes_value_before_catch_cleanup)
     const char *payload_clear;
     const char *handler_return;
     const char *catch_label_prefix;
+    char generation_diagnostic[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
+    int generation_diagnostic_code;
     int status;
 
     source = "int worker() {\n"
@@ -6679,13 +6745,21 @@ FT_TEST(test_cblc_generate_cobol_materializes_value_before_catch_cleanup)
         "void main() { worker(); }\n";
     cblc_translation_unit_init(&unit);
     generated_cobol = NULL;
+    generation_diagnostic[0] = '\0';
+    generation_diagnostic_code = 0;
     status = FT_FAILURE;
     if (test_expect_success(cblc_parse_translation_unit(source, &unit),
             "value-return-from-catch source should parse") != FT_SUCCESS)
         goto cleanup;
-    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+    if (test_expect_success(cblc_generate_cobol_with_diagnostic(&unit,
+                &generated_cobol, &generation_diagnostic_code,
+                generation_diagnostic, sizeof(generation_diagnostic)),
             "value-return-from-catch source should generate COBOL") != FT_SUCCESS)
+    {
+        std::printf("Catch-return generation diagnostic (%d): %s\n",
+            generation_diagnostic_code, generation_diagnostic);
         goto cleanup;
+    }
     catch_label_prefix = "       CBLC-TRY-CBLC-TRY-CALL-";
     result_move = ft_strnstr(generated_cobol, "MOVE 9 TO CBLC-RETURN-WORKER",
         std::strlen(generated_cobol));
@@ -8890,6 +8964,8 @@ const t_test_case *get_validation_tests(size_t *count)
             test_cblc_generate_c_and_cobol_emit_struct_returning_method_call_assignment},
         {"cblc_generate_cobol_emits_class_methods",
             test_cblc_generate_cobol_emits_class_methods},
+        {"cblc_boolean_literals_use_numeric_boolean_storage",
+            test_cblc_boolean_literals_use_numeric_boolean_storage},
         {"cblc_generate_cobol_emits_struct_returning_function_and_call_assignment",
             test_cblc_generate_cobol_emits_struct_returning_function_and_call_assignment},
         {"cblc_parse_translation_unit_rejects_private_field_access_outside_class",

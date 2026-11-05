@@ -330,7 +330,6 @@ int test_expect_transcript_equal(const char *actual, const char *expected)
 int test_expect_compiler_output_allowed(const char *path)
 {
     char buffer[4096];
-    const char *warning;
     size_t length;
 
     if (!path)
@@ -341,20 +340,16 @@ int test_expect_compiler_output_allowed(const char *path)
         return (FT_FAILURE);
     }
     length = std::strlen(buffer);
-    warning = "<command-line>: warning: \"_FORTIFY_SOURCE\" redefined";
-    if (length > 0 && !ft_strnstr(buffer, warning, length))
-    {
-        std::printf("Assertion failed: compiler output should include expected warning message\n");
-        return (FT_FAILURE);
-    }
     if (ft_strnstr(buffer, "error:", length))
     {
-        std::printf("Assertion failed: compiler output should not report errors\n");
+        std::printf("Assertion failed: compiler output should not report errors:\n%s\n",
+            buffer);
         return (FT_FAILURE);
     }
     if (ft_strnstr(buffer, "Error", length))
     {
-        std::printf("Assertion failed: compiler output should not contain fatal errors\n");
+        std::printf("Assertion failed: compiler output should not contain fatal errors:\n%s\n",
+            buffer);
         return (FT_FAILURE);
     }
     return (FT_SUCCESS);

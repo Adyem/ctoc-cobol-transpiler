@@ -1195,6 +1195,8 @@ static const t_cblc_data_item *find_scalar_item(const t_cblc_translation_unit *u
     while (index > 0)
     {
         const t_cblc_data_item &item = unit->data_items[index - 1];
+        const bool is_function_return_storage = function->return_cobol_name[0] != '\0'
+            && std::strcmp(item.cobol_name, function->return_cobol_name) == 0;
         bool is_parameter_storage = false;
         bool is_named_parameter_storage = false;
         for (std::size_t parameter_index = 0;
@@ -1212,9 +1214,9 @@ static const t_cblc_data_item *find_scalar_item(const t_cblc_translation_unit *u
                     is_named_parameter_storage = true;
             }
         }
-        if ((item.is_function_local
+        if ((is_function_return_storage || (item.is_function_local
                 ? std::strcmp(item.owner_function_name, function->source_name) == 0
-                : (item.is_active || is_parameter_storage))
+                : (item.is_active || is_parameter_storage)))
             && !item.is_shadowed && (std::strcmp(item.source_name, name) == 0
                 || std::strcmp(item.cobol_name, name) == 0
                 || std::strcmp(item.local_source_name, name) == 0
@@ -1439,14 +1441,47 @@ static bool lower_scalar_operand(const t_cblc_translation_unit *unit,
             }
             if (depth != 0 || (current != '+' && current != '-'))
                 continue;
+            if (current == '-')
+            {
+                bool part_of_cobol_name = false;
+                for (std::size_t item_index = 0;
+                    item_index < unit->data_count && !part_of_cobol_name;
+                    ++item_index)
+                {
+                    const char *cobol_name =
+                        unit->data_items[item_index].cobol_name;
+                    const std::size_t name_length = std::strlen(cobol_name);
+                    if (name_length == 0 || name_length > token.size())
+                        continue;
+                    std::size_t name_position = token.find(cobol_name);
+                    while (name_position != std::string::npos)
+                    {
+                        if (cursor >= name_position
+                            && cursor < name_position + name_length)
+                        {
+                            part_of_cobol_name = true;
+                            break;
+                        }
+                        name_position = token.find(cobol_name,
+                            name_position + 1);
+                    }
+                }
+                if (part_of_cobol_name)
+                    continue;
+            }
             std::size_t previous = cursor;
             while (previous > 0 && std::isspace(
                     static_cast<unsigned char>(token[previous - 1])))
                 --previous;
+            const bool exponent_sign = previous > 1
+                && (token[previous - 1] == 'e'
+                    || token[previous - 1] == 'E')
+                && (std::isdigit(static_cast<unsigned char>(
+                        token[previous - 2]))
+                    || token[previous - 2] == '.');
             if (previous == 0 || token[previous - 1] == '+'
                 || token[previous - 1] == '-' || token[previous - 1] == '*'
-                || token[previous - 1] == '/' || token[previous - 1] == 'e'
-                || token[previous - 1] == 'E')
+                || token[previous - 1] == '/' || exponent_sign)
                 continue;
             arithmetic_position = cursor;
             arithmetic_operator = current;
@@ -1510,9 +1545,14 @@ static bool lower_scalar_operand(const t_cblc_translation_unit *unit,
         const double parsed = std::strtod(token.c_str(), &literal_end);
         if (literal_end == token.c_str() || errno == ERANGE
             || *literal_end != '\0' || !std::isfinite(parsed))
+        {
+            const std::string message =
+                "condition adapter accepts only finite numeric literals: '"
+                + token + "'";
             return fail(diagnostic,
                 verification_error::unsupported_legacy_statement, 0,
-                "condition adapter accepts only finite numeric literals");
+                message.c_str());
+        }
     }
     else
     {
@@ -1814,6 +1854,8 @@ static bool lower_scalar_function_impl(const t_cblc_translation_unit *unit,
             && item.scope_id < unit->scope_count
             && std::strcmp(unit->scopes[item.scope_id].owner_function_name,
                 function->source_name) == 0;
+        const bool is_function_return_storage = function->return_cobol_name[0] != '\0'
+            && std::strcmp(item.cobol_name, function->return_cobol_name) == 0;
         bool is_function_parameter_storage = false;
         bool has_external_lifetime = false;
         symbol_id item_symbol = 0;
@@ -1839,10 +1881,10 @@ static bool lower_scalar_function_impl(const t_cblc_translation_unit *unit,
         }
         has_external_lifetime = !item.is_function_local
             && !is_function_parameter_storage;
-        if ((item.is_function_local
+        if ((!is_function_return_storage && (item.is_function_local
                 ? std::strcmp(item.owner_function_name, function->source_name) != 0
                 : (!item.is_active && !is_function_parameter_storage
-                    && !indexed_borrow_scope_visible))
+                    && !indexed_borrow_scope_visible)))
             || item.is_shadowed || (item.is_alias && !indexed_class_borrow)
             || item_type == 0)
             continue;
@@ -1950,6 +1992,66 @@ static bool lower_scalar_function_impl(const t_cblc_translation_unit *unit,
         {
             lifecycle_values_by_item.emplace(&item, std::move(lifecycle_values));
             lifecycle_places_by_item.emplace(&item, std::move(lifecycle_places));
+        }
+    }
+
+    /* Class-valued aliases are borrows into an owning object. Preserve that
+     * ownership relation in typed IR instead of leaving their lifetime token
+     * unset; copy assignment may read such a member while its owner is live. */
+    for (std::size_t alias_index = 0; alias_index < unit->data_count;
+        ++alias_index)
+    {
+        const t_cblc_data_item &alias = unit->data_items[alias_index];
+        if (class_type_id(unit, &alias) == 0)
+            continue;
+        const t_cblc_data_item *owner_item = nullptr;
+        std::size_t owner_name_length = 0;
+        for (std::size_t candidate_index = 0;
+            candidate_index < unit->data_count; ++candidate_index)
+        {
+            const t_cblc_data_item &candidate =
+                unit->data_items[candidate_index];
+            const std::size_t candidate_name_length =
+                std::strlen(candidate.source_name);
+            if (&candidate == &alias || candidate_name_length == 0
+                || candidate_name_length <= owner_name_length
+                || value_by_item.find(&candidate) == value_by_item.end()
+                || std::strncmp(alias.source_name, candidate.source_name,
+                    candidate_name_length) != 0
+                || (alias.source_name[candidate_name_length] != '.'
+                    && alias.source_name[candidate_name_length] != '[')
+                || class_type_id(unit, &candidate) == 0)
+                continue;
+            owner_item = &candidate;
+            owner_name_length = candidate_name_length;
+        }
+        if (!owner_item)
+            continue;
+        const auto owner_value_id = value_by_item.find(owner_item);
+        if (owner_value_id == value_by_item.end())
+            continue;
+        const auto owner_value = std::find_if(result->values.begin(),
+            result->values.end(), [&](const typed_value &value)
+            {
+                return value.id == owner_value_id->second;
+            });
+        if (owner_value == result->values.end()
+            || owner_value->lifetime_token == 0)
+            continue;
+        const auto alias_values = lifecycle_values_by_item.find(&alias);
+        if (alias_values == lifecycle_values_by_item.end())
+            continue;
+        for (value_id alias_value_id : alias_values->second)
+        {
+            const auto alias_value = std::find_if(result->values.begin(),
+                result->values.end(), [&](const typed_value &value)
+                {
+                    return value.id == alias_value_id;
+                });
+            if (alias_value != result->values.end()
+                && alias_value->category == value_category::borrow
+                && alias_value->lifetime_token == 0)
+                alias_value->lifetime_token = owner_value->lifetime_token;
         }
     }
 
@@ -3755,93 +3857,24 @@ static bool lower_scalar_function_impl(const t_cblc_translation_unit *unit,
             assignment.outcomes.push_back({});
             assignment.provenance.push_back(origin);
 
-            const t_cblc_data_item *source_item = find_scalar_item(unit, function, expression);
-            place_id source_place_id = 0;
-            type_id source_type = 0;
-            bool source_is_place = false;
-            if (source_item)
-            {
-                const auto source_place = place_by_item.find(source_item);
-                if (source_place == place_by_item.end())
-                    return fail(diagnostic, verification_error::unsupported_legacy_type,
-                        assignment.id,
-                        "scalar source is outside the finalized function storage map");
-                source_place_id = source_place->second;
-                source_type = scalar_type_id(source_item->kind);
-                source_is_place = true;
-            }
-            else if (append_scalar_member_place(unit, function, expression,
-                    value_by_item, place_by_item, result, &next_place,
-                    &source_place_id, &source_type))
-                source_is_place = true;
-            if (source_is_place)
-            {
-                typed_value loaded;
-                loaded.id = next_value++;
-                loaded.type = source_type;
-                loaded.category = value_category::scalar;
-                loaded.provenance.push_back(origin);
-                result->values.push_back(loaded);
-                typed_operation load;
-                load.id = next_operation++;
-                load.operation = opcode::load;
-                load.places.push_back(source_place_id);
-                load.results.push_back(loaded.id);
-                load.effects.reads.push_back(source_place_id);
-                load.effects.exceptions = exception_effect::non_throwing;
-                operation_outcome load_outcome;
-                load_outcome.initialized.push_back(loaded.id);
-                load.effects.may_fail = false;
-                load.outcomes.push_back(load_outcome);
-                load.provenance.push_back(origin);
-                assignment.operands.push_back(loaded.id);
-                assignment.must_follow.push_back(load.id);
-                if (!append_typed_operation(result, current_region,
-                        std::move(load), diagnostic))
-                    return false;
-            }
-            else
-            {
-                char *literal_end;
-                long long parsed_literal;
-                errno = 0;
-                parsed_literal = std::strtoll(expression, &literal_end, 10);
-                if (literal_end == expression || errno == ERANGE)
-                    return fail(diagnostic, verification_error::unsupported_legacy_statement,
-                        assignment.id,
-                        "scalar adapter accepts only integer literals or a single scalar name on the right-hand side");
-                while (*literal_end == ' ' || *literal_end == '\t'
-                    || *literal_end == '\r' || *literal_end == '\n')
-                    literal_end += 1;
-                if (*literal_end != '\0')
-                    return fail(diagnostic, verification_error::unsupported_legacy_statement,
-                        assignment.id,
-                        "scalar adapter does not parse compound expressions from legacy text");
-                typed_value literal;
-                literal.id = next_value++;
-                literal.type = target_type;
-                literal.category = value_category::scalar;
-                literal.provenance.push_back(origin);
-                literal.constant_value = std::to_string(parsed_literal);
-                result->values.push_back(literal);
-                typed_operation literal_operation;
-                literal_operation.id = next_operation++;
-                literal_operation.operation = opcode::literal;
-                literal_operation.results.push_back(literal.id);
-                operation_outcome literal_outcome;
-                literal_outcome.initialized.push_back(literal.id);
-                literal_operation.outcomes.push_back(literal_outcome);
-                literal_operation.effects.exceptions = exception_effect::non_throwing;
-                literal_operation.provenance.push_back(origin);
-                assignment.operands.push_back(literal.id);
-                assignment.must_follow.push_back(literal_operation.id);
-                if (!append_typed_operation(result, current_region,
-                        std::move(literal_operation), diagnostic))
-                    return false;
-            }
             if (target_type == 0)
                 return fail(diagnostic, verification_error::unsupported_legacy_type,
                     assignment.id, "assignment target has no supported scalar type");
+            lowered_scalar_operand source;
+            if (!lower_scalar_operand(unit, function, statement.source,
+                    statement.source + std::strlen(statement.source), result,
+                    current_region, value_by_item, place_by_item, &next_place,
+                    &next_value, &next_operation, origin, false, &source,
+                    diagnostic))
+                return false;
+            if (source.type != target_type)
+                return fail(diagnostic,
+                    verification_error::unsupported_legacy_type,
+                    assignment.id,
+                    "scalar assignment source and target types do not match");
+            assignment.operands.push_back(source.value);
+            if (source.producer != 0)
+                assignment.must_follow.push_back(source.producer);
             assignment.effects.may_fail = false;
             if (!append_typed_operation(result, current_region,
                     std::move(assignment), diagnostic))
@@ -4429,6 +4462,56 @@ static bool lower_scalar_function_impl(const t_cblc_translation_unit *unit,
         return_operation.effects.exceptions = exception_effect::non_throwing;
         return_operation.outcomes.push_back({});
         return_operation.provenance.push_back(origin);
+        if (*expression != '\0')
+        {
+            region_id return_region = current_region;
+
+            while (return_region != 0)
+            {
+                const auto region = std::find_if(result->regions.begin(),
+                    result->regions.end(), [&](const typed_region &candidate)
+                    {
+                        return candidate.id == return_region;
+                    });
+                if (region == result->regions.end())
+                    return fail(diagnostic,
+                        verification_error::invalid_region_tree,
+                        return_operation.id,
+                        "typed scalar return has a broken enclosing region chain");
+                if (region->kind == region_kind::exception_handler)
+                    return fail(diagnostic,
+                        verification_error::unsupported_legacy_statement,
+                        return_operation.id,
+                        "scalar returns from exception handlers remain on the legacy lowering path until handler CFG exits are modeled");
+                return_region = region->parent;
+            }
+            lowered_scalar_operand returned;
+            const char *return_begin = expression;
+            const char *return_end = expression + std::strlen(expression);
+            type_id expected_return_type = 0;
+
+            if (!lower_scalar_operand(unit, function, return_begin, return_end,
+                    result, current_region, value_by_item, place_by_item,
+                    &next_place, &next_value, &next_operation, origin, false,
+                    &returned, diagnostic))
+                return false;
+            if (function->return_kind == CBLC_FUNCTION_RETURN_INT)
+                expected_return_type = scalar_type_id(CBLC_DATA_KIND_INT);
+            else if (function->return_kind == CBLC_FUNCTION_RETURN_DOUBLE)
+                expected_return_type = scalar_type_id(CBLC_DATA_KIND_DOUBLE);
+            else if (function->return_kind == CBLC_FUNCTION_RETURN_CHAR)
+                expected_return_type = scalar_type_id(CBLC_DATA_KIND_CHAR);
+            if (expected_return_type == 0 || returned.type != expected_return_type)
+                return fail(diagnostic, verification_error::invalid_type_or_projection,
+                    return_operation.id,
+                    "typed scalar return expression does not match the declared return type");
+            return_operation.operands.push_back(returned.value);
+            if (returned.producer != 0)
+                return_operation.must_follow.push_back(returned.producer);
+        }
+        /* Evaluate/materialize the return expression before ending by-value
+         * parameter lifetimes.  This matters when the returned scalar is a
+         * member of an owned class parameter. */
         for (auto parameter = result->entry_live_values.rbegin();
             parameter != result->entry_live_values.rend(); ++parameter)
         {
@@ -4460,94 +4543,6 @@ static bool lower_scalar_function_impl(const t_cblc_translation_unit *unit,
             cleanup_origin.role = "implicit-by-value-parameter-destruction";
             cleanup_origin.compiler_generated = true;
             if (!append_destroy_tree(*parameter, cleanup_origin, true))
-                return false;
-        }
-        if (*expression != '\0')
-        {
-            const t_cblc_data_item *return_item = find_scalar_item(unit, function, expression);
-            place_id resolved_return_place = 0;
-            type_id resolved_return_type = return_item
-                ? scalar_type_id(return_item->kind) : 0;
-            if (return_item)
-            {
-                const auto return_place = place_by_item.find(return_item);
-                if (return_place == place_by_item.end())
-                    return fail(diagnostic, verification_error::unsupported_legacy_type,
-                        return_operation.id,
-                        "returned scalar is outside the finalized function storage map");
-                resolved_return_place = return_place->second;
-            }
-            else
-            {
-                const t_cblc_data_item *member_root = nullptr;
-                std::vector<place_projection> member_projections;
-                access_mode member_access = access_mode::read_only;
-                if (!resolve_scalar_member_expression(unit, function, expression,
-                        &member_root, &member_projections, &resolved_return_type,
-                        &member_access))
-                    return fail(diagnostic,
-                        verification_error::unsupported_legacy_statement,
-                        return_operation.id,
-                        "scalar adapter requires a named scalar or a resolved scalar member path");
-                const auto root_value = value_by_item.find(member_root);
-                const auto root_place = place_by_item.find(member_root);
-                if (root_value == value_by_item.end()
-                    || root_place == place_by_item.end())
-                    return fail(diagnostic, verification_error::unsupported_legacy_type,
-                        return_operation.id,
-                        "member expression root is outside the finalized function storage map");
-                const auto root_place_value = std::find_if(result->places.begin(),
-                    result->places.end(), [&](const typed_place &place)
-                    {
-                        return place.id == root_place->second;
-                    });
-                const auto root_typed_value = std::find_if(result->values.begin(),
-                    result->values.end(), [&](const typed_value &value)
-                    {
-                        return value.id == root_value->second;
-                    });
-                if (root_place_value == result->places.end()
-                    || root_typed_value == result->values.end())
-                    return fail(diagnostic, verification_error::invalid_type_or_projection,
-                        return_operation.id,
-                        "member expression root has no canonical typed place/value");
-                typed_place member_place = *root_place_value;
-                member_place.id = next_place++;
-                member_place.type = resolved_return_type;
-                member_place.access = member_access;
-                member_place.projections.insert(member_place.projections.end(),
-                    member_projections.begin(), member_projections.end());
-                member_place.owner_lifetime_token =
-                    root_typed_value->lifetime_token != 0
-                    ? root_typed_value->lifetime_token : root_typed_value->id;
-                resolved_return_place = member_place.id;
-                result->places.push_back(std::move(member_place));
-            }
-            if (resolved_return_type == 0 || resolved_return_place == 0)
-                return fail(diagnostic, verification_error::unsupported_legacy_statement,
-                    return_operation.id,
-                    "scalar return expression has no finalized typed place");
-            typed_value loaded;
-            loaded.id = next_value++;
-            loaded.type = resolved_return_type;
-            loaded.category = value_category::scalar;
-            loaded.provenance.push_back(origin);
-            result->values.push_back(loaded);
-            typed_operation load;
-            load.id = next_operation++;
-            load.operation = opcode::load;
-            load.places.push_back(resolved_return_place);
-            load.results.push_back(loaded.id);
-            load.effects.reads.push_back(resolved_return_place);
-            load.effects.exceptions = exception_effect::non_throwing;
-            operation_outcome load_outcome;
-            load_outcome.initialized.push_back(loaded.id);
-            load.outcomes.push_back(load_outcome);
-            load.provenance.push_back(origin);
-            return_operation.operands.push_back(loaded.id);
-            return_operation.must_follow.push_back(load.id);
-            if (!append_typed_operation(result, current_region,
-                    std::move(load), diagnostic))
                 return false;
         }
         if (!append_typed_operation(result, current_region,
@@ -4774,7 +4769,9 @@ bool lower_scalar_method(const t_cblc_translation_unit *unit,
     t_cblc_function adapted_function{};
     t_cblc_translation_unit adapted_unit = *unit;
     std::vector<t_cblc_data_item> adapted_data_items;
+    std::vector<t_cblc_statement> adapted_statements;
     std::vector<typed_receiver_field_binding> receiver_fields;
+    std::unordered_set<std::string> method_scoped_storage_names;
     t_cblc_data_item receiver_item{};
     char receiver_source_name[TRANSPILE_IDENTIFIER_MAX];
     if (ft_strlcpy(adapted_function.source_name, method.scope_source_name,
@@ -4837,18 +4834,19 @@ bool lower_scalar_method(const t_cblc_translation_unit *unit,
     for (t_cblc_data_item &item : adapted_data_items)
         if (std::strcmp(item.owner_function_name, method.scope_source_name) == 0
             && !item.is_function_local)
+        {
             item.is_active = 1;
+        }
+    for (const t_cblc_data_item &item : adapted_data_items)
+        if (!item.is_alias
+            && std::strcmp(item.owner_function_name,
+                method.scope_source_name) == 0)
+            method_scoped_storage_names.emplace(item.cobol_name);
     for (t_cblc_data_item &alias : adapted_data_items)
-        if (alias.is_alias)
-            for (const t_cblc_data_item &scoped_item : adapted_data_items)
-                if (!scoped_item.is_alias
-                    && std::strcmp(scoped_item.cobol_name, alias.cobol_name) == 0
-                    && std::strcmp(scoped_item.owner_function_name,
-                        method.scope_source_name) == 0)
-                {
-                    alias.is_active = 1;
-                    break;
-                }
+        if (alias.is_alias
+            && method_scoped_storage_names.find(alias.cobol_name)
+                != method_scoped_storage_names.end())
+            alias.is_active = 1;
     std::function<bool(const t_cblc_struct_type &, const std::string &,
         const std::string &, std::vector<place_projection>,
         std::unordered_set<std::size_t>)> collect_receiver_fields;
@@ -5024,8 +5022,30 @@ bool lower_scalar_method(const t_cblc_translation_unit *unit,
     if (method.parameter_count > 0)
         std::memcpy(adapted_function.parameters, method.parameters,
             method.parameter_count * sizeof(adapted_function.parameters[0]));
-    adapted_function.statements = method.statements;
-    adapted_function.statement_count = method.statement_count;
+    adapted_statements.reserve(method.statement_count);
+    for (std::size_t statement_index = 0;
+        statement_index < method.statement_count; ++statement_index)
+    {
+        const t_cblc_statement &statement = method.statements[statement_index];
+        bool materialized_parameter_cleanup = false;
+
+        if (statement.type == CBLC_STATEMENT_DESTRUCT)
+            for (std::size_t parameter_index = 0;
+                parameter_index < method.parameter_count; ++parameter_index)
+                if (parameter_index < std::numeric_limits<unsigned int>::digits
+                    && (method.template_value_parameter_cleanup_mask
+                            & (1U << parameter_index)) != 0
+                    && std::strcmp(statement.target,
+                        method.parameters[parameter_index].cobol_name) == 0)
+                {
+                    materialized_parameter_cleanup = true;
+                    break;
+                }
+        if (!materialized_parameter_cleanup)
+            adapted_statements.push_back(statement);
+    }
+    adapted_function.statements = adapted_statements.data();
+    adapted_function.statement_count = adapted_statements.size();
     adapted_function.return_kind = method.return_kind;
     adapted_function.template_return_pointer_depth =
         method.template_return_pointer_depth;
@@ -5941,15 +5961,52 @@ bool verify_typed_function(const typed_function &function,
                 return fail(diagnostic, verification_error::invalid_type_or_projection,
                     operation.id,
                     "copy/move assignment target must be owned or a mutable borrow tied to its owner's lifetime");
-            if (source->category != value_category::owned_object
+            const bool owned_source = source->category
+                == value_category::owned_object;
+            const bool borrowed_copy_source = !is_move
+                && source->category == value_category::borrow
+                && source->lifetime_token != 0;
+            if ((!owned_source && !borrowed_copy_source)
                 || operation.effects.reads.size() != 1
                 || operation.effects.reads.front() != operation.places.front()
                 || operation.effects.writes.size() != 1
                 || operation.effects.writes.front() != operation.places.front()
                 || operation.effects.constructs || operation.effects.destroys)
+            {
+                std::string source_name = "<unbound>";
+                for (const typed_place &source_place : function.places)
+                {
+                    if (source_place.base_value != source->id
+                        || source_place.symbol == 0)
+                        continue;
+                    const auto source_symbol = std::find_if(
+                        function.symbols.begin(), function.symbols.end(),
+                        [&](const typed_symbol &symbol)
+                        {
+                            return symbol.id == source_place.symbol;
+                        });
+                    if (source_symbol != function.symbols.end())
+                        source_name = source_symbol->canonical_name;
+                    break;
+                }
+                const std::string reason =
+                    "copy assignment requires an owned or lifetime-bound borrowed source; move assignment requires an owned source and exact read/write effects on its target (source-category="
+                    + std::to_string(static_cast<int>(source->category))
+                    + ", source-lifetime="
+                    + std::to_string(source->lifetime_token)
+                    + ", source-name=" + source_name
+                    + ", reads=" + std::to_string(operation.effects.reads.size())
+                    + ", writes=" + std::to_string(operation.effects.writes.size())
+                    + ", target-place=" + std::to_string(operation.places.front())
+                    + ", read-place=" + (operation.effects.reads.empty()
+                        ? std::string("none")
+                        : std::to_string(operation.effects.reads.front()))
+                    + ", write-place=" + (operation.effects.writes.empty()
+                        ? std::string("none")
+                        : std::to_string(operation.effects.writes.front())) + ")";
                 return fail(diagnostic, verification_error::invalid_type_or_projection,
-                    operation.id,
-                    "copy/move assignment requires an owned source and exact read/write effects on its target");
+                    operation.id, reason.c_str());
+            }
             const auto callable = callables.find(operation.callee);
             const callable_kind expected_kind = is_move
                 ? callable_kind::move_assignment
@@ -7884,7 +7941,13 @@ static bool analyze_lifetime_transitions(const typed_function &function,
             {
                 const typed_place &target_place = *places.at(operation->places.front());
                 const auto target = tracked_values.find(target_place.base_value);
-                const auto source = tracked_values.find(operation->operands.front());
+                const value_id source_id = operation->operands.front();
+                const auto source = tracked_values.find(source_id);
+                const auto source_value = std::find_if(function.values.begin(),
+                    function.values.end(), [&](const typed_value &value)
+                    {
+                        return value.id == source_id;
+                    });
                 const auto target_value = std::find_if(function.values.begin(),
                     function.values.end(), [&](const typed_value &value)
                     {
@@ -7895,8 +7958,29 @@ static bool analyze_lifetime_transitions(const typed_function &function,
                         verification_error::dangling_reference,
                         operation->id,
                         "assignment target has no canonical value identity");
-                const lifetime_state source_state = source == tracked_values.end()
+                lifetime_state source_state = source == tracked_values.end()
                     ? lifetime_state::uninitialized : state[source->second];
+                if (source_value != function.values.end()
+                    && source_value->category == value_category::borrow
+                    && source_value->lifetime_token != 0)
+                {
+                    for (const typed_value &owner_value : function.values)
+                    {
+                        if (owner_value.category != value_category::owned_object
+                            || owner_value.lifetime_token
+                                != source_value->lifetime_token)
+                            continue;
+                        const auto owner = tracked_values.find(owner_value.id);
+                        if (owner != tracked_values.end()
+                            && (state[owner->second] == lifetime_state::live
+                                || state[owner->second]
+                                    == lifetime_state::moved_from))
+                        {
+                            source_state = lifetime_state::live;
+                            break;
+                        }
+                    }
+                }
                 const bool target_is_live = target_value->category
                         == value_category::borrow
                     ? target_value->lifetime_token != 0
@@ -7911,7 +7995,7 @@ static bool analyze_lifetime_transitions(const typed_function &function,
                     return fail(diagnostic,
                         verification_error::use_after_lifetime_end,
                         operation->id,
-                        "copy/move assignment requires live source and target objects");
+                        "copy/move assignment requires a live source and target; borrowed copy sources must have a live owner");
             }
             if (operation->operation == opcode::destroy)
             {

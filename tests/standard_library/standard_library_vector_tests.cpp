@@ -1,5 +1,7 @@
 #include "standard_library_test_support.hpp"
 
+#include "../compiler/cobol/round_trip_pipeline_helpers.hpp"
+
 #include <chrono>
 #include <cctype>
 #include <cstdlib>
@@ -50,6 +52,78 @@ static int vector_cobol_contains(const char *source_path, const char *needle)
             return (FT_SUCCESS);
     }
     return (FT_FAILURE);
+}
+
+static size_t vector_count_output_lines(const char *output, const char *expected_line)
+{
+    const char *line_start;
+    size_t match_count;
+    const size_t expected_length = expected_line
+        ? std::strlen(expected_line) : 0;
+
+    if (!output || !expected_line || expected_length == 0)
+        return (0);
+    line_start = output;
+    match_count = 0;
+    while (*line_start != '\0')
+    {
+        const char *line_end = std::strchr(line_start, '\n');
+        const size_t line_length = line_end
+            ? static_cast<size_t>(line_end - line_start)
+            : std::strlen(line_start);
+
+        if (line_length == expected_length
+            && std::memcmp(line_start, expected_line, expected_length) == 0)
+            match_count += 1;
+        if (!line_end)
+            break ;
+        line_start = line_end + 1;
+    }
+    return (match_count);
+}
+
+static int vector_output_marker_has_value(const char *output,
+    const char *marker, const char *expected_value)
+{
+    const char *marker_line;
+    const char *value_start;
+    const char *value_end;
+    const size_t expected_length = expected_value
+        ? std::strlen(expected_value) : 0;
+
+    if (!output || !marker || !expected_value || expected_length == 0
+        || vector_count_output_lines(output, marker) != 1)
+        return (FT_FAILURE);
+    marker_line = std::strstr(output, marker);
+    if (!marker_line || !(value_start = std::strchr(marker_line, '\n')))
+        return (FT_FAILURE);
+    value_start += 1;
+    value_end = std::strchr(value_start, '\n');
+    if (!value_end || static_cast<size_t>(value_end - value_start)
+            != expected_length
+        || std::memcmp(value_start, expected_value, expected_length) != 0)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static void vector_report_first_output_difference(const char *expected,
+    const char *actual)
+{
+    size_t line_number = 1;
+
+    if (!expected || !actual)
+        return ;
+    while (*expected != '\0' && *actual != '\0' && *expected == *actual)
+    {
+        if (*expected == '\n')
+            line_number += 1;
+        expected += 1;
+        actual += 1;
+    }
+    if (*expected == '\0' && *actual == '\0')
+        return ;
+    std::printf("First output difference at line %zu; expected near: %.100s; actual near: %.100s\n",
+        line_number, expected, actual);
 }
 
 static int vector_cobol_has_paragraph(const char *source_path, const char *paragraph_name)
@@ -125,6 +199,494 @@ static int vector_cobol_paragraph_performs_defined_method(
         }
     }
     return (FT_FAILURE);
+}
+
+static int vector_cobol_paragraph_contains_line_token(
+    const char *source_path, const char *paragraph_name, const char *token)
+{
+    std::ifstream source(source_path);
+    std::string line;
+    int in_paragraph = 0;
+
+    if (!source || !paragraph_name || paragraph_name[0] == '\0'
+        || !token || token[0] == '\0')
+        return (FT_FAILURE);
+    while (std::getline(source, line))
+    {
+        size_t leading_spaces = 0;
+
+        while (leading_spaces < line.size() && line[leading_spaces] == ' ')
+            leading_spaces += 1;
+        if (!in_paragraph)
+        {
+            if (leading_spaces == 7
+                && line.size() == leading_spaces + std::strlen(paragraph_name) + 1
+                && line.compare(leading_spaces, std::strlen(paragraph_name),
+                    paragraph_name) == 0
+                && line.back() == '.')
+                in_paragraph = 1;
+            continue ;
+        }
+        if (leading_spaces == 7 && line.size() > leading_spaces
+            && line.back() == '.')
+            return (FT_FAILURE);
+        if (line.find(token) != std::string::npos)
+            return (FT_SUCCESS);
+    }
+    return (FT_FAILURE);
+}
+
+static int vector_compile_and_run_depth_16_cobol(const char *generated_cobol)
+{
+    char directory[256];
+    char source_path[256];
+    char binary_path[256];
+    char output_path[256];
+    char compile_log_path[256];
+    char output_buffer[131072];
+    std::string expected_output;
+    int directory_created = 0;
+    int status = FT_FAILURE;
+
+    if (!generated_cobol)
+        return (FT_FAILURE);
+    expected_output.clear();
+    for (size_t level = 1; level <= 16; ++level)
+        expected_output += "NESTED SELF ASSIGN LEVEL "
+            + std::to_string(level) + " OK\n";
+    for (size_t level = 1; level <= 16; ++level)
+        expected_output += "NESTED EDGE END INSERT ERASE LEVEL "
+            + std::to_string(level) + " OK\nNESTED EDGE RESET LEVEL "
+            + std::to_string(level) + " OK\n";
+    expected_output += "NESTED EDGE REUSE OK\n";
+    for (size_t level = 1; level <= 16; ++level)
+    {
+        expected_output += "EMPTY AT NEGATIVE LEVEL " + std::to_string(level)
+            + "\nEMPTY AT END LEVEL " + std::to_string(level)
+            + "\nEMPTY ERASE LEVEL " + std::to_string(level)
+            + "\nEMPTY POP BACK LEVEL " + std::to_string(level)
+            + "\nEMPTY RESIZE NEGATIVE LEVEL " + std::to_string(level)
+            + "\nEMPTY BOUNDS STATE LEVEL " + std::to_string(level)
+            + "\n+000000000\n";
+    }
+    expected_output += "EMPTY NESTED BOUNDS\n+000000001\n"
+        "LEAF CONSTRUCTED\nLEAF PARSED\n"
+        "STRING COPY CHECK\n+000000001\n";
+    for (size_t level = 1; level <= 16; ++level)
+        expected_output += "NESTED LEVEL " + std::to_string(level)
+            + " INSERTED\n";
+    expected_output.insert(expected_output.find("NESTED LEVEL 1 INSERTED"),
+        "NESTED LEVEL 1 REALLOCATED\n");
+    expected_output += "NESTED VALUE COPIED\nBORROWED LEAF RESOLVED\n"
+        "NESTED VALUE MUTATED\nNESTED VECTOR DEPTH 16 OK\n"
+        "DEPTH 16 CLEAR PRESERVES SOURCE AND CAPACITY\n"
+        "DEPTH 16 REPEATED CLEAR\n"
+        "DEPTH 16 REUSE AFTER CLEAR\n"
+        "DEPTH 16 POP BACK AFTER REUSE\n";
+    expected_output.insert(expected_output.find("NESTED VALUE COPIED"),
+        "BEFORE NESTED RETURN COPY\nAFTER NESTED RETURN COPY\n");
+    {
+        std::string chain_checkpoints;
+
+        for (size_t step = 1; step <= 16; ++step)
+            chain_checkpoints += "CHAIN STEP " + std::to_string(step) + "\n";
+        expected_output.insert(expected_output.find("NESTED VALUE COPIED"),
+            chain_checkpoints);
+    }
+    {
+        std::string populated_boundary_checkpoints;
+        static const char *const boundary_cases[] = {
+            "EMPTY AT NEGATIVE LEVEL", "EMPTY AT END LEVEL",
+            "EMPTY ERASE LEVEL", "EMPTY RESIZE NEGATIVE LEVEL",
+            "EMPTY POP BACK LEVEL",
+            "POPULATED AT NEGATIVE LEVEL", "POPULATED AT END LEVEL",
+            "POPULATED INSERT NEGATIVE LEVEL", "POPULATED INSERT END LEVEL",
+            "POPULATED ERASE NEGATIVE LEVEL", "POPULATED ERASE END LEVEL",
+            "POPULATED RESIZE NEGATIVE LEVEL",
+            "POPULATED ASSIGN NEGATIVE LEVEL"
+        };
+
+        populated_boundary_checkpoints = "BEFORE DIRECT CHAIN\n";
+        for (size_t level = 1; level <= 16; ++level)
+        {
+            for (size_t case_index = 5;
+                case_index < sizeof(boundary_cases) / sizeof(boundary_cases[0]);
+                ++case_index)
+                populated_boundary_checkpoints += boundary_cases[case_index]
+                    + std::string(" ") + std::to_string(level) + "\n";
+            populated_boundary_checkpoints += "POPULATED BOUNDS STATE LEVEL "
+                + std::to_string(level) + "\n"
+                + ((level == 1 || level == 16)
+                    ? "+000000002\n" : "+000000001\n");
+        }
+        populated_boundary_checkpoints += "POPULATED NESTED BOUNDS\n+000000001\n"
+            "AFTER DIRECT CHAIN\n"
+            "BEFORE SUFFIX CONSTRUCT\nAFTER SUFFIX CONSTRUCT\n";
+        {
+            std::string reserve_checkpoints;
+
+            for (size_t level = 1; level <= 16; ++level)
+                reserve_checkpoints += "NESTED NEGATIVE RESERVE LEVEL "
+                    + std::to_string(level) + "\nNESTED RESERVE LEVEL "
+                    + std::to_string(level) + " OK\n";
+            reserve_checkpoints += "NESTED RESERVE LIFECYCLE OK\n";
+            populated_boundary_checkpoints.insert(
+                populated_boundary_checkpoints.find("AFTER DIRECT CHAIN"),
+                reserve_checkpoints);
+        }
+        expected_output.insert(expected_output.find("NESTED VALUE COPIED"),
+            populated_boundary_checkpoints);
+    }
+    expected_output.insert(expected_output.find("CHAIN STEP 1"),
+        "NESTED COPY ASSIGNMENT INDEPENDENCE\n+000000001\n");
+    {
+        std::string size_checkpoints;
+
+        for (size_t level = 1; level <= 16; ++level)
+            size_checkpoints += "SIZE CHECK LEVEL " + std::to_string(level)
+                + "\n";
+        expected_output.insert(expected_output.find("NESTED VALUE COPIED"),
+            size_checkpoints);
+    }
+    if (!test_cobc_available())
+        return (test_require_cobc_dependency(__func__));
+    directory[0] = '\0';
+    source_path[0] = '\0';
+    binary_path[0] = '\0';
+    output_path[0] = '\0';
+    compile_log_path[0] = '\0';
+    if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
+        goto cleanup;
+    directory_created = 1;
+    if (test_join_path(directory, "nested_vector_depth_16.cob", source_path,
+            sizeof(source_path)) != FT_SUCCESS
+        || test_join_path(directory, "nested_vector_depth_16.bin", binary_path,
+            sizeof(binary_path)) != FT_SUCCESS
+        || test_join_path(directory, "nested_vector_depth_16.txt", output_path,
+            sizeof(output_path)) != FT_SUCCESS
+        || test_join_path(directory, "nested_vector_depth_16_compile.log",
+            compile_log_path, sizeof(compile_log_path)) != FT_SUCCESS
+        || test_write_text_file(source_path, generated_cobol) != FT_SUCCESS)
+        goto cleanup;
+    if (compile_generated_cobol(binary_path, source_path, compile_log_path,
+            "cobc should compile the depth-16 nested vector program") != FT_SUCCESS)
+    {
+        if (test_read_text_file(compile_log_path, output_buffer,
+                sizeof(output_buffer)) == FT_SUCCESS)
+            std::printf("Depth-16 COBOL compiler diagnostics:\n%s\n", output_buffer);
+        goto cleanup;
+    }
+    if (execute_binary(directory, "nested_vector_depth_16.bin",
+            "nested_vector_depth_16.txt",
+            "depth-16 nested vector COBOL should execute") != FT_SUCCESS
+        || test_read_text_file(output_path, output_buffer,
+            sizeof(output_buffer)) != FT_SUCCESS
+        || std::strcmp(output_buffer, expected_output.c_str()) != 0)
+    {
+        std::printf("Depth-16 nested vector execution did not produce its success marker\n");
+        if (test_read_text_file(output_path, output_buffer,
+                sizeof(output_buffer)) == FT_SUCCESS)
+        {
+            vector_report_first_output_difference(expected_output.c_str(),
+                output_buffer);
+            std::printf("Depth-16 COBOL runtime output:\n%s\n", output_buffer);
+        }
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (directory_created)
+    {
+        const char *preserve_failed_artifacts =
+            std::getenv("CTOC_KEEP_FAILED_TEST_ARTIFACTS");
+
+        if (status == FT_SUCCESS || !preserve_failed_artifacts
+            || preserve_failed_artifacts[0] == '\0'
+            || std::strcmp(preserve_failed_artifacts, "0") == 0)
+        {
+            test_cleanup_example_artifacts_with_log(source_path, binary_path,
+                output_path, compile_log_path);
+            test_remove_directory(directory);
+        }
+        else
+            std::printf("Depth-16 artifacts retained at %s\n", directory);
+    }
+    return (status);
+}
+
+static int vector_compile_and_run_nested_depth_cobol(
+    const char *generated_cobol, size_t depth)
+{
+    char directory[256];
+    char source_name[80];
+    char binary_name[80];
+    char output_name[80];
+    char compile_name[80];
+    char source_path[256];
+    char binary_path[256];
+    char output_path[256];
+    char compile_log_path[256];
+    char output_buffer[131072];
+    char success_marker[80];
+    int directory_created;
+    int status;
+
+    if (!generated_cobol || depth == 0
+        || std::snprintf(source_name, sizeof(source_name),
+            "nested_vector_depth_%zu.cob", depth) < 0
+        || std::snprintf(binary_name, sizeof(binary_name),
+            "nested_vector_depth_%zu.bin", depth) < 0
+        || std::snprintf(output_name, sizeof(output_name),
+            "nested_vector_depth_%zu.txt", depth) < 0
+        || std::snprintf(compile_name, sizeof(compile_name),
+            "nested_vector_depth_%zu_compile.log", depth) < 0
+        || std::snprintf(success_marker, sizeof(success_marker),
+            "NESTED VECTOR DEPTH %zu OK", depth) < 0)
+        return (FT_FAILURE);
+    if (!test_cobc_available())
+        return (test_require_cobc_dependency(__func__));
+    directory[0] = '\0';
+    source_path[0] = '\0';
+    binary_path[0] = '\0';
+    output_path[0] = '\0';
+    compile_log_path[0] = '\0';
+    directory_created = 0;
+    status = FT_FAILURE;
+    if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
+        goto cleanup;
+    directory_created = 1;
+    if (test_join_path(directory, source_name, source_path,
+            sizeof(source_path)) != FT_SUCCESS
+        || test_join_path(directory, binary_name, binary_path,
+            sizeof(binary_path)) != FT_SUCCESS
+        || test_join_path(directory, output_name, output_path,
+            sizeof(output_path)) != FT_SUCCESS
+        || test_join_path(directory, compile_name, compile_log_path,
+            sizeof(compile_log_path)) != FT_SUCCESS
+        || test_write_text_file(source_path, generated_cobol) != FT_SUCCESS)
+        goto cleanup;
+    if (compile_generated_cobol(binary_path, source_path, compile_log_path,
+            "cobc should compile a nested vector specialization") != FT_SUCCESS)
+    {
+        if (test_read_text_file(compile_log_path, output_buffer,
+                sizeof(output_buffer)) == FT_SUCCESS)
+            std::printf("Depth-%zu COBOL compiler diagnostics:\n%s\n",
+                depth, output_buffer);
+        goto cleanup;
+    }
+    if (execute_binary(directory, binary_name, output_name,
+            "nested vector COBOL specialization should execute") != FT_SUCCESS
+        || test_read_text_file(output_path, output_buffer,
+            sizeof(output_buffer)) != FT_SUCCESS
+        || !std::strstr(output_buffer, success_marker)
+        || !std::strstr(output_buffer,
+            "EMPTY NESTED BOUNDS\n+000000001\n")
+        || !std::strstr(output_buffer,
+            "POPULATED NESTED BOUNDS\n+000000001\n")
+        || !std::strstr(output_buffer,
+            "NESTED COPY ASSIGNMENT INDEPENDENCE\n+000000001\n")
+        || !std::strstr(output_buffer, "NESTED RESERVE LIFECYCLE OK")
+        || std::strstr(output_buffer, "NESTED RESERVE LIFECYCLE FAILED")
+        || (depth != 16
+            && !std::strstr(output_buffer, "NESTED ERASE LIFECYCLE OK"))
+        || std::strstr(output_buffer, "NESTED ERASE LIFECYCLE FAILED")
+        || std::strstr(output_buffer, "EMPTY NESTED BOUNDS\n+000000000\n")
+        || std::strstr(output_buffer, "POPULATED NESTED BOUNDS\n+000000000\n")
+        || std::strstr(output_buffer, "Fatal CBL-C double exception")
+        || std::strstr(output_buffer, "Unhandled CBL-C exception")
+        || std::strstr(output_buffer, "NESTED EDGE REUSE FAILED"))
+    {
+        std::printf("Depth-%zu COBOL runtime did not complete its nested lifecycle checks\n",
+            depth);
+        if (test_read_text_file(output_path, output_buffer,
+                sizeof(output_buffer)) == FT_SUCCESS)
+            std::printf("Depth-%zu COBOL runtime output:\n%s\n",
+                depth, output_buffer);
+        goto cleanup;
+    }
+    for (size_t level = 1; level <= depth; ++level)
+    {
+        static const char *const boundary_cases[] = {
+            "EMPTY AT NEGATIVE LEVEL", "EMPTY AT END LEVEL",
+            "EMPTY ERASE LEVEL", "EMPTY RESIZE NEGATIVE LEVEL",
+            "EMPTY POP BACK LEVEL",
+            "POPULATED AT NEGATIVE LEVEL", "POPULATED AT END LEVEL",
+            "POPULATED INSERT NEGATIVE LEVEL", "POPULATED INSERT END LEVEL",
+            "POPULATED ERASE NEGATIVE LEVEL", "POPULATED ERASE END LEVEL",
+            "POPULATED RESIZE NEGATIVE LEVEL"
+        };
+
+        for (size_t case_index = 0;
+            case_index < sizeof(boundary_cases) / sizeof(boundary_cases[0]);
+            ++case_index)
+        {
+            char expected_line[96];
+
+            if (std::snprintf(expected_line, sizeof(expected_line), "%s %zu",
+                    boundary_cases[case_index], level) < 0
+                || vector_count_output_lines(output_buffer, expected_line) != 1)
+            {
+                std::printf("Depth-%zu COBOL runtime did not report boundary case '%s %zu' exactly once\n",
+                    depth, boundary_cases[case_index], level);
+                std::printf("Depth-%zu COBOL runtime output:\n%s\n",
+                    depth, output_buffer);
+                goto cleanup;
+            }
+        }
+        {
+            char empty_state_marker[96];
+            char populated_state_marker[96];
+            char expected_size[32];
+            const size_t populated_size = level == depth ? 2
+                : (depth == 16 && level == 1 ? 2 : 1);
+
+            if (std::snprintf(empty_state_marker,
+                    sizeof(empty_state_marker),
+                    "EMPTY BOUNDS STATE LEVEL %zu", level) < 0
+                || std::snprintf(populated_state_marker,
+                    sizeof(populated_state_marker),
+                    "POPULATED BOUNDS STATE LEVEL %zu", level) < 0
+                || vector_output_marker_has_value(output_buffer,
+                    empty_state_marker, "+000000000") != FT_SUCCESS
+                || std::snprintf(expected_size, sizeof(expected_size),
+                    "+%09zu", populated_size) < 0
+                || vector_output_marker_has_value(output_buffer,
+                    populated_state_marker, expected_size) != FT_SUCCESS)
+            {
+                std::printf("Depth-%zu COBOL runtime did not preserve the exact empty/populated size after all invalid operations at nested level %zu\n",
+                    depth, level);
+                std::printf("Depth-%zu COBOL runtime output:\n%s\n",
+                    depth, output_buffer);
+                goto cleanup;
+            }
+        }
+        {
+            char reserve_success[96];
+            char reserve_failure[96];
+            char reserve_exception[96];
+
+            if (std::snprintf(reserve_success, sizeof(reserve_success),
+                    "NESTED RESERVE LEVEL %zu OK", level) < 0
+                || std::snprintf(reserve_failure, sizeof(reserve_failure),
+                    "NESTED RESERVE LEVEL %zu FAILED", level) < 0
+                || std::snprintf(reserve_exception, sizeof(reserve_exception),
+                    "NESTED NEGATIVE RESERVE LEVEL %zu", level) < 0
+                || vector_count_output_lines(output_buffer, reserve_success) != 1
+                || vector_count_output_lines(output_buffer, reserve_failure) != 0
+                || vector_count_output_lines(output_buffer, reserve_exception) != 1)
+            {
+                std::printf("Depth-%zu COBOL runtime did not prove reallocation and failed-reserve state preservation at nested level %zu\n",
+                    depth, level);
+                std::printf("Depth-%zu COBOL runtime output:\n%s\n",
+                    depth, output_buffer);
+                goto cleanup;
+            }
+        }
+    }
+    for (size_t level = 1; level <= depth; ++level)
+    {
+        char edge_reset[96];
+        char edge_failure[96];
+
+        if (std::snprintf(edge_reset, sizeof(edge_reset),
+                "NESTED EDGE RESET LEVEL %zu OK", level) < 0
+            || std::snprintf(edge_failure, sizeof(edge_failure),
+                "NESTED EDGE RESET LEVEL %zu FAILED", level) < 0
+            || vector_count_output_lines(output_buffer, edge_reset) != 1
+            || vector_count_output_lines(output_buffer, edge_failure) != 0)
+        {
+            std::printf("Depth-%zu COBOL runtime did not verify valid self-aliased insert, erase, clear, and empty state at nested level %zu\n",
+                depth, level);
+            std::printf("Depth-%zu COBOL runtime output:\n%s\n",
+                depth, output_buffer);
+            goto cleanup;
+        }
+    }
+    for (size_t level = 1; level <= depth; ++level)
+    {
+        char end_insert_erase[112];
+        char end_insert_erase_failure[112];
+
+        if (std::snprintf(end_insert_erase, sizeof(end_insert_erase),
+                "NESTED EDGE END INSERT ERASE LEVEL %zu OK", level) < 0
+            || std::snprintf(end_insert_erase_failure,
+                sizeof(end_insert_erase_failure),
+                "NESTED EDGE END INSERT ERASE LEVEL %zu FAILED", level) < 0
+            || vector_count_output_lines(output_buffer, end_insert_erase) != 1
+            || vector_count_output_lines(output_buffer,
+                end_insert_erase_failure) != 0)
+        {
+            std::printf("Depth-%zu COBOL runtime did not verify valid end insertion and last-element erase at nested level %zu\n",
+                depth, level);
+            std::printf("Depth-%zu COBOL runtime output:\n%s\n",
+                depth, output_buffer);
+            goto cleanup;
+        }
+    }
+    if (vector_count_output_lines(output_buffer,
+            "NESTED EDGE REUSE OK") != 1
+        || vector_count_output_lines(output_buffer,
+            "NESTED EDGE REUSE FAILED") != 0)
+    {
+        std::printf("Depth-%zu COBOL runtime did not verify nested reuse after clear\n",
+            depth);
+        std::printf("Depth-%zu COBOL runtime output:\n%s\n",
+            depth, output_buffer);
+        goto cleanup;
+    }
+    for (size_t level = 1; level <= depth; ++level)
+    {
+        char self_assignment[112];
+        char self_assignment_failure[112];
+
+        if (std::snprintf(self_assignment, sizeof(self_assignment),
+                "NESTED SELF ASSIGN LEVEL %zu OK", level) < 0
+            || std::snprintf(self_assignment_failure,
+                sizeof(self_assignment_failure),
+                "NESTED SELF ASSIGN LEVEL %zu FAILED", level) < 0
+            || vector_count_output_lines(output_buffer, self_assignment) != 1
+            || vector_count_output_lines(output_buffer,
+                self_assignment_failure) != 0)
+        {
+            std::printf("Depth-%zu COBOL runtime did not prove repeated self-assignment preserves nested value state at level %zu\n",
+                depth, level);
+            std::printf("Depth-%zu COBOL runtime output:\n%s\n",
+                depth, output_buffer);
+            goto cleanup;
+        }
+    }
+    {
+        char failure_marker[80];
+
+        std::snprintf(failure_marker, sizeof(failure_marker),
+            "NESTED VECTOR DEPTH %zu FAILED", depth);
+        if (vector_count_output_lines(output_buffer, success_marker) != 1
+            || vector_count_output_lines(output_buffer, failure_marker) != 0)
+        {
+            std::printf("Depth-%zu COBOL runtime must emit exactly one success marker and no failure marker\n",
+                depth);
+            goto cleanup;
+        }
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (directory_created)
+    {
+        const char *preserve_failed_artifacts =
+            std::getenv("CTOC_KEEP_FAILED_TEST_ARTIFACTS");
+
+        if (status == FT_SUCCESS || !preserve_failed_artifacts
+            || preserve_failed_artifacts[0] == '\0'
+            || std::strcmp(preserve_failed_artifacts, "0") == 0)
+        {
+            test_cleanup_example_artifacts_with_log(source_path, binary_path,
+                output_path, compile_log_path);
+            test_remove_directory(directory);
+        }
+        else
+            std::printf("Depth-%zu artifacts retained at %s\n", depth, directory);
+    }
+    return (status);
 }
 
 static int vector_make_transpile_command(char *command, size_t command_size,
@@ -239,22 +801,34 @@ static int vector_cobol_has_parameter_member_element_address(const char *source_
     based_view_uses_parameter_pointer = 0;
     {
         std::string::size_type address_start;
-        std::string::size_type field_end;
+        std::string::size_type parameter_address;
+        std::string::size_type based_name_end;
+        std::string::size_type based_member_use;
 
         address_start = normalized_text.find("SET CBLC-PTR-CURSOR TO CBLC-P-");
-        field_end = address_start == std::string::npos
+        parameter_address = address_start == std::string::npos
             ? std::string::npos
-            : normalized_text.find("-CBLC-USER-DATA", address_start);
-        if (field_end != std::string::npos)
+            : normalized_text.find("-ELEMENTS", address_start);
+        if (parameter_address != std::string::npos)
             pointer_derived_from_parameter = 1;
 
-        address_start = normalized_text.find("SET ADDRESS OF CBLC-SPTR-CBLC-P-");
-        field_end = address_start == std::string::npos
+        address_start = normalized_text.find("SET ADDRESS OF CBLC-SPTR-P");
+        parameter_address = address_start == std::string::npos
             ? std::string::npos
-            : normalized_text.find("-CBLC-USER-DATA", address_start);
-        if (field_end != std::string::npos
-            && normalized_text.find("TO CBLC-PTR-CURSOR", field_end)
-                != std::string::npos)
+            : normalized_text.find("TO CBLC-P-", address_start);
+        based_name_end = address_start == std::string::npos
+            ? std::string::npos
+            : normalized_text.find(" TO ", address_start);
+        based_member_use = address_start == std::string::npos
+                || based_name_end == std::string::npos
+            ? std::string::npos
+            : normalized_text.find(normalized_text.substr(address_start +
+                    std::strlen("SET ADDRESS OF "),
+                    based_name_end - (address_start +
+                        std::strlen("SET ADDRESS OF "))) + "-",
+                parameter_address);
+        if (parameter_address != std::string::npos
+            && based_member_use != std::string::npos)
             based_view_uses_parameter_pointer = 1;
     }
     return (pointer_derived_from_parameter && based_view_uses_parameter_pointer
@@ -298,22 +872,112 @@ static int vector_cobol_has_unique_level01_names(const char *source_path)
     return (FT_SUCCESS);
 }
 
-static int vector_cobol_main_contains(const char *source_path, const char *needle)
+static int vector_cobol_method_paragraph_reaches_line_tokens(
+    const char *source_path, const std::string &paragraph_name,
+    const char *first_line_token, const char *second_line_token,
+    std::vector<std::string> &visited, size_t depth)
 {
     std::ifstream source(source_path);
     std::string line;
-    int in_main;
+    std::vector<std::string> callees;
+    int in_paragraph = 0;
 
-    if (!source || !needle)
+    if (!source || depth > 16)
         return (FT_FAILURE);
-    in_main = 0;
+    for (size_t index = 0; index < visited.size(); ++index)
+        if (visited[index] == paragraph_name)
+            return (FT_FAILURE);
+    visited.push_back(paragraph_name);
+    while (std::getline(source, line))
+    {
+        size_t leading_spaces = 0;
+
+        while (leading_spaces < line.size() && line[leading_spaces] == ' ')
+            leading_spaces += 1;
+        if (!in_paragraph)
+        {
+            if (leading_spaces == 7
+                && line.size() == leading_spaces + paragraph_name.size() + 1
+                && line.compare(leading_spaces, paragraph_name.size(),
+                    paragraph_name) == 0
+                && line.back() == '.')
+                in_paragraph = 1;
+            continue ;
+        }
+        if (leading_spaces == 7 && !line.empty() && line.back() == '.')
+            break ;
+        if (line.find(first_line_token) != std::string::npos
+            && line.find(second_line_token) != std::string::npos)
+            return (FT_SUCCESS);
+        {
+            const std::string::size_type perform = line.find("PERFORM ");
+
+            if (perform != std::string::npos)
+            {
+                const std::string::size_type name_start = perform + 8;
+                const std::string::size_type name_end = line.find_first_of(
+                    " .\t", name_start);
+
+                if (name_end != std::string::npos
+                    && line.compare(name_start, 12, "CBLC-METHOD-") == 0)
+                    callees.push_back(line.substr(name_start,
+                        name_end - name_start));
+            }
+        }
+    }
+    for (size_t index = 0; index < callees.size(); ++index)
+        if (vector_cobol_method_paragraph_reaches_line_tokens(source_path,
+                callees[index], first_line_token, second_line_token,
+                visited, depth + 1) == FT_SUCCESS)
+            return (FT_SUCCESS);
+    return (FT_FAILURE);
+}
+
+static int vector_cobol_main_performs_method_writing_line_tokens(
+    const char *source_path, const char *method_prefix,
+    const char *first_line_token, const char *second_line_token)
+{
+    std::ifstream source(source_path);
+    std::string line;
+    std::vector<std::string> method_paragraphs;
+    int in_main = 0;
+
+    if (!source || !method_prefix || !first_line_token || !second_line_token)
+        return (FT_FAILURE);
     while (std::getline(source, line))
     {
         if (line.find("       MAIN.") != std::string::npos)
+        {
             in_main = 1;
-        else if (in_main && line.find("           STOP RUN.") != std::string::npos)
-            return (FT_FAILURE);
-        else if (in_main && line.find(needle) != std::string::npos)
+            continue ;
+        }
+        if (in_main && line.find("           STOP RUN.") != std::string::npos)
+            break ;
+        if (!in_main)
+            continue ;
+        {
+            const std::string::size_type perform = line.find("PERFORM ");
+
+            if (perform == std::string::npos)
+                continue ;
+            const std::string::size_type name_start = perform + 8;
+            const std::string::size_type name_end = line.find_first_of(
+                " .\t", name_start);
+
+            if (name_end != std::string::npos
+                && line.compare(name_start, std::strlen(method_prefix),
+                    method_prefix) == 0)
+                method_paragraphs.push_back(line.substr(name_start,
+                    name_end - name_start));
+        }
+    }
+    for (size_t index = 0; index < method_paragraphs.size(); ++index)
+    {
+        std::vector<std::string> visited;
+
+        if (vector_cobol_method_paragraph_reaches_line_tokens(source_path,
+                method_paragraphs[index], first_line_token, second_line_token,
+                visited, 0) == FT_SUCCESS)
             return (FT_SUCCESS);
     }
     return (FT_FAILURE);
@@ -367,6 +1031,10 @@ static const char *g_vector_runtime_source =
     "int tracked_constructions;\n"
     "int tracked_destructions;\n"
     "int value;\n"
+    "int rollback_construct_attempts;\n"
+    "int rollback_fail_at;\n"
+    "int rollback_successful_constructions;\n"
+    "int rollback_destructions;\n"
     "class Tracked\n"
     "{\n"
     "    public:\n"
@@ -391,6 +1059,27 @@ static const char *g_vector_runtime_source =
     "        tracked_destructions = tracked_destructions + 1;\n"
     "    }\n"
     "};\n"
+    "class ResizeRollbackProbe\n"
+    "{\n"
+    "    public:\n"
+    "    int payload;\n"
+    "    ResizeRollbackProbe()\n"
+    "    {\n"
+    "        rollback_construct_attempts = rollback_construct_attempts + 1;\n"
+    "        if (rollback_construct_attempts == rollback_fail_at) { throw 71; }\n"
+    "        rollback_successful_constructions = rollback_successful_constructions + 1;\n"
+    "        payload = 41;\n"
+    "    }\n"
+    "    ResizeRollbackProbe(ResizeRollbackProbe source)\n"
+    "    {\n"
+    "        rollback_successful_constructions = rollback_successful_constructions + 1;\n"
+    "        payload = source.payload;\n"
+    "    }\n"
+    "    ~ResizeRollbackProbe()\n"
+    "    {\n"
+    "        rollback_destructions = rollback_destructions + 1;\n"
+    "    }\n"
+    "};\n"
     "int lifetime_probe_constructions;\n"
     "int lifetime_probe_destructions;\n"
     "class LifetimeProbe\n"
@@ -401,6 +1090,11 @@ static const char *g_vector_runtime_source =
     "    {\n"
     "        lifetime_probe_constructions = lifetime_probe_constructions + 1;\n"
     "        payload = 1;\n"
+    "    }\n"
+    "    LifetimeProbe(LifetimeProbe source)\n"
+    "    {\n"
+    "        lifetime_probe_constructions = lifetime_probe_constructions + 1;\n"
+    "        payload = source.payload;\n"
     "    }\n"
     "    LifetimeProbe(LifetimeProbe *source)\n"
     "    {\n"
@@ -471,6 +1165,88 @@ static const char *g_vector_runtime_source =
     "    }\n"
     "}\n"
     "\n"
+    "void exercise_assign_zero_lifecycle()\n"
+    "{\n"
+    "    lifetime_probe_constructions = 0;\n"
+    "    lifetime_probe_destructions = 0;\n"
+    "    {\n"
+    "        LifetimeProbe fill;\n"
+    "        vector<LifetimeProbe> probes;\n"
+    "        probes.reserve(4);\n"
+    "        probes.emplace_back();\n"
+    "        probes.emplace_back();\n"
+    "        probes.assign(0, fill);\n"
+    "        if (probes.size() == 0 && lifetime_probe_constructions == 4\n"
+    "            && lifetime_probe_destructions == 3)\n"
+    "        {\n"
+    "            display(\"ZERO ASSIGN DESTROYS LIVE ELEMENTS\");\n"
+    "        }\n"
+    "        if (probes.capacity() == 4 && probes.size() == 0)\n"
+    "        {\n"
+    "            display(\"ZERO ASSIGN RETAINS CAPACITY\");\n"
+    "        }\n"
+    "    }\n"
+    "    if (lifetime_probe_constructions == 4\n"
+    "        && lifetime_probe_destructions == 4)\n"
+    "    {\n"
+    "        display(\"ZERO ASSIGN LIFETIME BALANCED\");\n"
+    "    }\n"
+    "}\n"
+    "\n"
+    "void exercise_last_erase_lifecycle()\n"
+    "{\n"
+    "    lifetime_probe_constructions = 0;\n"
+    "    lifetime_probe_destructions = 0;\n"
+    "    {\n"
+    "        vector<LifetimeProbe> probes;\n"
+    "        probes.reserve(3);\n"
+    "        probes.emplace_back();\n"
+    "        probes.emplace_back();\n"
+    "        probes.erase(1);\n"
+    "        if (probes.size() == 1 && probes.capacity() == 3\n"
+    "            && lifetime_probe_constructions == 2\n"
+    "            && lifetime_probe_destructions == 1)\n"
+    "        {\n"
+    "            display(\"ERASE LAST DOES NOT RELOCATE\");\n"
+    "        }\n"
+    "    }\n"
+    "    if (lifetime_probe_constructions == 2\n"
+    "        && lifetime_probe_destructions == 2)\n"
+    "    {\n"
+    "        display(\"ERASE LAST LIFETIME BALANCED\");\n"
+    "    }\n"
+    "}\n"
+    "\n"
+    "void exercise_insert_at_end_uses_spare_capacity()\n"
+    "{\n"
+    "    int construction_baseline;\n"
+    "    int destruction_baseline;\n"
+    "    lifetime_probe_constructions = 0;\n"
+    "    lifetime_probe_destructions = 0;\n"
+    "    {\n"
+    "        vector<LifetimeProbe> probes;\n"
+    "        LifetimeProbe fill;\n"
+    "        probes.reserve(3);\n"
+    "        probes.emplace_back();\n"
+    "        construction_baseline = lifetime_probe_constructions;\n"
+    "        destruction_baseline = lifetime_probe_destructions;\n"
+    "        probes.insert(probes.size(), fill);\n"
+    "        display(\"END INSERT LIFETIME COUNTS\");\n"
+    "        display(lifetime_probe_constructions);\n"
+    "        display(lifetime_probe_destructions);\n"
+    "        if (probes.size() == 2 && probes.capacity() == 3\n"
+    "            && lifetime_probe_constructions == construction_baseline + 2\n"
+    "            && lifetime_probe_destructions == destruction_baseline + 1)\n"
+    "        {\n"
+    "            display(\"END INSERT USES SPARE CAPACITY\");\n"
+    "        }\n"
+    "    }\n"
+    "    if (lifetime_probe_constructions == lifetime_probe_destructions)\n"
+    "    {\n"
+    "        display(\"END INSERT LIFETIME BALANCED\");\n"
+    "    }\n"
+    "}\n"
+    "\n"
     "void exercise_count_construction()\n"
     "{\n"
     "    tracked_constructions = 0;\n"
@@ -491,11 +1267,16 @@ static const char *g_vector_runtime_source =
     "    {\n"
     "        Tracked seed;\n"
     "        vector<Tracked> copies(2, seed);\n"
-    "        if (tracked_constructions == 4 && tracked_destructions == 0)\n"
+        "        display(\"COUNT VALUE PARAMETER CLEANED\");\n"
+        "        display(tracked_destructions);\n"
+        "        if (tracked_constructions == 4 && tracked_destructions == 1)\n"
     "        {\n"
     "            display(\"COUNT VALUE CONSTRUCTION\");\n"
     "        }\n"
     "    }\n"
+    "    display(\"COUNT VALUE CLEANUP COUNTS\");\n"
+    "    display(tracked_constructions);\n"
+    "    display(tracked_destructions);\n"
     "    if (tracked_constructions == 4 && tracked_destructions == 4)\n"
     "    {\n"
     "        display(\"COUNT VALUE CLEANUP\");\n"
@@ -533,6 +1314,94 @@ static const char *g_vector_runtime_source =
     "    }\n"
     "}\n"
     "\n"
+    "void exercise_constructor_failure_rollback()\n"
+    "{\n"
+    "    rollback_construct_attempts = 0;\n"
+    "    rollback_fail_at = 3;\n"
+    "    rollback_successful_constructions = 0;\n"
+    "    rollback_destructions = 0;\n"
+    "    {\n"
+    "        vector<ResizeRollbackProbe> values;\n"
+    "        ResizeRollbackProbe *borrowed_probe;\n"
+    "        int observed_payload;\n"
+    "        int observed_size;\n"
+    "        values.reserve(4);\n"
+    "        values.emplace_back();\n"
+    "        try { values.resize(4); }\n"
+    "        catch (int construction_error)\n"
+    "        {\n"
+    "            if (values.size() == 1)\n"
+    "            {\n"
+    "                borrowed_probe = values.at(0);\n"
+    "                observed_payload = borrowed_probe->payload;\n"
+    "                observed_size = values.size();\n"
+    "                display(\"RESIZE FAILURE OBSERVED\");\n"
+    "                display(observed_size);\n"
+    "                display(observed_payload);\n"
+    "                display(rollback_construct_attempts);\n"
+    "                display(rollback_successful_constructions);\n"
+    "                display(rollback_destructions);\n"
+    "                if (observed_payload == 41)\n"
+    "                {\n"
+    "                    if (rollback_successful_constructions == 2)\n"
+    "                    {\n"
+    "                        if (rollback_destructions == 1)\n"
+    "                        {\n"
+    "                            display(\"RESIZE FAILURE PRESERVES ORIGINAL\");\n"
+    "                        }\n"
+    "                    }\n"
+    "                }\n"
+    "            }\n"
+    "        }\n"
+    "    }\n"
+    "    display(\"RESIZE FAILURE AFTER TRY\");\n"
+    "    display(rollback_construct_attempts);\n"
+    "    display(rollback_successful_constructions);\n"
+    "    display(rollback_destructions);\n"
+    "    if (rollback_construct_attempts == 3\n"
+    "        && rollback_successful_constructions == 2\n"
+    "        && rollback_destructions == 2)\n"
+    "    {\n"
+    "        display(\"RESIZE FAILURE CLEANUP BALANCED\");\n"
+    "    }\n"
+    "}\n"
+    "\n"
+    "void exercise_each_resize_failure_position()\n"
+    "{\n"
+    "    int failure_attempt;\n"
+    "    int rollback_ok;\n"
+    "    failure_attempt = 2;\n"
+    "    rollback_ok = 1;\n"
+    "    while (failure_attempt <= 4)\n"
+    "    {\n"
+    "        rollback_construct_attempts = 0;\n"
+    "        rollback_fail_at = failure_attempt;\n"
+    "        rollback_successful_constructions = 0;\n"
+    "        rollback_destructions = 0;\n"
+    "        {\n"
+    "            vector<ResizeRollbackProbe> values;\n"
+    "            ResizeRollbackProbe *borrowed_probe;\n"
+    "            values.reserve(4);\n"
+    "            values.emplace_back();\n"
+    "            try { values.resize(4); rollback_ok = 0; }\n"
+    "            catch (int construction_error)\n"
+    "            {\n"
+    "                if (values.size() != 1) { rollback_ok = 0; }\n"
+    "                if (rollback_successful_constructions != failure_attempt - 1) { rollback_ok = 0; }\n"
+    "                if (rollback_destructions != failure_attempt - 2) { rollback_ok = 0; }\n"
+    "                borrowed_probe = values.at(0);\n"
+    "                if (borrowed_probe->payload != 41) { rollback_ok = 0; }\n"
+    "            }\n"
+    "        }\n"
+    "        if (rollback_destructions != rollback_successful_constructions) { rollback_ok = 0; }\n"
+    "        failure_attempt = failure_attempt + 1;\n"
+    "    }\n"
+    "    if (rollback_ok == 1)\n"
+    "    {\n"
+    "        display(\"EVERY RESIZE CONSTRUCTOR POSITION ROLLS BACK\");\n"
+    "    }\n"
+    "}\n"
+    "\n"
     "void exercise_scope()\n"
     "{\n"
     "    vector<int> scoped;\n"
@@ -556,6 +1425,7 @@ static const char *g_vector_runtime_source =
     "\n"
     "void main()\n"
     "{\n"
+    "    vector<int> zero_assignment;\n"
     "    vector<int> score_history;\n"
     "    vector<int> default_scores(3);\n"
     "    vector<int> filled_scores(3, 7);\n"
@@ -572,6 +1442,14 @@ static const char *g_vector_runtime_source =
     "    char suffix_byte;\n"
     "    string *borrowed_word;\n"
     "    vector<string> *borrowed_words;\n"
+    "    zero_assignment.reserve(4);\n"
+    "    zero_assignment.push_back(9);\n"
+    "    zero_assignment.assign(0, 11);\n"
+    "    display(\"ZERO ASSIGN\");\n"
+    "    value = zero_assignment.size();\n"
+    "    display(value);\n"
+    "    value = zero_assignment.capacity();\n"
+    "    display(value);\n"
     "    display(\"STRING CAPACITY\");\n"
     "    display(\"VECTOR MAX SIZE\");\n"
     "    value = score_history.max_size();\n"
@@ -681,7 +1559,8 @@ static const char *g_vector_runtime_source =
     "    score_history.insert(0, 5);\n"
     "    score_history.insert(5, 35);\n"
     "    try { score_history.insert(-1, 99); }\n"
-    "    catch (const out_of_range& error) { display(\"INSERT_NEGATIVE_CAUGHT\"); }\n"
+    "    catch (const out_of_range& error) { display(\"INSERT_NEGATIVE_CAUGHT\"); "
+    "value = error.code; display(value); }\n"
     "    try { score_history.insert(7, 99); }\n"
     "    catch (const out_of_range& error) { display(\"INSERT_PAST_END_CAUGHT\"); }\n"
     "    display(\"INSERT\");\n"
@@ -889,8 +1768,13 @@ static const char *g_vector_runtime_source =
     "\n"
     "    exercise_tracked_vector();\n"
     "    exercise_reserved_lifecycle();\n"
+    "    exercise_assign_zero_lifecycle();\n"
+    "    exercise_last_erase_lifecycle();\n"
+    "    exercise_insert_at_end_uses_spare_capacity();\n"
     "    exercise_count_construction();\n"
     "    exercise_value_resize_lifecycle();\n"
+    "    exercise_constructor_failure_rollback();\n"
+    "    exercise_each_resize_failure_position();\n"
     "\n"
     "    exercise_scope();\n"
     "    display(\"VECTOR COMPLETE\");\n"
@@ -949,11 +1833,25 @@ static const char *g_vector_nested_string_source =
     "    vector<string> *move_source;\n"
     "    string *borrowed_name;\n"
     "    int outer_index;\n"
+    "    int move_state_ok;\n"
+    "    int move_check_ok;\n"
+    "    int move_observed;\n"
     "    vector<string> inner;\n"
     "    string seed(3);\n"
+    "    string payload(\"abc\");\n"
+    "    seed.append(payload);\n"
+    "    move_state_ok = 1;\n"
     "    inner.push_back(seed);\n"
     "    move_source = &inner;\n"
     "    vector<string> transferred(move_source);\n"
+    "    move_check_ok = 1;\n"
+    "    if (inner.size() != 0 || transferred.size() != 1) { move_check_ok = 0; }\n"
+    "    borrowed_name = transferred.at(0);\n"
+    "    if (borrowed_name->byte_length() != 3) { move_check_ok = 0; }\n"
+    "    move_observed = borrowed_name->codepoint_at(0);\n"
+    "    if (move_observed != 97) { move_check_ok = 0; }\n"
+    "    if (move_check_ok == 1) { display(\"VECTOR MOVE CONSTRUCT OK\"); }\n"
+    "    else { display(\"VECTOR MOVE CONSTRUCT FAILED\"); move_state_ok = 0; }\n"
     "    inner.push_back(seed);\n"
     "    borrowed_name = inner.front();\n"
     "    seed.swap(borrowed_name);\n"
@@ -964,7 +1862,27 @@ static const char *g_vector_nested_string_source =
     "    groups.at(0)->at(0)->append(seed);\n"
     "    move_destination = groups.front();\n"
     "    move_source = groups.back();\n"
+    "    borrowed_name = move_destination->at(0);\n"
+    "    move_observed = borrowed_name->byte_length();\n"
+    "    display(move_observed);\n"
+    "    borrowed_name = move_source->at(0);\n"
+    "    move_observed = borrowed_name->byte_length();\n"
+    "    display(move_observed);\n"
     "    transfer_vector(move_destination, move_source);\n"
+    "    move_check_ok = 1;\n"
+    "    if (groups.size() == 2) { display(\"MOVE_FROM OUTER SIZE OK\"); }\n"
+    "    else { display(\"MOVE_FROM OUTER SIZE FAILED\"); move_check_ok = 0; }\n"
+    "    if (move_destination->size() == 1) { display(\"MOVE_FROM DESTINATION SIZE OK\"); }\n"
+    "    else { display(\"MOVE_FROM DESTINATION SIZE FAILED\"); move_check_ok = 0; }\n"
+    "    if (move_source->size() == 0) { display(\"MOVE_FROM SOURCE EMPTY OK\"); }\n"
+    "    else { display(\"MOVE_FROM SOURCE EMPTY FAILED\"); move_check_ok = 0; }\n"
+    "    borrowed_name = move_destination->at(0);\n"
+    "    move_observed = borrowed_name->byte_length();\n"
+    "    display(move_observed);\n"
+    "    if (move_observed == 3) { display(\"MOVE_FROM VALUE OK\"); }\n"
+    "    else { display(\"MOVE_FROM VALUE FAILED\"); move_check_ok = 0; }\n"
+    "    if (move_check_ok == 1) { display(\"NESTED VECTOR MOVE_FROM OK\"); }\n"
+    "    else { display(\"NESTED VECTOR MOVE_FROM FAILED\"); move_state_ok = 0; }\n"
     "    deeper_groups.push_back(groups);\n"
     "    four.push_back(deeper_groups);\n"
     "    five.push_back(four);\n"
@@ -977,12 +1895,32 @@ static const char *g_vector_nested_string_source =
     "    nested_length = borrowed_name->byte_length();\n"
     "    borrowed_name->clear();\n"
     "    groups.erase(0);\n"
+    "    inner.clear();\n"
+    "    inner.push_back(seed);\n"
     "    move_source = &inner;\n"
     "    transferred.move_assign(move_source);\n"
+    "    move_check_ok = 1;\n"
+    "    if (inner.size() != 0 || transferred.size() != 1) { move_check_ok = 0; }\n"
+    "    borrowed_name = transferred.at(0);\n"
+    "    if (borrowed_name->byte_length() != 3) { move_check_ok = 0; }\n"
+    "    move_observed = borrowed_name->codepoint_at(0);\n"
+    "    if (move_observed != 97) { move_check_ok = 0; }\n"
+    "    if (move_check_ok == 1) { display(\"VECTOR MOVE_ASSIGN OK\"); }\n"
+    "    else { display(\"VECTOR MOVE_ASSIGN FAILED\"); move_state_ok = 0; }\n"
     "    move_source = &transferred;\n"
     "    transferred.move_assign(move_source);\n"
+    "    move_check_ok = 1;\n"
+    "    if (transferred.size() != 1) { move_check_ok = 0; }\n"
+    "    borrowed_name = transferred.at(0);\n"
+    "    if (borrowed_name->byte_length() != 3) { move_check_ok = 0; }\n"
+    "    move_observed = borrowed_name->codepoint_at(0);\n"
+    "    if (move_observed != 97) { move_check_ok = 0; }\n"
+    "    if (move_check_ok == 1) { display(\"VECTOR SELF MOVE OK\"); }\n"
+    "    else { display(\"VECTOR SELF MOVE FAILED\"); move_state_ok = 0; }\n"
     "    alternate_groups_pointer = &alternate_groups;\n"
     "    groups.swap(alternate_groups_pointer);\n"
+    "    if (move_state_ok == 1) { display(\"NESTED VECTOR LIFECYCLE OK\"); }\n"
+    "    else { display(\"NESTED VECTOR LIFECYCLE FAILED\"); }\n"
     "    return;\n"
     "}\n";
 
@@ -1042,9 +1980,14 @@ static const char *g_vector_based_receiver_method_source =
     "{\n"
     "    vector<Probe> values;\n"
     "    Probe seed;\n"
+    "    Probe *observed;\n"
+    "    int observed_value;\n"
     "    values.emplace_back(seed);\n"
     "    values.emplace_back();\n"
     "    values[0]->reset();\n"
+    "    observed = values.at(0);\n"
+    "    observed_value = observed->value;\n"
+    "    display(observed_value);\n"
     "    return;\n"
     "}\n";
 
@@ -1318,6 +2261,10 @@ FT_TEST(test_standard_library_vector_insert_stages_before_commit)
 {
     const char *vector_source;
     const char *insert_body;
+    const char *end_capacity_guard;
+    const char *end_construct;
+    const char *end_count_commit;
+    const char *end_return;
     const char *stage_allocation;
     const char *insert_construct;
     const char *prefix_loop;
@@ -1336,7 +2283,15 @@ FT_TEST(test_standard_library_vector_insert_stages_before_commit)
 
     vector_source = transpiler_standard_library_get_native_source("CBLC-VECTOR");
     insert_body = vector_source ? std::strstr(vector_source, "void insert(int index, T value)") : NULL;
-    stage_allocation = insert_body ? std::strstr(insert_body,
+    end_capacity_guard = insert_body ? std::strstr(insert_body,
+        "if (index == count && count < reserved)") : NULL;
+    end_construct = end_capacity_guard ? std::strstr(end_capacity_guard,
+        "cblc_construct_at(elements[count], value);") : NULL;
+    end_count_commit = end_construct ? std::strstr(end_construct,
+        "count = count + 1;") : NULL;
+    end_return = end_count_commit ? std::strstr(end_count_commit,
+        "return;") : NULL;
+    stage_allocation = end_return ? std::strstr(end_return,
         "relocation = new T[requested_capacity];") : NULL;
     insert_construct = stage_allocation ? std::strstr(stage_allocation,
         "cblc_construct_at(relocation[index], value);") : NULL;
@@ -1365,12 +2320,16 @@ FT_TEST(test_standard_library_vector_insert_stages_before_commit)
         "elements = relocation;") : NULL;
     publish_count = publish_storage ? std::strstr(publish_storage,
         "count = count + 1;") : NULL;
-    if (!vector_source || !insert_body || !stage_allocation || !insert_construct
+    if (!vector_source || !insert_body || !end_capacity_guard || !end_construct
+        || !end_count_commit || !end_return || !stage_allocation || !insert_construct
         || !prefix_loop || !prefix_relocate || !suffix_loop || !suffix_relocate
         || !catch_body || !rollback_suffix || !rollback_prefix || !rollback_insert
         || !rollback_release || !commit_destroy || !commit_release
         || !publish_storage || !publish_count
-        || !(stage_allocation < insert_construct && insert_construct < prefix_loop
+        || !(end_capacity_guard < end_construct
+            && end_construct < end_count_commit && end_count_commit < end_return
+            && end_return < stage_allocation
+            && stage_allocation < insert_construct && insert_construct < prefix_loop
             && prefix_loop < prefix_relocate && prefix_relocate < suffix_loop
             && suffix_loop < suffix_relocate && suffix_relocate < catch_body
             && catch_body < rollback_suffix && rollback_suffix < rollback_prefix
@@ -1389,6 +2348,10 @@ FT_TEST(test_standard_library_vector_erase_stages_before_commit)
     const char *vector_source;
     const char *erase_body;
     const char *range_guard;
+    const char *last_element_guard;
+    const char *last_destroy;
+    const char *last_count_commit;
+    const char *last_return;
     const char *stage_allocation;
     const char *copy_loop;
     const char *skip_erased_element;
@@ -1406,7 +2369,15 @@ FT_TEST(test_standard_library_vector_erase_stages_before_commit)
         "void erase(int index)") : NULL;
     range_guard = erase_body ? std::strstr(erase_body,
         "if (index < 0 || index >= count)") : NULL;
-    stage_allocation = range_guard ? std::strstr(range_guard,
+    last_element_guard = range_guard ? std::strstr(range_guard,
+        "if (index == count - 1)") : NULL;
+    last_destroy = last_element_guard ? std::strstr(last_element_guard,
+        "cblc_destroy_at(elements[index]);") : NULL;
+    last_count_commit = last_destroy ? std::strstr(last_destroy,
+        "count = count - 1;") : NULL;
+    last_return = last_count_commit ? std::strstr(last_count_commit,
+        "return;") : NULL;
+    stage_allocation = last_return ? std::strstr(last_return,
         "relocation = new T[reserved];") : NULL;
     copy_loop = stage_allocation ? std::strstr(stage_allocation,
         "while (source_index < count)") : NULL;
@@ -1427,12 +2398,18 @@ FT_TEST(test_standard_library_vector_erase_stages_before_commit)
         "elements = relocation;") : NULL;
     publish_count = publish_storage ? std::strstr(publish_storage,
         "count = count - 1;") : NULL;
-    if (!vector_source || !erase_body || !range_guard || !stage_allocation || !copy_loop
+    if (!vector_source || !erase_body || !range_guard || !last_element_guard
+        || !last_destroy || !last_count_commit || !last_return
+        || !stage_allocation || !copy_loop
         || !skip_erased_element || !element_copy || !catch_body
         || !rollback_destroy || !rollback_release || !commit_destroy
         || !commit_release || !publish_storage || !publish_count
         || std::strstr(erase_body, "elements[source_index] =") != NULL
-        || !(range_guard < stage_allocation && stage_allocation < copy_loop
+        || !(range_guard < last_element_guard
+            && last_element_guard < last_destroy
+            && last_destroy < last_count_commit
+            && last_count_commit < last_return && last_return < stage_allocation
+            && stage_allocation < copy_loop
             && copy_loop < skip_erased_element
             && skip_erased_element < element_copy && element_copy < catch_body
             && catch_body < rollback_destroy && rollback_destroy < rollback_release
@@ -1658,6 +2635,7 @@ FT_TEST(test_standard_library_vector_string_chain_in_condition_uses_borrowed_ele
     size_t size_count;
     size_t if_count;
     int chain_calls_valid;
+    int char_condition_temporary_valid;
 
     errors_source = transpiler_standard_library_get_native_source("CBLC-ERRORS");
     string_source = transpiler_standard_library_get_native_source("CBLC-STRING");
@@ -1747,6 +2725,23 @@ FT_TEST(test_standard_library_vector_string_chain_in_condition_uses_borrowed_ele
     if (!main_function || at_count != 9 || len_count != 3
         || size_count != 1 || if_count != 4)
         chain_calls_valid = 0;
+    char_condition_temporary_valid = 0;
+    for (size_t data_index = 0; data_index < unit.data_count; ++data_index)
+    {
+        const t_cblc_data_item *item = &unit.data_items[data_index];
+
+        if (item->is_function_local
+            && std::strstr(item->source_name, "CONDITION_CHAIN")
+            && item->kind == CBLC_DATA_KIND_CHAR)
+        {
+            if (item->length == 1)
+                char_condition_temporary_valid = 1;
+            else
+                chain_calls_valid = 0;
+        }
+    }
+    if (!char_condition_temporary_valid)
+        chain_calls_valid = 0;
     for (size_t call_index = 0; chain_calls_valid && call_index < at_count;
         ++call_index)
     {
@@ -1821,14 +2816,21 @@ FT_TEST(test_standard_library_vector_string_chain_in_condition_uses_borrowed_ele
     }
     if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
             &diagnostic_code, diagnostic, sizeof(diagnostic)) != FT_SUCCESS
-        || !generated_cobol
-        || transpiler_validate_generated_cobol_with_diagnostic(generated_cobol,
+        || !generated_cobol)
+    {
+        std::printf("vector<string> condition-chain COBOL generation failed (%d): %s\n",
+            diagnostic_code, diagnostic);
+        if (generated_cobol)
+            cma_free(generated_cobol);
+        cblc_translation_unit_dispose(&unit);
+        return (FT_FAILURE);
+    }
+    if (transpiler_validate_generated_cobol_with_diagnostic(generated_cobol,
             diagnostic, sizeof(diagnostic)) != FT_SUCCESS)
     {
         std::printf("vector<string> condition-chain COBOL validation failed (%d): %s\n",
             diagnostic_code, diagnostic);
-        if (generated_cobol)
-            cma_free(generated_cobol);
+        cma_free(generated_cobol);
         cblc_translation_unit_dispose(&unit);
         return (FT_FAILURE);
     }
@@ -2413,6 +3415,78 @@ FT_TEST(test_standard_library_vector_size_call_in_while_is_recomputed_each_itera
     return (FT_SUCCESS);
 }
 
+FT_TEST(test_standard_library_vector_copy_assignment_commits_staged_parameter)
+{
+    const char *vector_source =
+        transpiler_standard_library_get_native_source("CBLC-VECTOR");
+    const char *assignment = vector_source
+        ? std::strstr(vector_source, "void operator=(vector source)") : NULL;
+    const char *assignment_end = assignment
+        ? std::strstr(assignment, "\n    ~vector()") : NULL;
+
+    if (!assignment || !assignment_end)
+    {
+        std::printf("Vector copy-assignment definition or its following destructor is missing\n");
+        return FT_FAILURE;
+    }
+    const std::string assignment_body(assignment,
+        static_cast<std::size_t>(assignment_end - assignment));
+    if (assignment_body.find("elements = source.elements;") == std::string::npos
+        || assignment_body.find("source.elements = temporary_data;")
+            == std::string::npos
+        || assignment_body.find("count = source.count;") == std::string::npos
+        || assignment_body.find("reserved = source.reserved;")
+            == std::string::npos
+        || assignment_body.find("new T[") != std::string::npos
+        || assignment_body.find("cblc_construct_at(") != std::string::npos)
+    {
+        std::printf("Vector copy assignment must exchange ownership with its already-staged by-value parameter without making a second element copy\n");
+        return FT_FAILURE;
+    }
+    return FT_SUCCESS;
+}
+
+FT_TEST(test_standard_library_vector_assign_zero_skips_replacement_allocation)
+{
+    const char *vector_source =
+        transpiler_standard_library_get_native_source("CBLC-VECTOR");
+    const char *assignment = vector_source
+        ? std::strstr(vector_source, "void assign(int requested, T value)") : NULL;
+    const char *assignment_end = assignment
+        ? std::strstr(assignment, "\n    void resize(int requested)") : NULL;
+
+    if (!assignment || !assignment_end)
+    {
+        std::printf("Vector assign definition or its following resize method is missing\n");
+        return FT_FAILURE;
+    }
+    const std::string assignment_body(assignment,
+        static_cast<std::size_t>(assignment_end - assignment));
+    const std::string zero_count_guard = "if (requested == 0)";
+    const std::string allocation = "new T[replacement_capacity]";
+    const std::string destroy_live_values = "destroy_current_elements();";
+    const std::string publish_empty_size = "count = 0;";
+    const std::string::size_type zero_guard_position =
+        assignment_body.find(zero_count_guard);
+    const std::string::size_type allocation_position =
+        assignment_body.find(allocation);
+
+    if (zero_guard_position == std::string::npos
+        || allocation_position == std::string::npos
+        || zero_guard_position > allocation_position
+        || assignment_body.find(destroy_live_values, zero_guard_position)
+            == std::string::npos
+        || assignment_body.find(publish_empty_size, zero_guard_position)
+            == std::string::npos
+        || assignment_body.find("return;", zero_guard_position)
+            == std::string::npos)
+    {
+        std::printf("assign(0, value) must destroy only live elements, publish size zero, and return before allocating replacement storage\n");
+        return FT_FAILURE;
+    }
+    return FT_SUCCESS;
+}
+
 FT_TEST(test_standard_library_vector_translates_full_lifecycle)
 {
     char directory[256];
@@ -2473,31 +3547,47 @@ FT_TEST(test_standard_library_vector_translates_full_lifecycle)
         goto cleanup;
     }
     {
-        static const char *const required_methods[] = {
-            "SIZE", "CAPACITY", "MAX-SIZE", "EMPTY", "RESERVE", "SHRINK-TO-FIT",
-            "PUSH-BACK", "POP-BACK", "AT", "FRONT", "BACK", "EMPLACE-BACK", "INSERT",
-            "FRONT-VALUE", "BACK-VALUE", "ERASE", "CLEAR", "ASSIGN", "RESIZE"
+        /* Reusable class methods now share receiver-independent COBOL
+         * paragraphs, so paragraph names are intentionally not synthesized
+         * from one source variable such as MAIN-SCORE-HISTORY. Verify the
+         * operation-specific lowering state here; the runtime transcript
+         * below exercises the value/read-only methods and their error paths. */
+        static const char *const required_lowering[] = {
+            "VECTOR-PUSH-BACK-RELOCATION",
+            "VECTOR-POP-BACK-ERROR",
+            "VECTOR-AT-ERROR-REQUESTED",
+            "VECTOR-FRONT-ERROR-REQUESTED",
+            "VECTOR-BACK-ERROR-REQUESTED",
+            "VECTOR-EMPLACE-BACK-RELOCATION",
+            "VECTOR-INSERT-SUFFIX-COUNT",
+            "VECTOR-ERASE-SOURCE-INDEX",
+            "VECTOR-ASSIGN-RELOCATION",
+            "VECTOR-RESIZE-RELOCATION",
+            "VECTOR-SHRINK-TO-FIT-RELOCATION",
+            "CBLC-METHOD-CBLC-MRET-"
         };
         size_t index;
-        char marker[192];
 
-        for (index = 0; index < sizeof(required_methods) / sizeof(required_methods[0]); ++index)
+        for (index = 0; index < sizeof(required_lowering)
+                / sizeof(required_lowering[0]); ++index)
         {
-            command_length = std::snprintf(marker, sizeof(marker),
-                "CBLC-METHOD-MAIN-SCORE-HISTORY-CBLC-TPL-VECTOR-INT-%s", required_methods[index]);
-            if (command_length < 0 || static_cast<size_t>(command_length) >= sizeof(marker)
-                || vector_cobol_contains(cobol_path, marker) != FT_SUCCESS)
+            if (vector_cobol_contains(cobol_path,
+                    required_lowering[index]) != FT_SUCCESS)
             {
-                std::printf("Assertion failed: vector translation should emit %s\n", required_methods[index]);
+                std::printf("Assertion failed: vector translation should emit operation lowering %s\n",
+                    required_lowering[index]);
                 goto cleanup;
             }
         }
     }
-    if (vector_cobol_contains(cobol_path, "CBLC-CONSTRUCTOR-COPIED") != FT_SUCCESS
+    if (vector_cobol_contains(cobol_path,
+            "CBLC-CONSTRUCTOR-MAIN-COPIED-3") != FT_SUCCESS
         || vector_cobol_contains(cobol_path, "ALLOCATE") != FT_SUCCESS
         || vector_cobol_contains(cobol_path, "FREE") != FT_SUCCESS
         || vector_cobol_contains(cobol_path, "CBLC-EX-RAISING") != FT_SUCCESS
         || vector_cobol_contains(cobol_path, "CBLC-EX-PAYLOAD-OUT-OF-RANGE") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path, "CBLC-EX-PAYLOAD-OUT-OF-RANGE-REQUESTED") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path, "CBLC-EX-PAYLOAD-OUT-OF-RANGE-EXTENT") != FT_SUCCESS
         || vector_cobol_contains(cobol_path, "      -    ") == FT_SUCCESS)
     {
         std::printf("Assertion failed: vector output should emit ownership/bounds paths with safe continuation lines\n");
@@ -2554,6 +3644,9 @@ FT_TEST(test_standard_library_vector_translates_full_lifecycle)
         std::printf("Vector runtime transcript at assertion failure:\n%s\n", runtime_output); \
         goto cleanup; \
     }
+    VECTOR_EXPECT_MARKER("ZERO ASSIGN", "zero-count assign marker");
+    VECTOR_EXPECT_VALUE(0, "assign(0, value) destroys all live values");
+    VECTOR_EXPECT_VALUE(4, "assign(0, value) retains existing capacity");
     VECTOR_EXPECT_MARKER("STRING CAPACITY", "string capacity marker");
     VECTOR_EXPECT_MARKER("VECTOR MAX SIZE", "vector max_size marker");
     VECTOR_EXPECT_VALUE(249999999, "vector<int> max_size respects the byte-offset limit");
@@ -2601,6 +3694,7 @@ FT_TEST(test_standard_library_vector_translates_full_lifecycle)
     VECTOR_EXPECT_MARKER("DATA", "data returns a pointer to contiguous element storage");
     VECTOR_EXPECT_VALUE(20, "data pointer indexes the second live vector element");
     VECTOR_EXPECT_MARKER("INSERT_NEGATIVE_CAUGHT", "negative insert throws out_of_range");
+    VECTOR_EXPECT_VALUE(1, "out_of_range preserves its stable error category code");
     VECTOR_EXPECT_MARKER("INSERT_PAST_END_CAUGHT", "past-end insert throws out_of_range");
     VECTOR_EXPECT_MARKER("INSERT", "insert marker");
     VECTOR_EXPECT_VALUE(6, "valid inserts update vector size");
@@ -2678,13 +3772,41 @@ FT_TEST(test_standard_library_vector_translates_full_lifecycle)
     VECTOR_EXPECT_MARKER("POP DESTROYS ONE", "pop_back destroys exactly the removed element");
     VECTOR_EXPECT_MARKER("CLEAR DESTROYS REMAINDER", "clear destroys each remaining live element exactly once");
     VECTOR_EXPECT_MARKER("SCOPE DOES NOT DOUBLE DESTROY", "scope exit does not destroy elements already removed or cleared");
+    VECTOR_EXPECT_MARKER("ZERO ASSIGN DESTROYS LIVE ELEMENTS", "assign(0, value) destroys live objects and its value parameter exactly once");
+    VECTOR_EXPECT_MARKER("ZERO ASSIGN RETAINS CAPACITY", "assign(0, value) retains allocated capacity without treating slots as live");
+    VECTOR_EXPECT_MARKER("ZERO ASSIGN LIFETIME BALANCED", "assign(0, value) leaves no live objects for vector scope exit to destroy");
+    VECTOR_EXPECT_MARKER("ERASE LAST DOES NOT RELOCATE", "erasing the final vector element preserves capacity without allocating or reconstructing survivors");
+    VECTOR_EXPECT_MARKER("ERASE LAST LIFETIME BALANCED", "last-element erase destroys exactly one live object and scope exit destroys the remaining object once");
+    VECTOR_EXPECT_MARKER("END INSERT LIFETIME COUNTS", "end insertion exposes exact constructor and destructor counts");
+    VECTOR_EXPECT_VALUE(4, "end insertion constructs the vector elements, insertion value, and parameter copy as expected");
+    VECTOR_EXPECT_VALUE(1, "end insertion destroys its by-value parameter before scope exit");
+    VECTOR_EXPECT_MARKER("END INSERT USES SPARE CAPACITY", "insertion at end with available capacity constructs only the new element");
+    VECTOR_EXPECT_MARKER("END INSERT LIFETIME BALANCED", "end insertion preserves exactly-once destruction for the inserted value, parameter copy, and vector elements");
     VECTOR_EXPECT_MARKER("COUNT CONSTRUCTS LIVE ELEMENTS", "count constructor constructs exactly the requested live class elements");
     VECTOR_EXPECT_MARKER("COUNT CONSTRUCTION CLEANUP", "count-constructed class elements are destroyed exactly once");
+    VECTOR_EXPECT_MARKER("COUNT VALUE PARAMETER CLEANED", "the by-value constructor parameter is destroyed when construction returns");
+    VECTOR_EXPECT_VALUE(1, "exactly the constructor parameter copy is destroyed before the caller continues");
     VECTOR_EXPECT_MARKER("COUNT VALUE CONSTRUCTION", "count/value construction copies class values into live slots");
+    VECTOR_EXPECT_MARKER("COUNT VALUE CLEANUP COUNTS", "count/value construction exposes exact total and destruction counts");
+    VECTOR_EXPECT_VALUE(4, "count/value construction creates one seed, one parameter copy, and two elements");
+    VECTOR_EXPECT_VALUE(4, "count/value scope exit destroys elements, seed, and parameter copy exactly once");
     VECTOR_EXPECT_MARKER("COUNT VALUE CLEANUP", "count/value elements and their seed are each destroyed exactly once");
     VECTOR_EXPECT_MARKER("VALUE RESIZE DESTROYS TAIL", "value-resize destroys removed class elements and publishes the reduced size");
     VECTOR_EXPECT_MARKER("VALUE RESIZE WHILE RECHECKS", "scalar condition methods are reevaluated on each loop iteration until the vector is empty");
     VECTOR_EXPECT_MARKER("VALUE RESIZE LIFETIME BALANCED", "value-resize leaves no live-element leaks or double destruction at scope exit");
+    VECTOR_EXPECT_MARKER("RESIZE FAILURE OBSERVED", "failed growth preserves the original vector and reports exact rollback counters");
+    VECTOR_EXPECT_VALUE(1, "failed growth leaves the original element count unchanged");
+    VECTOR_EXPECT_VALUE(41, "failed growth leaves the original element payload unchanged");
+    VECTOR_EXPECT_VALUE(3, "failed growth attempts exactly three constructions before failure");
+    VECTOR_EXPECT_VALUE(2, "failed growth completes exactly two constructions");
+    VECTOR_EXPECT_VALUE(1, "failed growth destroys only the successfully staged tail element");
+    VECTOR_EXPECT_MARKER("RESIZE FAILURE PRESERVES ORIGINAL", "a staged constructor failure preserves the original vector size and value and destroys only completed tail objects");
+    VECTOR_EXPECT_MARKER("RESIZE FAILURE AFTER TRY", "rollback state remains observable after catch dispatch");
+    VECTOR_EXPECT_VALUE(3, "failure occurs on the third constructor attempt");
+    VECTOR_EXPECT_VALUE(2, "two constructors complete before failure");
+    VECTOR_EXPECT_VALUE(2, "one staged element and the original are destroyed by scope exit");
+    VECTOR_EXPECT_MARKER("RESIZE FAILURE CLEANUP BALANCED", "failed resize rolls back completed tail objects and later destroys the original exactly once");
+    VECTOR_EXPECT_MARKER("EVERY RESIZE CONSTRUCTOR POSITION ROLLS BACK", "resize failure at each tail-element construction position preserves old state and balances exact destruction counts");
     VECTOR_EXPECT_VALUE(2, "local vector is usable during its scope");
     VECTOR_EXPECT_VALUE(41, "local vector front");
     VECTOR_EXPECT_VALUE(42, "local vector back");
@@ -2744,7 +3866,9 @@ FT_TEST(test_standard_library_vector_string_runtime_fixture_generates)
         goto cleanup;
     }
     if (vector_cobol_contains(cobol_path,
-            "CBLC-METHOD-MAIN-WORDS-CBLC-TPL-VECTOR-STRING-PUSH-BACK") != FT_SUCCESS)
+            "VECTOR-PUSH-BACK-APPENDED-CONSTRUCTED") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "CBLC-METHOD-CBLC-MRET-") != FT_SUCCESS)
     {
         std::printf("Missing vector<string> push_back lowering\n");
         goto cleanup;
@@ -2760,9 +3884,13 @@ FT_TEST(test_standard_library_vector_string_runtime_fixture_generates)
         goto cleanup;
     }
     if (vector_cobol_contains(cobol_path,
-            "01 CBLC-SPTR-MAIN-NESTED-WORDS-ELEMENTS BASED.") != FT_SUCCESS)
+            "01 CBLC-SPTR-HFF8327CEBE12D4B1 BASED.") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "01 MAIN-NESTED-WORDS.") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "05 MAIN-NESTED-WORDS-ELEMENTS USAGE POINTER") != FT_SUCCESS)
     {
-        std::printf("Missing nested vector<string> element storage layout\n");
+        std::printf("Missing vector<string> element layout or vector<vector<string>> owner storage\n");
         goto cleanup;
     }
     if (vector_cobol_main_contains_in_order(cobol_path,
@@ -2801,6 +3929,14 @@ FT_TEST(test_standard_library_vector_string_runtime_fixture_generates)
         || vector_cobol_contains(cobol_path,
             "DISPLAY \"SCOPE DOES NOT DOUBLE DESTROY\"") != FT_SUCCESS
         || vector_cobol_contains(cobol_path,
+            "DISPLAY \"ERASE LAST DOES NOT RELOCATE\"") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "DISPLAY \"ERASE LAST LIFETIME BALANCED\"") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "DISPLAY \"END INSERT USES SPARE CAPACITY\"") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "DISPLAY \"END INSERT LIFETIME BALANCED\"") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
             "DISPLAY \"VALUE RESIZE DESTROYS TAIL\"") != FT_SUCCESS
         || vector_cobol_contains(cobol_path,
             "DISPLAY \"VALUE RESIZE WHILE RECHECKS\"") != FT_SUCCESS
@@ -2808,6 +3944,18 @@ FT_TEST(test_standard_library_vector_string_runtime_fixture_generates)
             "DISPLAY \"VALUE RESIZE LIFETIME BALANCED\"") != FT_SUCCESS)
     {
         std::printf("Generated vector COBOL must retain exact live-element lifecycle assertions\n");
+        goto cleanup;
+    }
+    if (vector_cobol_contains(cobol_path,
+            "DISPLAY \"RESIZE FAILURE PRESERVES ORIGINAL\"") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "DISPLAY \"RESIZE FAILURE CLEANUP BALANCED\"") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "DISPLAY \"EVERY RESIZE CONSTRUCTOR POSITION ROLLS BACK\"") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "CBLC-EX-RAISING") != FT_SUCCESS)
+    {
+        std::printf("Generated vector COBOL must retain the constructor-failure rollback checks and exception path\n");
         goto cleanup;
     }
     if (vector_cobol_contains(cobol_path, "-ELEMENTS(") == FT_SUCCESS)
@@ -2827,8 +3975,9 @@ FT_TEST(test_standard_library_vector_string_runtime_fixture_generates)
         || vector_cobol_contains(cobol_path,
             "ELEMENTS(relocation_index + 1)") == FT_SUCCESS
         || vector_cobol_contains_normalized(cobol_path,
-            "COMPUTE CBLC-PTR-OFFSET = (VECTOR-CTOR-3-RELOCATION-INDEX) * 4")
-            != FT_SUCCESS)
+            "COMPUTE CBLC-PTR-OFFSET = (CBLC-TEMPLATE-LOCAL-") != FT_SUCCESS
+        || vector_cobol_contains_normalized(cobol_path,
+            ") * 4") != FT_SUCCESS)
     {
         std::printf("Pointer element offsets must use the concrete constructor index storage\n");
         goto cleanup;
@@ -2979,13 +4128,21 @@ FT_TEST(test_standard_library_vector_nested_string_specialization_transpiles)
     char directory[256];
     char source_path[256];
     char cobol_path[256];
+    char binary_path[256];
+    char output_path[256];
+    char compile_log_path[256];
+    char output_buffer[256];
     char command[1024];
     int command_length;
     int status;
 
+    FT_REQUIRE_COBC();
     directory[0] = '\0';
     source_path[0] = '\0';
     cobol_path[0] = '\0';
+    binary_path[0] = '\0';
+    output_path[0] = '\0';
+    compile_log_path[0] = '\0';
     status = FT_FAILURE;
     vector_source = transpiler_standard_library_get_native_source("CBLC-VECTOR");
     error_source = transpiler_standard_library_get_native_source("CBLC-ERRORS");
@@ -3018,7 +4175,13 @@ FT_TEST(test_standard_library_vector_nested_string_specialization_transpiles)
     if (test_join_path(directory, "vector_nested_string.cblc", source_path,
                 sizeof(source_path)) != FT_SUCCESS
         || test_join_path(directory, "vector_nested_string.cob", cobol_path,
-                sizeof(cobol_path)) != FT_SUCCESS)
+                sizeof(cobol_path)) != FT_SUCCESS
+        || test_join_path(directory, "nested_string.bin", binary_path,
+                sizeof(binary_path)) != FT_SUCCESS
+        || test_join_path(directory, "nested_string.txt", output_path,
+                sizeof(output_path)) != FT_SUCCESS
+        || test_join_path(directory, "nested_string_compile.log",
+                compile_log_path, sizeof(compile_log_path)) != FT_SUCCESS)
     {
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -3045,20 +4208,38 @@ FT_TEST(test_standard_library_vector_nested_string_specialization_transpiles)
     else if (vector_cobol_has_unique_level01_names(cobol_path) != FT_SUCCESS)
         std::printf("Assertion failed: nested output contains duplicate level-01 names\n");
     else if (vector_cobol_contains(cobol_path,
-            "01 CBLC-SPTR-MAIN-GROUPS-ELEMENTS BASED.") != FT_SUCCESS)
-        std::printf("Assertion failed: nested output is missing the outer element layout\n");
+            "01 CBLC-SPTR-HFF8327CEBE12D4B1 BASED.") != FT_SUCCESS)
+        std::printf("Assertion failed: nested output is missing the shared vector<string> element layout\n");
     else if (vector_cobol_contains(cobol_path,
-            "01 CBLC-SPTR-MAIN-GROUPS-ELEMENTS-ELEMENTS BASED.")
+            "01 CBLC-SPTR-H53E1514516EA5068 BASED.") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "05 CBLC-SPTR-H53E1514516EA5068-ELEMENTS USAGE POINTER")
+            != FT_SUCCESS
+        || vector_cobol_contains_normalized(cobol_path,
+            "SET CBLC-PTR-CURSOR TO CBLC-SPTR-H53E1514516EA5068-ELEMENTS "
+            "COMPUTE CBLC-PTR-OFFSET = "
+            "(CBLC-TEMPLATE-LOCAL-4404EC1B2F93CF96) * 16 "
+            "SET CBLC-PTR-CURSOR UP BY CBLC-PTR-OFFSET "
+            "SET ADDRESS OF CBLC-SPTR-HFF8327CEBE12D4B1 TO CBLC-PTR-CURSOR")
             != FT_SUCCESS)
-        std::printf("Assertion failed: nested output is missing the inner element layout\n");
+        std::printf("Assertion failed: nested vector layout must transition through the inner vector element view\n");
     else if (vector_cobol_contains(cobol_path,
-            "01 CBLC-SPTR-MAIN-FIVE-ELEMENTS-ELEMENTS-ELEMENT-H")
+            "01 CBLC-SPTR-H6137BF350A850E78 BASED.") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "05 CBLC-SPTR-H6137BF350A850E78-ELEMENTS USAGE POINTER")
+            != FT_SUCCESS
+        || vector_cobol_contains_normalized(cobol_path,
+            "SET CBLC-PTR-CURSOR TO CBLC-SPTR-H6137BF350A850E78-ELEMENTS "
+            "COMPUTE CBLC-PTR-OFFSET = "
+            "(CBLC-TEMPLATE-LOCAL-6BE707689C718FEE) * 16 "
+            "SET CBLC-PTR-CURSOR UP BY CBLC-PTR-OFFSET "
+            "SET ADDRESS OF CBLC-SPTR-H0C9A7324645D7361 TO CBLC-PTR-CURSOR")
             != FT_SUCCESS)
-        std::printf("Assertion failed: five-level nested output is missing its leaf element layout\n");
+        std::printf("Assertion failed: five-level nested specialization must link its outer and inner vector layouts\n");
     else if (vector_cobol_contains(cobol_path,
-            "SET ADDRESS OF CBLC-SPTR-MAIN-GROUPS-ELEMENTS-ELEMENTS")
+            "SET ADDRESS OF CBLC-SPTR-H53E1514516EA5068 TO CBLC-PTR-CURSOR")
             != FT_SUCCESS)
-        std::printf("Assertion failed: nested output never binds the inner layout\n");
+        std::printf("Assertion failed: nested output never binds the shared inner-specialization layout\n");
     else if (vector_cobol_contains(cobol_path,
             "SET MAIN-BORROWED-NAME") != FT_SUCCESS
         || vector_cobol_contains(cobol_path,
@@ -3072,7 +4253,7 @@ FT_TEST(test_standard_library_vector_nested_string_specialization_transpiles)
         || vector_cobol_contains(cobol_path, "CBLC-CONSTRUCTOR-") != FT_SUCCESS)
         std::printf("Assertion failed: nested vector reallocation must emit its type-directed element construction path\n");
     else if (vector_cobol_contains_normalized(cobol_path,
-            "CBLC-CONSTRUCTOR-CBLC-SPTR-MAIN-GROUPS-ELEMENTS-1 THRU")
+            "CBLC-CONSTRUCTOR-CBLC-SPTR-HFF8327CEBE12D4B1-3 THRU")
             != FT_SUCCESS)
         std::printf("Assertion failed: nested push_back must invoke the element copy constructor\n");
     else if (vector_cobol_contains_normalized(cobol_path,
@@ -3085,45 +4266,56 @@ FT_TEST(test_standard_library_vector_nested_string_specialization_transpiles)
         std::printf("Assertion failed: nested copy construction leaked a source-level name into generated COBOL\n");
     else if (vector_cobol_contains(cobol_path, "CBLC-P-") != FT_SUCCESS)
         std::printf("Assertion failed: nested push_back parameter storage is missing\n");
+    else if (vector_cobol_contains_normalized(cobol_path,
+            "IF CBLC-P-8594A2A22315A61A NOT = NULL "
+            "SET ADDRESS OF CBLC-SPTR-P20D6A11F793934FD "
+            "TO CBLC-P-8594A2A22315A61A END-IF") != FT_SUCCESS)
+        std::printf("Assertion failed: move_assign must bind its source parameter view before accessing nested elements\n");
     else if (vector_cobol_contains(cobol_path,
-            "VECTOR-VECTOR-STRING-PUSH-BACK-RELOCATION") != FT_SUCCESS
+            "VECTOR-PUSH-BACK-RELOCATION") != FT_SUCCESS
         || vector_cobol_contains(cobol_path,
-            "CBLC-CONSTRUCTOR-CBLC-SPTR-MAIN-GROUPS-ELEMENTS-1") != FT_SUCCESS)
+            "CBLC-CONSTRUCTOR-CBLC-SPTR-HFF8327CEBE12D4B1-3") != FT_SUCCESS)
         std::printf("Assertion failed: nested push_back method is missing\n");
     else if (vector_cobol_contains(cobol_path,
-            "CBLC-METHOD-MAIN-GROUPS-CBLC-TPL-VECTOR-VECTOR--STRING-SWAP") != FT_SUCCESS)
-        std::printf("Assertion failed: nested vector swap method is missing\n");
+            "VECTOR-SWAP-TEMPORARY-DATA") != FT_SUCCESS)
+        std::printf("Assertion failed: nested vector swap must stage its owned element storage\n");
     else if (vector_cobol_contains(cobol_path,
-            "CBLC-METHOD-MAIN-GROUPS-CBLC-TPL-VECTOR-VECTOR--STRING-ERASE") != FT_SUCCESS)
-        std::printf("Assertion failed: nested vector erase specialization is missing\n");
+            "VECTOR-ERASE-RELOCATION") != FT_SUCCESS)
+        std::printf("Assertion failed: nested vector erase must stage replacement storage\n");
     else if (vector_cobol_contains(cobol_path, "CBLC-METHOD-MAIN-SEED-SWAP") != FT_SUCCESS)
         std::printf("Assertion failed: string swap method is missing\n");
     else if (vector_cobol_contains(cobol_path,
-            "CBLC-METHOD-CONSUME-BY-MOVE-MOVED-MOVE-FROM") != FT_SUCCESS)
-        std::printf("Assertion failed: string move_from method is missing\n");
+            "CBLC-USER-STRING-MOVE-FROM-SOURCE") != FT_SUCCESS)
+        std::printf("Assertion failed: string move_from must lower its source-pointer path\n");
     else if (vector_cobol_paragraph_performs_defined_method(cobol_path,
             "TRANSFER-VECTOR") != FT_SUCCESS)
         std::printf("Assertion failed: pointer-receiver move_from call must target an emitted method paragraph\n");
     else if (vector_cobol_contains(cobol_path,
-            "CBLC-METHOD-MAIN-TRANSFERRED-CBLC-TPL-VECTOR-STRING-MOVE-ASSIGN")
-            != FT_SUCCESS)
-        std::printf("Assertion failed: vector<string> move assignment method is missing\n");
+            "VECTOR-MOVE-ASSIGN-CBLC-BOOLEAN-RESULT") != FT_SUCCESS)
+        std::printf("Assertion failed: vector<string> move assignment must lower its self-assignment check\n");
     else if (vector_cobol_contains(cobol_path,
             "CBLC-CONSTRUCTOR-MAIN-TRANSFERRED") != FT_SUCCESS)
         std::printf("Assertion failed: vector<string> move construction paragraph is missing\n");
-    else if (vector_cobol_contains(cobol_path, "RELOCATION = NULL") != FT_SUCCESS)
-        std::printf("Assertion failed: vector array allocation must route null results through exception dispatch\n");
+    else if (vector_cobol_paragraph_contains_line_token(cobol_path,
+            "CBLC-CONSTRUCTOR-MAIN-TRANSFERRED-4",
+            "SET ADDRESS OF CBLC-SPTR-P6E9F2878B5F2DCC7") != FT_SUCCESS)
+        std::printf("Assertion failed: the move-constructor pointer parameter BASED view must be rebound inside the constructor paragraph on each call\n");
+    else if (vector_cobol_contains(cobol_path, "CBLC-TRY-CALL-") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "IF CBLC-EX-ACTIVE = 'Y'") != FT_SUCCESS)
+        std::printf("Assertion failed: nested vector allocation must route failure through generated exception dispatch\n");
     else if (vector_cobol_contains(cobol_path, "CBLC-MRET-") != FT_SUCCESS)
         std::printf("Assertion failed: allocating vector methods need an exception return paragraph\n");
     else if (vector_cobol_contains(cobol_path, "DESTROY-INDEX") != FT_SUCCESS
         || vector_cobol_contains_normalized(cobol_path,
-            "FREE CBLC-SPTR-MAIN-GROUPS-ELEMENTS-ELEMENTS-CBLC-USER-DATA") != FT_SUCCESS
+            "FREE CBLC-SPTR-H704BE0D8FAAFFC58-CBLC-USER-DATA") != FT_SUCCESS
         || vector_cobol_contains_normalized(cobol_path,
-            "CBLC-SPTR-MAIN-GROUPS-ELEMENTS-ELEMENTS-STORED-LENGTH")
-            != FT_SUCCESS)
+            "FREE CBLC-SPTR-HFF8327CEBE12D4B1-ELEMENTS") != FT_SUCCESS
+        || vector_cobol_contains_normalized(cobol_path,
+            "FREE CBLC-SPTR-H53E1514516EA5068-ELEMENTS") != FT_SUCCESS)
         std::printf("Assertion failed: nested destruction must visit outer elements in reverse order, destroy inner string storage, then release inner vector storage\n");
     else if (vector_cobol_has_move_from_parameter_to(cobol_path,
-            "TO CBLC-SPTR-MAIN-GROUPS-ELEMENTS") == FT_SUCCESS)
+            "TO MAIN-GROUPS-ELEMENTS") == FT_SUCCESS)
         std::printf("Assertion failed: nested push_back shallow-copies its element\n");
     else if (vector_cobol_excludes(cobol_path, "CBLC-SPTR-CBLC-SPTR-")
             != FT_SUCCESS)
@@ -3132,6 +4324,37 @@ FT_TEST(test_standard_library_vector_nested_string_specialization_transpiles)
         status = FT_SUCCESS;
     if (status != FT_SUCCESS)
         goto cleanup;
+    /* Structural inspection is only an intermediate gate. Keep the test
+     * failed until the generated COBOL has compiled and completed at runtime. */
+    status = FT_FAILURE;
+    if (compile_generated_cobol(binary_path, cobol_path, compile_log_path,
+            "cobc should compile nested vector<string> lifecycle COBOL")
+        != FT_SUCCESS)
+        goto cleanup;
+    if (execute_binary(directory, "nested_string.bin", "nested_string.txt",
+            "nested vector<string> lifecycle should execute") != FT_SUCCESS
+        || test_read_text_file(output_path, output_buffer,
+            sizeof(output_buffer)) != FT_SUCCESS
+        || std::strcmp(output_buffer,
+            "VECTOR MOVE CONSTRUCT OK\n"
+            "+000000006\n+000000003\n"
+            "MOVE_FROM OUTER SIZE OK\n"
+            "MOVE_FROM DESTINATION SIZE OK\n"
+            "MOVE_FROM SOURCE EMPTY OK\n"
+            "+000000000\n"
+            "MOVE_FROM VALUE OK\n"
+            "NESTED VECTOR MOVE_FROM OK\n"
+            "VECTOR MOVE_ASSIGN OK\n"
+            "VECTOR SELF MOVE OK\n"
+            "NESTED VECTOR LIFECYCLE OK\n") != 0)
+    {
+        std::printf("Assertion failed: nested vector<string> lifecycle should complete and emit its success marker\n");
+        if (test_read_text_file(output_path, output_buffer,
+                sizeof(output_buffer)) == FT_SUCCESS)
+            std::printf("Nested vector<string> runtime output:\n%s\n", output_buffer);
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
 cleanup:
     if (status == FT_SUCCESS)
         test_remove_directory(directory);
@@ -3184,7 +4407,11 @@ FT_TEST(test_standard_library_vector_throwing_element_constructor_emits_exceptio
     }
     status = FT_SUCCESS;
 cleanup:
-    test_remove_directory(directory);
+    if (status == FT_SUCCESS)
+        test_remove_directory(directory);
+    else
+        std::printf("Generated throwing-element vector probe retained at %s\n",
+            directory);
     return (status);
 }
 
@@ -3193,11 +4420,16 @@ FT_TEST(test_standard_library_vector_reserve_relocates_move_only_elements)
     char directory[256];
     char source_path[256];
     char cobol_path[256];
+    char binary_path[256];
+    char compiler_log_path[256];
+    char output_path[256];
+    char output_buffer[256];
     char command[1024];
     const char *source;
     int command_length;
     int status;
 
+    FT_REQUIRE_COBC();
     source = "class MoveOnly {\n"
         "    public:\n"
         "    int value;\n"
@@ -3205,12 +4437,21 @@ FT_TEST(test_standard_library_vector_reserve_relocates_move_only_elements)
         "    MoveOnly(MoveOnly *source) { value = source->value; source->value = 0; }\n"
         "    ~MoveOnly() { value = 0; }\n"
         "};\n"
-        "void main() { vector<MoveOnly> values; values.emplace_back(); values.emplace_back(); "
+        "void main() { vector<MoveOnly> values; MoveOnly *borrowed; "
+        "int observed_size; int observed_value; "
+        "values.emplace_back(); values.emplace_back(); "
         "values.erase(0); values.resize(3); values.reserve(4); "
-        "values.shrink_to_fit(); return; }\n";
+        "values.shrink_to_fit(); borrowed = values.at(0); "
+        "observed_size = values.size(); display(observed_size); "
+        "observed_value = borrowed->value; display(observed_value); "
+        "values.clear(); observed_size = values.size(); "
+        "display(observed_size); return; }\n";
     directory[0] = '\0';
     source_path[0] = '\0';
     cobol_path[0] = '\0';
+    binary_path[0] = '\0';
+    compiler_log_path[0] = '\0';
+    output_path[0] = '\0';
     status = FT_FAILURE;
     if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
         return (FT_FAILURE);
@@ -3218,6 +4459,12 @@ FT_TEST(test_standard_library_vector_reserve_relocates_move_only_elements)
                 sizeof(source_path)) != FT_SUCCESS
         || test_join_path(directory, "vector_move_only.cob", cobol_path,
                 sizeof(cobol_path)) != FT_SUCCESS
+        || test_join_path(directory, "vector_move_only.bin", binary_path,
+                sizeof(binary_path)) != FT_SUCCESS
+        || test_join_path(directory, "vector_move_only_compile.log",
+                compiler_log_path, sizeof(compiler_log_path)) != FT_SUCCESS
+        || test_join_path(directory, "vector_move_only.txt", output_path,
+                sizeof(output_path)) != FT_SUCCESS
         || test_write_text_file(source_path, source) != FT_SUCCESS)
         goto cleanup;
     command_length = vector_make_transpile_command(command, sizeof(command),
@@ -3230,19 +4477,52 @@ FT_TEST(test_standard_library_vector_reserve_relocates_move_only_elements)
         goto cleanup;
     }
     if (vector_cobol_contains_normalized(cobol_path,
-            "SET CBLC-PTR-CURSOR TO ADDRESS OF CBLC-SPTR-") != FT_SUCCESS
+            "SET MOVEONLY-CTOR-1-SOURCE TO ADDRESS OF CBLC-SPTR-") != FT_SUCCESS
         || vector_cobol_contains_normalized(cobol_path,
             "PERFORM CBLC-CONSTRUCTOR-")
             != FT_SUCCESS
-        || vector_cobol_contains(cobol_path, "MOVEONLY-REALLOCATE")
+        || vector_cobol_contains(cobol_path, "VECTOR-REALLOCATE-RELOCATION")
             != FT_SUCCESS)
     {
-        std::printf("Assertion failed: reserve must invoke the non-throwing move constructor with the source element address\n");
+        std::printf("Assertion failed: reserve must capture and pass the source element address to the non-throwing move constructor\n");
+        goto cleanup;
+    }
+    if (compile_generated_cobol(binary_path, cobol_path, compiler_log_path,
+            "cobc should compile move-only vector relocation") != FT_SUCCESS)
+    {
+        char compiler_diagnostics[4096];
+
+        if (test_read_text_file(compiler_log_path, compiler_diagnostics,
+                sizeof(compiler_diagnostics)) == FT_SUCCESS)
+            std::printf("Move-only vector COBOL compiler diagnostics:\n%s\n",
+                compiler_diagnostics);
+        goto cleanup;
+    }
+    if (execute_binary(directory, "vector_move_only.bin",
+            "vector_move_only.txt",
+            "move-only vector relocation should execute") != FT_SUCCESS
+        || test_read_text_file(output_path, output_buffer,
+            sizeof(output_buffer)) != FT_SUCCESS
+        || std::strcmp(output_buffer,
+            "+000000003\n+000000007\n+000000000\n") != 0)
+    {
+        std::printf("Move-only vector relocation did not preserve values through erase, resize, reserve, shrink_to_fit, and clear\n");
+        if (test_read_text_file(output_path, output_buffer,
+                sizeof(output_buffer)) == FT_SUCCESS)
+            std::printf("Move-only vector runtime output:\n%s\n", output_buffer);
         goto cleanup;
     }
     status = FT_SUCCESS;
 cleanup:
-    test_remove_directory(directory);
+    if (status == FT_SUCCESS)
+    {
+        test_cleanup_example_artifacts_with_log(source_path, binary_path,
+            output_path, compiler_log_path);
+        test_remove_directory(directory);
+    }
+    else
+        std::printf("Generated move-only vector probe retained at %s\n",
+            directory);
     return (status);
 }
 
@@ -3506,29 +4786,53 @@ FT_TEST(test_standard_library_vector_reserve_copies_when_move_may_throw)
 
 FT_TEST(test_standard_library_vector_template_depth_boundary)
 {
-    static const size_t chain_depths[] = {4, 5, 16};
+    static const size_t chain_depths[] = {
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
+    };
     const size_t supported_depth = CBLC_TEMPLATE_DEFAULT_MAX_DEPTH;
     const char *vector_source =
         transpiler_standard_library_get_native_source("CBLC-VECTOR");
     const char *error_source =
         transpiler_standard_library_get_native_source("CBLC-ERRORS");
+    size_t generated_sizes[sizeof(chain_depths) / sizeof(chain_depths[0])] = {};
     std::string nested_type;
+    std::string level_types[17];
     std::string source;
     t_cblc_translation_unit unit;
     const int trace_depth = std::getenv("CTOC_TRACE_TEMPLATE_DEPTH") != NULL;
+    const char *selected_depth_setting =
+        std::getenv("CTOC_TEST_TEMPLATE_DEPTH_ONLY");
     std::chrono::steady_clock::time_point phase_started;
     size_t index;
+    size_t selected_depth;
 
     nested_type.reserve(supported_depth * 16 + 8);
-    /* Keep an actual string object in the fixture: merely naming string as
-     * the leaf type of an empty nested vector does not require its default
-     * constructor to be emitted. */
+    selected_depth = 0;
+    if (selected_depth_setting && selected_depth_setting[0] != '\0')
+    {
+        char *parse_end = NULL;
+        const unsigned long parsed_depth = std::strtoul(
+            selected_depth_setting, &parse_end, 10);
+
+        if (!parse_end || *parse_end != '\0' || parsed_depth == 0
+            || parsed_depth > supported_depth
+            || parsed_depth > sizeof(chain_depths) / sizeof(chain_depths[0]))
+        {
+            std::printf("CTOC_TEST_TEMPLATE_DEPTH_ONLY must be an integer from 1 through %zu\n",
+                supported_depth);
+            return (FT_FAILURE);
+        }
+        selected_depth = static_cast<size_t>(parsed_depth);
+    }
+    /* Keep an initialized string object in the fixture: merely naming string
+     * as the leaf type of an empty nested vector does not require its
+     * constructor or UTF-8 validation path to be emitted. */
     for (index = 0; index < supported_depth; ++index)
         nested_type += "vector<";
     nested_type += "string";
     for (index = 0; index < supported_depth; ++index)
         nested_type += ">";
-    source = "void main() {\n    string leaf;\n    " + nested_type
+    source = "void main() {\n    string leaf(\"nested\");\n    " + nested_type
         + " value;\n}\n";
 
     cblc_translation_unit_init(&unit);
@@ -3636,6 +4940,8 @@ FT_TEST(test_standard_library_vector_template_depth_boundary)
         std::string previous_type;
         size_t level;
 
+        if (selected_depth != 0 && depth != selected_depth)
+            continue ;
         if (depth > supported_depth)
         {
             std::printf("Configured template nesting limit %zu is below required proof depth %zu\n",
@@ -3645,45 +4951,493 @@ FT_TEST(test_standard_library_vector_template_depth_boundary)
 
         source.clear();
         source += "void main() {\nstring leaf(\"0\");\n"
-            "string *borrowed_leaf;\n";
+            "string copied_leaf(leaf);\nint copy_probe_ok;\n"
+            "string *borrowed_leaf;\nint erase_chain_size;\n"
+            "string assignment_suffix(\"1\");\n"
+            "int nested_copy_assignment_ok;\n"
+            "int empty_bounds_ok;\n"
+            "int populated_bounds_ok;\n"
+            "int layer_capacity_before;\n"
+            "int layer_capacity_after;\n"
+            "int layer_reserve_request;\n"
+            "int layer_size_before;\n"
+            "int layer_check_ok;\n"
+            "int reserve_lifecycle_ok;\n"
+            "int leaf_codepoint;\n"
+            "int branch_index;\n"
+            "int invalid_insert_index;\n"
+            "int nested_edge_ok;\n"
+            "int nested_self_assignment_ok;\n"
+            "string edge_leaf(\"7\");\n";
         previous_type = "string";
         level = 1;
         while (level <= depth)
         {
-            if (depth < 16)
-                source += "vector<" + previous_type + "> level"
-                    + std::to_string(level) + ";\n";
-            previous_type = "vector<" + previous_type + ">";
+            level_types[level] = "vector<" + previous_type + ">";
+            source += level_types[level] + " level"
+                + std::to_string(level) + ";\n";
+            source += level_types[level] + " edge_probe"
+                + std::to_string(level) + ";\n";
+            previous_type = level_types[level];
             level += 1;
         }
-        if (depth == 16)
-            source += previous_type + " level16;\n";
-        source += "int parsed_leaf;\nparsed_leaf = leaf.parse_int();\n";
-        if (depth < 16)
-            source += "level1.push_back(leaf);\n";
-        if (depth < 16)
+        source += previous_type + " assigned_level;\n";
+        source += "edge_probe1.push_back(edge_leaf);\n";
+        for (level = 2; level <= depth; ++level)
+            source += "edge_probe" + std::to_string(level)
+                + ".push_back(edge_probe" + std::to_string(level - 1)
+                + ");\n";
+        source += "nested_self_assignment_ok = 1;\n";
+        for (level = 1; level <= depth; ++level)
         {
-            for (level = 2; level <= depth; ++level)
-            {
-                source += "level" + std::to_string(level) + ".push_back(level"
-                    + std::to_string(level - 1) + ");\n";
-            }
+            const std::string probe = "edge_probe" + std::to_string(level);
+
+            source += probe + " = " + probe + ";\n"
+                + probe + " = " + probe + ";\n"
+                "if (" + probe
+                + ".size() != 1) { nested_self_assignment_ok = 0; }\n";
         }
+        source += "borrowed_leaf = edge_probe" + std::to_string(depth)
+            + ".front()";
+        for (index = 1; index < depth; ++index)
+            source += "->at(0)";
+        source += ";\n"
+            "if (borrowed_leaf->len() != 1) { nested_self_assignment_ok = 0; }\n"
+            "if (borrowed_leaf->parse_int() != 7) { nested_self_assignment_ok = 0; }\n";
+        for (level = 1; level <= depth; ++level)
+        {
+            source += "if (nested_self_assignment_ok == 1) { display(\"NESTED SELF ASSIGN LEVEL "
+                + std::to_string(level)
+                + " OK\"); } else { display(\"NESTED SELF ASSIGN LEVEL "
+                + std::to_string(level) + " FAILED\"); }\n";
+        }
+        source += "nested_edge_ok = 1;\n";
+        for (level = 1; level <= depth; ++level)
+        {
+            const std::string probe = "edge_probe" + std::to_string(level);
+
+            source += probe + ".insert(0, " + probe
+                + ".at_value(0));\n"
+                "if (" + probe
+                + ".size() != 2) { nested_edge_ok = 0; }\n"
+                + probe + ".insert(" + probe + ".size(), " + probe
+                + ".at_value(0));\n"
+                "if (" + probe
+                + ".size() != 3) { nested_edge_ok = 0; }\n"
+                + probe + ".erase(2);\n"
+                "if (" + probe
+                + ".size() != 2) { nested_edge_ok = 0; }\n"
+                "if (nested_edge_ok == 1) { display(\"NESTED EDGE END INSERT ERASE LEVEL "
+                + std::to_string(level)
+                + " OK\"); } else { display(\"NESTED EDGE END INSERT ERASE LEVEL "
+                + std::to_string(level) + " FAILED\"); }\n"
+                + probe + ".erase(0);\n"
+                "if (" + probe
+                + ".size() != 1) { nested_edge_ok = 0; }\n"
+                + probe + ".clear();\n"
+                "if (" + probe
+                + ".size() != 0) { nested_edge_ok = 0; }\n"
+                + probe + ".clear();\n"
+                "if (" + probe
+                + ".size() != 0) { nested_edge_ok = 0; }\n"
+                "if (nested_edge_ok == 1) { display(\"NESTED EDGE RESET LEVEL "
+                + std::to_string(level)
+                + " OK\"); } else { display(\"NESTED EDGE RESET LEVEL "
+                + std::to_string(level) + " FAILED\"); }\n";
+        }
+        source += "edge_probe1.push_back(edge_leaf);\n";
+        for (level = 2; level <= depth; ++level)
+            source += "edge_probe" + std::to_string(level)
+                + ".push_back(edge_probe" + std::to_string(level - 1)
+                + ");\n";
+        source += "nested_edge_ok = 1;\n";
+        /* Exercise value-taking operations with an element borrowed from the
+         * same vector. At depths > 1 each element is itself a class, so these
+         * calls also cover nested copy construction during assign and resize
+         * growth, plus shrink preservation at every concrete specialization. */
+        for (level = 1; level <= depth; ++level)
+        {
+            const std::string probe = "edge_probe" + std::to_string(level);
+
+            source += probe + ".assign(2, " + probe + ".at_value(0));\n"
+                "if (" + probe
+                + ".size() != 2) { nested_edge_ok = 0; }\n"
+                + probe + ".resize(1);\n"
+                "if (" + probe
+                + ".size() != 1) { nested_edge_ok = 0; }\n"
+                + probe + ".resize(2, " + probe + ".at_value(0));\n"
+                "if (" + probe
+                + ".size() != 2) { nested_edge_ok = 0; }\n"
+                + probe + ".assign(1, " + probe + ".at_value(0));\n"
+                "if (" + probe
+                + ".size() != 1) { nested_edge_ok = 0; }\n";
+        }
+        for (level = 1; level <= depth; ++level)
+            source += "if (edge_probe" + std::to_string(level)
+                + ".size() != 1) { nested_edge_ok = 0; }\n";
+        source += "borrowed_leaf = edge_probe" + std::to_string(depth)
+            + ".front()";
+        for (index = 1; index < depth; ++index)
+            source += "->at(0)";
+        source += ";\n"
+            "if (borrowed_leaf->parse_int() != 7) { nested_edge_ok = 0; }\n"
+            "if (nested_edge_ok == 1) { display(\"NESTED EDGE REUSE OK\"); }\n"
+            "else { display(\"NESTED EDGE REUSE FAILED\"); }\n";
+        for (level = 1; level < depth; ++level)
+            source += level_types[level] + " *erase_chain"
+                + std::to_string(level) + ";\n";
+        if (depth == 16)
+        {
+            for (level = 1; level < depth; ++level)
+                source += level_types[level] + " *chain" + std::to_string(level)
+                    + ";\n";
+        }
+        source += "empty_bounds_ok = 1;\n";
+        for (level = 1; level <= depth; ++level)
+        {
+            const std::string level_name = "level" + std::to_string(level);
+            const std::string borrowed_target = level == 1
+                ? "borrowed_leaf" : "erase_chain" + std::to_string(level - 1);
+
+            source += "try { " + borrowed_target + " = " + level_name
+                + ".at(-1); empty_bounds_ok = 0; }\n"
+                "catch (const out_of_range& error) { display(\"EMPTY AT NEGATIVE LEVEL "
+                + std::to_string(level) + "\"); }\n"
+                "try { " + borrowed_target + " = " + level_name
+                + ".at(0); empty_bounds_ok = 0; }\n"
+                "catch (const out_of_range& error) { display(\"EMPTY AT END LEVEL "
+                + std::to_string(level) + "\"); }\n"
+                "try { " + level_name
+                + ".erase(0); empty_bounds_ok = 0; }\n"
+                "catch (const out_of_range& error) { display(\"EMPTY ERASE LEVEL "
+                + std::to_string(level) + "\"); }\n"
+                "try { " + level_name
+                + ".pop_back(); empty_bounds_ok = 0; }\n"
+                "catch (const out_of_range& error) { display(\"EMPTY POP BACK LEVEL "
+                + std::to_string(level) + "\"); }\n"
+                "try { " + level_name
+                + ".resize(-1); empty_bounds_ok = 0; }\n"
+                "catch (const invalid_argument& error) { display(\"EMPTY RESIZE NEGATIVE LEVEL "
+                + std::to_string(level) + "\"); }\n"
+                "if (" + level_name
+                + ".size() != 0) { empty_bounds_ok = 0; }\n"
+                "display(\"EMPTY BOUNDS STATE LEVEL "
+                + std::to_string(level) + "\");\n"
+                "erase_chain_size = " + level_name + ".size();\n"
+                "display(erase_chain_size);\n";
+        }
+        source += "display(\"EMPTY NESTED BOUNDS\");\n"
+            "display(empty_bounds_ok);\n"
+            "display(\"LEAF CONSTRUCTED\");\n"
+            "int parsed_leaf;\nparsed_leaf = leaf.parse_int();\n"
+            "display(\"LEAF PARSED\");\n"
+            "copy_probe_ok = 1;\n"
+            "leaf_codepoint = copied_leaf.codepoint_at(0);\n"
+            "if (leaf_codepoint != 48) { copy_probe_ok = 0; }\n"
+            "display(\"STRING COPY CHECK\");\n"
+            "display(copy_probe_ok);\n";
+        source += "level1.push_back(leaf);\n";
+        if (depth == 16)
+            source += "level1.push_back(level1.at_value(0));\n"
+                "display(\"NESTED LEVEL 1 REALLOCATED\");\n"
+                "display(\"NESTED LEVEL 1 INSERTED\");\n";
+        for (level = 2; level <= depth; ++level)
+        {
+            source += "level" + std::to_string(level) + ".push_back(level"
+                + std::to_string(level - 1) + ");\n";
+            if (depth == 16)
+                source += "display(\"NESTED LEVEL " + std::to_string(level)
+                    + " INSERTED\");\n";
+        }
+        if (depth == 16)
+            source += "display(\"BEFORE NESTED RETURN COPY\");\n";
         source += "level" + std::to_string(depth) + ".push_back(level"
             + std::to_string(depth) + ".at_value(0));\n";
+        if (depth == 16)
+            source += "display(\"AFTER NESTED RETURN COPY\");\n";
+        source += "assigned_level = level" + std::to_string(depth) + ";\n"
+            "borrowed_leaf = assigned_level.front()";
+        for (index = 1; index < depth; ++index)
+            source += "->at(0)";
+        source += ";\nborrowed_leaf->append(assignment_suffix);\n"
+            "borrowed_leaf = level" + std::to_string(depth) + ".front()";
+        for (index = 1; index < depth; ++index)
+            source += "->at(0)";
+        source += ";\nnested_copy_assignment_ok = 1;\n"
+            "if (borrowed_leaf->len() != 1) { nested_copy_assignment_ok = 0; }\n"
+            "if (borrowed_leaf->parse_int() != 0) { nested_copy_assignment_ok = 0; }\n"
+            "display(\"NESTED COPY ASSIGNMENT INDEPENDENCE\");\n"
+            "display(nested_copy_assignment_ok);\n";
+        if (depth == 16)
+        {
+            source += "chain15 = level16.front();\n"
+                "display(\"CHAIN STEP 1\");\n";
+            for (level = 15; level > 1; --level)
+            {
+                source += "chain" + std::to_string(level - 1) + " = chain"
+                    + std::to_string(level) + "->at(0);\n"
+                    "display(\"CHAIN STEP "
+                    + std::to_string(17 - level) + "\");\n";
+            }
+            source += "borrowed_leaf = chain1->at(0);\n"
+                "display(\"CHAIN STEP 16\");\n";
+        }
+        if (depth == 16)
+            source += "display(\"BEFORE DIRECT CHAIN\");\n";
         source += "borrowed_leaf = level" + std::to_string(depth) + ".front()";
         for (index = 1; index < depth; ++index)
             source += "->at(0)";
         source += ";\n";
-        if (depth < 16)
+        source += "populated_bounds_ok = 1;\n";
+        for (level = 1; level <= depth; ++level)
         {
-            for (level = depth; level > 0; --level)
-                source += "level" + std::to_string(level) + ".erase(0);\n";
+            const std::string level_name = "level" + std::to_string(level);
+            const std::string borrowed_target = level == 1
+                ? "borrowed_leaf" : "erase_chain" + std::to_string(level - 1);
+
+            source += "erase_chain_size = " + level_name + ".size();\n"
+                "try { " + borrowed_target + " = " + level_name
+                + ".at(-1); populated_bounds_ok = 0; }\n"
+                "catch (const out_of_range& error) { display(\"POPULATED AT NEGATIVE LEVEL "
+                + std::to_string(level) + "\"); }\n"
+                "try { " + borrowed_target + " = " + level_name
+                + ".at(erase_chain_size); populated_bounds_ok = 0; }\n"
+                "catch (const out_of_range& error) { display(\"POPULATED AT END LEVEL "
+                + std::to_string(level) + "\"); }\n"
+                "if (" + level_name
+                + ".size() != erase_chain_size) { populated_bounds_ok = 0; }\n";
+            source += "invalid_insert_index = erase_chain_size + 1;\n"
+                "try { " + level_name + ".insert(-1, " + level_name
+                + ".at_value(0)); populated_bounds_ok = 0; }\n"
+                "catch (const out_of_range& error) { display(\"POPULATED INSERT NEGATIVE LEVEL "
+                + std::to_string(level) + "\"); }\n"
+                "try { " + level_name + ".insert(invalid_insert_index, "
+                + level_name + ".at_value(0)); populated_bounds_ok = 0; }\n"
+                "catch (const out_of_range& error) { display(\"POPULATED INSERT END LEVEL "
+                + std::to_string(level) + "\"); }\n"
+                "try { " + level_name
+                + ".erase(-1); populated_bounds_ok = 0; }\n"
+                "catch (const out_of_range& error) { display(\"POPULATED ERASE NEGATIVE LEVEL "
+                + std::to_string(level) + "\"); }\n"
+                "try { " + level_name
+                + ".erase(erase_chain_size); populated_bounds_ok = 0; }\n"
+                "catch (const out_of_range& error) { display(\"POPULATED ERASE END LEVEL "
+                + std::to_string(level) + "\"); }\n"
+                "try { " + level_name
+                + ".resize(-1); populated_bounds_ok = 0; }\n"
+                "catch (const invalid_argument& error) { display(\"POPULATED RESIZE NEGATIVE LEVEL "
+                + std::to_string(level) + "\"); }\n"
+                "try { " + level_name + ".assign(-1, " + level_name
+                + ".at_value(0)); populated_bounds_ok = 0; }\n"
+                "catch (const invalid_argument& error) { display(\"POPULATED ASSIGN NEGATIVE LEVEL "
+                + std::to_string(level) + "\"); }\n"
+                "if (" + level_name
+                + ".size() != erase_chain_size) { populated_bounds_ok = 0; }\n"
+                "display(\"POPULATED BOUNDS STATE LEVEL "
+                + std::to_string(level) + "\");\n"
+                "erase_chain_size = " + level_name + ".size();\n"
+                "display(erase_chain_size);\n";
         }
+        source += "display(\"POPULATED NESTED BOUNDS\");\n"
+            "display(populated_bounds_ok);\n";
+        source += "reserve_lifecycle_ok = 1;\n";
+        for (level = 1; level <= depth; ++level)
+        {
+            const std::string level_name = "level" + std::to_string(level);
+
+            source += "layer_check_ok = 1;\n"
+                "layer_capacity_before = " + level_name
+                + ".capacity();\n"
+                "layer_reserve_request = layer_capacity_before + 1;\n"
+                "layer_size_before = " + level_name + ".size();\n"
+                + level_name + ".reserve(layer_reserve_request);\n"
+                "if (" + level_name
+                + ".capacity() < layer_reserve_request) { layer_check_ok = 0; }\n"
+                "if (" + level_name
+                + ".size() != layer_size_before) { layer_check_ok = 0; }\n"
+                "layer_capacity_after = " + level_name + ".capacity();\n"
+                "try { " + level_name + ".reserve(-1); layer_check_ok = 0; }\n"
+                "catch (const invalid_argument& error) { display(\"NESTED NEGATIVE RESERVE LEVEL "
+                + std::to_string(level) + "\"); }\n"
+                "if (" + level_name
+                + ".capacity() != layer_capacity_after) { layer_check_ok = 0; }\n"
+                "if (" + level_name
+                + ".size() != layer_size_before) { layer_check_ok = 0; }\n"
+                "if (layer_check_ok == 1) { display(\"NESTED RESERVE LEVEL "
+                + std::to_string(level) + " OK\"); }\n"
+                "else { reserve_lifecycle_ok = 0; display(\"NESTED RESERVE LEVEL "
+                + std::to_string(level) + " FAILED\"); }\n";
+        }
+        source += "borrowed_leaf = level" + std::to_string(depth) + ".front()";
+        for (index = 1; index < depth; ++index)
+            source += "->at(0)";
+        source += ";\n"
+            "if (borrowed_leaf->len() != 1) { reserve_lifecycle_ok = 0; }\n"
+            "if (borrowed_leaf->parse_int() != 0) { reserve_lifecycle_ok = 0; }\n"
+            "if (reserve_lifecycle_ok == 1) { display(\"NESTED RESERVE LIFECYCLE OK\"); }\n"
+            "else { display(\"NESTED RESERVE LIFECYCLE FAILED\"); }\n";
+        if (depth == 16)
+            source += "display(\"AFTER DIRECT CHAIN\");\n";
+        if (depth == 16)
+        {
+            source += "int depth16_ok;\nint depth16_capacity;\ndepth16_ok = copy_probe_ok;\n"
+                "display(\"BEFORE SUFFIX CONSTRUCT\");\n"
+                "string depth16_suffix(\"1\");\n"
+                "display(\"AFTER SUFFIX CONSTRUCT\");\n"
+                "depth16_ok = 1;\n";
+            for (level = 1; level < depth; ++level)
+                source += "if (level" + std::to_string(level)
+                    + ".size() != "
+                    + (level == 1 ? "2" : "1")
+                    + ") { depth16_ok = 0; }\n"
+                    "display(\"SIZE CHECK LEVEL " + std::to_string(level)
+                    + "\");\n";
+            source += "if (level16.size() != 2) { depth16_ok = 0; }\n"
+                "display(\"SIZE CHECK LEVEL 16\");\n"
+                "display(\"NESTED VALUE COPIED\");\n"
+                "display(\"BORROWED LEAF RESOLVED\");\n"
+                "borrowed_leaf->append(depth16_suffix);\n"
+                "display(\"NESTED VALUE MUTATED\");\n"
+                "if (borrowed_leaf->len() != 2) { depth16_ok = 0; }\n"
+                "if (borrowed_leaf->parse_int() != 1) { depth16_ok = 0; }\n"
+                "if (depth16_ok == 1) { display(\"NESTED VECTOR DEPTH 16 OK\"); }\n"
+                "else { display(\"NESTED VECTOR DEPTH 16 FAILED\"); }\n"
+                "depth16_capacity = level16.capacity();\n"
+                "level16.clear();\n"
+                "if (level16.size() == 0 && level16.capacity() == depth16_capacity && level15.size() == 1) { display(\"DEPTH 16 CLEAR PRESERVES SOURCE AND CAPACITY\"); }\n"
+                "else { display(\"DEPTH 16 CLEAR PRESERVES SOURCE FAILED\"); depth16_ok = 0; }\n"
+                "level16.clear();\n"
+                "if (level16.size() == 0 && level16.capacity() == depth16_capacity) { display(\"DEPTH 16 REPEATED CLEAR\"); }\n"
+                "else { display(\"DEPTH 16 REPEATED CLEAR FAILED\"); depth16_ok = 0; }\n"
+                "level16.push_back(level15);\n"
+                "borrowed_leaf = level16.front()";
+            for (index = 1; index < depth; ++index)
+                source += "->at(0)";
+            source += ";\n"
+                "if (level16.size() != 1 || level16.capacity() != depth16_capacity || borrowed_leaf->len() != 1 || borrowed_leaf->parse_int() != 0) { depth16_ok = 0; }\n"
+                "if (depth16_ok == 1) { display(\"DEPTH 16 REUSE AFTER CLEAR\"); }\n"
+                "else { display(\"DEPTH 16 REUSE AFTER CLEAR FAILED\"); }\n"
+                "level16.pop_back();\n"
+                "if (level16.size() == 0 && level16.capacity() == depth16_capacity && level15.size() == 1) { display(\"DEPTH 16 POP BACK AFTER REUSE\"); }\n"
+                "else { display(\"DEPTH 16 POP BACK AFTER REUSE FAILED\"); }\n";
+        }
+        else
+        {
+            source += "int nested_depth_ok;\n"
+                "nested_depth_ok = copy_probe_ok;\n";
+            for (level = 1; level < depth; ++level)
+                source += "level" + std::to_string(level)
+                    + ".push_back(level" + std::to_string(level)
+                    + ".at_value(0));\n";
+            for (level = 1; level <= depth; ++level)
+                source += "if (level" + std::to_string(level)
+                    + ".size() != 2) { nested_depth_ok = 0; }\n";
+            source += "display(\"NESTED SIZE TWO CHECK\");\n"
+                "display(nested_depth_ok);\n";
+            for (level = 1; level <= depth; ++level)
+                source += "level" + std::to_string(level)
+                    + ".push_back(level" + std::to_string(level)
+                    + ".at_value(0));\n";
+            source += "borrowed_leaf = level" + std::to_string(depth)
+                + ".front()";
+            for (index = 1; index < depth; ++index)
+                source += "->at(0)";
+            source += ";\n";
+            for (level = 1; level <= depth; ++level)
+                source += "if (level" + std::to_string(level)
+                    + ".size() != 3) { nested_depth_ok = 0; }\n";
+            source += "if (borrowed_leaf->len() != 1) { nested_depth_ok = 0; }\n"
+                "if (borrowed_leaf->parse_int() != 0) { nested_depth_ok = 0; }\n";
+            source += "display(\"NESTED VALUE CHECK\");\n"
+                "display(nested_depth_ok);\n";
+            source += "branch_index = 0;\nwhile (branch_index < 3) {\n"
+                "borrowed_leaf = level1.at(branch_index);\n"
+                "try { erase_chain_size = borrowed_leaf->parse_int(); }\n"
+                "catch (...) { nested_depth_ok = 0; }\n"
+                "if (erase_chain_size != 0) { nested_depth_ok = 0; }\n"
+                "branch_index = branch_index + 1;\n}\n";
+            for (level = 2; level <= depth; ++level)
+            {
+                source += "branch_index = 0;\nwhile (branch_index < 3) {\n"
+                    "erase_chain" + std::to_string(level - 1) + " = level"
+                    + std::to_string(level) + ".at(branch_index);\n"
+                    "erase_chain_size = erase_chain"
+                    + std::to_string(level - 1) + "->size();\n"
+                    "display(\"PREERASE LEVEL " + std::to_string(level)
+                    + " BRANCH\");\ndisplay(branch_index);\n"
+                    "display(erase_chain_size);\n"
+                    "if (erase_chain_size != 1) { nested_depth_ok = 0; }\n"
+                    "branch_index = branch_index + 1;\n}\n";
+            }
+            source += "if (nested_depth_ok == 1) { display(\"NESTED VECTOR DEPTH "
+                + std::to_string(depth)
+                + " OK\"); } else { display(\"NESTED VECTOR DEPTH "
+                + std::to_string(depth) + " FAILED\"); }\n";
+        }
+        /* The depth-16 scenario deliberately keeps a single live path in
+         * levels 2..15, so it cannot erase index 0 and then borrow index 0
+         * from each level as the depth-4/5 three-branch erase scenario does. */
+        for (level = depth; depth != 16 && level > 0; --level)
+        {
+            const std::string level_name = "level" + std::to_string(level);
+            const std::string check_name = depth == 16
+                ? "depth16_ok" : "nested_depth_ok";
+
+            source += level_name + ".erase(0);\n"
+                "display(\"NESTED ERASE LEVEL " + std::to_string(level)
+                + " RETURNED\");\n"
+                "if (" + level_name + ".size() != 2) { "
+                + check_name + " = 0; }\n"
+                "display(\"NESTED ERASE LEVEL " + std::to_string(level)
+                + " SIZE CHECKED\");\n";
+            if (level == 1)
+                source += "borrowed_leaf = " + level_name + ".at(0);\n";
+            else
+            {
+                source += "erase_chain" + std::to_string(level - 1) + " = "
+                    + level_name + ".at(0);\n"
+                    "display(\"NESTED ERASE BORROW LEVEL "
+                    + std::to_string(level - 1) + "\");\n"
+                    "erase_chain_size = erase_chain" + std::to_string(level - 1)
+                    + "->size();\n"
+                    "display(erase_chain_size);\n";
+                for (index = level - 1; index > 1; --index)
+                    source += "erase_chain" + std::to_string(index - 1)
+                        + " = erase_chain" + std::to_string(index)
+                        + "->at(0);\ndisplay(\"NESTED ERASE BORROW LEVEL "
+                        + std::to_string(index - 1) + "\");\n"
+                        "erase_chain_size = erase_chain"
+                        + std::to_string(index - 1)
+                        + "->size();\ndisplay(erase_chain_size);\n";
+                source += "borrowed_leaf = erase_chain1->at(0);\n";
+            }
+            source += "display(\"NESTED ERASE LEVEL "
+                + std::to_string(level) + " BORROWED STRING\");\n"
+                "if (borrowed_leaf->len() != 1) { " + check_name
+                + " = 0; }\ndisplay(\"NESTED ERASE LEVEL "
+                + std::to_string(level) + " LENGTH CHECKED\");\n"
+                "leaf_codepoint = borrowed_leaf->codepoint_at(0);\n"
+                "display(leaf_codepoint);\n"
+                "if (leaf_codepoint != 48) { " + check_name + " = 0; }\n"
+                "try { erase_chain_size = borrowed_leaf->parse_int(); }\n"
+                "catch (...) { " + check_name
+                + " = 0; display(\"NESTED ERASE PARSE ERROR\"); }\n"
+                "display(\"NESTED ERASE PARSE CHECKED\");\n"
+                "display(erase_chain_size);\n"
+                "if (erase_chain_size != 0) { " + check_name
+                + " = 0; }\ndisplay(\"NESTED ERASE LEVEL "
+                + std::to_string(level) + " OK\");\n";
+        }
+        if (depth != 16)
+            source += "if (nested_depth_ok == 1) { display(\"NESTED ERASE LIFECYCLE OK\"); }\n"
+                "else { display(\"NESTED ERASE LIFECYCLE FAILED\"); }\n";
         source += "}\n";
         source = std::string(error_source) + "\n" + vector_source + "\n" + source;
         cblc_translation_unit_init(&unit);
         phase_started = std::chrono::steady_clock::now();
+        if (trace_depth)
+            std::fprintf(stderr, "template depth %zu parse started (%zu source bytes)\n",
+                depth, source.size());
         if (cblc_parse_translation_unit(source.c_str(), &unit) != FT_SUCCESS)
         {
             std::printf("Nested vector<string> parsing failed at depth %zu: %s\n",
@@ -3692,7 +5446,7 @@ FT_TEST(test_standard_library_vector_template_depth_boundary)
             return (FT_FAILURE);
         }
         if (trace_depth)
-            std::fprintf(stderr, "template depth %zu parse: %.3f s\n", depth,
+            std::fprintf(stderr, "template depth %zu parse completed: %.3f s\n", depth,
                 std::chrono::duration<double>(
                     std::chrono::steady_clock::now() - phase_started).count());
         if (test_expect_int_equal(static_cast<int>(unit.template_instantiation_count),
@@ -3764,6 +5518,9 @@ FT_TEST(test_standard_library_vector_template_depth_boundary)
             }
         }
         phase_started = std::chrono::steady_clock::now();
+        if (trace_depth)
+            std::fprintf(stderr, "template depth %zu COBOL generation started\n",
+                depth);
         if (cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
                 &generation_diagnostic_code, generation_diagnostic,
                 sizeof(generation_diagnostic)) != FT_SUCCESS
@@ -3794,29 +5551,147 @@ FT_TEST(test_standard_library_vector_template_depth_boundary)
             cblc_translation_unit_dispose(&unit);
             return (FT_FAILURE);
         }
+        generated_sizes[depth_index] = std::strlen(generated_cobol);
         if (trace_depth)
             std::fprintf(stderr, "template depth %zu COBOL generation: %.3f s (%zu bytes)\n",
                 depth, std::chrono::duration<double>(
                     std::chrono::steady_clock::now() - phase_started).count(),
-                std::strlen(generated_cobol));
-        for (level = 1; depth < 16 && level <= depth; ++level)
+                generated_sizes[depth_index]);
+        for (level = 1; level <= depth; ++level)
         {
-            const std::string element_constructor_marker =
-                "CBLC-CONSTRUCTOR-CBLC-SPTR-MAIN-LEVEL" + std::to_string(level)
-                + "-ELEMENTS-";
+            char level_name[TRANSPILE_IDENTIFIER_MAX];
+            char element_source_name[TRANSPILE_IDENTIFIER_MAX];
+            const t_cblc_data_item *level_item = NULL;
+            const t_cblc_data_item *element_item = NULL;
+            const t_cblc_struct_type *level_type = NULL;
+            const t_cblc_struct_type *element_type = NULL;
+            size_t type_index;
+            unsigned long long specialization_hash;
+            char specialization_based_name[TRANSPILE_IDENTIFIER_MAX];
+            std::string element_constructor_marker;
             const std::string destructor_marker = "CBLC-DESTRUCTOR-MAIN-LEVEL"
                 + std::to_string(level) + ".";
 
-            if (((depth < 16 || level == 1)
-                    && !std::strstr(generated_cobol,
-                        element_constructor_marker.c_str()))
+            std::snprintf(level_name, sizeof(level_name), "level%zu", level);
+            element_source_name[0] = '\0';
+            if (level == 1)
+                ft_strlcpy(element_source_name, "string",
+                    sizeof(element_source_name));
+            else
+            {
+                char element_item_name[TRANSPILE_IDENTIFIER_MAX];
+
+                std::snprintf(element_item_name, sizeof(element_item_name),
+                    "level%zu", level - 1);
+                for (size_t data_index = 0; data_index < unit.data_count;
+                    ++data_index)
+                    if (std::strcmp(unit.data_items[data_index].source_name,
+                            element_item_name) == 0)
+                    {
+                        element_item = &unit.data_items[data_index];
+                        break ;
+                    }
+                if (element_item)
+                    ft_strlcpy(element_source_name,
+                        element_item->struct_type_name,
+                        sizeof(element_source_name));
+            }
+            for (size_t data_index = 0; data_index < unit.data_count;
+                ++data_index)
+                if (std::strcmp(unit.data_items[data_index].source_name,
+                        level_name) == 0)
+                {
+                    level_item = &unit.data_items[data_index];
+                    break ;
+                }
+            if (level_item)
+                for (type_index = 0; type_index < unit.struct_type_count;
+                    ++type_index)
+                    if (std::strcmp(unit.struct_types[type_index].source_name,
+                            level_item->struct_type_name) == 0)
+                    {
+                        level_type = &unit.struct_types[type_index];
+                        break ;
+                    }
+            if (level_type && level_type->is_template_instantiation)
+            {
+                for (type_index = 0; type_index < unit.struct_type_count;
+                    ++type_index)
+                    if (std::strcmp(unit.struct_types[type_index].source_name,
+                            element_source_name) == 0)
+                    {
+                        element_type = &unit.struct_types[type_index];
+                        break ;
+                    }
+                if (!element_type)
+                {
+                    std::printf("Missing concrete element type '%s' at depth %zu (level %zu)\n",
+                        element_source_name, depth, level);
+                    cma_free(generated_cobol);
+                    cblc_translation_unit_dispose(&unit);
+                    return (FT_FAILURE);
+                }
+                const unsigned char *hash_cursor =
+                    reinterpret_cast<const unsigned char *>(
+                        element_type->source_name);
+
+                specialization_hash = 14695981039346656037ULL;
+                while (*hash_cursor)
+                {
+                    specialization_hash ^=
+                        static_cast<unsigned long long>(*hash_cursor);
+                    specialization_hash *= 1099511628211ULL;
+                    ++hash_cursor;
+                }
+                std::snprintf(specialization_based_name,
+                    sizeof(specialization_based_name),
+                    "CBLC-SPTR-H%016llX", specialization_hash);
+                /* A vector owns instances of its element specialization.
+                 * Check the constructor ABI for that concrete element type;
+                 * the owning vector's destructor is checked separately. */
+                element_constructor_marker = "CBLC-CONSTRUCTOR-"
+                    + std::string(specialization_based_name) + "-";
+            }
+            if (!level_type || element_constructor_marker.empty()
+                || !std::strstr(generated_cobol,
+                    element_constructor_marker.c_str())
                 || !std::strstr(generated_cobol, destructor_marker.c_str()))
             {
-                std::printf("Nested vector<string> lifecycle call graph is incomplete at depth %zu (level %zu)\n",
-                    depth, level);
+                std::printf("Nested vector<string> lifecycle call graph is incomplete at depth %zu (level %zu): owner=%s element=%s constructor-prefix=%s constructor-found=%d destructor=%s destructor-found=%d\n",
+                    depth, level, level_type ? level_type->source_name : "<missing>",
+                    element_type ? element_type->source_name : "<missing>",
+                    element_constructor_marker.c_str(),
+                    generated_cobol && !element_constructor_marker.empty()
+                        && std::strstr(generated_cobol,
+                            element_constructor_marker.c_str()) != NULL,
+                    destructor_marker.c_str(), generated_cobol
+                        && std::strstr(generated_cobol,
+                            destructor_marker.c_str()) != NULL);
                 cma_free(generated_cobol);
                 cblc_translation_unit_dispose(&unit);
                 return (FT_FAILURE);
+            }
+            {
+                const std::string based_declaration =
+                    "       01 " + std::string(specialization_based_name)
+                    + " BASED.";
+                size_t declaration_count = 0;
+                const char *declaration_cursor = generated_cobol;
+
+                while ((declaration_cursor = std::strstr(declaration_cursor,
+                            based_declaration.c_str())) != NULL)
+                {
+                    declaration_count += 1;
+                    declaration_cursor += based_declaration.size();
+                }
+                if (declaration_count != 1)
+                {
+                    std::printf("Template specialization '%s' at depth %zu must have one shared BASED layout, found %zu\n",
+                        level_type->source_name, depth, declaration_count);
+                    cma_free(generated_cobol);
+                    cblc_translation_unit_dispose(&unit);
+                    return (FT_FAILURE);
+                }
             }
         }
         if (depth == 16)
@@ -3830,9 +5705,52 @@ FT_TEST(test_standard_library_vector_template_depth_boundary)
                 cblc_translation_unit_dispose(&unit);
                 return (FT_FAILURE);
             }
+            if (trace_depth)
+                std::fprintf(stderr, "template depth 16 COBOL compile/run started\n");
+            const int execution_status =
+                vector_compile_and_run_depth_16_cobol(generated_cobol);
+
+            if (trace_depth)
+                std::fprintf(stderr, "template depth 16 COBOL compile/run returned %d\n",
+                    execution_status);
+            if (execution_status != FT_SUCCESS)
+            {
+                std::printf("Depth-16 generated COBOL failed compile-and-execute verification\n");
+                cma_free(generated_cobol);
+                cblc_translation_unit_dispose(&unit);
+                return (FT_FAILURE);
+            }
+        }
+        else
+        {
+            if (trace_depth)
+                std::fprintf(stderr, "template depth %zu COBOL compile/run started\n",
+                    depth);
+            const int execution_status =
+                vector_compile_and_run_nested_depth_cobol(generated_cobol, depth);
+
+            if (trace_depth)
+                std::fprintf(stderr, "template depth %zu COBOL compile/run returned %d\n",
+                    depth, execution_status);
+            if (execution_status != FT_SUCCESS)
+            {
+                std::printf("Depth-%zu generated COBOL failed compile-and-execute verification\n",
+                    depth);
+                cma_free(generated_cobol);
+                cblc_translation_unit_dispose(&unit);
+                return (FT_FAILURE);
+            }
         }
         cma_free(generated_cobol);
         cblc_translation_unit_dispose(&unit);
+    }
+    if (selected_depth == 0
+        && generated_sizes[15] > generated_sizes[4] * chain_depths[15] * 2
+            / chain_depths[4])
+    {
+        std::printf("Depth-16 generated COBOL grew beyond the specialization-linear budget: depth 5=%zu bytes, depth 16=%zu bytes\n",
+            generated_sizes[4], generated_sizes[15]);
+        return (FT_FAILURE);
     }
 
     source.clear();
@@ -3874,23 +5792,35 @@ FT_TEST(test_vector_indexed_method_can_call_another_method_on_based_receiver)
     char directory[256];
     char source_path[256];
     char cobol_path[256];
+    char binary_path[256];
+    char output_path[256];
+    char compile_log_path[256];
+    char runtime_output[256];
     char command[1024];
     int command_length;
     int status;
-    int reset_call_status;
-    int clear_call_status;
-    int field_write_status;
+    int indexed_reset_status;
 
     directory[0] = '\0';
     source_path[0] = '\0';
     cobol_path[0] = '\0';
+    binary_path[0] = '\0';
+    output_path[0] = '\0';
+    compile_log_path[0] = '\0';
+    runtime_output[0] = '\0';
     status = FT_FAILURE;
     if (test_create_temp_directory(directory, sizeof(directory)) != FT_SUCCESS)
         return (FT_FAILURE);
     if (test_join_path(directory, "based_receiver.cblc", source_path,
                 sizeof(source_path)) != FT_SUCCESS
         || test_join_path(directory, "based_receiver.cob", cobol_path,
-                sizeof(cobol_path)) != FT_SUCCESS)
+                sizeof(cobol_path)) != FT_SUCCESS
+        || test_join_path(directory, "based_receiver.bin", binary_path,
+                sizeof(binary_path)) != FT_SUCCESS
+        || test_join_path(directory, "based_receiver.txt", output_path,
+                sizeof(output_path)) != FT_SUCCESS
+        || test_join_path(directory, "based_receiver_compile.txt",
+                compile_log_path, sizeof(compile_log_path)) != FT_SUCCESS)
     {
         test_remove_directory(directory);
         return (FT_FAILURE);
@@ -3906,36 +5836,61 @@ FT_TEST(test_vector_indexed_method_can_call_another_method_on_based_receiver)
         std::printf("Assertion failed: indexed class method with nested self-call should transpile\n");
         goto cleanup;
     }
-    reset_call_status = vector_cobol_main_contains(cobol_path,
-        "CBLC-METHOD-CBLC-SPTR-MAIN-VALUES-ELEMENTS-RESET");
-    clear_call_status = vector_cobol_contains_normalized(cobol_path,
-        "PERFORM CBLC-METHOD-CBLC-SPTR-MAIN-VALUES-ELEMENTS-CLEAR");
-    field_write_status = vector_cobol_contains_normalized(cobol_path,
-        "CBLC-SPTR-MAIN-VALUES-ELEMENTS-CBLC-USER-VALUE = 0");
-    if (reset_call_status != FT_SUCCESS || clear_call_status != FT_SUCCESS
-        || field_write_status != FT_SUCCESS)
+    indexed_reset_status = vector_cobol_main_performs_method_writing_line_tokens(
+        cobol_path, "CBLC-METHOD-CBLC-MRET-", "CBLC-SPTR-H",
+        "CBLC-USER-VALUE = 0");
+    if (indexed_reset_status != FT_SUCCESS)
     {
-        std::printf("Assertion failed: indexed receiver reset=%d clear=%d field-write=%d; expected reset -> clear on the same element\n",
-            reset_call_status, clear_call_status, field_write_status);
+        std::printf("Assertion failed: indexed values[0]->reset() must call its resolved method paragraph and write zero into the concrete based element\n");
         goto cleanup;
     }
     if (vector_cobol_contains(cobol_path,
-            "CBLC-CONSTRUCTOR-CBLC-SPTR-MAIN-VALUES-ELEMENTS-") != FT_SUCCESS)
+            "CBLC-CONSTRUCTOR-CBLC-SPTR-H") != FT_SUCCESS
+        || vector_cobol_contains(cobol_path,
+            "PERFORM CBLC-CONSTRUCTOR-CBLC-SPTR-H") != FT_SUCCESS)
     {
         std::printf("Assertion failed: pointer-backed Probe elements should dispatch through their concrete constructor\n");
         goto cleanup;
     }
     if (vector_cobol_contains(cobol_path,
-            "EMPLACE-BACK-OVL1-RELOCATION-CBLC-USER-VALUE = 42")
+            "VECTOR-EMPLACE-BACK-OVL-1-RELOCATION")
         != FT_SUCCESS)
     {
-        std::printf("Assertion failed: explicit element constructor body must target the pointer-backed staging element\n");
+        std::printf("Assertion failed: the explicit-argument emplace_back overload must have distinct relocation state\n");
         goto cleanup;
     }
-    if (vector_cobol_contains(cobol_path, "EMPLACE-BACK-OVL1")
-        != FT_SUCCESS)
+    if (vector_cobol_contains(cobol_path,
+            "VECTOR-EMPLACE-BACK-RELOCATION") != FT_SUCCESS
+        || vector_cobol_main_contains_in_order(cobol_path,
+            "PERFORM CBLC-METHOD-CBLC-MRET-",
+            "PERFORM CBLC-METHOD-CBLC-MRET-",
+            "PERFORM CBLC-METHOD-CBLC-MRET-") != FT_SUCCESS)
     {
-        std::printf("Assertion failed: zero-argument emplace_back overload must have its own generated method paragraph\n");
+        std::printf("Assertion failed: zero-argument and explicit-argument emplace_back overloads must both be dispatched from main\n");
+        goto cleanup;
+    }
+    if (!test_cobc_available())
+    {
+        status = test_require_cobc_dependency(__func__);
+        goto cleanup;
+    }
+    if (compile_generated_cobol(binary_path, cobol_path, compile_log_path,
+            "cobc should compile indexed based-receiver method dispatch") != FT_SUCCESS)
+    {
+        if (test_read_text_file(compile_log_path, runtime_output,
+                sizeof(runtime_output)) == FT_SUCCESS)
+            std::printf("Indexed based-receiver COBOL diagnostics:\n%s\n",
+                runtime_output);
+        goto cleanup;
+    }
+    if (execute_binary(directory, "based_receiver.bin", "based_receiver.txt",
+            "indexed based-receiver method should execute") != FT_SUCCESS
+        || test_read_text_file(output_path, runtime_output,
+            sizeof(runtime_output)) != FT_SUCCESS
+        || std::strcmp(runtime_output, "+000000000\n") != 0)
+    {
+        std::printf("Assertion failed: values[0]->reset() should mutate the indexed Probe and display zero; got '%s'\n",
+            runtime_output);
         goto cleanup;
     }
     status = FT_SUCCESS;

@@ -866,6 +866,13 @@ static int cblc_parse_translation_unit_impl(const char *text,
                     return (FT_FAILURE);
                 continue ;
             }
+            if (cblc_match_keyword(&cursor, "bool"))
+            {
+                cursor -= std::strlen("bool");
+                if (cblc_parse_bool_declaration(&cursor, unit, 1) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                continue ;
+            }
             const_instance_start = unit->data_count;
             if (cblc_parse_struct_instance_declaration(&cursor, unit) != FT_SUCCESS)
                 return (FT_FAILURE);
@@ -899,6 +906,13 @@ static int cblc_parse_translation_unit_impl(const char *text,
             if (cblc_parse_pointer_declaration(&cursor, unit, 0) == FT_SUCCESS)
                 continue ;
             if (cblc_parse_int_declaration(&cursor, unit, 0) != FT_SUCCESS)
+                return (FT_FAILURE);
+            continue ;
+        }
+        if (cblc_match_keyword(&cursor, "bool"))
+        {
+            cursor -= std::strlen("bool");
+            if (cblc_parse_bool_declaration(&cursor, unit, 0) != FT_SUCCESS)
                 return (FT_FAILURE);
             continue ;
         }

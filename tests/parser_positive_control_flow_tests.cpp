@@ -3,6 +3,36 @@
 #include "compatibility/libft_compat.hpp"
 #include "test_suites.hpp"
 
+FT_TEST(test_parser_accepts_continue_noop_statement)
+{
+    const char *source;
+    t_parser parser;
+    t_ast_node *program;
+
+    source = "IDENTIFICATION DIVISION.\n"
+        "PROGRAM-ID. CONTINUE-TEST.\n"
+        "DATA DIVISION.\n"
+        "PROCEDURE DIVISION.\n"
+        "MAIN.\n"
+        "    PERFORM UNTIL TRUE\n"
+        "        CONTINUE\n"
+        "        EXIT PERFORM\n"
+        "    END-PERFORM.\n"
+        "    STOP RUN.\n";
+    parser_init(&parser, source);
+    program = NULL;
+    if (parser_parse_program(&parser, &program) != FT_SUCCESS)
+    {
+        parser_dispose(&parser);
+        return (FT_FAILURE);
+    }
+    parser_dispose(&parser);
+    if (!program)
+        return (FT_FAILURE);
+    ast_node_destroy(program);
+    return (FT_SUCCESS);
+}
+
 FT_TEST(test_parser_parses_control_flow_statements)
 {
     const char *source;

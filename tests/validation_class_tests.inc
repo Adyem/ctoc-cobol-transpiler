@@ -2018,6 +2018,59 @@ cleanup:
     return (status);
 }
 
+FT_TEST(test_cblc_boolean_literals_use_numeric_boolean_storage)
+{
+    const char *source;
+    t_cblc_translation_unit unit;
+    char *generated_cobol;
+    int status;
+
+    source = "bool control_flag = false;\n"
+        "int output_value;\n"
+        "void main() {\n"
+        "    if (control_flag == false) { output_value = 0; }\n"
+        "    control_flag = true;\n"
+        "    if (control_flag == true) { output_value = 1; }\n"
+        "    if (control_flag) { output_value = 2; }\n"
+        "    display(output_value);\n"
+        "    return;\n"
+        "}\n";
+    cblc_translation_unit_init(&unit);
+    generated_cobol = NULL;
+    status = FT_FAILURE;
+    if (test_expect_success(cblc_parse_translation_unit(source, &unit),
+            "bool declarations and true/false literals should parse") != FT_SUCCESS)
+        goto cleanup;
+    if (test_expect_success(cblc_generate_cobol(&unit, &generated_cobol),
+            "bool literals should lower to native numeric COBOL storage") != FT_SUCCESS)
+        goto cleanup;
+    if (!generated_cobol
+        || !ft_strnstr(generated_cobol, "01 CONTROL-FLAG PIC S9(9)",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "VALUE 0.",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "COMPUTE CONTROL-FLAG = 1",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "IF CONTROL-FLAG = 0",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "IF CONTROL-FLAG = 1",
+            std::strlen(generated_cobol))
+        || !ft_strnstr(generated_cobol, "IF CONTROL-FLAG NOT = 0",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Assertion failed: true/false must lower to numeric 1/0, not character Y/N\n");
+        std::printf("Generated COBOL follows:\n%s\n",
+            generated_cobol ? generated_cobol : "<null>");
+        goto cleanup;
+    }
+    status = FT_SUCCESS;
+cleanup:
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return (status);
+}
+
 FT_TEST(test_cblc_parse_translation_unit_rejects_private_field_access_outside_class)
 {
     const char *source;

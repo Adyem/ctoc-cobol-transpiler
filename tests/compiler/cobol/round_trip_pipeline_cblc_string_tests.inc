@@ -647,12 +647,22 @@ static const char *g_string_remove_prefix_suffix_source =
     "    caught = 0;\n"
     "    try { text.remove_prefix(1); }\n"
     "    catch (const invalid_argument& error) { caught = caught + 1; }\n"
+    "    display(\"AFTER PREFIX SPLIT\");\n"
+    "    display(caught);\n"
     "    try { text.remove_suffix(1); }\n"
     "    catch (const invalid_argument& error) { caught = caught + 1; }\n"
+    "    display(\"AFTER SUFFIX SPLIT\");\n"
+    "    display(caught);\n"
     "    try { text.remove_prefix(3); }\n"
     "    catch (const out_of_range& error) { caught = caught + 1; }\n"
+    "    display(\"AFTER RANGE\");\n"
+    "    display(caught);\n"
     "    unchanged = text.equals(original);\n"
     "    accent_matches = text.equals(accent);\n"
+    "    display(\"PREFIX SUFFIX OBSERVED\");\n"
+    "    display(caught);\n"
+    "    display(unchanged);\n"
+    "    display(accent_matches);\n"
     "    if (caught == 3 && unchanged == 1 && accent_matches == 1) {\n"
     "        display(\"STRING PREFIX SUFFIX OK\");\n"
     "    } else {\n"
@@ -710,7 +720,10 @@ FT_TEST(test_cblc_string_remove_prefix_suffix_executes)
         return (test_require_cobc_dependency(__func__));
     return (run_inline_cblc_to_cobol_execution_test(
         g_string_remove_prefix_suffix_source,
-        "string_remove_prefix_suffix_generated", "STRING PREFIX SUFFIX OK\n"));
+        "string_remove_prefix_suffix_generated",
+        "AFTER PREFIX SPLIT\n+000000001\nAFTER SUFFIX SPLIT\n+000000002\n"
+        "AFTER RANGE\n+000000003\nPREFIX SUFFIX OBSERVED\n"
+        "+000000003\n+000000001\n+000000001\nSTRING PREFIX SUFFIX OK\n"));
 }
 
 FT_TEST(test_cblc_inline_string_capacity_translates_to_cobol_and_executes)

@@ -406,7 +406,7 @@ static int cblc_emit_substituted_statement_with_flow(
             control_flow_base_depth
                 + (control_flow_depth ? *control_flow_depth : 0));
         if (std::snprintf(line, sizeof(line), "%s",
-                control_flow_depth && *control_flow_depth > 0
+                builder->control_flow_depth > 0
                     ? "           END-IF" : "           END-IF.") < 0)
             return (FT_FAILURE);
         return (cobol_text_builder_append_line(builder, line));
@@ -441,7 +441,7 @@ static int cblc_emit_substituted_statement_with_flow(
             control_flow_base_depth
                 + (control_flow_depth ? *control_flow_depth : 0));
         if (std::snprintf(line, sizeof(line), "%s",
-                control_flow_depth && *control_flow_depth > 0
+                builder->control_flow_depth > 0
                     ? "           END-PERFORM" : "           END-PERFORM.") < 0)
             return (FT_FAILURE);
         return (cobol_text_builder_append_line(builder, line));
@@ -481,7 +481,7 @@ static int cblc_emit_substituted_statement_with_flow(
         {
             const int pointer_assignment_status =
                 cblc_emit_pointer_assignment_statement(unit, &substituted, builder,
-                    line, sizeof(line), receiver_context);
+                    line, sizeof(line), receiver_context, function);
 
             if (pointer_assignment_status == FT_SUCCESS)
             {
@@ -519,9 +519,82 @@ static int cblc_emit_substituted_statement_with_flow(
             }
         }
 
-        if (std::snprintf(line, sizeof(line), "           MOVE %s TO %s",
-                source_text, target_text) < 0)
-            return (FT_FAILURE);
+        {
+            size_t operator_index = 0;
+            char arithmetic_operator = '\0';
+            int char_target = std::strcmp(target_text, "CBLC-PTR-CHAR") == 0
+                || std::strcmp(target_text, "CBLC-PTR-CHAR-2") == 0;
+            const t_cblc_data_item *target_item =
+                cblc_find_data_item_for_emit_by_source(unit, substituted.target);
+
+            if (!target_item)
+                target_item = cblc_find_data_item_by_cobol(unit,
+                    substituted.target);
+            if (target_item && target_item->kind == CBLC_DATA_KIND_CHAR)
+                char_target = 1;
+            while (source_text[operator_index] != '\0')
+            {
+                if ((source_text[operator_index] == '+'
+                        || source_text[operator_index] == '-'
+                        || source_text[operator_index] == '*'
+                        || source_text[operator_index] == '/')
+                    && operator_index > 0
+                    && std::isspace(static_cast<unsigned char>(
+                        source_text[operator_index - 1]))
+                    && std::isspace(static_cast<unsigned char>(
+                        source_text[operator_index + 1])))
+                {
+                    arithmetic_operator = source_text[operator_index];
+                    break ;
+                }
+                operator_index += 1;
+            }
+            if (arithmetic_operator != '\0' && char_target
+                && (arithmetic_operator == '+' || arithmetic_operator == '-'))
+            {
+                size_t left_start = 0;
+                size_t left_end = operator_index;
+                size_t right_start = operator_index + 1;
+                size_t source_length = std::strlen(source_text);
+                char character_expression[TRANSPILE_STATEMENT_TEXT_MAX];
+
+                while (left_start < left_end
+                    && std::isspace(static_cast<unsigned char>(
+                        source_text[left_start])))
+                    left_start += 1;
+                while (left_end > left_start
+                    && std::isspace(static_cast<unsigned char>(
+                        source_text[left_end - 1])))
+                    left_end -= 1;
+                while (right_start < source_length
+                    && std::isspace(static_cast<unsigned char>(
+                        source_text[right_start])))
+                    right_start += 1;
+                if (left_end == left_start || right_start >= source_length)
+                    return (FT_FAILURE);
+                if (std::snprintf(character_expression,
+                        sizeof(character_expression),
+                        "FUNCTION CHAR(FUNCTION ORD(%.*s) %c %s)",
+                        static_cast<int>(left_end - left_start),
+                        source_text + left_start, arithmetic_operator,
+                        source_text + right_start) < 0
+                    || std::snprintf(line, sizeof(line),
+                        "           MOVE %s TO %s", character_expression,
+                        target_text) < 0)
+                    return (FT_FAILURE);
+            }
+            else if (arithmetic_operator != '\0')
+            {
+                if (std::snprintf(line, sizeof(line),
+                        "           COMPUTE %s = %s", target_text,
+                        source_text) < 0)
+                    return (FT_FAILURE);
+            }
+            else if (std::snprintf(line, sizeof(line),
+                    "           MOVE %s TO %s", source_text,
+                    target_text) < 0)
+                return (FT_FAILURE);
+        }
         return (append_statement_line(line));
     }
     if (substituted.type == CBLC_STATEMENT_DISPLAY)
@@ -855,7 +928,20 @@ static int cblc_emit_substituted_statement_with_flow(
         return (append_statement_line(line));
     }
     if (substituted.type == CBLC_STATEMENT_RETURN)
-        return (FT_SUCCESS);
+    {
+        char line[TRANSPILE_STATEMENT_TEXT_MAX];
+
+        if (function && function->paragraph_return_label[0] != '\0')
+        {
+            if (std::snprintf(line, sizeof(line), "           GO TO %s",
+                    function->paragraph_return_label) < 0)
+                return (FT_FAILURE);
+            return (append_statement_line(line));
+        }
+        if (std::snprintf(line, sizeof(line), "           CONTINUE") < 0)
+            return (FT_FAILURE);
+        return (append_statement_line(line));
+    }
     if (substituted.type == CBLC_STATEMENT_DEFAULT_CONSTRUCT
         || substituted.type == CBLC_STATEMENT_DESTRUCT)
         return (cblc_emit_lifecycle_statement(unit, &substituted, builder,

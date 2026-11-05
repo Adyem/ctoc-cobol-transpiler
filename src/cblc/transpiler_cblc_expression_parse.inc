@@ -230,6 +230,20 @@ static int cblc_parse_numeric_expression(const char **cursor, t_cblc_translation
             break ;
         if (expect_operand)
         {
+            int boolean_value;
+
+            if (cblc_parse_boolean_literal(cursor, &boolean_value) == FT_SUCCESS)
+            {
+                char boolean_text[2];
+
+                boolean_text[0] = boolean_value ? '1' : '0';
+                boolean_text[1] = '\0';
+                if (cblc_expression_append(buffer, buffer_size, boolean_text)
+                    != FT_SUCCESS)
+                    return (FT_FAILURE);
+                expect_operand = 0;
+                continue ;
+            }
             if (std::strncmp(*cursor, "std::", 5) == 0
                 && (std::strncmp(*cursor, "std::fabs", 9) == 0
                     || std::strncmp(*cursor, "std::floor", 10) == 0
@@ -998,7 +1012,7 @@ static int cblc_parse_class_addition_assignment(const char **cursor,
             || method->parameter_count != 1
             || !cblc_argument_matches_parameter(unit, right_item->source_name,
                 &method->parameters[0])
-            || cblc_normalize_call_arguments(unit, call_arguments,
+            || cblc_normalize_call_arguments(unit, function, call_arguments,
                 argument_count, normalized_arguments,
                 sizeof(normalized_arguments)) != FT_SUCCESS
             || cblc_append_statement(function,
@@ -1088,6 +1102,7 @@ static int cblc_parse_method_call_assignment(const char **cursor,
     size_t argument_count;
     size_t chain_index;
     size_t argument_cleanup_base;
+    int has_implicit_receiver;
 
     if (!cursor || !*cursor || !unit || !function || !target_item)
         return (FT_FAILURE);
@@ -1096,9 +1111,26 @@ static int cblc_parse_method_call_assignment(const char **cursor,
         sizeof(original_target_source_name));
     ft_strlcpy(original_target_cobol_name, target_item->cobol_name,
         sizeof(original_target_cobol_name));
+    has_implicit_receiver = 0;
     if (cblc_parse_method_receiver(cursor, unit, &receiver_item, method_name,
             sizeof(method_name)) != FT_SUCCESS)
-        return (FT_FAILURE);
+    {
+        *cursor = start;
+        if (!g_cblc_member_access_type
+            || cblc_parse_identifier(cursor, method_name,
+                sizeof(method_name)) != FT_SUCCESS)
+            return (FT_FAILURE);
+        receiver_item = cblc_find_data_item(unit, "this");
+        if (!receiver_item)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        receiver_type = g_cblc_member_access_type;
+        has_implicit_receiver = 1;
+    }
+    else
+        receiver_type = cblc_find_receiver_type(unit, receiver_item);
     method_source_start = *cursor - std::strlen(method_name);
     chain_index = 0;
     while (1)
@@ -1109,7 +1141,11 @@ static int cblc_parse_method_call_assignment(const char **cursor,
         t_cblc_statement *statement;
         int has_next_member;
 
-        receiver_type = cblc_find_receiver_type(unit, receiver_item);
+        if (!receiver_type)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
         cblc_skip_whitespace(cursor);
         if (**cursor != '(')
         {
@@ -1159,7 +1195,7 @@ static int cblc_parse_method_call_assignment(const char **cursor,
                 argument_index += 1;
             }
         }
-        if (cblc_normalize_call_arguments(unit, call_arguments, argument_count,
+        if (cblc_normalize_call_arguments(unit, function, call_arguments, argument_count,
                 normalized_call_arguments, sizeof(normalized_call_arguments))
             != FT_SUCCESS)
         {
@@ -1192,7 +1228,8 @@ static int cblc_parse_method_call_assignment(const char **cursor,
                 sizeof(receiver_snapshot.source_name));
             ft_strlcpy(receiver_snapshot.cobol_name, receiver_item->cobol_name,
                 sizeof(receiver_snapshot.cobol_name));
-            ft_strlcpy(receiver_cobol_name, receiver_snapshot.cobol_name,
+            ft_strlcpy(receiver_cobol_name,
+                has_implicit_receiver ? "CBLC-THIS" : receiver_snapshot.cobol_name,
                 sizeof(receiver_cobol_name));
             temporary_base_name = "CBLC_CHAIN_VALUE";
             if (std::snprintf(base_source_name, sizeof(base_source_name),
@@ -1245,6 +1282,8 @@ static int cblc_parse_method_call_assignment(const char **cursor,
                 *cursor = start;
                 return (FT_FAILURE);
             }
+            receiver_type = cblc_find_receiver_type(unit, receiver_item);
+            has_implicit_receiver = 0;
             *cursor += 2;
             method_source_start = *cursor;
             if (cblc_parse_identifier(cursor, method_name,
@@ -1295,7 +1334,8 @@ static int cblc_parse_method_call_assignment(const char **cursor,
             *cursor = start;
             return (FT_FAILURE);
         }
-        ft_strlcpy(receiver_snapshot.cobol_name, receiver_item->cobol_name,
+        ft_strlcpy(receiver_snapshot.cobol_name,
+            has_implicit_receiver ? "CBLC-THIS" : receiver_item->cobol_name,
             sizeof(receiver_snapshot.cobol_name));
         ft_strlcpy(target_cobol_name, original_target_cobol_name,
             sizeof(target_cobol_name));

@@ -895,6 +895,106 @@ FT_TEST(test_backend_typed_ir_models_explicit_and_self_assignment)
         "self-move assignment is accepted without spuriously moving-from its target");
 }
 
+FT_TEST(test_backend_typed_ir_allows_copy_from_live_borrow_only)
+{
+    typed_function function = make_may_fail_construct_function();
+    verification_diagnostic diagnostic;
+    control_flow_graph cfg;
+    typed_operation copy_assignment;
+    typed_operation destroy_target;
+    typed_operation destroy_owner;
+
+    function.types[3].kind = typed_type_kind::class_type;
+    function.types[3].canonical_name = "Box";
+    function.values[0].lifetime_token = 101;
+    function.values.push_back({2, 4, value_category::owned_object,
+        access_mode::read_write, 102, true,
+        {{17, 20, 8, 1, 21, "assignment-target", false}}, ""});
+    function.values.push_back({3, 4, value_category::borrow,
+        access_mode::read_only, 101, true,
+        {{17, 30, 8, 1, 31, "borrowed-member-source", false}}, ""});
+    function.places.push_back({2, 2, 4, access_mode::read_write, 102, {}});
+    function.entry_live_values = {2, 1};
+    function.callables.push_back({77, callable_kind::copy_assignment, 4, 0,
+        "Box::operator=", {4}, 0, exception_effect::non_throwing, true, {}});
+    function.callables.push_back({78, callable_kind::move_assignment, 4, 0,
+        "Box::operator=(Box&&)", {4}, 0, exception_effect::non_throwing, true, {}});
+
+    copy_assignment.id = 1;
+    copy_assignment.operation = opcode::copy_assign;
+    copy_assignment.callee = 77;
+    copy_assignment.operands = {3};
+    copy_assignment.places = {2};
+    copy_assignment.effects.reads = {2};
+    copy_assignment.effects.writes = {2};
+    copy_assignment.effects.exceptions = exception_effect::non_throwing;
+    copy_assignment.outcomes.push_back({});
+    copy_assignment.provenance.push_back(
+        {17, 40, 8, 1, 41, "borrowed-copy-source", false});
+    destroy_target.id = 3;
+    destroy_target.operation = opcode::destroy;
+    destroy_target.places = {2};
+    destroy_target.must_follow = {1, 2};
+    destroy_target.effects.destroys = true;
+    destroy_target.effects.exceptions = exception_effect::non_throwing;
+    operation_outcome target_destroyed;
+    target_destroyed.destroyed = {2};
+    destroy_target.outcomes.push_back(target_destroyed);
+    destroy_target.provenance.push_back(
+        {17, 50, 4, 1, 51, "target-destruction", false});
+    destroy_owner = function.operations[1];
+    destroy_owner.id = 2;
+    destroy_owner.must_follow = {1};
+    destroy_owner.provenance[0].source_offset += 60;
+    function.operations = {copy_assignment, destroy_owner, destroy_target};
+    function.regions[0].operations = {1, 2, 3};
+    function.regions[0].sequence = {
+        {typed_region::item::kind::operation, 1},
+        {typed_region::item::kind::operation, 2},
+        {typed_region::item::kind::operation, 3}};
+
+    if (test_expect_int_equal(build_linear_control_flow_graph(function, &cfg,
+                &diagnostic) ? 1 : 0, 1,
+            "copy assignment may read a borrow whose owner is live") != FT_SUCCESS)
+        return (FT_FAILURE);
+    function.values[2].lifetime_token = 999;
+    if (test_expect_int_equal(build_linear_control_flow_graph(function, &cfg,
+                &diagnostic) ? 1 : 0, 0,
+            "copy assignment rejects a borrow with no live owner") != FT_SUCCESS)
+        return (FT_FAILURE);
+    function.values[2].lifetime_token = 101;
+    {
+        typed_operation destroy_owner_first = destroy_owner;
+        typed_operation copy_after_owner = copy_assignment;
+        typed_operation destroy_target_after_copy = destroy_target;
+
+        destroy_owner_first.id = 1;
+        destroy_owner_first.must_follow.clear();
+        copy_after_owner.id = 2;
+        copy_after_owner.must_follow = {1};
+        destroy_target_after_copy.id = 3;
+        destroy_target_after_copy.must_follow = {1, 2};
+        function.operations = {destroy_owner_first, copy_after_owner,
+            destroy_target_after_copy};
+        if (test_expect_int_equal(build_linear_control_flow_graph(function,
+                    &cfg, &diagnostic) ? 1 : 0, 0,
+                "copy assignment rejects a borrow after its owner is destroyed")
+            != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (test_expect_int_equal(static_cast<int>(diagnostic.code),
+                static_cast<int>(verification_error::use_after_lifetime_end),
+                "expired borrowed copy source reports a lifetime error")
+            != FT_SUCCESS)
+            return (FT_FAILURE);
+        function.operations = {copy_assignment, destroy_owner, destroy_target};
+    }
+    function.operations[0].operation = opcode::move_assign;
+    function.operations[0].callee = 78;
+    return test_expect_int_equal(verify_typed_function(function, &diagnostic)
+            ? 1 : 0, 0,
+        "move assignment must not accept a borrowed source");
+}
+
 FT_TEST(test_backend_typed_ir_requires_moved_from_state_for_move_assignment)
 {
     typed_function function = make_may_fail_construct_function();
@@ -3425,6 +3525,32 @@ FT_TEST(test_backend_typed_ir_lowers_nested_member_expression_from_function)
             "CBLC-SPTR-PASS-MEMBER-INPUT-CELL-STATE") != NULL;
     if (!emitted_member_argument)
     {
+        const char *argument_slot = std::strstr(generated_cobol,
+            "SINK-CBLC-USER-ACCEPT-VALUE");
+        const char *nested_field = std::strstr(generated_cobol, "CELL-STATE");
+
+        std::printf("Generated ABI markers: argument-slot=%d nested-field=%d\n",
+            argument_slot != NULL, nested_field != NULL);
+        const char *compute = std::strstr(generated_cobol,
+            "COMPUTE SINK-CBLC-USER-ACCEPT-VALUE");
+        if (compute)
+            std::printf("Generated argument assignment: %.360s\n", compute);
+        for (const char *occurrence = argument_slot; occurrence;
+            occurrence = std::strstr(occurrence + 1,
+                "SINK-CBLC-USER-ACCEPT-VALUE"))
+        {
+            const char *line_start = occurrence;
+            const char *line_end;
+
+            while (line_start > generated_cobol && line_start[-1] != '\n')
+                --line_start;
+            line_end = std::strchr(occurrence, '\n');
+            if (!line_end)
+                line_end = occurrence + std::strlen(occurrence);
+
+            std::printf("Generated method-call line: %.*s\n",
+                static_cast<int>(line_end - line_start), line_start);
+        }
         cma_free(generated_cobol);
         cblc_translation_unit_dispose(&emission_unit);
         std::printf("COBOL method-call ABI must stage the nested field value into its argument slot\n");
@@ -3538,7 +3664,7 @@ FT_TEST(test_backend_typed_ir_preserves_pointer_return_as_borrowed_receiver)
 
 FT_TEST(test_backend_typed_ir_failed_lowering_discards_partial_output)
 {
-    const char *source = "int main() { int value; value = 7; return 8; }\n";
+    const char *source = "int main() { int value; value = 7; return value * 2; }\n";
     t_cblc_translation_unit unit;
     typed_function function_ir;
     verification_diagnostic diagnostic;
@@ -3556,7 +3682,7 @@ FT_TEST(test_backend_typed_ir_failed_lowering_discards_partial_output)
     }
     if (test_expect_int_equal(lower_scalar_function(&unit, 0,
                 &function_ir, &diagnostic) ? 1 : 0, 0,
-            "unsupported return expression must fail typed lowering") != FT_SUCCESS
+            "unsupported multiplicative return expression must fail typed lowering") != FT_SUCCESS
         || test_expect_int_equal(static_cast<int>(diagnostic.code),
                 static_cast<int>(verification_error::unsupported_legacy_statement),
             "failed lowering reports the unsupported source operation") != FT_SUCCESS
@@ -3574,6 +3700,500 @@ FT_TEST(test_backend_typed_ir_failed_lowering_discards_partial_output)
     }
     cblc_translation_unit_dispose(&unit);
     return (FT_SUCCESS);
+}
+
+FT_TEST(test_backend_typed_ir_lowers_scalar_literal_return)
+{
+    const char *source = "int constant_value() { return 8; }\n"
+        "void main() { return; }\n";
+    t_cblc_translation_unit unit;
+    typed_function function_ir;
+    verification_diagnostic diagnostic;
+    char *generated_cobol = nullptr;
+    std::size_t function_index = 0;
+
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("Literal return source parse diagnostic: %s\n",
+            unit.parse_error_message);
+        cblc_translation_unit_dispose(&unit);
+        return FT_FAILURE;
+    }
+    while (function_index < unit.function_count
+        && std::strcmp(unit.functions[function_index].source_name,
+            "constant_value") != 0)
+        ++function_index;
+    if (function_index == unit.function_count
+        || !lower_scalar_function(&unit, function_index, &function_ir,
+            &diagnostic))
+    {
+        std::printf("Literal return typed-lowering diagnostic: %s\n",
+            diagnostic.message.c_str());
+        cblc_translation_unit_dispose(&unit);
+        return FT_FAILURE;
+    }
+    const typed_operation *literal = nullptr;
+    const typed_operation *returned = nullptr;
+    for (const typed_operation &operation : function_ir.operations)
+    {
+        if (operation.operation == opcode::literal)
+            literal = &operation;
+        else if (operation.operation == opcode::return_value)
+            returned = &operation;
+    }
+    bool verified = false;
+    if (literal && returned && returned->operands.size() == 1
+        && returned->must_follow.size() == 1
+        && returned->must_follow.front() == literal->id)
+        verified = verify_typed_function(function_ir, &diagnostic);
+    if (!verified
+        || cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
+        || !generated_cobol
+        || !ft_strnstr(generated_cobol, "MOVE 8 TO ",
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Literal return COBOL emission diagnostic: %s\n",
+            diagnostic.message.c_str());
+        if (generated_cobol)
+            cma_free(generated_cobol);
+        cblc_translation_unit_dispose(&unit);
+        return FT_FAILURE;
+    }
+    cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return test_expect_success(verified ? FT_SUCCESS : FT_FAILURE,
+        "scalar literal return is explicit in typed IR and sequenced before return");
+}
+
+FT_TEST(test_backend_typed_ir_emits_scalar_parameter_return_from_load)
+{
+    const char *source = "int echo_value(int input) { return input; }\n"
+        "void main() { return; }\n";
+    t_cblc_translation_unit unit;
+    typed_function function_ir;
+    verification_diagnostic diagnostic;
+    char *generated_cobol = nullptr;
+    const t_cblc_function *function = nullptr;
+    const t_cblc_statement *return_statement = nullptr;
+    const t_cblc_data_item *input_item = nullptr;
+    const t_cblc_data_item *return_item = nullptr;
+    const typed_operation *load = nullptr;
+    const typed_operation *returned = nullptr;
+    std::size_t function_index = 0;
+    bool verified = false;
+    std::string expected_move;
+
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("Parameter return source parse diagnostic: %s\n",
+            unit.parse_error_message);
+        cblc_translation_unit_dispose(&unit);
+        return FT_FAILURE;
+    }
+    while (function_index < unit.function_count
+        && std::strcmp(unit.functions[function_index].source_name,
+            "echo_value") != 0)
+        ++function_index;
+    if (function_index == unit.function_count)
+    {
+        cblc_translation_unit_dispose(&unit);
+        return FT_FAILURE;
+    }
+    function = &unit.functions[function_index];
+    for (std::size_t statement_index = 0;
+        statement_index < function->statement_count; ++statement_index)
+        if (function->statements[statement_index].type
+                == CBLC_STATEMENT_RETURN)
+        {
+            return_statement = &function->statements[statement_index];
+            break;
+        }
+    for (std::size_t item_index = 0; item_index < unit.data_count; ++item_index)
+    {
+        const t_cblc_data_item *item = &unit.data_items[item_index];
+
+        if (item->is_alias || item->is_shadowed
+            || (item->is_function_local
+                && std::strcmp(item->owner_function_name,
+                    function->source_name) != 0))
+            continue;
+        if (return_statement && return_statement->target[0] != '\0'
+            && std::strcmp(item->cobol_name,
+                return_statement->target) == 0)
+            return_item = item;
+        if (std::strcmp(item->source_name, "echo_value__input") == 0
+            && item->kind == CBLC_DATA_KIND_INT)
+            input_item = item;
+    }
+    if (!return_statement
+        || !lower_scalar_function(&unit, function_index, &function_ir,
+            &diagnostic))
+    {
+        std::printf("Parameter return typed-lowering diagnostic: %s\n",
+            diagnostic.message.c_str());
+        cblc_translation_unit_dispose(&unit);
+        return FT_FAILURE;
+    }
+    for (const typed_operation &operation : function_ir.operations)
+    {
+        if (operation.operation == opcode::return_value)
+            returned = &operation;
+        if (operation.operation == opcode::load)
+            load = &operation;
+    }
+    if (returned && returned->operands.size() == 1 && load
+        && load->results.size() == 1
+        && load->results.front() == returned->operands.front()
+        && std::find(returned->must_follow.begin(), returned->must_follow.end(),
+            load->id) != returned->must_follow.end())
+        verified = verify_typed_function(function_ir, &diagnostic);
+    if (input_item && return_item)
+        expected_move = std::string("MOVE ") + input_item->cobol_name
+            + " TO " + return_item->cobol_name;
+    if (!verified || expected_move.empty()
+        || cblc_generate_cobol(&unit, &generated_cobol) != FT_SUCCESS
+        || !generated_cobol
+        || !ft_strnstr(generated_cobol, expected_move.c_str(),
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Parameter return COBOL emission diagnostic: %s expected='%s' return-target='%s' input=%s output=%s\n",
+            diagnostic.message.c_str(), expected_move.c_str(),
+            return_statement ? return_statement->target : "<none>",
+            input_item ? input_item->cobol_name : "<missing>",
+            return_item ? return_item->cobol_name : "<missing>");
+        if (returned)
+            std::printf("  return op=%u operands=%zu must-follow=%zu load=%u\n",
+                returned->id, returned->operands.size(),
+                returned->must_follow.size(), load ? load->id : 0);
+        if (generated_cobol)
+            std::printf("  generated length=%zu\n", std::strlen(generated_cobol));
+        if (generated_cobol)
+            cma_free(generated_cobol);
+        cblc_translation_unit_dispose(&unit);
+        return FT_FAILURE;
+    }
+    cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return test_expect_success(verified ? FT_SUCCESS : FT_FAILURE,
+        "scalar parameter return is emitted from its typed load before function exit");
+}
+
+FT_TEST(test_backend_typed_ir_emits_scalar_member_return_before_parameter_cleanup)
+{
+    const char *source = "class Cell { public: int state; };\n"
+        "class Box { public: Cell cell; ~Box() { cell.state = 0; } };\n"
+        "int read_member(Box input) { return input.cell.state; }\n"
+        "void main() { return; }\n";
+    t_cblc_translation_unit unit;
+    typed_function function_ir;
+    verification_diagnostic diagnostic;
+    char *generated_cobol = nullptr;
+    const t_cblc_function *function = nullptr;
+    const t_cblc_statement *return_statement = nullptr;
+    const t_cblc_data_item *member_item = nullptr;
+    const t_cblc_data_item *return_item = nullptr;
+    const typed_operation *member_load = nullptr;
+    const typed_operation *store = nullptr;
+    const typed_operation *return_load = nullptr;
+    const typed_operation *returned = nullptr;
+    const typed_operation *cleanup = nullptr;
+    std::size_t function_index = 0;
+    std::size_t member_load_index = static_cast<std::size_t>(-1);
+    std::size_t store_index = static_cast<std::size_t>(-1);
+    std::size_t return_load_index = static_cast<std::size_t>(-1);
+    std::size_t return_index = static_cast<std::size_t>(-1);
+    std::size_t last_cleanup_index = 0;
+    bool verified = false;
+    std::string expected_move;
+    int generation_diagnostic_code = 0;
+    char generation_diagnostic[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX] = {};
+
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("Member return source parse diagnostic: %s\n",
+            unit.parse_error_message);
+        cblc_translation_unit_dispose(&unit);
+        return FT_FAILURE;
+    }
+    while (function_index < unit.function_count
+        && std::strcmp(unit.functions[function_index].source_name,
+            "read_member") != 0)
+        ++function_index;
+    if (function_index == unit.function_count)
+    {
+        cblc_translation_unit_dispose(&unit);
+        return FT_FAILURE;
+    }
+    function = &unit.functions[function_index];
+    for (std::size_t statement_index = 0;
+        statement_index < function->statement_count; ++statement_index)
+        if (function->statements[statement_index].type
+                == CBLC_STATEMENT_RETURN)
+        {
+            return_statement = &function->statements[statement_index];
+            break;
+        }
+    for (std::size_t item_index = 0; item_index < unit.data_count; ++item_index)
+    {
+        const t_cblc_data_item *item = &unit.data_items[item_index];
+
+        if (item->is_alias || item->is_shadowed
+            || (item->is_function_local
+                && std::strcmp(item->owner_function_name,
+                    function->source_name) != 0))
+            continue;
+        if (return_statement && return_statement->target[0] != '\0'
+            && std::strcmp(item->cobol_name,
+                return_statement->target) == 0)
+            return_item = item;
+        if (std::strcmp(item->source_name,
+                "read_member__input.cell.state") == 0
+            && item->kind == CBLC_DATA_KIND_INT)
+            member_item = item;
+    }
+    if (!return_statement
+        || !lower_scalar_function(&unit, function_index, &function_ir,
+            &diagnostic))
+    {
+        std::printf("Member return typed-lowering diagnostic: %s\n",
+            diagnostic.message.c_str());
+        cblc_translation_unit_dispose(&unit);
+        return FT_FAILURE;
+    }
+    for (std::size_t operation_index = 0;
+        operation_index < function_ir.operations.size(); ++operation_index)
+    {
+        const typed_operation &operation = function_ir.operations[operation_index];
+
+        if (operation.operation == opcode::return_value)
+        {
+            returned = &operation;
+            return_index = operation_index;
+        }
+        if (operation.operation == opcode::store
+            || operation.operation == opcode::assign)
+        {
+            store = &operation;
+            store_index = operation_index;
+        }
+        if (operation.operation == opcode::load
+            && !operation.results.empty() && !operation.places.empty())
+        {
+            const auto place = std::find_if(function_ir.places.begin(),
+                function_ir.places.end(), [&](const typed_place &candidate)
+                {
+                    return candidate.id == operation.places.front();
+                });
+            const auto symbol = place == function_ir.places.end()
+                ? function_ir.symbols.end()
+                : std::find_if(function_ir.symbols.begin(),
+                    function_ir.symbols.end(), [&](const typed_symbol &candidate)
+                    {
+                        return candidate.id == place->symbol;
+                    });
+
+            if (symbol != function_ir.symbols.end()
+                && member_item
+                && symbol->canonical_name == member_item->source_name)
+            {
+                member_load = &operation;
+                member_load_index = operation_index;
+            }
+        }
+        if (operation.operation == opcode::scope_exit
+            && operation.effects.destroys)
+        {
+            cleanup = &operation;
+            last_cleanup_index = operation_index;
+        }
+    }
+    if (returned && !returned->operands.empty())
+        for (std::size_t operation_index = 0;
+            operation_index < function_ir.operations.size(); ++operation_index)
+        {
+            const typed_operation &operation = function_ir.operations[operation_index];
+
+            if (operation.operation == opcode::load
+                && operation.results.size() == 1
+                && operation.results.front() == returned->operands.front())
+            {
+                return_load = &operation;
+                return_load_index = operation_index;
+                break;
+            }
+        }
+    if (member_load && store && return_load && returned && cleanup
+        && member_load->results.size() == 1
+        && store->operands.size() == 1
+        && store->operands.front() == member_load->results.front()
+        && returned->operands.size() == 1
+        && return_load->results.size() == 1
+        && return_load->results.front() == returned->operands.front()
+        && member_load_index < store_index
+        && store_index < last_cleanup_index
+        && last_cleanup_index < return_load_index
+        && return_load_index < return_index
+        && std::find(returned->must_follow.begin(), returned->must_follow.end(),
+            return_load->id) != returned->must_follow.end())
+        verified = verify_typed_function(function_ir, &diagnostic);
+    if (member_item && return_item)
+        expected_move = std::string("MOVE ") + member_item->cobol_name
+            + " TO " + return_item->cobol_name;
+    if (!verified || expected_move.empty()
+        || cblc_generate_cobol_with_diagnostic(&unit, &generated_cobol,
+            &generation_diagnostic_code, generation_diagnostic,
+            sizeof(generation_diagnostic)) != FT_SUCCESS
+        || !generated_cobol
+        || !ft_strnstr(generated_cobol, expected_move.c_str(),
+            std::strlen(generated_cobol)))
+    {
+        std::printf("Member return COBOL emission diagnostic: %s generated(%d): %s expected='%s'\n",
+            diagnostic.message.c_str(), generation_diagnostic_code,
+            generation_diagnostic, expected_move.c_str());
+        if (generated_cobol)
+            cma_free(generated_cobol);
+        cblc_translation_unit_dispose(&unit);
+        return FT_FAILURE;
+    }
+    cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return test_expect_success(verified ? FT_SUCCESS : FT_FAILURE,
+        "scalar member return loads before owned parameter cleanup and emits from the resolved field");
+}
+
+FT_TEST(test_backend_typed_ir_emits_compound_scalar_return_before_parameter_cleanup)
+{
+    const char *source = "class Cell { public: int state; };\n"
+        "class Box { public: Cell cell; ~Box() { cell.state = 0; } };\n"
+        "int read_member_plus_one(Box input) { return input.cell.state + 1; }\n"
+        "void main() { return; }\n";
+    t_cblc_translation_unit unit;
+    typed_function function_ir;
+    verification_diagnostic diagnostic;
+    char *generated_cobol = nullptr;
+    const t_cblc_function *function = nullptr;
+    const t_cblc_statement *return_statement = nullptr;
+    const t_cblc_data_item *member_item = nullptr;
+    const t_cblc_data_item *return_item = nullptr;
+    const typed_operation *addition = nullptr;
+    const typed_operation *assignment = nullptr;
+    std::size_t function_index = 0;
+    std::size_t add_index = static_cast<std::size_t>(-1);
+    std::size_t assign_index = static_cast<std::size_t>(-1);
+    std::size_t cleanup_index = static_cast<std::size_t>(-1);
+    std::string expected_compute;
+    bool verified = false;
+
+    cblc_translation_unit_init(&unit);
+    if (cblc_parse_translation_unit(source, &unit) != FT_SUCCESS)
+    {
+        std::printf("Compound member return source parse diagnostic: %s\n",
+            unit.parse_error_message);
+        cblc_translation_unit_dispose(&unit);
+        return FT_FAILURE;
+    }
+    while (function_index < unit.function_count
+        && std::strcmp(unit.functions[function_index].source_name,
+            "read_member_plus_one") != 0)
+        ++function_index;
+    if (function_index == unit.function_count)
+    {
+        cblc_translation_unit_dispose(&unit);
+        return FT_FAILURE;
+    }
+    function = &unit.functions[function_index];
+    for (std::size_t statement_index = 0;
+        statement_index < function->statement_count; ++statement_index)
+        if (function->statements[statement_index].type
+                == CBLC_STATEMENT_RETURN)
+        {
+            return_statement = &function->statements[statement_index];
+            break;
+        }
+    for (std::size_t item_index = 0; item_index < unit.data_count; ++item_index)
+    {
+        const t_cblc_data_item *item = &unit.data_items[item_index];
+
+        if (item->is_alias || item->is_shadowed
+            || (item->is_function_local
+                && std::strcmp(item->owner_function_name,
+                    function->source_name) != 0))
+            continue;
+        if (return_statement && return_statement->target[0] != '\0'
+            && std::strcmp(item->cobol_name,
+                return_statement->target) == 0)
+            return_item = item;
+        if (std::strcmp(item->source_name,
+                "read_member_plus_one__input.cell.state") == 0
+            && item->kind == CBLC_DATA_KIND_INT)
+            member_item = item;
+    }
+    if (!return_statement
+        || !lower_scalar_function(&unit, function_index, &function_ir,
+            &diagnostic))
+    {
+        std::printf("Compound member return typed-lowering diagnostic: %s\n",
+            diagnostic.message.c_str());
+        cblc_translation_unit_dispose(&unit);
+        return FT_FAILURE;
+    }
+    for (std::size_t operation_index = 0;
+        operation_index < function_ir.operations.size(); ++operation_index)
+    {
+        const typed_operation &operation = function_ir.operations[operation_index];
+
+        if (operation.operation == opcode::add)
+        {
+            addition = &operation;
+            add_index = operation_index;
+        }
+        if (operation.operation == opcode::assign
+            && !operation.operands.empty())
+        {
+            const typed_value *value = nullptr;
+            for (const typed_value &candidate : function_ir.values)
+                if (candidate.id == operation.operands.front())
+                {
+                    value = &candidate;
+                    break;
+                }
+            if (value && addition
+                && value->id == addition->results.front())
+            {
+                assignment = &operation;
+                assign_index = operation_index;
+            }
+        }
+        if (operation.operation == opcode::scope_exit
+            && operation.effects.destroys)
+            cleanup_index = operation_index;
+    }
+    if (member_item && return_item)
+        expected_compute = std::string("COMPUTE ") + return_item->cobol_name
+            + " = (" + member_item->cobol_name + " + 1).";
+    if (addition && assignment && add_index < assign_index
+        && assign_index < cleanup_index
+        && addition->results.size() == 1
+        && assignment->operands.size() == 1
+        && assignment->operands.front() == addition->results.front()
+        && verify_typed_function(function_ir, &diagnostic)
+        && !expected_compute.empty()
+        && cblc_generate_cobol(&unit, &generated_cobol) == FT_SUCCESS
+        && generated_cobol
+        && ft_strnstr(generated_cobol, expected_compute.c_str(),
+            std::strlen(generated_cobol)))
+        verified = true;
+    else
+        std::printf("Compound member return diagnostic: %s expected='%s'\n",
+            diagnostic.message.c_str(), expected_compute.c_str());
+    if (generated_cobol)
+        cma_free(generated_cobol);
+    cblc_translation_unit_dispose(&unit);
+    return test_expect_success(verified ? FT_SUCCESS : FT_FAILURE,
+        "compound scalar return is computed into its return slot before owned parameter cleanup");
 }
 
 FT_TEST(test_backend_typed_ir_lowers_pointer_move_and_relocation_intrinsics)
@@ -5704,6 +6324,29 @@ FT_TEST(test_backend_typed_ir_dispatches_class_lifecycle_in_template_method)
         }
     const bool verified = verify_typed_function(method_ir, &diagnostic);
     cblc_translation_unit_dispose(&unit);
+    if (!(has_concrete_payload_field && calls_payload_assignment
+            && by_value_parameter != 0 && parameter_destruction_count == 1
+            && !borrowed_field_destroyed && verified))
+    {
+        std::printf("Template method lifecycle details: field=%d assignment=%d parameter=%u parameter-destroys=%zu borrowed-destroyed=%d verified=%d diagnostic=%s\n",
+            has_concrete_payload_field ? 1 : 0,
+            calls_payload_assignment ? 1 : 0,
+            static_cast<unsigned int>(by_value_parameter),
+            parameter_destruction_count,
+            borrowed_field_destroyed ? 1 : 0,
+            verified ? 1 : 0, diagnostic.message.c_str());
+        for (const typed_operation &operation : method_ir.operations)
+            for (const operation_outcome &outcome : operation.outcomes)
+                if (std::find(outcome.destroyed.begin(), outcome.destroyed.end(),
+                        by_value_parameter) != outcome.destroyed.end())
+                    std::printf("  destruction record: operation=%u region=%u opcode=%u outcome=%u role=%s\n",
+                        static_cast<unsigned int>(operation.id),
+                        static_cast<unsigned int>(operation.region),
+                        static_cast<unsigned int>(operation.operation),
+                        static_cast<unsigned int>(outcome.kind),
+                        operation.provenance.empty() ? "<none>"
+                            : operation.provenance.front().role.c_str());
+    }
     return test_expect_success(has_concrete_payload_field
             && calls_payload_assignment && by_value_parameter != 0
             && parameter_destruction_count == 1 && !borrowed_field_destroyed
@@ -5799,6 +6442,8 @@ static const t_test_case backend_typed_ir_test_cases[] = {
         test_backend_lifetime_requires_reverse_construction_order},
     {"backend_typed_ir_models_explicit_and_self_assignment",
         test_backend_typed_ir_models_explicit_and_self_assignment},
+    {"backend_typed_ir_allows_copy_from_live_borrow_only",
+        test_backend_typed_ir_allows_copy_from_live_borrow_only},
     {"backend_typed_ir_requires_moved_from_state_for_move_assignment",
         test_backend_typed_ir_requires_moved_from_state_for_move_assignment},
     {"backend_lifetime_rejects_branch_local_cleanup_leak",
@@ -5835,6 +6480,14 @@ static const t_test_case backend_typed_ir_test_cases[] = {
         test_backend_typed_ir_lowers_nested_member_expression_from_function},
     {"backend_typed_ir_failed_lowering_discards_partial_output",
         test_backend_typed_ir_failed_lowering_discards_partial_output},
+    {"backend_typed_ir_lowers_scalar_literal_return",
+        test_backend_typed_ir_lowers_scalar_literal_return},
+    {"backend_typed_ir_emits_scalar_parameter_return_from_load",
+        test_backend_typed_ir_emits_scalar_parameter_return_from_load},
+    {"backend_typed_ir_emits_scalar_member_return_before_parameter_cleanup",
+        test_backend_typed_ir_emits_scalar_member_return_before_parameter_cleanup},
+    {"backend_typed_ir_emits_compound_scalar_return_before_parameter_cleanup",
+        test_backend_typed_ir_emits_compound_scalar_return_before_parameter_cleanup},
     {"backend_typed_ir_lowers_pointer_move_and_relocation_intrinsics",
         test_backend_typed_ir_lowers_pointer_move_and_relocation_intrinsics},
     {"backend_typed_ir_lowers_integer_throw_to_uncaught_cfg_exit",

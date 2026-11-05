@@ -24,6 +24,53 @@ static int cblc_argument_is_numeric_literal(const char *argument)
     return (digits);
 }
 
+static int cblc_argument_is_numeric_expression(
+    const t_cblc_translation_unit *unit, const char *argument)
+{
+    size_t index = 0;
+    int saw_value = 0;
+
+    if (!unit || !argument || argument[0] == '\0')
+        return (0);
+    while (argument[index] != '\0')
+    {
+        const unsigned char current =
+            static_cast<unsigned char>(argument[index]);
+
+        if (std::isalpha(current) || argument[index] == '_')
+        {
+            char identifier[TRANSPILE_IDENTIFIER_MAX];
+            const t_cblc_data_item *item;
+            size_t length = 0;
+
+            while ((std::isalnum(static_cast<unsigned char>(argument[index]))
+                    || argument[index] == '_' || argument[index] == '-')
+                && length + 1 < sizeof(identifier))
+                identifier[length++] = argument[index++];
+            identifier[length] = '\0';
+            item = cblc_find_data_item_for_emit_by_source(unit, identifier);
+            if (!item)
+                item = cblc_find_data_item_by_cobol(unit, identifier);
+            if (!item || (item->kind != CBLC_DATA_KIND_INT
+                    && item->kind != CBLC_DATA_KIND_DOUBLE
+                    && item->kind != CBLC_DATA_KIND_CHAR))
+                return (0);
+            saw_value = 1;
+            continue ;
+        }
+        if (std::isdigit(current))
+            saw_value = 1;
+        else if (!std::isspace(current) && argument[index] != '+'
+            && argument[index] != '-' && argument[index] != '*'
+            && argument[index] != '/' && argument[index] != '%'
+            && argument[index] != '(' && argument[index] != ')'
+            && argument[index] != '.')
+            return (0);
+        index += 1;
+    }
+    return (saw_value);
+}
+
 static int cblc_extract_call_argument(const t_cblc_statement *statement,
     size_t argument_index, char *buffer, size_t buffer_size)
 {
@@ -301,15 +348,32 @@ static int cblc_argument_matches_parameter(const t_cblc_translation_unit *unit,
         return (0);
     if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_INT)
     {
+        /* A quoted source string is not an integer just because its decoded
+         * contents happen to contain decimal digits (for example, "0").
+         * Keeping the source spelling here is essential for overload
+         * resolution between String(int capacity) and String(char *text). */
+        if (argument[0] == '"')
+            return (0);
         if (item && (item->kind == CBLC_DATA_KIND_STRUCT
                 || cblc_data_kind_is_pointer(item->kind)
-                || item->kind == CBLC_DATA_KIND_CHAR_BUFFER))
+                || item->kind == CBLC_DATA_KIND_CHAR_BUFFER
+                || (item->kind == CBLC_DATA_KIND_CHAR && item->length > 1)))
+            return (0);
+        /* An unresolved expression is not evidence of an integer. In
+         * particular, a class-valued `container.elements[index]` reference
+         * must not fall through to an integer constructor merely because
+         * indexed template-field type resolution has not succeeded yet. */
+        if (!item && !cblc_argument_is_numeric_expression(unit, argument))
             return (0);
         return (1);
     }
     if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_DOUBLE)
     {
+        if (argument[0] == '"')
+            return (0);
         if (item && item->kind != CBLC_DATA_KIND_DOUBLE)
+            return (0);
+        if (!item && !cblc_argument_is_numeric_expression(unit, argument))
             return (0);
         return (1);
     }
@@ -355,6 +419,14 @@ static int cblc_argument_matches_parameter(const t_cblc_translation_unit *unit,
     }
     if (parameter->kind == TRANSPILE_FUNCTION_PARAMETER_CHAR_POINTER)
     {
+        /* String literals are immutable byte sequences with pointer semantics
+         * at call sites; accept them for read-only-compatible char* APIs such
+         * as String's owning constructor. Lowering materializes their storage
+         * separately from numeric and named-pointer arguments. */
+        if (argument[0] == '"')
+            return (1);
+        if (item && item->kind == CBLC_DATA_KIND_CHAR && item->length > 1)
+            return (1);
         if (cblc_parse_pointer_cast_argument_kind(unit, argument, &cast_kind,
                 cast_struct_type_name, sizeof(cast_struct_type_name)) == FT_SUCCESS)
             return (cblc_pointer_assignment_is_compatible(CBLC_DATA_KIND_CHAR_POINTER,
@@ -815,13 +887,18 @@ static int cblc_emit_prepare_struct_pointer_field(
     const t_cblc_translation_unit *unit, const char *reference,
     t_cobol_text_builder *builder, char *field_reference,
     size_t field_reference_size, int allow_pointer_member);
+static int cblc_emit_struct_copy_return(const t_cblc_translation_unit *unit,
+    const char *target_name, const char *return_type_name,
+    const char *source_reference,
+    const t_cblc_data_item *receiver_context, t_cobol_text_builder *builder,
+    int *out_handled);
 
 static int cblc_emit_parameter_argument_moves(const t_cblc_translation_unit *unit,
     const char *call_arguments,
     size_t call_argument_count, const t_cblc_parameter *parameters,
     size_t parameter_count, t_cobol_text_builder *builder,
-    const t_cblc_parameter *source_parameters = NULL,
-    size_t source_parameter_count = 0)
+    const t_cblc_parameter *source_parameters,
+    size_t source_parameter_count, int borrow_struct_arguments)
 {
     size_t index;
 
@@ -953,6 +1030,68 @@ static int cblc_emit_parameter_argument_moves(const t_cblc_translation_unit *uni
             index += 1;
             continue ;
         }
+        if (source_parameters && !std::strchr(argument, '['))
+        {
+            const t_cblc_parameter *source_parameter = NULL;
+            size_t source_index = 0;
+
+            while (source_index < source_parameter_count)
+            {
+                const t_cblc_parameter *candidate =
+                    &source_parameters[source_index];
+
+                if ((candidate->source_name[0] != '\0'
+                        && std::strcmp(argument, candidate->source_name) == 0)
+                    || (candidate->actual_source_name[0] != '\0'
+                        && std::strcmp(argument,
+                            candidate->actual_source_name) == 0)
+                    || (candidate->cobol_name[0] != '\0'
+                        && std::strcmp(argument, candidate->cobol_name) == 0))
+                {
+                    source_parameter = candidate;
+                    break ;
+                }
+                source_index += 1;
+            }
+            if (source_parameter
+                && source_parameter->kind == parameters[index].kind
+                && (parameters[index].kind == TRANSPILE_FUNCTION_PARAMETER_INT
+                    || parameters[index].kind
+                        == TRANSPILE_FUNCTION_PARAMETER_DOUBLE
+                    || parameters[index].kind
+                        == TRANSPILE_FUNCTION_PARAMETER_CHAR_POINTER
+                    || parameters[index].kind
+                        == TRANSPILE_FUNCTION_PARAMETER_INT_POINTER
+                    || parameters[index].kind
+                        == TRANSPILE_FUNCTION_PARAMETER_VOID_POINTER))
+            {
+                if (parameters[index].kind
+                        == TRANSPILE_FUNCTION_PARAMETER_CHAR_POINTER
+                    || parameters[index].kind
+                        == TRANSPILE_FUNCTION_PARAMETER_INT_POINTER
+                    || parameters[index].kind
+                        == TRANSPILE_FUNCTION_PARAMETER_VOID_POINTER)
+                {
+                    if (std::snprintf(line, sizeof(line),
+                            "           SET %s TO %s.",
+                            parameters[index].cobol_name,
+                            source_parameter->cobol_name) < 0)
+                        return (FT_FAILURE);
+                }
+                else if (std::snprintf(line, sizeof(line),
+                        "           %s %s TO %s.",
+                        parameters[index].kind
+                            == TRANSPILE_FUNCTION_PARAMETER_DOUBLE
+                            ? "COMPUTE" : "MOVE",
+                        source_parameter->cobol_name,
+                        parameters[index].cobol_name) < 0)
+                    return (FT_FAILURE);
+                if (cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                index += 1;
+                continue ;
+            }
+        }
         if (parameters[index].kind == TRANSPILE_FUNCTION_PARAMETER_STRUCT)
         {
             const t_cblc_parameter *lexical_source_parameter;
@@ -990,12 +1129,28 @@ static int cblc_emit_parameter_argument_moves(const t_cblc_translation_unit *uni
              * class argument in the active constructor. */
             if (lexical_source_parameter)
             {
+                int copy_handled;
+
                 if (lexical_source_parameter->kind
                         != TRANSPILE_FUNCTION_PARAMETER_STRUCT
                     || std::strncmp(lexical_source_parameter->type_name,
                         parameters[index].type_name,
-                        sizeof(lexical_source_parameter->type_name)) != 0
-                    || std::snprintf(line, sizeof(line),
+                        sizeof(lexical_source_parameter->type_name)) != 0)
+                    return (FT_FAILURE);
+                copy_handled = 0;
+                if (!borrow_struct_arguments
+                    && cblc_emit_struct_copy_return(unit,
+                        parameters[index].cobol_name,
+                        parameters[index].type_name,
+                        lexical_source_parameter->cobol_name, NULL, builder,
+                        &copy_handled) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                if (copy_handled)
+                {
+                    index += 1;
+                    continue ;
+                }
+                if (std::snprintf(line, sizeof(line),
                         "           MOVE %s TO %s.",
                         lexical_source_parameter->cobol_name,
                         parameters[index].cobol_name) < 0)
@@ -1010,6 +1165,20 @@ static int cblc_emit_parameter_argument_moves(const t_cblc_translation_unit *uni
                 item = cblc_find_data_item_for_emit_by_source(unit, argument);
             if (item && item->kind == CBLC_DATA_KIND_STRUCT)
             {
+                int copy_handled;
+
+                copy_handled = 0;
+                if (!borrow_struct_arguments
+                    && cblc_emit_struct_copy_return(unit,
+                        parameters[index].cobol_name,
+                        parameters[index].type_name, item->cobol_name,
+                        NULL, builder, &copy_handled) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                if (copy_handled)
+                {
+                    index += 1;
+                    continue ;
+                }
                 if (std::snprintf(line, sizeof(line), "           MOVE %s TO %s.",
                         item->cobol_name, parameters[index].cobol_name) < 0)
                     return (FT_FAILURE);
@@ -1300,10 +1469,48 @@ static int cblc_emit_parameter_argument_moves(const t_cblc_translation_unit *uni
             const t_cblc_data_item *item;
 
             item = cblc_find_data_item_for_emit_by_source(unit, argument);
+            /* Substituted class-method bodies pass scope-qualified COBOL
+             * spellings for locals (for example a fixed char buffer). Those
+             * names are already canonical and must resolve through the COBOL
+             * namespace rather than the source-name lookup. */
+            if (!item)
+                item = cblc_find_data_item_by_cobol(unit, argument);
             if (item && cblc_data_kind_is_pointer(item->kind))
             {
                 if (std::snprintf(line, sizeof(line), "           SET %s TO %s.",
                         parameters[index].cobol_name, item->cobol_name) < 0)
+                    return (FT_FAILURE);
+            }
+            else if (parameters[index].kind
+                    == TRANSPILE_FUNCTION_PARAMETER_CHAR_POINTER
+                && item && item->kind == CBLC_DATA_KIND_CHAR
+                && item->length > 1)
+            {
+                if (std::snprintf(line, sizeof(line),
+                        "           SET %s TO ADDRESS OF %s.",
+                        parameters[index].cobol_name, item->cobol_name) < 0)
+                    return (FT_FAILURE);
+            }
+            else if (parameters[index].kind
+                    == TRANSPILE_FUNCTION_PARAMETER_CHAR_POINTER
+                && item && item->kind == CBLC_DATA_KIND_CHAR_BUFFER)
+            {
+                /* A fixed local `char buffer[N]` is represented by a COBOL
+                 * group containing its byte storage. Pass the address of that
+                 * storage, not the group (or its length field), to a char* ABI.
+                 * Dynamically-backed buffers already own a pointer slot. */
+                if (cblc_string_item_uses_dynamic_storage(item))
+                {
+                    if (std::snprintf(line, sizeof(line),
+                            "           SET %s TO %s-PTR.",
+                            parameters[index].cobol_name,
+                            item->cobol_name) < 0)
+                        return (FT_FAILURE);
+                }
+                else if (std::snprintf(line, sizeof(line),
+                            "           SET %s TO ADDRESS OF %s-BUF.",
+                            parameters[index].cobol_name,
+                            item->cobol_name) < 0)
                     return (FT_FAILURE);
             }
             else if (parameters[index].kind
@@ -1376,7 +1583,56 @@ static int cblc_emit_parameter_argument_moves(const t_cblc_translation_unit *uni
         {
             const char *expression_source = argument;
             const char *member_arrow = std::strstr(argument, "->");
+            const t_cblc_data_item *scalar_item = NULL;
             char canonical_member_expression[TRANSPILE_STATEMENT_TEXT_MAX];
+
+            if (parameters[index].kind == TRANSPILE_FUNCTION_PARAMETER_INT
+                || parameters[index].kind == TRANSPILE_FUNCTION_PARAMETER_DOUBLE)
+            {
+                scalar_item = cblc_find_data_item_const(unit, argument);
+                if (!scalar_item)
+                    scalar_item = cblc_find_data_item_for_emit_by_source(unit,
+                        argument);
+                if (scalar_item
+                    && ((parameters[index].kind
+                            == TRANSPILE_FUNCTION_PARAMETER_INT
+                            && scalar_item->kind == CBLC_DATA_KIND_INT)
+                        || (parameters[index].kind
+                            == TRANSPILE_FUNCTION_PARAMETER_DOUBLE
+                            && scalar_item->kind == CBLC_DATA_KIND_DOUBLE)))
+                {
+                    if (std::snprintf(line, sizeof(line),
+                            "           %s %s TO %s.",
+                            parameters[index].kind
+                                == TRANSPILE_FUNCTION_PARAMETER_DOUBLE
+                                ? "COMPUTE" : "MOVE",
+                            scalar_item->cobol_name,
+                            parameters[index].cobol_name) < 0
+                        || cobol_text_builder_append_line(builder, line)
+                            != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    index += 1;
+                    continue ;
+                }
+            }
+            else if (parameters[index].kind == TRANSPILE_FUNCTION_PARAMETER_CHAR)
+            {
+                scalar_item = cblc_find_data_item_const(unit, argument);
+                if (!scalar_item)
+                    scalar_item = cblc_find_data_item_for_emit_by_source(unit,
+                        argument);
+                if (scalar_item && scalar_item->kind == CBLC_DATA_KIND_CHAR)
+                {
+                    if (std::snprintf(line, sizeof(line),
+                            "           MOVE %s TO %s.", scalar_item->cobol_name,
+                            parameters[index].cobol_name) < 0
+                        || cobol_text_builder_append_line(builder, line)
+                            != FT_SUCCESS)
+                        return (FT_FAILURE);
+                    index += 1;
+                    continue ;
+                }
+            }
             if (member_arrow && source_parameters)
             {
                 char source_root[TRANSPILE_IDENTIFIER_MAX];

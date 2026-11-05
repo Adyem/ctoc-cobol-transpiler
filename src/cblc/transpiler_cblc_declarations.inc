@@ -122,6 +122,67 @@ static int cblc_parse_int_declaration(const char **cursor, t_cblc_translation_un
             is_const, is_const, initializer_text, 0));
 }
 
+static int cblc_parse_bool_declaration(const char **cursor,
+    t_cblc_translation_unit *unit, int is_const)
+{
+    const char *start;
+    char identifier[TRANSPILE_IDENTIFIER_MAX];
+    char initializer_text[8];
+    int boolean_value;
+    int has_initializer;
+
+    if (!cursor || !*cursor || !unit)
+        return (FT_FAILURE);
+    start = *cursor;
+    if (!cblc_match_keyword(cursor, "bool"))
+        return (FT_FAILURE);
+    cblc_skip_whitespace(cursor);
+    if (cblc_parse_identifier(cursor, identifier, sizeof(identifier)) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    cblc_skip_whitespace(cursor);
+    initializer_text[0] = '\0';
+    has_initializer = 0;
+    if (**cursor == '=')
+    {
+        *cursor += 1;
+        cblc_skip_whitespace(cursor);
+        if (cblc_parse_boolean_literal(cursor, &boolean_value) != FT_SUCCESS)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        if (std::snprintf(initializer_text, sizeof(initializer_text), "%d",
+                boolean_value) < 0)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        has_initializer = 1;
+        cblc_skip_whitespace(cursor);
+    }
+    else if (is_const)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    if (**cursor != ';')
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    *cursor += 1;
+    if (cblc_finalize_data_item(unit, identifier, 0, 0, CBLC_DATA_KIND_INT,
+            is_const, has_initializer, initializer_text, 0) != FT_SUCCESS)
+    {
+        *cursor = start;
+        return (FT_FAILURE);
+    }
+    return (FT_SUCCESS);
+}
+
 static int cblc_parse_string_literal(const char **cursor, char *buffer, size_t buffer_size)
 {
     size_t index;

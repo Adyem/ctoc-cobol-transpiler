@@ -38,6 +38,15 @@ class out_of_range
 {
     public:
     int code;
+    int requested;
+    int extent;
+
+    out_of_range()
+    {
+        code = 0;
+        requested = -1;
+        extent = -1;
+    }
 };
 
 class invalid_encoding

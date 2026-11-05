@@ -568,7 +568,7 @@ static int cblc_parse_method_pointer_field_assignment(const char **cursor,
                     &method->parameters[argument_index]))
                 goto fail;
         }
-        if (cblc_normalize_call_arguments(unit, arguments, argument_count,
+        if (cblc_normalize_call_arguments(unit, function, arguments, argument_count,
                 normalized_arguments, sizeof(normalized_arguments)) != FT_SUCCESS)
             goto fail;
         cblc_skip_whitespace(cursor);
@@ -751,7 +751,7 @@ static int cblc_parse_assignment(const char **cursor, t_cblc_translation_unit *u
             || !cblc_argument_matches_parameter(unit,
                 source_item->source_name,
                 &method->parameters[0])
-            || cblc_normalize_call_arguments(unit, call_arguments, 1,
+            || cblc_normalize_call_arguments(unit, function, call_arguments, 1,
                 normalized_call_arguments,
                 sizeof(normalized_call_arguments)) != FT_SUCCESS)
             return (FT_FAILURE);
@@ -1792,9 +1792,12 @@ static int cblc_parse_method_call(const char **cursor, t_cblc_translation_unit *
     const char *method_source_start;
     char call_arguments[TRANSPILE_STATEMENT_TEXT_MAX];
     char normalized_call_arguments[TRANSPILE_STATEMENT_TEXT_MAX];
+    char receiver_source_name[TRANSPILE_IDENTIFIER_MAX];
+    char receiver_cobol_name[TRANSPILE_IDENTIFIER_MAX];
     t_cblc_data_item *receiver_item;
     const t_cblc_struct_type *receiver_type;
     const t_cblc_method *method;
+    t_cblc_method method_snapshot;
     char method_name[TRANSPILE_IDENTIFIER_MAX];
     t_cblc_statement *statement;
     size_t argument_count;
@@ -1809,6 +1812,8 @@ static int cblc_parse_method_call(const char **cursor, t_cblc_translation_unit *
     normalized_call_arguments[0] = '\0';
     argument_count = 0;
     has_implicit_receiver = 0;
+    receiver_source_name[0] = '\0';
+    receiver_cobol_name[0] = '\0';
     if (cblc_parse_method_receiver(cursor, unit, &receiver_item, method_name,
             sizeof(method_name)) != FT_SUCCESS)
     {
@@ -1827,11 +1832,15 @@ static int cblc_parse_method_call(const char **cursor, t_cblc_translation_unit *
     }
     else
         receiver_type = cblc_find_receiver_type(unit, receiver_item);
+    ft_strlcpy(receiver_source_name, receiver_item->source_name,
+        sizeof(receiver_source_name));
+    ft_strlcpy(receiver_cobol_name, receiver_item->cobol_name,
+        sizeof(receiver_cobol_name));
     method_source_start = *cursor - std::strlen(method_name);
     chain_index = 0;
     while (1)
     {
-        if (!receiver_type)
+        if (receiver_source_name[0] == '\0')
         {
             *cursor = start;
             return (FT_FAILURE);
@@ -1851,6 +1860,22 @@ static int cblc_parse_method_call(const char **cursor, t_cblc_translation_unit *
             *cursor = start;
             return (FT_FAILURE);
         }
+        /* Parsing arguments may add locals and reallocate unit->data_items.
+         * Refresh the receiver pointer from its stable source identifier. */
+        receiver_item = cblc_find_data_item(unit, receiver_source_name);
+        if (!receiver_item)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
+        receiver_type = cblc_find_receiver_type(unit, receiver_item);
+        if (!receiver_type && has_implicit_receiver)
+            receiver_type = g_cblc_member_access_type;
+        if (!receiver_type)
+        {
+            *cursor = start;
+            return (FT_FAILURE);
+        }
         method = cblc_find_method_on_type_for_arguments(unit, receiver_type,
             method_name, call_arguments, argument_count);
         if (!method)
@@ -1858,6 +1883,10 @@ static int cblc_parse_method_call(const char **cursor, t_cblc_translation_unit *
             *cursor = start;
             return (FT_FAILURE);
         }
+        /* Argument validation can itself instantiate dependent types. Copy
+         * the selected overload before that work can move struct_types. */
+        method_snapshot = *method;
+        method = &method_snapshot;
         {
             size_t index;
             t_cblc_statement probe_statement;
@@ -1883,7 +1912,7 @@ static int cblc_parse_method_call(const char **cursor, t_cblc_translation_unit *
                 index += 1;
             }
         }
-        if (cblc_normalize_call_arguments(unit, call_arguments, argument_count,
+        if (cblc_normalize_call_arguments(unit, function, call_arguments, argument_count,
                 normalized_call_arguments, sizeof(normalized_call_arguments))
             != FT_SUCCESS)
         {
@@ -1897,7 +1926,6 @@ static int cblc_parse_method_call(const char **cursor, t_cblc_translation_unit *
             char base_source_name[TRANSPILE_IDENTIFIER_MAX];
             char generated_source_name[TRANSPILE_IDENTIFIER_MAX];
             char generated_cobol_name[TRANSPILE_IDENTIFIER_MAX];
-            char receiver_cobol_name[TRANSPILE_IDENTIFIER_MAX];
             const char *temporary_base_name;
 
             if (method->return_kind != CBLC_FUNCTION_RETURN_STRUCT_POINTER
@@ -1906,9 +1934,6 @@ static int cblc_parse_method_call(const char **cursor, t_cblc_translation_unit *
                 *cursor = start;
                 return (FT_FAILURE);
             }
-            ft_strlcpy(receiver_cobol_name,
-                has_implicit_receiver ? "CBLC-THIS" : receiver_item->cobol_name,
-                sizeof(receiver_cobol_name));
             temporary_base_name = "CBLC_CHAIN_VALUE";
             if (std::snprintf(base_source_name, sizeof(base_source_name),
                     "%s_%zu", temporary_base_name,
@@ -1954,6 +1979,10 @@ static int cblc_parse_method_call(const char **cursor, t_cblc_translation_unit *
                 *cursor = start;
                 return (FT_FAILURE);
             }
+            ft_strlcpy(receiver_source_name, receiver_item->source_name,
+                sizeof(receiver_source_name));
+            ft_strlcpy(receiver_cobol_name, receiver_item->cobol_name,
+                sizeof(receiver_cobol_name));
             has_implicit_receiver = 0;
             receiver_type = cblc_find_receiver_type(unit, receiver_item);
             *cursor += 2;
@@ -1974,7 +2003,7 @@ static int cblc_parse_method_call(const char **cursor, t_cblc_translation_unit *
         }
         *cursor += 1;
         if (cblc_append_statement(function, CBLC_STATEMENT_METHOD_CALL,
-                has_implicit_receiver ? "CBLC-THIS" : receiver_item->cobol_name,
+                receiver_cobol_name,
                 NULL, 0) != FT_SUCCESS)
         {
             *cursor = start;
@@ -2872,6 +2901,24 @@ static int cblc_parse_return(const char **cursor, t_cblc_translation_unit *unit,
     function->saw_return = 1;
     if (function->return_cobol_name[0] == '\0')
         return (FT_FAILURE);
+    /* A return expression must be evaluated before the parser-generated
+     * destructor statements for this scope. Stage scalar results in the
+     * function return slot, then let the ordinary RETURN statement transfer
+     * that already-materialized value after cleanup. */
+    if (function->local_destructor_count > 0
+        && (function->return_kind == CBLC_FUNCTION_RETURN_INT
+            || function->return_kind == CBLC_FUNCTION_RETURN_DOUBLE
+            || function->return_kind == CBLC_FUNCTION_RETURN_CHAR))
+    {
+        if (cblc_append_statement(function, CBLC_STATEMENT_ASSIGNMENT,
+                function->return_cobol_name, expression, 0) != FT_SUCCESS)
+            return (FT_FAILURE);
+        if (cblc_append_local_destructor_statements(function) != FT_SUCCESS)
+            return (FT_FAILURE);
+        return (cblc_append_statement(function, CBLC_STATEMENT_RETURN,
+            function->return_cobol_name,
+            function->return_cobol_name, 0));
+    }
     if (cblc_append_local_destructor_statements(function) != FT_SUCCESS)
         return (FT_FAILURE);
     if (cblc_append_statement(function, CBLC_STATEMENT_RETURN,

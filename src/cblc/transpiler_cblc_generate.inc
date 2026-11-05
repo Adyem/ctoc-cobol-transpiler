@@ -621,11 +621,7 @@ static int cblc_emit_reusable_method_paragraphs(const t_cblc_translation_unit *u
                 || (!cblc_method_is_called_for_receiver_in_functions(unit,
                         receiver, type, method)
                     && type_method_references.find(method)
-                        == type_method_references.end())
-                || ((!data_item->is_function_local
-                        && data_item->owner_function_name[0] != '\0')
-                    && !cblc_method_parameter_storage_uses_method(unit,
-                        data_item, method)))
+                        == type_method_references.end()))
             {
                 method_index += 1;
                 continue ;
@@ -729,6 +725,132 @@ static int cblc_emit_reusable_method_paragraphs(const t_cblc_translation_unit *u
         data_index += 1;
     }
     return (FT_SUCCESS);
+}
+
+static int cblc_emit_exception_payload_statement(
+    const t_cblc_translation_unit *unit, const t_cblc_statement *statement,
+    t_cobol_text_builder *builder,
+    std::unordered_set<std::string> *emitted_payloads)
+{
+    const t_cblc_struct_type *payload_type;
+    char declaration[TRANSPILE_IDENTIFIER_MAX + 32];
+    const char *payload_name;
+
+    if (!unit || !statement || !builder || !emitted_payloads)
+        return (FT_FAILURE);
+    if (!statement->exception_payload_is_struct)
+        return (FT_SUCCESS);
+    payload_name = statement->exception_payload_cobol_name;
+    if (!payload_name || payload_name[0] == '\0'
+        || !emitted_payloads->insert(payload_name).second)
+        return (payload_name && payload_name[0] != '\0'
+            ? FT_SUCCESS : FT_FAILURE);
+    payload_type = cblc_find_struct_type(unit,
+        statement->exception_payload_struct_type);
+    if (!payload_type
+        || std::snprintf(declaration, sizeof(declaration),
+            "       01 %s.", payload_name) < 0)
+        return (FT_FAILURE);
+    if (builder->data && std::strstr(builder->data, declaration))
+        return (FT_SUCCESS);
+    if (cobol_text_builder_append_line(builder, declaration) != FT_SUCCESS
+        || cblc_emit_struct_fields(unit, payload_type, payload_name, 5,
+            builder) != FT_SUCCESS)
+        return (FT_FAILURE);
+    return (FT_SUCCESS);
+}
+
+static int cblc_emit_exception_payload_declarations(
+    const t_cblc_translation_unit *unit, t_cobol_text_builder *builder)
+{
+    std::unordered_set<std::string> emitted_payloads;
+    size_t function_index;
+    size_t type_index;
+
+    if (!unit || !builder)
+        return (FT_FAILURE);
+    function_index = 0;
+    while (function_index < unit->function_count)
+    {
+        const t_cblc_function *function = &unit->functions[function_index];
+        size_t statement_index = 0;
+
+        while (statement_index < function->statement_count)
+        {
+            if (cblc_emit_exception_payload_statement(unit,
+                    &function->statements[statement_index], builder,
+                    &emitted_payloads) != FT_SUCCESS)
+                return (FT_FAILURE);
+            statement_index += 1;
+        }
+        function_index += 1;
+    }
+    type_index = 0;
+    while (type_index < unit->struct_type_count)
+    {
+        const t_cblc_struct_type *type = &unit->struct_types[type_index];
+        size_t method_index = 0;
+
+        while (method_index < type->method_count)
+        {
+            size_t statement_index = 0;
+
+            while (statement_index < type->methods[method_index].statement_count)
+            {
+                if (cblc_emit_exception_payload_statement(unit,
+                        &type->methods[method_index].statements[statement_index],
+                        builder, &emitted_payloads) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                statement_index += 1;
+            }
+            method_index += 1;
+        }
+        method_index = 0;
+        while (method_index < type->constructor_count)
+        {
+            size_t statement_index = 0;
+
+            while (statement_index
+                < type->constructors[method_index].statement_count)
+            {
+                if (cblc_emit_exception_payload_statement(unit,
+                        &type->constructors[method_index].statements[statement_index],
+                        builder, &emitted_payloads) != FT_SUCCESS)
+                    return (FT_FAILURE);
+                statement_index += 1;
+            }
+            method_index += 1;
+        }
+        method_index = 0;
+        while (method_index < type->destructor_statement_count)
+        {
+            if (cblc_emit_exception_payload_statement(unit,
+                    &type->destructor_statements[method_index], builder,
+                    &emitted_payloads) != FT_SUCCESS)
+                return (FT_FAILURE);
+            method_index += 1;
+        }
+        type_index += 1;
+    }
+    return (FT_SUCCESS);
+}
+
+static int cblc_builder_has_data_declaration(
+    const t_cobol_text_builder *builder, const char *name)
+{
+    char declaration[TRANSPILE_IDENTIFIER_MAX + 32];
+    int written;
+
+    if (!builder || !builder->data || !name || name[0] == '\0')
+        return (0);
+    written = std::snprintf(declaration, sizeof(declaration), "       01 %s.", name);
+    if (written < 0 || static_cast<size_t>(written) >= sizeof(declaration))
+        return (0);
+    if (std::strstr(builder->data, declaration) != NULL)
+        return (1);
+    written = std::snprintf(declaration, sizeof(declaration), "       01 %s ", name);
+    return (written >= 0 && static_cast<size_t>(written) < sizeof(declaration)
+        && std::strstr(builder->data, declaration) != NULL);
 }
 
 static int cblc_unit_uses_exceptions(const t_cblc_translation_unit *unit)
@@ -846,23 +968,6 @@ static int cblc_unit_uses_cleanup_guard(const t_cblc_translation_unit *unit)
         }
         function_index += 1;
     }
-    return (0);
-}
-
-static int cblc_struct_pointer_layout_seen(
-    std::unordered_set<std::string> *layout_keys,
-    const t_cblc_data_item *item)
-{
-    std::string key;
-
-    if (!layout_keys || !item)
-        return (0);
-    key.assign(item->cobol_name);
-    key.push_back('\x1f');
-    key.append(item->struct_type_name);
-    if (layout_keys->find(key) != layout_keys->end())
-        return (1);
-    layout_keys->insert(key);
     return (0);
 }
 
@@ -1061,9 +1166,10 @@ static int cblc_emit_nested_pointer_lifecycle_paragraphs(
                     constructor_index += 1;
                     continue ;
                 }
-                if (cblc_constructor_has_exception_control(constructor))
+                if (cblc_constructor_has_exception_control(constructor)
+                    || cblc_constructor_has_pointer_parameter(constructor))
                 {
-                    if (cblc_emit_constructor_exception_body(unit,
+                    if (cblc_emit_constructor_body(unit,
                             &based_receiver, constructor, constructor_index,
                             builder) != FT_SUCCESS)
                     {
@@ -1272,9 +1378,10 @@ static int cblc_emit_method_result_lifecycle_paragraphs(
                         "failed to name constructor lifecycle paragraphs for a method result");
                     return (FT_FAILURE);
                 }
-                if (cblc_constructor_has_exception_control(constructor))
+                if (cblc_constructor_has_exception_control(constructor)
+                    || cblc_constructor_has_pointer_parameter(constructor))
                 {
-                    if (cblc_emit_constructor_exception_body(unit,
+                    if (cblc_emit_constructor_body(unit,
                             &result_receiver, constructor, constructor_index,
                             builder) != FT_SUCCESS)
                     {
@@ -1373,7 +1480,9 @@ static int cblc_emit_method_result_lifecycle_paragraphs(
 
 static int cblc_lifecycle_storage_owner_is_referenced(
     const t_cblc_translation_unit *unit, const t_cblc_data_item *item,
-    std::unordered_map<std::string, int> *reachability_cache)
+    std::unordered_map<std::string, int> *reachability_cache,
+    std::unordered_map<const t_cblc_struct_type *,
+        std::unordered_set<const t_cblc_method *>> *template_method_cache)
 {
     size_t index;
 
@@ -1409,60 +1518,102 @@ static int cblc_lifecycle_storage_owner_is_referenced(
             if (std::strcmp(method->scope_source_name,
                     item->owner_function_name) == 0)
             {
-                size_t receiver_index;
-                t_cblc_data_item synthetic_receiver;
-
-                receiver_index = 0;
-                while (receiver_index < unit->data_count)
-                {
-                    const t_cblc_data_item *receiver =
-                        &unit->data_items[receiver_index];
-
-                    if ((receiver->kind == CBLC_DATA_KIND_STRUCT
-                            || receiver->kind == CBLC_DATA_KIND_STRUCT_POINTER)
-                        && std::strcmp(receiver->struct_type_name,
-                            owner_type->source_name) == 0)
-                    {
-                        if (owner_type->is_template_instantiation)
-                        {
-                            std::unordered_set<const t_cblc_method *> reachable_methods;
-
-                            cblc_collect_type_method_references(unit, receiver,
-                                owner_type, &reachable_methods);
-                            if (reachable_methods.find(method)
-                                != reachable_methods.end())
-                                return (cache_result(1));
-                        }
-                        else if (cblc_method_is_referenced_for_receiver(unit,
-                                receiver, owner_type, method))
-                            return (cache_result(1));
-                    }
-                    receiver_index += 1;
-                }
-                std::memset(&synthetic_receiver, 0, sizeof(synthetic_receiver));
-                synthetic_receiver.kind = CBLC_DATA_KIND_STRUCT;
-                ft_strlcpy(synthetic_receiver.source_name,
-                    owner_type->source_name,
-                    sizeof(synthetic_receiver.source_name));
-                ft_strlcpy(synthetic_receiver.cobol_name,
-                    owner_type->cobol_name,
-                    sizeof(synthetic_receiver.cobol_name));
-                ft_strlcpy(synthetic_receiver.struct_type_name,
-                    owner_type->source_name,
-                    sizeof(synthetic_receiver.struct_type_name));
                 if (owner_type->is_template_instantiation)
                 {
-                    std::unordered_set<const t_cblc_method *> reachable_methods;
+                    if (!template_method_cache)
+                        return (cache_result(0));
+                    auto type_references = template_method_cache->find(owner_type);
 
-                    cblc_collect_type_method_references(unit,
-                        &synthetic_receiver, owner_type, &reachable_methods);
-                    if (reachable_methods.find(method)
-                        != reachable_methods.end())
+                    if (type_references == template_method_cache->end())
+                    {
+                        std::unordered_set<const t_cblc_method *>
+                            reachable_methods;
+                        t_cblc_data_item synthetic_receiver;
+
+                        for (size_t candidate_index = 0;
+                            candidate_index < unit->data_count;
+                            ++candidate_index)
+                        {
+                            const t_cblc_data_item *candidate =
+                                &unit->data_items[candidate_index];
+                            std::unordered_set<const t_cblc_method *>
+                                candidate_references;
+
+                            if ((candidate->kind != CBLC_DATA_KIND_STRUCT
+                                    && candidate->kind
+                                        != CBLC_DATA_KIND_STRUCT_POINTER)
+                                || std::strcmp(candidate->struct_type_name,
+                                    owner_type->source_name) != 0)
+                                continue ;
+                            cblc_collect_type_method_references(unit,
+                                candidate, owner_type, &candidate_references);
+                            reachable_methods.insert(candidate_references.begin(),
+                                candidate_references.end());
+                        }
+                        std::memset(&synthetic_receiver, 0,
+                            sizeof(synthetic_receiver));
+                        synthetic_receiver.kind = CBLC_DATA_KIND_STRUCT;
+                        ft_strlcpy(synthetic_receiver.source_name,
+                            owner_type->source_name,
+                            sizeof(synthetic_receiver.source_name));
+                        ft_strlcpy(synthetic_receiver.cobol_name,
+                            owner_type->cobol_name,
+                            sizeof(synthetic_receiver.cobol_name));
+                        ft_strlcpy(synthetic_receiver.struct_type_name,
+                            owner_type->source_name,
+                            sizeof(synthetic_receiver.struct_type_name));
+                        std::unordered_set<const t_cblc_method *>
+                            synthetic_references;
+
+                        cblc_collect_type_method_references(unit,
+                            &synthetic_receiver, owner_type,
+                            &synthetic_references);
+                        reachable_methods.insert(synthetic_references.begin(),
+                            synthetic_references.end());
+                        type_references = template_method_cache->emplace(
+                            owner_type, std::move(reachable_methods)).first;
+                    }
+                    if (type_references->second.find(method)
+                        != type_references->second.end())
                         return (cache_result(1));
                 }
-                else if (cblc_method_is_referenced_for_receiver(unit,
-                        &synthetic_receiver, owner_type, method))
-                    return (cache_result(1));
+                else
+                {
+                    size_t receiver_index = 0;
+
+                    while (receiver_index < unit->data_count)
+                    {
+                        const t_cblc_data_item *receiver =
+                            &unit->data_items[receiver_index];
+
+                        if ((receiver->kind == CBLC_DATA_KIND_STRUCT
+                                || receiver->kind
+                                    == CBLC_DATA_KIND_STRUCT_POINTER)
+                            && std::strcmp(receiver->struct_type_name,
+                                owner_type->source_name) == 0
+                            && cblc_method_is_referenced_for_receiver(unit,
+                                receiver, owner_type, method))
+                            return (cache_result(1));
+                        receiver_index += 1;
+                    }
+                    t_cblc_data_item synthetic_receiver;
+
+                    std::memset(&synthetic_receiver, 0,
+                        sizeof(synthetic_receiver));
+                    synthetic_receiver.kind = CBLC_DATA_KIND_STRUCT;
+                    ft_strlcpy(synthetic_receiver.source_name,
+                        owner_type->source_name,
+                        sizeof(synthetic_receiver.source_name));
+                    ft_strlcpy(synthetic_receiver.cobol_name,
+                        owner_type->cobol_name,
+                        sizeof(synthetic_receiver.cobol_name));
+                    ft_strlcpy(synthetic_receiver.struct_type_name,
+                        owner_type->source_name,
+                        sizeof(synthetic_receiver.struct_type_name));
+                    if (cblc_method_is_referenced_for_receiver(unit,
+                            &synthetic_receiver, owner_type, method))
+                        return (cache_result(1));
+                }
                 /* Copy assignment can be selected by compiler-generated
                  * lifecycle dispatch without a source-level method-call edge.
                  * Preserve its storage, but do not retain every method in a
@@ -1491,6 +1642,8 @@ static int cblc_emit_reusable_lifecycle_paragraphs(const t_cblc_translation_unit
     size_t data_index;
     std::unordered_set<std::string> emitted_pointer_layouts;
     std::unordered_map<std::string, int> lifecycle_owner_reachability;
+    std::unordered_map<const t_cblc_struct_type *,
+        std::unordered_set<const t_cblc_method *>> template_method_references;
     const int trace_lifecycle = std::getenv("CTOC_TRACE_COBOL_EMIT") != NULL;
     std::chrono::steady_clock::time_point lifecycle_phase_started;
 
@@ -1506,10 +1659,14 @@ static int cblc_emit_reusable_lifecycle_paragraphs(const t_cblc_translation_unit
         size_t constructor_index;
 
         receiver = &unit->data_items[data_index];
-        if (receiver->is_alias || receiver->is_template_item
+        if ((receiver->is_alias
+                && !cblc_is_owned_method_parameter_storage(unit, receiver))
+            || receiver->is_template_item
             || receiver->kind != CBLC_DATA_KIND_STRUCT
-            || !cblc_lifecycle_storage_owner_is_referenced(unit, receiver,
-                &lifecycle_owner_reachability)
+            || (!cblc_is_owned_method_parameter_storage(unit, receiver)
+                && !cblc_lifecycle_storage_owner_is_referenced(unit, receiver,
+                    &lifecycle_owner_reachability,
+                    &template_method_references))
             || (!receiver->is_function_local && receiver->owner_function_name[0] != '\0'
                 && !cblc_find_method_parameter_storage_by_cobol(unit,
                     receiver->cobol_name)))
@@ -1561,9 +1718,10 @@ static int cblc_emit_reusable_lifecycle_paragraphs(const t_cblc_translation_unit
                 constructor_index += 1;
                 continue ;
             }
-            if (cblc_constructor_has_exception_control(constructor))
+            if (cblc_constructor_has_exception_control(constructor)
+                || cblc_constructor_has_pointer_parameter(constructor))
             {
-                if (cblc_emit_constructor_exception_body(unit, receiver, constructor,
+                if (cblc_emit_constructor_body(unit, receiver, constructor,
                         constructor_index, builder) != FT_SUCCESS)
                 {
                     char diagnostic[TRANSPILE_DIAGNOSTIC_MESSAGE_MAX];
@@ -1675,11 +1833,9 @@ static int cblc_emit_reusable_lifecycle_paragraphs(const t_cblc_translation_unit
         pointer_item = &unit->data_items[data_index];
         if (pointer_item->is_alias
             || !cblc_lifecycle_storage_owner_is_referenced(unit, pointer_item,
-                &lifecycle_owner_reachability)
+                &lifecycle_owner_reachability, &template_method_references)
             || std::strchr(pointer_item->cobol_name, '[')
             || pointer_item->kind != CBLC_DATA_KIND_STRUCT_POINTER
-            || cblc_struct_pointer_layout_seen(&emitted_pointer_layouts,
-                pointer_item)
             || cblc_build_struct_pointer_based_name(unit, pointer_item->cobol_name,
                 pointer_item->struct_type_name, based_name, sizeof(based_name))
                 != FT_SUCCESS)
@@ -1689,6 +1845,17 @@ static int cblc_emit_reusable_lifecycle_paragraphs(const t_cblc_translation_unit
         }
         type = cblc_find_struct_type(unit, pointer_item->struct_type_name);
         if (!type || type->is_builtin)
+        {
+            data_index += 1;
+            continue ;
+        }
+        /* Pointer-parameter BASED views exist only to keep a source pointer
+         * distinct from the current receiver. They do not own objects and do
+         * not need lifecycle paragraphs. Other views are deduplicated by
+         * their concrete BASED name, not merely by element type. */
+        if (std::strncmp(based_name, "CBLC-SPTR-P",
+                sizeof("CBLC-SPTR-P") - 1) == 0
+            || !emitted_pointer_layouts.insert(based_name).second)
         {
             data_index += 1;
             continue ;
@@ -1728,9 +1895,10 @@ static int cblc_emit_reusable_lifecycle_paragraphs(const t_cblc_translation_unit
                     constructor_index += 1;
                     continue ;
                 }
-                if (cblc_constructor_has_exception_control(constructor))
+                if (cblc_constructor_has_exception_control(constructor)
+                    || cblc_constructor_has_pointer_parameter(constructor))
                 {
-                    if (cblc_emit_constructor_exception_body(unit, &based_receiver,
+                    if (cblc_emit_constructor_body(unit, &based_receiver,
                             constructor, constructor_index, builder) != FT_SUCCESS)
                     {
                         if (builder->diagnostic_message[0] == '\0')
@@ -2008,9 +2176,10 @@ static int cblc_emit_deferred_lifecycle_constructor_paragraphs(
             t_cobol_text_builder_lifecycle_scope lifecycle_scope(builder, NULL,
                 constructor);
 
-            if (cblc_constructor_has_exception_control(constructor))
+            if (cblc_constructor_has_exception_control(constructor)
+                || cblc_constructor_has_pointer_parameter(constructor))
             {
-                if (cblc_emit_constructor_exception_body(unit,
+                if (cblc_emit_constructor_body(unit,
                         &request.receiver, constructor,
                         request.constructor_index, builder) != FT_SUCCESS)
                     return (FT_FAILURE);
@@ -2030,10 +2199,11 @@ static int cblc_emit_deferred_lifecycle_constructor_paragraphs(
                 statement_index = 0;
                 while (statement_index < constructor->statement_count)
                 {
-                    if (cblc_emit_substituted_statement_with_flow(unit, NULL,
-                            &constructor->statements[statement_index],
-                            request.receiver.cobol_name, builder,
-                            &control_flow_depth, &request.receiver)
+                    if (cblc_emit_pointer_lifecycle_body_statement(unit, type,
+                            request.receiver.cobol_name,
+                            &constructor->statements[statement_index], builder,
+                            &control_flow_depth, constructor->parameters,
+                            constructor->parameter_count)
                         != FT_SUCCESS)
                         return (FT_FAILURE);
                     statement_index += 1;
@@ -2060,6 +2230,7 @@ static int cblc_emit_reusable_method_results(const t_cblc_translation_unit *unit
 {
     size_t data_index;
     std::unordered_set<std::string> emitted_result_names;
+    std::unordered_set<std::string> emitted_receiver_return_names;
 
     if (!unit || !builder)
         return (FT_FAILURE);
@@ -2107,6 +2278,39 @@ static int cblc_emit_reusable_method_results(const t_cblc_translation_unit *unit
             {
                 method_index += 1;
                 continue ;
+            }
+            if (method->return_kind == CBLC_FUNCTION_RETURN_INT
+                || method->return_kind == CBLC_FUNCTION_RETURN_DOUBLE
+                || method->return_kind == CBLC_FUNCTION_RETURN_CHAR)
+            {
+                char receiver_return_name[TRANSPILE_IDENTIFIER_MAX];
+
+                if (std::snprintf(receiver_return_name,
+                        sizeof(receiver_return_name), "%s-RET",
+                        receiver->cobol_name) < 0
+                    || std::strlen(receiver_return_name)
+                        >= sizeof(receiver_return_name))
+                    return (FT_FAILURE);
+                if (emitted_receiver_return_names.insert(
+                        receiver_return_name).second)
+                {
+                    if (method->return_kind == CBLC_FUNCTION_RETURN_CHAR)
+                        std::snprintf(line, sizeof(line),
+                            "       01 %s PIC X VALUE SPACE.",
+                            receiver_return_name);
+                    else if (method->return_kind
+                            == CBLC_FUNCTION_RETURN_DOUBLE)
+                        std::snprintf(line, sizeof(line),
+                            "       01 %s PIC S9(18)V9(9) VALUE 0.",
+                            receiver_return_name);
+                    else
+                        std::snprintf(line, sizeof(line),
+                            "       01 %s PIC S9(9) VALUE 0.",
+                            receiver_return_name);
+                    if (cobol_text_builder_append_line(builder, line)
+                        != FT_SUCCESS)
+                        return (FT_FAILURE);
+                }
             }
             if (cblc_method_result_name(receiver, method, result_name,
                     sizeof(result_name)) != FT_SUCCESS)
@@ -2190,6 +2394,51 @@ static int cblc_emit_reusable_method_results(const t_cblc_translation_unit *unit
             method_index += 1;
         }
         data_index += 1;
+    }
+    /* A nested specialization may be used only as the element type of an
+     * enclosing vector, so it need not have a standalone STRUCT data item.
+     * Its reusable pointer-returning methods still share a return slot in
+     * COBOL. Declare those slots from the canonical concrete specialization
+     * graph as well as from concrete receiver variables above. */
+    for (size_t type_index = 0; type_index < unit->struct_type_count;
+        ++type_index)
+    {
+        const t_cblc_struct_type *type = &unit->struct_types[type_index];
+        t_cblc_data_item receiver;
+
+        if (!type->is_template_instantiation || type->is_builtin)
+            continue ;
+        std::memset(&receiver, 0, sizeof(receiver));
+        receiver.kind = CBLC_DATA_KIND_STRUCT;
+        ft_strlcpy(receiver.source_name, type->source_name,
+            sizeof(receiver.source_name));
+        ft_strlcpy(receiver.cobol_name, type->cobol_name,
+            sizeof(receiver.cobol_name));
+        ft_strlcpy(receiver.struct_type_name, type->source_name,
+            sizeof(receiver.struct_type_name));
+        for (size_t method_index = 0; method_index < type->method_count;
+            ++method_index)
+        {
+            const t_cblc_method *method = &type->methods[method_index];
+            char result_name[TRANSPILE_IDENTIFIER_MAX];
+            char line[256];
+
+            if (!cblc_method_is_reusable(method)
+                || (method->return_kind != CBLC_FUNCTION_RETURN_VOID_POINTER
+                    && method->return_kind != CBLC_FUNCTION_RETURN_CHAR_POINTER
+                    && method->return_kind != CBLC_FUNCTION_RETURN_INT_POINTER
+                    && method->return_kind != CBLC_FUNCTION_RETURN_STRUCT_POINTER))
+                continue ;
+            if (cblc_method_result_name(&receiver, method, result_name,
+                    sizeof(result_name)) != FT_SUCCESS)
+                return (FT_FAILURE);
+            if (!emitted_result_names.insert(result_name).second)
+                continue ;
+            if (std::snprintf(line, sizeof(line),
+                    "       01 %s USAGE POINTER VALUE NULL.", result_name) < 0
+                || cobol_text_builder_append_line(builder, line) != FT_SUCCESS)
+                return (FT_FAILURE);
+        }
     }
     return (FT_SUCCESS);
 }
@@ -2397,6 +2646,12 @@ static int cblc_emit_global_failure_unwind(
     if (cobol_text_builder_append_line(builder,
             "           DISPLAY \"Unhandled CBL-C exception\"") != FT_SUCCESS
         || cobol_text_builder_append_line(builder,
+            "           DISPLAY \"Exception type: \" CBLC-EX-TYPE-ID") != FT_SUCCESS
+        || cobol_text_builder_append_line(builder,
+            "           DISPLAY \"Exception source line: \" CBLC-EX-SOURCE-LINE") != FT_SUCCESS
+        || cobol_text_builder_append_line(builder,
+            "           DISPLAY \"Exception source column: \" CBLC-EX-SOURCE-COLUMN") != FT_SUCCESS
+        || cobol_text_builder_append_line(builder,
             "           PERFORM CBLC-EX-CLEAR-PAYLOAD") != FT_SUCCESS
         || cobol_text_builder_append_line(builder, "           STOP RUN.") != FT_SUCCESS
         || cobol_text_builder_append_line(builder, "") != FT_SUCCESS)
@@ -2412,6 +2667,7 @@ int cblc_generate_cobol_with_diagnostic(
     t_cobol_text_builder builder;
     std::unordered_set<std::string> emitted_pointer_layouts;
     std::unordered_set<std::string> emitted_method_paragraphs;
+    std::unordered_map<std::string, std::string> method_paragraph_return_targets;
     std::unordered_set<std::string> known_paragraph_definitions;
     char line[256];
     size_t index;
@@ -2460,6 +2716,8 @@ int cblc_generate_cobol_with_diagnostic(
         cblc::backend::control_flow_graph typed_cfg;
         cblc::backend::lifecycle_cleanup_plan cleanup_plan;
         cblc::backend::verification_diagnostic ir_diagnostic;
+        const std::chrono::steady_clock::time_point preflight_started =
+            std::chrono::steady_clock::now();
 
         if (!cblc::backend::lower_scalar_function(unit, index, &typed_function,
                 &ir_diagnostic))
@@ -2484,6 +2742,13 @@ int cblc_generate_cobol_with_diagnostic(
                 "CFG/lifecycle");
             return (FT_FAILURE);
         }
+        if (trace_cobol_emission)
+            std::fprintf(stderr,
+                "COBOL typed preflight function: name=%s elapsed=%.3f s\n",
+                unit->functions[index].source_name,
+                std::chrono::duration<double>(
+                    std::chrono::steady_clock::now()
+                    - preflight_started).count());
         index += 1;
     }
     {
@@ -2501,6 +2766,8 @@ int cblc_generate_cobol_with_diagnostic(
                 cblc::backend::control_flow_graph typed_cfg;
                 cblc::backend::lifecycle_cleanup_plan cleanup_plan;
                 cblc::backend::verification_diagnostic ir_diagnostic;
+                const std::chrono::steady_clock::time_point preflight_started =
+                    std::chrono::steady_clock::now();
 
                 if (!cblc::backend::lower_scalar_method(unit, type_index,
                         method_index, &typed_function, &ir_diagnostic))
@@ -2535,6 +2802,14 @@ int cblc_generate_cobol_with_diagnostic(
                             ir_diagnostic.message.c_str());
                     return (FT_FAILURE);
                 }
+                if (trace_cobol_emission)
+                    std::fprintf(stderr,
+                        "COBOL typed preflight method: type=%s method=%s elapsed=%.3f s\n",
+                        unit->struct_types[type_index].source_name,
+                        unit->struct_types[type_index].methods[method_index].source_name,
+                        std::chrono::duration<double>(
+                            std::chrono::steady_clock::now()
+                            - preflight_started).count());
                 method_index += 1;
             }
             type_index += 1;
@@ -2574,6 +2849,7 @@ int cblc_generate_cobol_with_diagnostic(
         && cblc_unit_uses_exceptions(unit);
     cobol_text_builder_init(&builder);
     builder.emitted_method_paragraphs = &emitted_method_paragraphs;
+    builder.method_paragraph_return_targets = &method_paragraph_return_targets;
     builder.known_paragraph_definitions = &known_paragraph_definitions;
     generation_phase = "program and working-storage declarations";
     builder.free_format = unit->is_native_standard_library ? 1 : 0;
@@ -2727,12 +3003,28 @@ int cblc_generate_cobol_with_diagnostic(
     index = 0;
     while (index < unit->data_count)
     {
-        if (unit->data_items[index].is_template_item)
+        if (unit->data_items[index].is_template_item
+            && !unit->data_items[index].is_function_local
+            && std::strncmp(unit->data_items[index].source_name,
+                "__cblc_exception_payload_",
+                sizeof("__cblc_exception_payload_") - 1) != 0)
         {
             index += 1;
             continue ;
         }
-        if (unit->data_items[index].is_alias || std::strchr(unit->data_items[index].source_name, '.')
+        if ((unit->data_items[index].is_function_local
+                || cblc_is_owned_method_parameter_storage(unit,
+                    &unit->data_items[index]))
+            && cblc_builder_has_data_declaration(&builder,
+                unit->data_items[index].cobol_name))
+        {
+            index += 1;
+            continue ;
+        }
+        if ((unit->data_items[index].is_alias
+                && !cblc_is_owned_method_parameter_storage(unit,
+                    &unit->data_items[index]))
+            || std::strchr(unit->data_items[index].source_name, '.')
             || std::strstr(unit->data_items[index].source_name, "->")
             || cblc_is_entry_parameter_item(unit, &unit->data_items[index])
             || cblc_is_entry_return_item(unit, &unit->data_items[index]))
@@ -2794,8 +3086,7 @@ int cblc_generate_cobol_with_diagnostic(
                         unit->data_items[index].array_count) < 0)
                     goto cleanup;
             }
-            else if (unit->data_items[index].is_const
-                && unit->data_items[index].has_initializer)
+            else if (unit->data_items[index].has_initializer)
             {
                 if (std::snprintf(line, sizeof(line), "       01 %s PIC S9(%zu)%s VALUE %s.",
                         unit->data_items[index].cobol_name,
@@ -2926,6 +3217,43 @@ int cblc_generate_cobol_with_diagnostic(
             if (std::snprintf(line, sizeof(line), "       01 %s USAGE POINTER VALUE NULL.",
                     unit->data_items[index].cobol_name) < 0)
                 goto cleanup;
+            if (cobol_text_builder_append_line(&builder, line) != FT_SUCCESS)
+                goto cleanup;
+            if ((unit->data_items[index].kind == CBLC_DATA_KIND_STRUCT_POINTER
+                    || unit->data_items[index].kind == CBLC_DATA_KIND_INT_POINTER
+                    || unit->data_items[index].kind == CBLC_DATA_KIND_CHAR_POINTER
+                    || unit->data_items[index].kind == CBLC_DATA_KIND_VOID_POINTER)
+                && std::strlen(unit->data_items[index].cobol_name) + 6 <= 55)
+            {
+                char index_name[TRANSPILE_IDENTIFIER_MAX];
+                int index_already_declared;
+                size_t candidate_index;
+
+                if (std::snprintf(index_name, sizeof(index_name), "%s-INDEX",
+                        unit->data_items[index].cobol_name) < 0)
+                    goto cleanup;
+                index_already_declared = 0;
+                for (candidate_index = 0; candidate_index < unit->data_count;
+                    ++candidate_index)
+                {
+                    if (std::strcmp(unit->data_items[candidate_index].cobol_name,
+                            index_name) == 0)
+                    {
+                        index_already_declared = 1;
+                        break ;
+                    }
+                }
+                if (!index_already_declared)
+                {
+                    if (std::snprintf(line, sizeof(line),
+                            "       01 %s PIC S9(9) VALUE 0.", index_name) < 0
+                        || cobol_text_builder_append_line(&builder, line)
+                            != FT_SUCCESS)
+                        goto cleanup;
+                }
+            }
+            index += 1;
+            continue ;
         }
         else
         {
@@ -2935,6 +3263,8 @@ int cblc_generate_cobol_with_diagnostic(
             goto cleanup;
         index += 1;
     }
+    if (cblc_emit_exception_payload_declarations(unit, &builder) != FT_SUCCESS)
+        goto cleanup;
     generation_phase = "reusable method result storage";
     if (cblc_emit_reusable_method_results(unit, &builder) != FT_SUCCESS)
     {
@@ -2947,10 +3277,25 @@ int cblc_generate_cobol_with_diagnostic(
                 "       01 CBLC-PTR-CURSOR USAGE POINTER VALUE NULL.") != FT_SUCCESS)
             goto cleanup;
         if (cobol_text_builder_append_line(&builder,
+                "       01 CBLC-PTR-SAVE-DEPTH PIC 9(4) COMP-5 VALUE 0.")
+            != FT_SUCCESS)
+            goto cleanup;
+        if (cobol_text_builder_append_line(&builder,
+                "       01 CBLC-PTR-CURSOR-SAVED-STACK.") != FT_SUCCESS)
+            goto cleanup;
+        if (cobol_text_builder_append_line(&builder,
+                "           05 CBLC-PTR-CURSOR-SAVED USAGE POINTER OCCURS 4096 TIMES VALUE NULL.")
+            != FT_SUCCESS)
+            goto cleanup;
+        if (cobol_text_builder_append_line(&builder,
                 "       01 CBLC-PTR-OFFSET PIC S9(9) VALUE 0.") != FT_SUCCESS)
             goto cleanup;
         if (cobol_text_builder_append_line(&builder,
                 "       01 CBLC-PTR-CHAR BASED PIC X.") != FT_SUCCESS)
+            goto cleanup;
+        if (cobol_text_builder_append_line(&builder,
+                "       01 CBLC-PTR-CHAR-TABLE BASED PIC X(999999999).")
+            != FT_SUCCESS)
             goto cleanup;
         if (cobol_text_builder_append_line(&builder,
                 "       01 CBLC-PTR-INT BASED PIC S9(9) COMP-5.") != FT_SUCCESS)
@@ -2970,16 +3315,40 @@ int cblc_generate_cobol_with_diagnostic(
         index = 0;
         while (index < unit->data_count)
         {
-            if (unit->data_items[index].kind == CBLC_DATA_KIND_STRUCT_POINTER
-                && !unit->data_items[index].is_template_item
+            if (unit->data_items[index].kind == CBLC_DATA_KIND_STRUCT
+                && !unit->data_items[index].is_alias)
+            {
+                const t_cblc_struct_type *type = cblc_find_struct_type(unit,
+                    unit->data_items[index].struct_type_name);
+
+                /* Ordinary object declarations can own nested pointer fields
+                 * too (for example vector<vector<String>>). Emit their
+                 * path-specific BASED views from the concrete object root;
+                 * previously this traversal only started at standalone
+                 * struct-pointer variables, leaving container element layouts
+                 * undeclared. */
+                if (type && !type->is_builtin
+                    && (!unit->data_items[index].is_template_item
+                        || type->is_template_instantiation)
+                    && cblc_emit_nested_pointer_layouts(unit, type,
+                        unit->data_items[index].cobol_name, 0, &builder)
+                        != FT_SUCCESS)
+                    goto cleanup;
+            }
+            else if (unit->data_items[index].kind == CBLC_DATA_KIND_STRUCT_POINTER
                 && !unit->data_items[index].is_alias
-                && !std::strchr(unit->data_items[index].cobol_name, '[')
-                && !cblc_struct_pointer_layout_seen(&emitted_pointer_layouts,
-                    &unit->data_items[index]))
+                && !std::strchr(unit->data_items[index].cobol_name, '['))
             {
                 char based_name[TRANSPILE_IDENTIFIER_MAX];
                 const t_cblc_struct_type *type;
 
+                type = cblc_find_struct_type(unit,
+                    unit->data_items[index].struct_type_name);
+                if (!type)
+                {
+                    index += 1;
+                    continue ;
+                }
                 if (cblc_build_struct_pointer_based_name(unit,
                         unit->data_items[index].cobol_name,
                         unit->data_items[index].struct_type_name,
@@ -2987,33 +3356,29 @@ int cblc_generate_cobol_with_diagnostic(
                 {
                     goto cleanup;
                 }
-                type = cblc_find_struct_type(unit, unit->data_items[index].struct_type_name);
-                if (!type)
+                if (!cblc_builder_has_based_data_declaration(&builder, based_name))
                 {
-                    goto cleanup;
+                    if (std::snprintf(line, sizeof(line), "       01 %s BASED.",
+                            based_name) < 0
+                        || cobol_text_builder_append_line(&builder, line) != FT_SUCCESS
+                        || cblc_emit_struct_fields(unit, type, based_name, 5,
+                            &builder) != FT_SUCCESS)
+                        goto cleanup;
                 }
-                if (std::snprintf(line, sizeof(line), "       01 %s BASED.",
-                        based_name) < 0)
-                    goto cleanup;
-                if (cobol_text_builder_append_line(&builder, line) != FT_SUCCESS)
-                {
-                    goto cleanup;
-                }
-                if (cblc_emit_struct_fields(unit, type, based_name, 5, &builder)
-                    != FT_SUCCESS)
-                {
-                    goto cleanup;
-                }
+                /* Shared template layouts do not remove the need to emit
+                 * path-specific nested pointer views required by generated
+                 * lifecycle paragraphs. */
                 if (cblc_emit_nested_pointer_layouts(unit, type,
-                        unit->data_items[index].cobol_name, 0, &builder)
+                        based_name, 0, &builder)
                     != FT_SUCCESS)
-                {
                     goto cleanup;
-                }
             }
             index += 1;
         }
     }
+    if (cblc_emit_constructor_pointer_parameter_layouts(unit, &builder)
+        != FT_SUCCESS)
+        goto cleanup;
     if (entry_function && cblc_is_external_entry_function(unit)
         && (entry_function->parameter_count > 0
             || entry_function->return_kind != CBLC_FUNCTION_RETURN_VOID
@@ -3444,6 +3809,7 @@ int cblc_generate_cobol_with_diagnostic(
         goto cleanup;
     if (cobol_text_builder_append_line(&builder, "") != FT_SUCCESS)
         goto cleanup;
+    cobol_text_builder_normalize_procedure_scope_periods(&builder);
     *out_text = builder.data;
     builder.data = NULL;
 cleanup:

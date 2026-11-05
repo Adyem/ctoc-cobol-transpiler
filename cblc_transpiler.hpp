@@ -912,6 +912,8 @@ typedef enum e_lexer_token_kind
     LEXER_TOKEN_KEYWORD_UNTIL,
     LEXER_TOKEN_KEYWORD_MOVE,
     LEXER_TOKEN_KEYWORD_COMPUTE,
+    LEXER_TOKEN_KEYWORD_ADD,
+    LEXER_TOKEN_KEYWORD_SUBTRACT,
     LEXER_TOKEN_KEYWORD_COPY,
     LEXER_TOKEN_KEYWORD_REPLACING,
     LEXER_TOKEN_KEYWORD_LEADING,
@@ -966,7 +968,8 @@ typedef enum e_lexer_token_kind
     LEXER_TOKEN_KEYWORD_SIZE,
     LEXER_TOKEN_KEYWORD_END_COMPUTE,
     LEXER_TOKEN_KEYWORD_END_CALL,
-    LEXER_TOKEN_KEYWORD_EXIT
+    LEXER_TOKEN_KEYWORD_EXIT,
+    LEXER_TOKEN_KEYWORD_CONTINUE
 }   t_lexer_token_kind;
 
 typedef enum e_lexer_trivia_kind
@@ -1027,6 +1030,8 @@ typedef enum e_ast_node_kind
     AST_NODE_MOVE_STATEMENT,
     AST_NODE_ASSIGNMENT_STATEMENT,
     AST_NODE_COMPUTE_STATEMENT,
+    AST_NODE_ADD_STATEMENT,
+    AST_NODE_SUBTRACT_STATEMENT,
     AST_NODE_IF_STATEMENT,
     AST_NODE_PERFORM_UNTIL_STATEMENT,
     AST_NODE_PERFORM_VARYING_STATEMENT,
@@ -1449,6 +1454,7 @@ typedef struct s_cblc_method
     size_t statement_capacity;
     int has_definition;
     int is_copy_assignment;
+    unsigned int template_value_parameter_cleanup_mask;
     char implementation_program_name[TRANSPILE_IDENTIFIER_MAX];
     size_t exception_type_count;
     size_t exception_type_ids[CBLC_EXCEPTION_THROW_SET_MAX];
@@ -1468,6 +1474,7 @@ typedef struct s_cblc_constructor
     int has_definition;
     int is_copy_constructor;
     int is_move_constructor;
+    unsigned int template_value_parameter_cleanup_mask;
     size_t exception_type_count;
     size_t exception_type_ids[CBLC_EXCEPTION_THROW_SET_MAX];
     int exception_types_unknown;
